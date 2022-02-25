@@ -50,11 +50,10 @@ func main() {
 		usersMap[kv[1]] = turn.GenerateAuthKey(kv[1], *realm, kv[2])
 	}
 
-	f := logging.NewDefaultLoggerFactory()
-	f.Writer = os.Stdout
-	f.DefaultLogLevel = logging.LogLevelWarn
+	logger := logging.NewDefaultLoggerFactory()
+	logger.DefaultLogLevel = logging.LogLevelWarn
 	if *verbose == true {
-		f.DefaultLogLevel = logging.LogLevelDebug
+		logger.ScopeLevels["turn"] = logging.LogLevelDebug
 	}
 	
 	s, err := turn.NewServer(turn.ServerConfig{
@@ -68,7 +67,7 @@ func main() {
 			}
 			return nil, false
 		},
-		LoggerFactory:  f,
+		LoggerFactory:  logger,
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
