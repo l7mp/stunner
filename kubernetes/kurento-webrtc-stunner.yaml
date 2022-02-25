@@ -83,10 +83,11 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        image: webrtc-server
+        image: l7mp/kurento-webrtc-server
         command: ["npm"]
         args: ["start", "--",  "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
-        imagePullPolicy: Never
+        # imagePullPolicy: Never
+        imagePullPolicy: Always
         ports:
         - containerPort: 8443
 
@@ -124,8 +125,9 @@ spec:
     spec:
       containers:
       - name: stunnerd
-        image: stunnerd:latest
-        imagePullPolicy: Never
+        image: l7mp/stunnerd:latest
+        # imagePullPolicy: Never
+        imagePullPolicy: Always
         command: ["stunnerd"]
         args: ["--users", "test=test", "--verbose" ]
         env:
@@ -157,3 +159,24 @@ spec:
   selector:
     app: stunner
 
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-egress-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kms
+    ports:
+    - protocol: UDP
+      port: 10000
+      endPort: 20000
