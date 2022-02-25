@@ -18,11 +18,12 @@ TODO
 
 ### Executing program
 
-Tunnel the local UDP client connection `127.0.0.1:5000` through the TURN server `34.116.207.28:3478` to
-the peer `10.76.128.7:53`:
+Tunnel the local UDP connection `127.0.0.1:5000` through the TURN server `192.0.2.1:3478` to the
+remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN credential with
+user/passwdL `test/test`:
 
 ``` shell
-go run main.go --client=127.0.0.1:5000 --server=34.116.207.28:3478 --peer=10.76.128.7:53 --user test=test --verbose
+go run main.go --client=127.0.0.1:5000 --server=192.0.2.1:3478 --peer=192.0.2.2:53 --user test=test --verbose
 ```
 
 ## Help
