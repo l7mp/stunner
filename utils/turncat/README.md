@@ -23,7 +23,7 @@ remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN cre
 user/passwdL `test/test`:
 
 ``` shell
-go run main.go --client=127.0.0.1:5000 --server=192.0.2.1:3478 --peer=192.0.2.2:53 --user test=test --verbose
+go run main.go --user test=test --log=all:INFO,turncat=DEBUG udp:127.0.0.1:5000 turn:192.0.2.1:3478 udp:192.0.2.2:53
 ```
 
 ## Help
