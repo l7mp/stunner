@@ -107,63 +107,12 @@ spec:
       protocol: TCP
       name: webrtc-server-port
 
-# TURN server
 ---
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: stunner
-spec:
-  selector:
-    matchLabels:
-      app: stunner
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: stunner
-    spec:
-      containers:
-      - name: stunnerd
-        image: l7mp/stunnerd:latest
-        # imagePullPolicy: Never
-        imagePullPolicy: Always
-        command: ["stunnerd"]
-        args: ["--users", "test=test", "--verbose" ]
-        env:
-        - name: PUBLIC_IP  # we use the POD IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-      - name: net-debug
-        image: retvari/net-debug:latest
-        command: ["/bin/sh"]
-        args: ["-c", "while true; do echo hello; sleep 10;done"]
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: stunner
-  labels:
-    app: stunner
-spec:
-  ports:
-    # - port: 3478
-    #   protocol: TCP
-    #   name: sidecar-stun-tcp
-    - port: 3478
-      protocol: UDP
-      name: stun-udp
-  type: LoadBalancer
-  selector:
-    app: stunner
-
----
+# lock down access from the TURN server only to kms
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: stunner-egress-network-policy
+  name: stunner-network-policy
   namespace: default
 spec:
   podSelector:
