@@ -1,0 +1,65 @@
+# TURN server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stunner
+spec:
+  selector:
+    matchLabels:
+      app: stunner
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: stunner
+    spec:
+      containers:
+      - name: stunnerd
+        image: l7mp/stunnerd:latest
+        # imagePullPolicy: Never
+        imagePullPolicy: Always
+        command: ["stunnerd"]
+        args: ["--user", "test=test", "-l all:INFO", "-p", "3478"]
+        env:
+        - name: SERVER_ADDR  # we use the POD IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+      - name: net-debug
+        image: retvari/net-debug:latest
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stunner
+  labels:
+    app: stunner
+spec:
+  ports:
+    # - port: 3478
+    #   protocol: TCP
+    #   name: sidecar-stun-tcp
+    - port: 3478
+      protocol: UDP
+      name: stun-udp
+  type: LoadBalancer
+  selector:
+    app: stunner
+
+---
+# lock down access from the TURN server to anywhere!
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
