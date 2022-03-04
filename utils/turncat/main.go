@@ -107,7 +107,7 @@ func reuseAddr(network, address string, conn syscall.RawConn) error {
 }
 
 ///////
-func NewLogger(levelSpec string) *logging.DefaultLoggerFactory{
+func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
 	logger := logging.NewDefaultLoggerFactory()
 	logger.ScopeLevels["turncat"] = logging.LogLevelError
 
@@ -467,13 +467,16 @@ func (t *Turncat) Run(p context.Context) {
 
 func main() {
 	var realm, level, user string
+	var verbose bool
 	usage := "turncat <-u|--user user1=pwd1> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] <udp:listener_addr:listener_port> <turn:server_addr:server_port> <udp:peer_addr:peer_port>"
-	flag.StringVar(&user,  "u",     "user=pass", "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&user,  "user",  "user=pass", "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&realm, "r",     "stunner.l7mp.io", "Realm (default: \"stunner.l7mp.io\")")
-	flag.StringVar(&realm, "realm", "stunner.l7mp.io", "Realm (defaults to \"stunner.l7mp.io\")")
-	flag.StringVar(&level, "l",     "all:ERROR", "Log level (default: all:ERROR)")
-	flag.StringVar(&level, "log",   "all:ERROR", "Log level (default: all:ERROR)")
+	flag.StringVar(&user,  "u",       "user=pass",       "A pair of username and password (default: \"user=pass\")")
+	flag.StringVar(&user,  "user",    "user=pass",       "A pair of username and password (default: \"user=pass\")")
+	flag.StringVar(&realm, "r",       "stunner.l7mp.io", "Realm (default: \"stunner.l7mp.io\")")
+	flag.StringVar(&realm, "realm",   "stunner.l7mp.io", "Realm (defaults to \"stunner.l7mp.io\")")
+	flag.StringVar(&level, "l",       "all:ERROR",       "Log level (default: all:ERROR)")
+	flag.StringVar(&level, "log",     "all:ERROR",       "Log level (default: all:ERROR)")
+	flag.BoolVar(&verbose, "v",       false,             "Verbose logging, identical to -l all:DEBUG")
+	flag.BoolVar(&verbose, "verbose", false,             "Verbose logging, identical to -l all:DEBUG")
 	flag.Parse()
 
 	if len(user) == 0 || flag.NArg() != 3 {
@@ -482,7 +485,10 @@ func main() {
 	}
 	cred := strings.SplitN(user, "=", 2)
 
-	logger := NewLogger(level)
+	if verbose {
+		level = "all:DEBUG"
+	}
+	logger := newLogger(level)
 	
 	cfg := &TurncatConfig{
 		ListenAddr:    flag.Arg(0),
