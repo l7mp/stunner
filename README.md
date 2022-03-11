@@ -109,4 +109,5 @@ MIT License - see [LICENSE](LICENSE) for full text
 
 ## Acknowledgments
 
-* Initial code adopted from [pion/stun](https://github.com/pion/turn). 
+Initial code adopted from [pion/stun](https://github.com/pion/stun) and
+[pion/turn](https://github.com/pion/turn).
