@@ -31,8 +31,8 @@ allows to run your media server pool in ordinary Kubernetes containers/pods and 
 Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot your WebRTC
 infrastructure like any other cloud-bound workload. Once exposed over a Kubernetes `LoadBalancer`
 service, STUNner presents a standard pubic-facing STUN/TURN access point that WebRTC clients can
-ask for a TURN transport relay connection to the media server and everything just works as
-expected.
+ask for a TURN transport relay connection to a media server that runs containerized _inside_ the
+                 Kubernetes cluster, and everything should just work as expected.
 
 Don't worry about the performance implications of processing your media over a TURN server: STUNner
 is written entirely in [Go](https://go.dev) so it is extremely fast, it is co-located with your
