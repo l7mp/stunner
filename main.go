@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net"
 	"fmt"
+	"strconv"
 	"os"
 	"strings"
 	"os/signal"
@@ -36,7 +37,7 @@ func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
 		if found == false {
 			continue
 		}
-		
+
 		if strings.ToLower(scope) == "all" {
 			logger.DefaultLogLevel = l
 			logger.ScopeLevels["turncat"] = l
@@ -48,63 +49,83 @@ func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
 	return logger
 }
 
-func main() {
-	var realm, level, user string
-	var verbose bool
-	var port int
-	usage := "stunner <-u|--user user1=pwd1> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] -p|--port server_port [server_addr]"
-	flag.IntVar(&port,     "p",       3478,              "Port (default: 3478)")
-	flag.IntVar(&port,     "port",    3478,              "Port (default: 3478)")
-	flag.StringVar(&user,  "u",       "user=pass",       "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&user,  "user",    "user=pass",       "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&realm, "r",       "stunner.l7mp.io", "Realm (default: \"stunner.l7mp.io\")")
-	flag.StringVar(&realm, "realm",   "stunner.l7mp.io", "Realm (defaults to \"stunner.l7mp.io\")")
-	flag.StringVar(&level, "l",       "all:ERROR",       "Log level (default: all:ERROR)")
-	flag.StringVar(&level, "log",     "all:ERROR",       "Log level (default: all:ERROR)")
-	flag.BoolVar(&verbose, "v",       false,             "Verbose logging, identical to -l all:DEBUG")
-	flag.BoolVar(&verbose, "verbose", false,             "Verbose logging, identical to -l all:DEBUG")
-	flag.Parse()
+func envDefault(env, def string) string {
+	e, ok := os.LookupEnv(env)
+	if ok { return e } else { return def }
+}
 
-	if len(user) == 0 {
-		fmt.Println(usage)
+func envDefaultUint(env string, def int) uint16 {
+	r, err := strconv.ParseUint(envDefault(env, fmt.Sprintf("%d", def)), 10, 16)
+	if err != nil {
+		fmt.Printf("Invalid integer value in %s: %d\n", env, def)
 		os.Exit(1)
 	}
+	return uint16(r)
+}
 
-	server := os.Getenv("SERVER_ADDR")
-	if len(server) == 0 {
-		if flag.NArg() == 1 {
-			server = flag.Arg(0)
-		} else {
-			server = "0.0.0.0"
-		}
-	}
-	
+////////////////////
+func main() {
+	usage := "stunner <-u|--user user1=pwd1> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] addr:port"
+
+	// can be overriden on the command line
+	dRealm    := envDefault("STUNNER_REALM",    "stunner.l7mp.io")
+	dServer   := envDefault("STUNNER_ADDR",     "127.0.0.1")
+	dPort 	  := envDefaultUint("STUNNER_PORT",  3478)
+	dUser     := envDefault("STUNNER_USERNAME", "user")
+	dPasswd	  := envDefault("STUNNER_PASSWORD", "pass")
+	dLoglevel := envDefault("STUNNER_LOGLEVEL", "all:ERROR")
+	var verbose bool
+
+	// comes from ENV
+	minPort := envDefaultUint("STUNNER_MIN_PORT", 10000)
+	maxPort := envDefaultUint("STUNNER_MAX_PORT", 20000) 
+
+	var realm, users, level string
+	flag.StringVar(&realm, "r",       dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
+	flag.StringVar(&realm, "realm",   dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
+	flag.StringVar(&users, "u",       dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
+	flag.StringVar(&users, "user",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
+	flag.StringVar(&level, "l",       dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
+	flag.StringVar(&level, "log",     dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
+	flag.BoolVar(&verbose, "v",       false,                 "Verbose logging, identical to -l all:DEBUG")
+	flag.BoolVar(&verbose, "verbose", false,                 "Verbose logging, identical to -l all:DEBUG")
+	flag.Parse()
+
 	if verbose {
 		level = "all:DEBUG"
 	}
 	logger := newLogger(level)
 	log := logger.NewLogger("stunner")
 
+	serverAddr := fmt.Sprintf("%s:%d", dServer, dPort);
+	if flag.NArg() == 1 { serverAddr = flag.Arg(0) }
+	serverIP, _, errSplit := net.SplitHostPort(serverAddr)
+	if errSplit != nil {
+		fmt.Println(usage)
+		log.Errorf("invalid server address %s: %s", serverAddr)
+		os.Exit(1)
+	}
+
 	// Create a UDP listener to pass into pion/turn
 	// pion/turn itself doesn't allocate any UDP sockets, but lets the user pass them in
 	// this allows us to add logging, storage or modify inbound/outbound traffic
-	serverAddr := fmt.Sprintf("%s:%d", server, port);
 	udpListener, err := net.ListenPacket("udp", serverAddr)
 	if err != nil {
+		fmt.Println(usage)
 		log.Errorf("failed to create TURN server listener at %s: %s", serverAddr, err)
 		os.Exit(1)
 	}
 	defer udpListener.Close()
-	
+
 	log.Infof("Stunner starting at %s, realm='%s'", serverAddr, realm)
 
 	// Cache -users flag for easy lookup later
 	// If passwords are stored they should be saved to your DB hashed using turn.GenerateAuthKey
 	usersMap := map[string][]byte{}
-	for _, kv := range regexp.MustCompile(`(\w+)=(\w+)`).FindAllStringSubmatch(user, -1) {
+	for _, kv := range regexp.MustCompile(`(\w+)=(\w+)`).FindAllStringSubmatch(users, -1) {
 		usersMap[kv[1]] = turn.GenerateAuthKey(kv[1], realm, kv[2])
 	}
-
+	
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm: realm,
 		// Set AuthHandler callback
@@ -121,9 +142,11 @@ func main() {
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
 				PacketConn: udpListener,
-				RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{
-					RelayAddress: net.ParseIP(server), // Claim that we are listening on server_addr
-					Address:      "0.0.0.0",           // But actually be listening on every interface
+				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
+					RelayAddress: net.ParseIP(serverIP), // Claim that we are listening on server_addr
+					Address:      "0.0.0.0",               // But actually be listening on every interface
+					MinPort:      minPort,
+					MaxPort:      maxPort,
 				},
 			},
 		},
@@ -133,7 +156,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer s.Close()
-	
+
 	// Block until user sends SIGINT or SIGTERM
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
