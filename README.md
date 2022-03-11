@@ -1,5 +1,7 @@
 # STUNner: A Kubernetes ingress gateway for WebRTC
 
+WORK IN PROGRESS
+
 STUNner is a cloud-native STUN/TURN server designed specifically for hosting scalable WebRTC
 services over Kubernetes.
 
@@ -29,8 +31,8 @@ allows to run your media server pool in ordinary Kubernetes containers/pods and 
 Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot your WebRTC
 infrastructure like any other cloud-bound workload. Once exposed over a Kubernetes `LoadBalancer`
 service, STUNner presents a standard pubic-facing STUN/TURN access point that WebRTC clients can
-ask for a TURN transport relay connection to the media server and send media traffic, and
-everything just works as expected. 
+ask for a TURN transport relay connection to the media server and everything just works as
+expected.
 
 Don't worry about the performance implications of processing your media over a TURN server: STUNner
 is written entirely in [Go](https://go.dev) so it is extremely fast, it is co-located with your
@@ -41,26 +43,30 @@ Kubernetes service.
 ## Features
 
 You may wonder why not using a standard [STUN/TURN server](https://github.com/coturn/coturn)
-instead of STUNner. In fact, nothing stops you from deploying any standard STUN/TURN server in a
-similar setup as we deploy STUNner. However, STUNner comes with a set of unique features that make
-it seamlessly fit into the Kubernetes ecosystem.
+instead of STUNner. In fact, nothing stops you from doing that; however, STUNner comes with a set
+of unique features that allow it to seamlessly fit into the Kubernetes ecosystem.
 
 * **Expose a Kubernetes WebRTC media server on a single external UDP port.** No more Kubernetes
   [antipatterns](https://kubernetes.io/docs/concepts/configuration/overview) just to run your
   WebRTC media plane! Secure perimeter defense for the WebRTC cluster: only 2 public facing ports
-  for a typical WebRTC setup
+  for a typical WebRTC setup.
 
 * **Full Kubernetes integration.** The Web runs on TCP/HTTP and Kubernetes has been designed and
-  optimized for Web workload. This makes WebRTC, and especially RTP/UDP media, a foreign citizen in
-  the cloud-native world. The aim of STUNner is to change this state-of-the-art. STUNner comes with
-  a full-blown Kubernetes integration, which allows you to, among others, deploy it into any
-  Kubernetes cluster (even into restricted ones like GKE Autopilot) using a single command or store
-  your secrets in a Kubernetes vault.
+  optimized for the typical Web workload. This makes streaming workloads, and especially RTP/UDP
+  based WebRTC media, a foreign citizen in the cloud-native world. The aim of STUNner is to change
+  this state-of-the-art. STUNner comes with a full-blown Kubernetes integration, which allows you
+  to, among others, deploy it into any Kubernetes cluster (even into restricted ones like GKE
+  Autopilot) using a single command or store your secrets in a Kubernetes vault.
+
+* **Complete browser and WebRTC tooling compatibility.** Under thr hood, STUNner is a standard
+  STUN/TURN server so any WebRTC clients and servers should be able to use it without
+  problems. STUNner comes with a Kurento based demo that allows you to see it in action.
 
 * **Scale your WebRTC like any other cloud-native workload.**
 
 * **Service mesh integration.** Manage your HTTP/HTTPS application servers with your favorite
-  service mesh (like Istio), STUNner will take care of the UDP/RTP based media.
+  service mesh (like [Istio](https://istio.io)), STUNner will take care of the UDP/RTP based
+  media.
   
 * **Simple code and extremely small size.** Written in pure Go using the fantastic battle-tested
   [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundreds of
@@ -79,9 +85,9 @@ it seamlessly fit into the Kubernetes ecosystem.
 
 ## Testing
 
-```
-go run main.go --public-ip 127.0.0.1 --users test=test
-```
+### Local tests
+
+### Kurento Web Conferencing
 
 ## Architecture
 
