@@ -9,7 +9,7 @@ metadata:
 data:
 # STUNNER_ADDR: The external IP configured by the load-balancer for the Stunner service (overridden
 # to POD IP in the stunner pod)
-  STUNNER_ADDR: "34.118.22.69"
+  STUNNER_PUBLIC_ADDR: "34.118.22.69"
 # STUNNER_REALM: Credential realm, default "stunner.l7mp.io"
   STUNNER_REALM: "stunner.l7mp.io"
 # STUNNER_PORT: Server port, default: 3478
