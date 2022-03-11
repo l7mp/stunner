@@ -1,4 +1,31 @@
-# TURN server
+# Stunner: An ingress gateway for WebRTC
+---
+# TURN server config: make sure to customize the below environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunner-config
+  namespace: default
+data:
+# STUNNER_ADDR: The external IP configured by the load-balancer for the Stunner service (overridden
+# to POD IP in the stunner pod)
+  STUNNER_ADDR: "34.118.22.69"
+# STUNNER_REALM: Credential realm, default "stunner.l7mp.io"
+  STUNNER_REALM: "stunner.l7mp.io"
+# STUNNER_PORT: Server port, default: 3478
+  STUNNER_PORT: "3478"
+# STUNNER_USERNAME: User name, default: "user"
+  STUNNER_USERNAME: user
+# STUNNER_PASSWORD: Password, default: "pass"
+  STUNNER_PASSWORD: pass
+# STUNNER_LOGLEVEL: Log level, default: "all:WARN"
+#  STUNNER_LOGLEVEL: "all:WARN"
+  STUNNER_LOGLEVEL: "all:INFO"
+# STUNNER_MIN_PORT: lowest relay transport port, default: 10000
+  STUNNER_MIN_PORT: "10000"
+# STUNNER_MAX_PORT: lowest relay transport port, default: 20000
+  STUNNER_MAX_PORT: "20000"
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -20,9 +47,13 @@ spec:
         # imagePullPolicy: Never
         imagePullPolicy: Always
         command: ["stunnerd"]
-        args: ["--user", "test=test", "-l all:INFO", "-p", "3478"]
+        # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
+        args: []
+        envFrom:
+          - configMapRef:
+              name: stunner-config
         env:
-        - name: SERVER_ADDR  # we use the POD IP
+        - name: STUNNER_ADDR  # we use the POD IP
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
@@ -41,9 +72,11 @@ metadata:
 spec:
   ports:
     # - port: 3478
+    #   targetPort: 3478
     #   protocol: TCP
     #   name: sidecar-stun-tcp
     - port: 3478
+      targetPort: 3478
       protocol: UDP
       name: stun-udp
   type: LoadBalancer
