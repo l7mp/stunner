@@ -48,38 +48,33 @@ You may wonder why not using a well-known [STUN/TURN server](https://github.com/
 instead of STUNner. Nothing stops you from doing that; however, STUNner comes with a set of unique
 features that allow it to seamlessly fit into the Kubernetes ecosystem.
 
-* **Seamless integration with Kubernetes.** STUNner can be deployed into any Kubernetes cluste,
+* **Seamless integration with Kubernetes.** STUNner can be deployed into any Kubernetes cluster,
   even into restricted ones like GKE Autopilot, using a single command. Manage your HTTP/HTTPS
   application servers with your favorite [service mesh](https://istio.io), and STUNner will take
-  care of all UDP/RTP based media. 
+  care of all UDP/RTP based media.
   
 * **Expose a WebRTC media server on a single external UDP port.** No more Kubernetes
   [anti-patterns](https://kubernetes.io/docs/concepts/configuration/overview) just to deploy your
   WebRTC media plane into the cloud! Using STUNner a typical WebRTC deployment needs only two
-  public-facing ports, one HTTPS port for the application server and a UDP port one for *all* your
-  media.
+  public-facing ports, one HTTPS port for the application server and a *single* UDP port one for
+  *all* your media.
 
-* **Complete browser and WebRTC tooling compatibility.** STUNner exposes a standard STUN/TURN
-  server to browsers, so any WebRTC client and server should be able to use it without
-  problems. The repository comes with a Kurento based demo that shows STUNner in action.
-
-* **Scale your WebRTC like any other cloud-native workload.** Tired of manually provisioning your
-  WebRTC media servers? Can't get sufficient audio/voice quality because public TURN servers are a
-  bottleneck? STUNner can be scaled up with a single `kubectl scale` command and, since STUNner
-  lets you deploy your media servers into a standard Kubernetes `Deployment`, the same applies to
-  the media plane!
+* **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
+  servers? Can't get sufficient audio/voice quality because public TURN servers are a bottleneck?
+  STUNner can be scaled up with a single `kubectl scale` command and, since STUNner lets you deploy
+  your media servers into a standard Kubernetes `Deployment`, the same applies to the entire media
+  plane!
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server;
-  with STUNner all media is received through a single ingress port. STUNner's Kubernetes
-  integration allows to store STUN/TURN credentials and DTLS keys in secure Kubernetes vaults, use
-  standard Kubernetes ACLs (`NetworkPolicy`) to lock down network access between your application
-  servers and the media plane, and take advantage of the Kubernetes based zero-trust networking and
-  micro-segmentation frameworks to secure your WebRTC service.
+  with STUNner all media is received through a single ingress port. STUNner stores all STUN/TURN
+  credentials and DTLS keys in secure Kubernetes vaults, and uses standard Kubernetes ACLs
+  (`NetworkPolicy`) to lock down network access between your application servers and the media
+  plane.
 
 * **Simple code and extremely small size.** Written in pure Go using the battle-tested
-  [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundreds of
-  fully open-source code. STUNner is extremely lightweight, the typical STUNner container is only
-  2.5 Mbytes.
+  [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundred
+  lines of fully open-source code. STUNner is extremely lightweight, the typical STUNner container
+  is only 2.5 Mbytes.
 
 <!-- * **Dynamic long-term credentials (planned).**  -->
 
