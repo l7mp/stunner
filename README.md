@@ -177,29 +177,33 @@ Wait until Kubernetes assigns a valid external IP to STUNner.
 $ until [ -n "$(kubectl get svc -n default stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
 
-If this hangs for minutes, then your load-balancer integration is not working. Otherwise, query the
-public IP address and port from Kubernetes.
+If this hangs for minutes, then your load-balancer integration is not working. If using
+[Minikube](https://github.com/kubernetes/minikube), make sure `minikube tunnel` is
+[running](https://minikube.sigs.k8s.io/docs/handbook/accessing). 
+
+Next, query the public IP address and port used by STUNner from Kubernetes.
 
 ```console
 $ export STUNNER_PUBLIC_ADDR=$(kubectl get service stunner -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 $ export STUNNER_PORT=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PORT}')
 ```
 
-From this point, your STUNner service is exposed to your clients on the IP address
-`$STUNNER_PUBLIC_ADDR` and UDP port `$STUNNER_PUBLIC_ADDR`. 
+From this point, your STUNner service is exposed on the IP address `$STUNNER_PUBLIC_ADDR` and UDP
+port `$STUNNER_PUBLIC_ADDR`.
 
 In order to have all STUNner configuration available in the Kubernetes cluster, it is worth storing
-back the public IP address into STUNner's configuration (available in a `ConfigMap`).
+back the public IP address into STUNner's internal configuration (available in a `ConfigMap`).
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
   -p "{\"data\":{\"STUNNER_PUBLIC_ADDR\":\"${STUNNER_PUBLIC_ADDR}\"}}"
 ```
 
-### Configuring a WebRTC client to reach STUNner
+### Configuring WebRTC clients to reach STUNner
 
-Here is a simple way to direct your webRTC clients to use STUNner; make sure to substitute the
-placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration from the above.
+Here is a simple JavaScript snippet to direct your webRTC clients to use STUNner; make sure to
+substitute the placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration from
+the above.
 
 ```js
 var ICE_config = {
@@ -224,7 +228,7 @@ inside the cluster; for more info, see the `turncat` [documentation](utils/turnc
 For a quick verification that STUNner is up and running, we shall use `turncat` to reach the
 Kubernetes DNS service.
 
-First, we store the STUN/TURN credentials for later use.
+First, store the STUN/TURN credentials for later use.
 
 ```console
 $ export STUNNER_REALM=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_REALM}')
@@ -233,24 +237,26 @@ $ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -n default -o jsonpath
 $ export KUBE_DNS_IP=$(kubectl get svc kube-dns -n kube-system -o jsonpath='{.spec.clusterIP}')
 ```
 Then fire up `turncat` locally; this will open a UDP server port on `localhost:5000` and forward
-all received packets to the `kube-dns` service.
+all received packets to the `kube-dns` service through STUNner.
 
 ```console
 $ go run main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
   --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PORT} udp:${KUBE_DNS_IP}:53
 ```
 
-Now, in another terminal try to query the Kubernetes DNS service for the internal IP address
-allocated for STUNner:
+Now, in another terminal try to query the Kubernetes DNS service for the internal service address
+allocated by Kubernetes for STUNner:
 
 ```console
-$ dig +short  @127.0.0.1 -p 5000  stunner.default.svc.cluster.local
+$ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
 ```
 
-If all goes well, this should hang until `dig` times out. The reason is that, by default, *all*
-communication from STUNner is prohibited to minimize the exposure of your sensitive internal
-services to the external world. For testing purposes, we can temporarily open up the Kubernetes ACL
-to allow access from STUNner to the Kube DNS service as follows.
+If all goes well, this should hang until `dig` times out. The reason is that the default
+installation scripts block *all* communication from STUNner to the rest of the workload. This is to
+minimize the exposure of your sensitive internal services to the external world. For testing
+purposes, we can temporarily open up the Kubernetes access control rules to allow access from
+STUNner to the Kube DNS service as follows (see the [security notice](#access-control) on
+configuring STUNner ACLs).
 
 ```console
 $ kubectl apply -f - <<EOF
