@@ -65,15 +65,15 @@ features that allow it to seamlessly fit into the Kubernetes ecosystem.
 
 * **Expose a WebRTC media server on a single external UDP port.** No more Kubernetes
   [anti-patterns](https://kubernetes.io/docs/concepts/configuration/overview) just to virtualize
-  your WebRTC media plane! Using STUNner a typical WebRTC deployment needs only two public-facing
-  ports, one HTTPS port for the application server and a *single* UDP port one for *all* your
-  media.
+  your WebRTC media plane, No need for privileged pods and `hostNetwork`/`hostPort` services!
+  Using STUNner a typical WebRTC deployment needs only two public-facing ports, one HTTPS port for
+  the application server and a *single* UDP port one for *all* your media.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
   servers? Can't get sufficient audio/voice quality because public TURN servers pose a bottleneck?
   STUNner can be scaled up with a single `kubectl scale` command and, since now you can deploy your
-  media servers into a standard Kubernetes `Deployment` behind STUNner, the same applies to the
-  entire media plane!
+  media servers into a ordinary Kubernetes pods behind STUNner, the same applies to the entire
+  media plane!
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server;
   with STUNner all media is received through a single ingress port. STUNner stores all STUN/TURN
@@ -96,8 +96,8 @@ reachable for WebRTC clients, despite running with a private IP address inside a
 The below installation instructions require an operational cluster running a supported version of
 Kubernetes (>1.20). You can use any supported platform, for example
 [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) or any
-[hosted](https://cloud.google.com/kubernetes-engine) or private service, but make sure that the
-cluster has [load-balancer
+[hosted](https://cloud.google.com/kubernetes-engine) or private Kubernetes cluster, but make sure
+that the cluster has [load-balancer
 integration](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer)
 available (all major hosted Kubernetes services should support this, and even Minikube
 [provides](https://minikube.sigs.k8s.io/docs/handbook/accessing) standard `LoadBalancer` service
@@ -132,7 +132,7 @@ If Helm is not an option, you can use the static Kubernetes manifests packaged w
 mode is not recommended for general use however, since the static Kubernetes manifests do not
 provide the same flexibility and configurability as the Helm charts.
 
-First, download the STUNner repository.
+First, clone the STUNner repository.
 
 ```console
 $ git clone https://github.com/l7mp/stunner.git
@@ -149,8 +149,8 @@ $ kubectl apply -f kubernetes/stunner.yaml
 STUNner exposes the STUN/TURN server through a standard Kubernetes `LoadBalancer` service. Since
 Kubernetes assigns an [ephemeral public
 IP](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) address to
-`LoadBalancer` services, the STUN/TURN server's public IP address and port may change from
-deployment to deployment. (Of course, Kubernetes lets you use your own [fix
+`LoadBalancer` services, the STUN/TURN server's public IP address may change from deployment to
+deployment. (Of course, Kubernetes lets you use your own [fix
 IP/DNS](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
 but the default installation scripts do not support this.)  WebRTC clients will need to learn the
 external IP and port somehow; this is outside the scope of STUNner, but see our [Kurento
@@ -200,8 +200,8 @@ $ export STUNNER_PORT=$(kubectl get cm stunner-config -n default -o jsonpath='{.
 From this point, your STUNner service is exposed on the IP address `$STUNNER_PUBLIC_ADDR` and UDP
 port `$STUNNER_PUBLIC_ADDR`.
 
-In order to have all STUNner configuration available in the Kubernetes cluster, it is worth storing
-back the public IP address into STUNner's internal configuration (available in a `ConfigMap`).
+In order to have all STUNner configuration available at single place, it is worth storing back the
+public IP address into STUNner's configuration (available in a `ConfigMap`).
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
@@ -211,8 +211,8 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
 ### Configuring WebRTC clients to reach STUNner
 
 Here is a simple JavaScript snippet to direct your webRTC clients to use STUNner; make sure to
-substitute the placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration from
-the above.
+substitute the placeholders below (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration
+from the above.
 
 ```js
 var ICE_config = {
@@ -230,9 +230,9 @@ var pc = new RTCPeerConnection(ICE_config);
 ### Testing
 
 STUNner comes with a simple STUN/TURN client called [`turncat`](utils/turncat) that can be used to
-test whether installation is successful. The `turncat` client will open a UDP tunnel through
-STUNner into your Kubernetes cluster. This tunnel can be used to access any UDP service running
-inside the cluster; for more info, see the `turncat` [documentation](utils/turncat). 
+check you installation. The `turncat` client will open a UDP tunnel through STUNner into your
+Kubernetes cluster. This tunnel can be used to access any UDP service running inside the cluster;
+for more info, see the `turncat` [documentation](utils/turncat).
 
 For a quick verification that STUNner is up and running, we shall use `turncat` to reach the
 Kubernetes DNS service.
@@ -253,8 +253,8 @@ $ go run main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PAS
   --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PORT} udp:${KUBE_DNS_IP}:53
 ```
 
-Now, in another terminal try to query the Kubernetes DNS service for the internal service address
-allocated by Kubernetes for STUNner:
+Now, in another terminal try to query the Kubernetes DNS service through the `turncat` tunnel for
+the internal service address allocated by Kubernetes for STUNner:
 
 ```console
 $ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
@@ -263,8 +263,8 @@ $ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
 If all goes well, this should hang until `dig` times out. The reason is that the default
 installation scripts block *all* communication from STUNner to the rest of the workload. This is to
 minimize the exposure of your sensitive internal services to the external world. For testing
-purposes, we can temporarily open up the Kubernetes access control rules to allow access from
-STUNner to the Kube DNS service as follows.
+purposes, we can temporarily open up the Kubernetes ACLs to allow access from STUNner to the Kube
+DNS service as follows.
 
 ```console
 $ kubectl apply -f - <<EOF
@@ -300,7 +300,7 @@ $ dig +short  @127.0.0.1 -p 5000  stunner.default.svc.cluster.local
 ```
 
 After testing, stop `turncat` and revert the default-deny ACL (but see the below [security
-notice](#access-control) on a STUNner ccess control).
+notice](#access-control) on access control).
 
 ```console
 $ kubectl apply -f - <<EOF
@@ -368,12 +368,12 @@ demo code to make it work with STUNner and Kubernetes.
    been configured with *no STUN and TURN servers* and *no external IP addresses*, and it runs in
    an ordinary Kubernetes pod at an ephemeral private IP address which is not available from
    browsers directly. Here is where the *magic* happens: STUNner makes sure that WebRTC media just
-   keeps flowing between clients and the media server, without *any* of the two being accessible
-   via a public IP.
+   keeps flowing between clients and the media server, without *any* of the two being directly
+   accessible via a public IP.
 3. Expose the media server pool, i.e., the Kurento media server deployment, over the Kubernetes
    service `kms-control` over the TCP port 8888. This assigns a virtual IP address (a `ClusterIP`)
-   that the application server can use to configure the WebRTC endpoints on the media servers. Note
-   that this address is private and it is not reachable from outside the cluster.
+   that the application server can use to configure the WebRTC endpoints and media pipelines in
+   Kurento. Note that this address is private and it is not reachable from outside the cluster.
 4. [Modify](https://github.com/l7mp/kurento-tutorial-node/commit/54289c2c6592d9237f3b465a0e10fa425b8ade8b#diff-70406ec94adfebba544257cb82e2aed222a8941c8b8db766aee488272446f1acR26)
    the WebRTC application server to (1)
    [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L26)
@@ -401,18 +401,18 @@ demo code to make it work with STUNner and Kubernetes.
    the [prebuilt image](https://hub.docker.com/repository/docker/l7mp/kurento-webrtc-server).
 7. Start the modified WebRTC application server in a Kubernetes `Deployment` (called
    `webrtc-server`). Note that the STUNner configuration is made available to the application
-   server in environment variables and the TLS keys are taken from the Kubernetes `Secret`
-   configured above.
+   server in environment variables taken from STUNner's default Kubernetes `ConfigMap` and the TLS
+   keys are taken from the Kubernetes `Secret` configured above.
 8. Expose the application server on a Kubernetes `LoadBalancer` service so that external clients
    can reach it via the TCP port 8443.
 9. And finally, as a critical step, make sure that STUNner is permitted to forward UDP/RTP media
    packets to the media servers. Recall, by default all internal access from STUNner is locked down
    by a Kubernetes `NetworkPolicy`. The demo installation script opens this ACL up so that STUNner
-   can reach all WebRTC endpoints configured on the Kurento media servers, but Just the WebRTC
-   ports and *nothing else* (see the below [security notice](#access-control) on access
-   control)). This makes sure that the [trick](#testing) to query the Kubernetes DNS service
-   externally will not work; external STUN/TURN clients can reach only the UDP ports exposed on the
-   media server exclusively.
+   can reach all WebRTC endpoints configured on the Kurento media servers, but just the WebRTC
+   ports and *nothing else* (but see the below [security notice](#access-control) on access
+   control). This makes sure that the [trick](#testing) to query the Kubernetes DNS service
+   externally through STUNner will not work; external STUN/TURN clients can reach only the UDP
+   ports exposed on the media server through STUNner and nothing else.
 
 And that's all. We added only 32 lines of code to the Kurento demo to make it work with Kubernetes,
 with most of the changes needed to return the ephemeral public STUN/TURN URI and credentials to the
@@ -426,7 +426,7 @@ At the moment, [WebRTC](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [a](https://stackoverflow.com/questions/64232853/how-to-use-webrtc-with-rtcpeerconnection-on-kubernetes)
 [vitualization](https://stackoverflow.com/questions/68339856/webrtc-on-kubernetes-cluster/68352515#68352515)
 [story](https://stackoverflow.com/questions/52929955/akskubernetes-service-with-udp-and-tcp) that
-would allow to deploy a WebRTC backend service into the cloud and enjoy the
+would allow to deploy a WebRTC backend service into Kubernetes and enjoy the
 [resiliency](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce),
 [scalability](https://stackoverflow.com/questions/62088089/scaling-down-video-conference-software-in-kubernetes),
 and [high
@@ -440,21 +440,23 @@ to third-parties accessing all media communications (even if encrypted).
 
 The main goal of STUNner is to allow *anyone* to deploy their own WebRTC infrastructure into
 Kubernetes, without relying on any external service other than the cloud-provider's standard hosted
-Kubernetes offering, and enjoy the unmatched [agility and
-manageability](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) Kubernetes
+Kubernetes offering, and enjoy the unmatched
+[manageability](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) Kubernetes
 provides to cloud-bound workloads.
 
 Suppose for a demo that the single STUNner instance fired up by the default installation scripts is
 no longer sufficient for some reason (e.g., due to concerns related to performance or
-availability). In a "conventional" privately hosted setup, you need to provision a new STUN/TURN
-server instance, allocate a public IP, add the new server to your STUN/TURN server pool, and
-monitor the liveliness of the new server continuously. This takes a lot of manual effort and
-considerable time. In Kubernetes, however, you can use *a single command to scale STUNner to an
-arbitrary number of replicas*, with Kubernetes potentially adding new nodes to the cluster if
-needed, and the new replicas will be *automatically* added to the STUN/TURN server pool accessible
-behind the (single) public IP address/port pair (`<STUNNER_PUBLIC_ADDR>:<STUNNER_PORT>`), with
-UDP/RTP streams conveniently being load-balanced between the replicas. The below command will fire
-up 15 STUNner replicas in a matter of seconds.
+availability). In a "conventional" privately hosted setup, you would need to provision a new
+physical STUN/TURN server instance, allocate a public IP, add the new server to your STUN/TURN
+server pool, and monitor the liveliness of the new server continuously. This takes a lot of manual
+effort and considerable time. In Kubernetes, however, you can use a single command to *scale
+STUNner to an arbitrary number of replicas*. Kubernetes will potentially add new nodes to the
+cluster if needed, and the new replicas will be *automatically* added to the STUN/TURN server pool
+accessible behind the (single) public IP address/port pair
+(`<STUNNER_PUBLIC_ADDR>:<STUNNER_PORT>`), with UDP/RTP streams conveniently being load-balanced
+across STUNner replicas. 
+
+For instance, the below command will fire up 15 STUNner replicas, usually in a matter of seconds.
 
 ```console
 $ kubectl scale deployment stunner --replicas=15
@@ -463,8 +465,12 @@ You can even use Kubernetes
 [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
 the size of the STUNner pool to the actual demand. 
 
-Notably, the media server pool can likewise be (auto-)scaled with Kubernetes effortlessly. For
-instance, the below scales the media server pool in the [Kurento demo](#demo) deployment to 20
+Notably, the media server pool can likewise be (auto-)scaled with Kubernetes effortlessly. Each
+conventional WebRTC media server is a unique snowflake: tied to a public IP address and managed by
+hand. Contrarily, with STUNner the media servers can become ephemeral and disposable, so that it
+is easy to replicate and scale the media plane with automated tools.
+
+The below command will scale the media server pool in the [Kurento demo](#demo) deployment to 20
 instances and again, automatic health-checks and load-balancing should just work as expected.
 
 ```console
@@ -595,6 +601,7 @@ list, please bear with us for now.
   load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
+* [STUN/TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) is not supported at the moment.
 
 ## Milestones
 
