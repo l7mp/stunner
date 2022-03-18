@@ -88,7 +88,7 @@ The below installation instructions require an operational cluster running a sup
 Kubernetes (>1.20). You can use any supported platform, for example
 [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) or any
 [hosted](https://cloud.google.com/kubernetes-engine) or private service, but make sure that the
-cluster has an operational [load-balancer
+cluster has [load-balancer
 integration](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer)
 available (all major hosted Kubernetes services should support this, and even Minikube
 [provides](https://minikube.sigs.k8s.io/docs/handbook/accessing) standard `LoadBalancer` service
@@ -97,7 +97,7 @@ your WebRTC infra.
 
 ### Configuration
 
-STUNner will need to have the below Kubernetes resources configured and deployed in order to run:
+STUNner will need the below Kubernetes resources configured and deployed in order to run:
 1. a `ConfigMap` that stores STUNner local configuration,
 2. a `Deployment` running one or more STUNner replicas,
 3. a `LoadBalancer` service to expose the STUNner deployment on a public IP address and UDP port
@@ -186,9 +186,10 @@ $ export STUNNER_PORT=$(kubectl get cm stunner-config -n default -o jsonpath='{.
 ```
 
 From this point, your STUNner service is exposed to your clients on the IP address
-`$STUNNER_PUBLIC_ADDR` and UDP port `$STUNNER_PUBLIC_ADDR`. In order to have all STUNner
-configuration available in the Kubernetes cluster, it is worth storing the public IP address into
-STUNner's `ConfigMap`:
+`$STUNNER_PUBLIC_ADDR` and UDP port `$STUNNER_PUBLIC_ADDR`. 
+
+In order to have all STUNner configuration available in the Kubernetes cluster, it is worth storing
+back the public IP address into STUNner's configuration (available in a `ConfigMap`).
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
@@ -198,7 +199,7 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
 Here is a simple way to direct your webRTC clients to reach STUNner; make sure to substitute the
 placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration.
 
-```javascript
+```js
 var ICE_config= {
   'iceServers': [
     {
