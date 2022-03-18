@@ -196,11 +196,13 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
   -p "{\"data\":{\"STUNNER_PUBLIC_ADDR\":\"${STUNNER_PUBLIC_ADDR}\"}}"
 ```
 
-Here is a simple way to direct your webRTC clients to reach STUNner; make sure to substitute the
-placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration.
+### Configuring a WebRTC client to reach STUNner
+
+Here is a simple way to direct your webRTC clients to use STUNner; make sure to substitute the
+placeholders below (like `<STUNNER_PUBLIC_ADDR`) with the correct configuration from the above.
 
 ```js
-var ICE_config= {
+var ICE_config = {
   'iceServers': [
     {
       'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PORT>?transport=udp',
@@ -208,7 +210,7 @@ var ICE_config= {
       'credential': <STUNNER_PASSWORD>,
     },
   ]
-}
+};
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
@@ -216,9 +218,11 @@ var pc = new RTCPeerConnection(ICE_config);
 
 STUNner comes with a simple STUN/TURN client called [`turncat`](utils/turncat) that can be used to
 test whether installation is successful. The `turncat` client will open a UDP tunnel through
-STUNner into your Kubernetes cluster that can be used to access any UDP service running inside the
-cluster; for more info, see the [documentation](utils/turncat). For simplicity, we shall use
-`turncat` to reach the Kubernetes DNS service.
+STUNner into your Kubernetes cluster. This tunnel can be used to access any UDP service running
+inside the cluster; for more info, see the `turncat` [documentation](utils/turncat). 
+
+For a quick verification that STUNner is up and running, we shall use `turncat` to reach the
+Kubernetes DNS service.
 
 First, we store the STUN/TURN credentials for later use.
 
