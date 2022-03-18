@@ -452,11 +452,11 @@ $ kubectl scale deployment stunner --replicas=15
 ```
 You can even use Kubernetes
 [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
-the STUNner pool to the actual demand. But not just STUNner but the media server pool can also be
-(auto-)scaled with Kubernetes effortlessly. For instance, the below scales the media
-server in the [Kurento demo](kubectl scale deployment stunner --replicas=20) deployment to 20 instances and
-again, automatic health-checks and load-balancing should just work as
-expected.
+the size of the STUNner pool to the actual demand. 
+
+Notably, the media server pool can likewise be (auto-)scaled with Kubernetes effortlessly. For
+instance, the below scales the media server pool in the [Kurento demo](#demo) deployment to 20
+instances and again, automatic health-checks and load-balancing should just work as expected.
 
 ```console
 $ kubectl scale deployment kms --replicas=20
