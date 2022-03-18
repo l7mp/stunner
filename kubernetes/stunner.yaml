@@ -7,23 +7,22 @@ metadata:
   name: stunner-config
   namespace: default
 data:
-# STUNNER_ADDR: The external IP configured by the load-balancer for the Stunner service (overridden
-# to POD IP in the stunner pod)
-  STUNNER_PUBLIC_ADDR: "34.118.22.69"
-# STUNNER_REALM: Credential realm, default "stunner.l7mp.io"
+# The external IP configured by the load-balancer for the Stunner service
+# STUNNER_PUBLIC_ADDR: "A.B.C.D"
+# Credential realm, default "stunner.l7mp.io"
   STUNNER_REALM: "stunner.l7mp.io"
-# STUNNER_PORT: Server port, default: 3478
+# Server port, default: 3478
   STUNNER_PORT: "3478"
-# STUNNER_USERNAME: User name, default: "user"
+# User name, default: "user". Make sure to customize!
   STUNNER_USERNAME: user
-# STUNNER_PASSWORD: Password, default: "pass"
+# Password, default: "pass". Make sure to customize!
   STUNNER_PASSWORD: pass
-# STUNNER_LOGLEVEL: Log level, default: "all:WARN"
+# Log level, default: "all:WARN"
 #  STUNNER_LOGLEVEL: "all:WARN"
   STUNNER_LOGLEVEL: "all:INFO"
-# STUNNER_MIN_PORT: lowest relay transport port, default: 10000
+# Lowest relay transport port, default: 10000
   STUNNER_MIN_PORT: "10000"
-# STUNNER_MAX_PORT: lowest relay transport port, default: 20000
+# Highest relay transport port, default: 20000
   STUNNER_MAX_PORT: "20000"
 
 ---
@@ -31,6 +30,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stunner
+  namespace: default
 spec:
   selector:
     matchLabels:
@@ -57,32 +57,48 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-      - name: net-debug
-        image: retvari/net-debug:latest
-        command: ["/bin/sh"]
-        args: ["-c", "while true; do echo hello; sleep 10;done"]
+      # Uncomment this if you want to deploy a sidecar container with stunner to sniff traffic
+      # - name: net-debug
+      #   image: retvari/net-debug:latest
+      #   command: ["/bin/sh"]
+      #   args: ["-c", "while true; do echo hello; sleep 10;done"]
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: stunner
+  namespace: default
   labels:
     app: stunner
 spec:
   ports:
-    # - port: 3478
-    #   targetPort: 3478
-    #   protocol: TCP
-    #   name: sidecar-stun-tcp
     - port: 3478
       targetPort: 3478
       protocol: UDP
-      name: stun-udp
+      name: stunner-udp
   type: LoadBalancer
   selector:
     app: stunner
 
+---
+# STUN/TURN over TCP: Not implemented as of v0.1
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: stunner-tcp
+#   labels:
+#     app: stunner
+# spec:
+#   ports:
+#     - port: 3478
+#       targetPort: 3478
+#       protocol: TCP
+#       name: stunner-tcp
+#   type: LoadBalancer
+#   selector:
+#     app: stunner
+    
 ---
 # lock down access from the TURN server to anywhere!
 apiVersion: networking.k8s.io/v1
