@@ -23,6 +23,15 @@ Worry no more! STUNner allows you to run, scale and manage your own STUN/TURN se
 Kubernetes cluster, with _full_ browser-compatibility and no modifications to your existing WebRTC
 codebase!
 
+## Table of Contents
+1. [Description](#description)
+2. [Features](#features)
+3. [Getting started](#getting-started)
+4. [Demo](#demo)
+5. [Security](#security)
+6. [Caveats](#caveats)
+7. [Milestones](#milestones)
+
 ## Description
 
 STUNner is a gateway for ingesting WebRTC media traffic into a Kubernetes cluster. This makes it
@@ -472,8 +481,8 @@ cluster (recall our little [trick](#testing) from above).
 
 The below security considerations will greatly reduce the attack surface associated by
 STUNner. Overall, **a properly configured STUNner deployment will present exactly the same attack
-surface* as a WebRTC infrastructure hosted on a public IP address** (possibly behind a
-fiewwall). In any case, use STUNner at your own risk.
+surface as a WebRTC infrastructure hosted on a public IP address** (possibly behind a firewall). In
+any case, use STUNner at your own risk.
 
 ### Authentication
 
@@ -482,10 +491,10 @@ clients and the password is available in plain text at the clients. Anyone with 
 static STUNner credentials can open a UDP tunnel to any service inside the Kubernetes cluster,
 unless [blocked](#access-control) by a properly configured Kubernetes `NetworkPolicy`.
 
-In order to mitigate the risks, it is a good practice to roll the username/password pair every
-once in a while.  Suppose you want to set the STUN/TURN username to `my_user` and the password to
-`my_pass`. To do this simply modify the STUNner `ConfigMap` and simply restart STUNner to enforce
-the new access tokens:
+In order to mitigate the risk, it is a good security practice to reset the username/password pair
+every once in a while.  Suppose you want to set the STUN/TURN username to `my_user` and the
+password to `my_pass`. To do this simply modify the STUNner `ConfigMap` and simply restart STUNner
+to enforce the new access tokens:
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
@@ -493,28 +502,31 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
 $ kubectl rollout restart deployment/stunner
 ```
 
-If the WebRTC application server uses [dynamic STUN/TURN credentials](#demo) then it may need to be
-restarted as well to learn the new credentials.
+You can even set up a [cron
+job](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) to automate this. Note
+that if the WebRTC application server uses [dynamic STUN/TURN credentials](#demo), then it may need
+to be restarted to learn the new credentials.
 
 ### Access control
 
-The ultimate condition for a secure STUNner deployment is a correctly configured access control
-rules that restricts external users to open transport relay connections only to the media server
-and nothing else. The STUNner installation comes with a default `NetworkPolicy` that locks down
-*all* access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to
-enforce the security best practice that the access permissions of STUNner must be carefully
-customized before deployment.
+The ultimate condition for a secure STUNner deployment is correctly configured access control that
+restricts external users to open transport relay connections inside the cluster. The ACL must make
+sure that only the media servers, and only on a limited set of UDP ports, can be reached
+externally. The STUNner installation comes with a default `NetworkPolicy` that locks down *all*
+access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to enforce
+the security best practice that the access permissions of STUNner be carefully customized before
+deployment.
 
 It is a good practice to configure the ACL so that STUNner can access only the media server ports
 used by WebRTC media connection endpoints, and *nothing else*. Thanks to the versatility of
 Kubernetes, this is very
 [simple](https://kubernetes.io/docs/concepts/services-networking/network-policies) to do with a
 `NetworkPolicy`. For instance, in our [Kurento demo](#demo), STUNner is deployed into the `default`
-namespace and it is labeled with `app: stunner`, and the media server runs in the same namaspace
-using the label `app: webrtc-server`. In addition, WebRTC endpoints on the Kurento server are
-assigned a UDP port between 10000 and 20000. Then, the below `NetworkPolicy` ensures that access
-from any STUNner pod to the media server is allowed over any UDP port between 10000 and 20000, and
-any other network traffic is denied.
+namespace and all STUNner pods are labeled as `app: stunner`, and the media server runs in the same
+namaspace using the label `app: webrtc-server`. In addition, WebRTC endpoints on the Kurento server
+are assigned from the UDP port range [10000:20000]. Then, the below `NetworkPolicy` ensures that
+access from any STUNner pod to the media server is allowed over any UDP port between 10000 and
+20000, and any other network access is denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -537,7 +549,7 @@ spec:
         matchLabels:
           app: kms
     ports:
-    # only ports 10000-20000 are allowed
+    # Only UDP ports 10000-20000 are allowed
     - protocol: UDP
       port: 10000
       endPort: 20000
@@ -554,32 +566,33 @@ the [`turncat`](utils/turncat) client packaged with STUNner can be used for this
 ### Exposing internal IP addresses
 
 The trick in STUNner is that both the TURN relay transport address and the media server address are
-internal pod IP addresses, and pods can connect
+internal pod IP addresses, and pods in Kubernetes are always guaranteed to be able connect
 [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model),
-without a NAT. This makes it possible to host the entire WebRTC infrastructure over the private
-internal pod network and still allow external clients to make connections to the media servers via
-STUNner.  At the same time, this also has the consequence that internal IP addresses will be
-exposed to the 
+without the involvement of a NAT. This makes it possible to host the entire WebRTC infrastructure
+over the private internal pod network and still allow external clients to make connections to the
+media servers via STUNner.  At the same time, this also has the consequence that internal IP
+addresses will be exposed to the clients in ICE candidates.
 
-In particular, an attacker can learn the *private* IP address of all STUNner pods and all media
-server pods. We believe that this does not cause a major security risk: remember, none of these
-private IP addresses can be reached externally. Nevertheless, if worried about such information
-exposures then it STUNner may not be the best option.
+In particular, an attacker can scan the *private* IP address of all STUNner pods and all media
+server pods used inside Kubernetes. We believe that this does not pose a major security risk:
+remember, none of these private IP addresses can be reached externally. Nevertheless, if worried
+about information exposure,then STUNner may not be the best option for you.
 
 ## Caveats
 
-STUNner is a work-in-progress. Therefore, some features are missing, others are not working as
-expected. Some particular limitations at this point are as follows.
+STUNner is a work-in-progress. Some features are missing, others may not work as expected. The
+notable limitations at this point are as follows.
 
-* Only username/password authentication is supported. Support for the standard STUN/TURN [long term
-credential mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of
-our TODO list, please bear with us for now.
+* Only simple plain-text username/password authentication is implemented. Support for the standard
+STUN/TURN [long term credential
+mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of our TODO
+list, please bear with us for now.
 * Access through STUnner to the rest of the cluster *must* be locked down with a Kubernetes
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
-  externally; see our [notes](#security).
+  externally; see the [notes on access control](#access-control).
 * STUNner supports arbitrary scale-up without dropping active calls, but scale-down might
   disconnect calls established through the STUNner and/or media servers being removed from the
-  pool. Note that this problem is
+  load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
 
@@ -587,7 +600,7 @@ our TODO list, please bear with us for now.
 
 * v0.1: Basic connectivity: STUNner + helm chart + simple use cases (Kurento demo).
 * v0.2: Security: per-session long-term STUN/TURN credentials.
-* v0.3: Performance: eBPF acceleration.
+* v0.3: Performance: eBPF STUN/TURN acceleration.
 * v0.4: Observability: Prometheus + Grafana dashboard.
 * v0.5: Ubiquity: make it work with Jitsi, Janus, mediasoup and pion-SFU.
 * v1.0: GA
