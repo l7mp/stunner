@@ -465,9 +465,10 @@ You can even use Kubernetes
 [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
 the size of the STUNner pool to the actual demand. 
 
-Notably, the media server pool can likewise be (auto-)scaled with Kubernetes effortlessly. Each
-conventional WebRTC media server is a unique snowflake: tied to a public IP address and managed by
-hand. Contrarily, with STUNner the media servers can become ephemeral and disposable, so that it
+Notably, the media server pool can likewise be (auto-)scaled with Kubernetes
+effortlessly. Conventional WebRTC media servers are unique snowflakes: tied to a public IP address
+and managed by hand. Contrarily, with STUNner the media servers can be deployed into Kubernetes. As
+such, media servers become ephemeral and disposable and run in ordinary Kubernetes pods, so that it
 is easy to replicate and scale the media plane with automated tools.
 
 The below command will scale the media server pool in the [Kurento demo](#demo) deployment to 20
@@ -479,11 +480,12 @@ $ kubectl scale deployment kms --replicas=20
 
 ## Security
 
-Before deploying STUNner, it is well-worth being aware of the potential [security
+Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
-configured publicly available STUN/TURN server poses. Unless properly locked down by an ACL,
-STUNner may be used hostilely to open a UDP tunnel to *any* UDP service running inside a Kubernetes
-cluster (recall our little [trick](#testing) from above).
+configured public STUN/TURN server poses. Unless properly locked down by an ACL, STUNner may be
+used hostilely to open a UDP tunnel to *any* UDP service running inside a Kubernetes cluster
+(recall our little [trick](#testing) from above). Therefore, it is critical to tightly control the
+portion of the Kubernetes workload accessible through STUNner using an ACL.
 
 The below security considerations will greatly reduce the attack surface associated by
 STUNner. Overall, **a properly configured STUNner deployment will present exactly the same attack
@@ -499,8 +501,8 @@ unless [blocked](#access-control) by a properly configured Kubernetes `NetworkPo
 
 In order to mitigate the risk, it is a good security practice to reset the username/password pair
 every once in a while.  Suppose you want to set the STUN/TURN username to `my_user` and the
-password to `my_pass`. To do this simply modify the STUNner `ConfigMap` and simply restart STUNner
-to enforce the new access tokens:
+password to `my_pass`. To do this simply modify the STUNner `ConfigMap` and restart STUNner to
+enforce the new access tokens:
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
@@ -528,11 +530,11 @@ used by WebRTC media connection endpoints, and *nothing else*. Thanks to the ver
 Kubernetes, this is very
 [simple](https://kubernetes.io/docs/concepts/services-networking/network-policies) to do with a
 `NetworkPolicy`. For instance, in our [Kurento demo](#demo), STUNner is deployed into the `default`
-namespace and all STUNner pods are labeled as `app: stunner`, and the media server runs in the same
-namaspace using the label `app: webrtc-server`. In addition, WebRTC endpoints on the Kurento server
-are assigned from the UDP port range [10000:20000]. Then, the below `NetworkPolicy` ensures that
-access from any STUNner pod to the media server is allowed over any UDP port between 10000 and
-20000, and any other network access is denied.
+namespace and all STUNner pods are labeled as `app=stunner`, and the media server runs in the same
+namaspace using the label `app=kms`. In addition, WebRTC endpoints on the Kurento server are
+assigned from the UDP port range [10000:20000]. Then, the below `NetworkPolicy` ensures that all
+access from any STUNner pod to any media server pod is allowed over any UDP port between 10000 and
+20000, and all other network access is denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -580,9 +582,9 @@ media servers via STUNner.  At the same time, this also has the consequence that
 addresses will be exposed to the clients in ICE candidates.
 
 In particular, an attacker can scan the *private* IP address of all STUNner pods and all media
-server pods used inside Kubernetes. We believe that this does not pose a major security risk:
-remember, none of these private IP addresses can be reached externally. Nevertheless, if worried
-about information exposure,then STUNner may not be the best option for you.
+server pods. This should not pose a major security risk: remember, none of these private IP
+addresses can be reached externally. Nevertheless, if worried about information exposure then
+STUNner may not be the best option for you.
 
 ## Caveats
 
@@ -615,7 +617,7 @@ list, please bear with us for now.
 
 ## Help
 
-STUNner has a lively Discord server, send [us](AUTHORS) an email to get an invitation.
+STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
 
 ## License
 
