@@ -1,5 +1,4 @@
 // creates a tunnel through a TURN server
-// turncat --client=127.0.0.1:5000 --server=127.0.0.1:3478 --peer=127.0.0.1:5001 --users test=test
 // go run main.go --user test=test --verbose 127.0.0.1:5000 34.118.22.69:3478 10.116.0.10:11111
 
 package main
@@ -148,6 +147,8 @@ func NewTurncat(config TurncatConfig) (*Turncat, error) {
 	}
 	log := loggerFactory.NewLogger("turncat")
 
+	log.Tracef("Resolving address %s", config.ServerAddr)
+	
 	serverAddr, serverErr := resolveAddr(config.ServerAddr)
 	if serverErr != nil {
 		log.Errorf("error resolving server address: %s", serverErr.Error())
