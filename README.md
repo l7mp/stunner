@@ -39,8 +39,8 @@ STUNner can be easily scaled up if needed, just like any other "normal" Kubernet
 
 ## Features
 
-Kubernetes has been designed and optimized for the typical HTTTP/TCP based Web workload, which
-makes streaming workloads, and especially UDP/RTP based WebRTC media, feel like a foreign citizen.
+Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
+streaming workloads, and especially UDP/RTP based WebRTC media, feel like a foreign citizen.
 STUNner aims to change this state-of-the-art, by exposing a single public STUN/TURN server port for
 ingesting *all* media traffic into a Kubernetes cluster in a controlled and standards-compliant
 way.
@@ -55,44 +55,44 @@ features that allow it to seamlessly fit into the Kubernetes ecosystem.
   care of all UDP/RTP based media.
 
 * **Expose a WebRTC media server on a single external UDP port.** No more Kubernetes
-  [anti-patterns](https://kubernetes.io/docs/concepts/configuration/overview) just to deploy your
-  WebRTC media plane into the cloud! Using STUNner a typical WebRTC deployment needs only two
-  public-facing ports, one HTTPS port for the application server and a *single* UDP port one for
-  *all* your media.
+  [anti-patterns](https://kubernetes.io/docs/concepts/configuration/overview) just to virtualize
+  your WebRTC media plane! Using STUNner a typical WebRTC deployment needs only two public-facing
+  ports, one HTTPS port for the application server and a *single* UDP port one for *all* your
+  media.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
-  servers? Can't get sufficient audio/voice quality because public TURN servers are a bottleneck?
-  STUNner can be scaled up with a single `kubectl scale` command and, since STUNner lets you deploy
-  your media servers into a standard Kubernetes `Deployment`, the same applies to the entire media
-  plane!
+  servers? Can't get sufficient audio/voice quality because public TURN servers pose a bottleneck?
+  STUNner can be scaled up with a single `kubectl scale` command and, since now you can deploy your
+  media servers into a standard Kubernetes `Deployment` behind STUNner, the same applies to the
+  entire media plane!
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server;
   with STUNner all media is received through a single ingress port. STUNner stores all STUN/TURN
-  credentials and DTLS keys in secure Kubernetes vaults, and uses standard Kubernetes ACLs
-  (`NetworkPolicy`) to lock down network access between your application servers and the media
-  plane.
+  credentials and DTLS keys in secure Kubernetes vaults, and uses standard Kubernetes ACLs to lock
+  down network access between your application servers and the media plane.
 
 * **Simple code and extremely small size.** Written in pure Go using the battle-tested
   [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundred
-  lines of fully open-source code. STUNner is extremely lightweight, the typical STUNner container
-  is only 2.5 Mbytes.
+  lines of fully open-source code. The server is extremely lightweight: the typical STUNner
+  container image size is only about 2.5 Mbytes.
 
 ## Getting Started
 
 STUNner comes with prefab deployment manifests to fire up a fully functional STUNner-based WebRTC
 media gateway in minutes. Note that the default deployment does not contain an application server
 and a media server. STUNner in itself is not a WebRTC backend, it is just an *enabler* for you to
-deploy your *own* WebRTC infrastructure into Kubernetes and make sure your media server is still
-reachable for WebRTC clients despite running with a private IP address inside a Kubernetes pod.
+deploy your *own* WebRTC infrastructure into Kubernetes and make sure your media servers are still
+reachable for WebRTC clients, despite running with a private IP address inside a Kubernetes pod.
 
-The below installation instructions require you to have an operational Kubernetes cluster running a
-supported version of Kubernetes (>1.20). You can use any supported platform, for example
-[Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) or any hosted or private
-service, but make sure that the cluster has an operational [load-balancer
-integration](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) running
-(all major hosted Kubernetes services should support this, and even Minikube
+The below installation instructions require an operational cluster running a supported version of
+Kubernetes (>1.20). You can use any supported platform, for example
+[Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) or any
+[hosted](https://cloud.google.com/kubernetes-engine) or private service, but make sure that the
+cluster has an operational [load-balancer
+integration](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer)
+available (all major hosted Kubernetes services should support this, and even Minikube
 [provides](https://minikube.sigs.k8s.io/docs/handbook/accessing) standard `LoadBalancer` service
-access), otherwise STUNner will not be able to allocate a public IP address for clients to reach
+access). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach
 your WebRTC infra.
 
 ### Configuration
