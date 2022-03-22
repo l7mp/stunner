@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stunner_helm.name" . }}
+  namespace: {{ .Values.turnServer.namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "stunner_helm.labels" . | nindent 4 }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        {{- include "stunner_helm.labels" . | nindent 4 }}
+    spec:
+      containers:
+      - name: {{ .Values.turnServer.deployment.container.name }}
+        image: "{{ .Values.turnServer.deployment.container.image.repository }}{{ .Values.turnServer.deployment.container.image.name }}:{{ .Values.turnServer.deployment.container.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.turnServer.deployment.container.image.pullPolicy }}
+        command: ["stunnerd"]
+        # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
+        args: []
+        envFrom:
+          - configMapRef:
+              name: stunner-config
+        env:
+        - name: STUNNER_ADDR  # we use the POD IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+{{- if eq .Values.turnServer.deployment.container.netdebug "enable"}}
+      - name: net-debug
+        image: retvari/net-debug:latest
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{{- end}}
+---

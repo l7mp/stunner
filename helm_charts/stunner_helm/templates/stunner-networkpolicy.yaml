@@ -1,0 +1,16 @@
+# lock down access from the TURN server to anywhere!
+---
+{{- if eq .Values.turnServer.networkPolicy "enable"}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: "{{- include "stunner_helm.name" .}}-network-policy"
+  namespace: {{ .Values.turnServer.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "stunner_helm.turnServer.selectorLabels" . | nindent 4 }}
+  policyTypes:
+  - Egress
+{{- end}}
+---

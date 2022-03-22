@@ -1,0 +1,27 @@
+---
+# TURN server config: make sure to customize the below environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.turnServer.deployment.name}}-config
+  namespace: {{ .Values.turnServer.namespace }}
+data:
+# The external IP configured by the load-balancer for the Stunner service
+# STUNNER_PUBLIC_ADDR: "A.B.C.D"
+# Credential realm, default "stunner.l7mp.io"
+  STUNNER_REALM: "stunner.l7mp.io"
+# Server port, default: 3478
+  STUNNER_PORT: "3478"
+# User name, default: "user". Make sure to customize!
+  STUNNER_USERNAME: user
+# Password, default: "pass". Make sure to customize!
+  STUNNER_PASSWORD: pass
+# Log level, default: "all:WARN"
+#  STUNNER_LOGLEVEL: "all:WARN"
+  STUNNER_LOGLEVEL: "all:INFO"
+# Lowest relay transport port, default: 10000
+  STUNNER_MIN_PORT: "10000"
+# Highest relay transport port, default: 20000
+  STUNNER_MAX_PORT: "20000"
+
+---
