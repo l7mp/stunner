@@ -1,0 +1,45 @@
+# WebRTC application server
+---
+{{- if eq .Values.applicationServer.deployment.enablement "enable"}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webrtc-server
+spec:
+  selector:
+    matchLabels:
+      app: webrtc-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: webrtc-server
+    spec:
+      containers:
+      - name: webrtc-server
+        image: l7mp/kurento-webrtc-server
+        command: ["npm"]
+        args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
+        # imagePullPolicy: Never
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8443
+        # TURN server config to return to the user
+        envFrom:
+          - configMapRef:
+              name: stunner-config
+        volumeMounts:
+          - name: webrtc-server-tls
+            mountPath: "/app/keys"
+            readOnly: true
+      volumes:
+        - name: webrtc-server-tls
+          secret:
+            secretName: {{ .Values.applicationServer.deployment.name}}-secret
+            items:
+              - key: tls.crt
+                path: server.crt
+              - key: tls.key
+                path: server.key
+{{- end}}
+---

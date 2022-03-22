@@ -1,0 +1,17 @@
+---
+{{- if eq .Values.mediaServer.deployment.enablement "enable"}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kms-control
+  labels:
+    app: kms-control
+spec:
+  ports:
+    - port: 8888
+      protocol: TCP
+      name: kms-port
+  selector:
+    app: kms
+{{- end}}
+---

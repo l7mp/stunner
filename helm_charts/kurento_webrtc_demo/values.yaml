@@ -1,0 +1,18 @@
+# Default values for kurento_webrtc_demo.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+mediaServer:
+  deployment:
+    enablement: enable
+    name: kms
+    containerPort: 8888
+    replicas: 1
+    imagePullPolicy: Always
+
+applicationServer:
+  deployment:
+    enablement: enable
+    name: webrtc-server
+
+netdebug: enable
