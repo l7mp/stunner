@@ -17,10 +17,10 @@ jobs:
         id: vars
         run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
       - name: Build the tagged Docker image
-        run: docker build . --file Dockerfile --tag l7mp/stunner:${{steps.vars.outputs.tag}}
+        run: docker build . --file Dockerfile --tag l7mp/stunnerd:${{steps.vars.outputs.tag}}
       - name: Push the tagged Docker image
-        run: docker push l7mp/l7mp:${{steps.vars.outputs.tag}}
+        run: docker push l7mp/stunnerd:${{steps.vars.outputs.tag}}
       - name: Build the latest Docker image
-        run: docker build . --file Dockerfile --tag l7mp/stunner:latest
+        run: docker build . --file Dockerfile --tag l7mp/stunnerd:latest
       - name: Push the latest Docker image
-        run: docker push l7mp/stunner:latest
+        run: docker push l7mp/stunnerd:latest
