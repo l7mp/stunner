@@ -1,8 +1,9 @@
 # turncat: Tunnel a local connection through a TURN server
 
 A simple STUN/TURN client to tunnel a local connection through a TURN server to an arbitrary remote
-address/port. The main use is to open a connection to any service running inside a Kubernetes on a
-pod.  This is very similar to `kubectl proxy`, but it uses STUN/TURN to enter the cluster. 
+address/port. The main use is to open a connection to any service running inside a Kubernetes
+cluster.  This is very similar in functionality to `kubectl proxy`, but it uses STUN/TURN to enter
+the cluster.
 
 ## Getting Started
 
@@ -11,29 +12,29 @@ pod.  This is very similar to `kubectl proxy`, but it uses STUN/TURN to enter th
 As simple as it gets:
 
 ```console
-cd utils/turncat
-go build -o turncat main.go
+$ cd utils/turncat
+$ go build -o turncat main.go
 ```
 
 ### Usage
 
 Tunnel the local UDP connection `127.0.0.1:5000` through the TURN server `192.0.2.1:3478` to the
 remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN credential with
-user/passwd `test/test` with realm `REALM`:
+user/passwd `test/test` and realm `REALM`:
 
 ```console
 $ ./turncat --user test=test --realm=REALM --log=all:INFO,turncat:DEBUG \
       udp:127.0.0.1:5000 turn:192.0.2.1:3478 udp:192.0.2.2:53
 ```
 
-## Advanced usage
+### Advanced usage
 
-The below will execute a benchmark using [`iperfv2`](https://iperf.fr/) to measure the bandwidth
-and/or latency from the local host to the Kubernetes cluster. 
+The below will execute an [`iperfv2` benchmark](https://iperf.fr) to measure the available
+bandwidth and/or latency from the local endhost to the Kubernetes cluster through STUNner.
 
 If you haven't done that so far, [deploy](README.md/#getting-started) STUNner into
 Kubernetes. Then, fire up an `iperfv2` UDP server in the cluster and store the service IP: this
-will be the peer address for our TURN tunnel. 
+will be the peer address for our TURN tunnel.
 
 ```console
 $ kubectl create deployment iperf-server --image=l7mp/net-debug:0.5.3
@@ -42,11 +43,12 @@ $ kubectl exec -it $(kubectl get pod -l app=iperf-server -o jsonpath="{.items[0]
       iperf -s -p 5001 -u -e
 ```
 
-NOTE: The `l7mp/net-debug` image contains lots of useful network debug utilities. You can use it to
-debug your cluster dataplane, e.g., by deploying it as a sidecar next to `stunnerd`.
+NOTE: The `l7mp/net-debug` image contains lots of useful network debugging utilities. You can use
+it to debug your cluster dataplane, e.g., by deploying it as a sidecar container next to
+`stunnerd`.
 
 Next, start `turncat` in a local terminal to tunnel the `localhost:5001` UDP connection through
-STUNner to the iperf server.
+STUNner to the `iperf` server.
 
 ```console
 $ cd utils/turncat
@@ -117,7 +119,25 @@ $ iperf -u -c localhost -p 5001 -i 1 -l 100 -b 3200000 -t 10
 
 ### Cleanup
 
-Stop `turncat` and delete the `iperf-server` deployment and service.
+Make sure to revert the STUNner `NetworkPolicy` to close down all unintended external access to
+sensitive services running inside the cluster.
+
+```console
+$ kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
+EOF
+```
+Then, stop `turncat` and delete the `iperf-server` deployment and service.
 
 ```console
 $ kubectl delete service iperf-server 
