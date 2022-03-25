@@ -6,13 +6,14 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "stunner_helm.labels" . | nindent 4 }}
+      {{- include "stunner_helm.labels" . | nindent 6 }}
   replicas: 1
   template:
     metadata:
       labels:
-        {{- include "stunner_helm.labels" . | nindent 4 }}
+        {{- include "stunner_helm.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: job-sa
       containers:
       - name: {{ .Values.turnServer.deployment.container.name }}
         image: "{{ .Values.turnServer.deployment.container.image.repository }}{{ .Values.turnServer.deployment.container.image.name }}:{{ .Values.turnServer.deployment.container.image.tag | default .Chart.AppVersion }}"

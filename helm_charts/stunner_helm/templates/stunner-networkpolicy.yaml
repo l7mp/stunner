@@ -9,7 +9,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      {{- include "stunner_helm.turnServer.selectorLabels" . | nindent 4 }}
+      {{- include "stunner_helm.turnServer.selectorLabels" . | nindent 6 }}
   policyTypes:
   - Egress
 {{- end}}
