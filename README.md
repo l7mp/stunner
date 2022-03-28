@@ -13,7 +13,8 @@ Overflow](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [to](https://stackoverflow.com/questions/52929955/akskubernetes-service-with-udp-and-tcp)
 [scale](https://stackoverflow.com/questions/62088089/scaling-down-video-conference-software-in-kubernetes)
 WebRTC services with Kubernetes, just to get (mostly) insufficient answers?  Puzzled by the
-security implications of the whole WebRTC industry relying on a handful of public STUN servers?
+security and financial implications of the whole WebRTC industry relying on a handful of
+third-party STUN/TURN services?
 
 Worry no more! STUNner allows you to deploy _any_ WebRTC service into Kubernetes, smoothly
 integrating it into the [cloud-native ecosystem](https://landscape.cncf.io), and enjoy the
@@ -79,19 +80,19 @@ way.
 
 * **Expose a WebRTC media server on a single external UDP port.** Get rid of the Kubernetes
   [hacks](https://kubernetes.io/docs/concepts/configuration/overview) like privileged pods and
-  `hostNetwork`/`hostPort` typically required to containerize your WebRTC media plane.  Using
-  STUNner a WebRTC deployment needs only two public-facing ports, one HTTPS port for the
+  `hostNetwork`/`hostPort` services typically required to containerize your WebRTC media plane.
+  Using STUNner a WebRTC deployment needs only two public-facing ports, one HTTPS port for the
   application server and a *single* UDP port one for *all* your media.
 
 * **No reliance on external services for NAT traversal.** Can't afford a decent [hosted TURN
   service](https://bloggeek.me/webrtc-turn) for client-side NAT traversal? Can't get good
   audio/video quality because the TURN service poses a bottleneck? STUNner can be deployed into the
   same cluster as the rest of your WebRTC infrastructure, and any WebRTC client can connect to it
-  directly, without the use of *any* public STUN/TURN service apart from STUNner itself.
+  directly, without the use of *any* external STUN/TURN service apart from STUNner itself.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
   servers?  STUNner lets you deploy your entire WebRTC infrastructure into ordinary Kubernetes
-  pods, thus scaling your media plane up is as easy as issuing a `kubectl scale` command. STUNner
+  pods, thus scaling your media plane is as easy as issuing a `kubectl scale` command. STUNner
   itself can be scaled with similar ease, completely separately from the media servers.
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server for
@@ -253,14 +254,17 @@ var pc = new RTCPeerConnection(ICE_config);
 
 STUNner comes with a simple STUN/TURN client called [`turncat`](utils/turncat) that can be used to
 check your installation. The `turncat` client will open a UDP tunnel through STUNner into your
-Kubernetes cluster. This tunnel can be used to access any UDP service running inside the
-cluster. Note that your WebRTC clients will not need `turncat` to reach the cluster, since all
-WebRTC clients, including all major browsers, come with an STUN/TURN client preinstalled; `turncat`
-here is merely just used to simulate what a WebRTC client would do when trying to reach
-STUNner. For more info, see the `turncat` [documentation](utils/turncat).
+Kubernetes cluster, which can be used to access any UDP service running inside the cluster. Note
+that your WebRTC clients will not need `turncat` to reach the cluster, since all WebRTC clients,
+including all major browsers, come with a STUN/TURN client included; `turncat` here is merely just
+used to simulate what a WebRTC client would do when trying to reach STUNner. For more info, see the
+`turncat` [documentation](utils/turncat).
 
 We test the STUNner installation by deploying a UDP echo server into the cluster and exposing it
-for external access via STUNner. 
+for external access via STUNner.
+
+![STUNner demo setup](./doc/stunner_echo.svg)
+<img src="./doc/stunner_echo.svg">
 
 First, we create a `Deployment` called `udp-echo`, currently containing only a single pod, make
 this pod available over the UDP port 9001 as a cluster-internal service with the same name, and use
