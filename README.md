@@ -25,16 +25,15 @@ Meanwhile, STUNner maintains full browser compatibility and requires minimal or 
 your existing WebRTC codebase.
 
 ## Table of Contents
-1. [Motivation](#motivation)
-2. [Description](#description)
-3. [Features](#features)
-4. [Getting started](#getting-started)
-5. [Demo](#demo)
-6. [Security](#security)
-7. [Caveats](#caveats)
-8. [Milestones](#milestones)
+1. [Description](#description)
+2. [Features](#features)
+3. [Getting started](#getting-started)
+4. [Demo](#demo)
+5. [Security](#security)
+6. [Caveats](#caveats)
+7. [Milestones](#milestones)
 
-## Motivation
+## Description
 
 Currently [WebRTC](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [lacks](https://stackoverflow.com/questions/61140228/kubernetes-loadbalancer-open-a-wide-range-thousands-of-port)
@@ -47,19 +46,16 @@ would allow to deploy a WebRTC backend service into Kubernetes and enjoy the
 and [high
 availability](https://blog.cloudflare.com/announcing-our-real-time-communications-platform) we have
 come to expect from modern network services. Worse yet, the entire industry relies on a handful of
-[public STUN/TURN servers](https://www.npmjs.com/package/freeice) to connect clients behind a
-firewall, which may create a useless dependency on externally operated services, introduce a
-bottleneck, needlessly increase UDP/RTP delay/jitter by stretching the round-trip time between
-clients and media servers through a public TURN server, and raise certain security concerns related
-to third-parties accessing all media communications (even if encrypted).
+[public](https://bloggeek.me/google-free-turn-server/) [STUN
+servers](https://www.npmjs.com/package/freeice) to connect clients behind a firewall, which may
+create a useless dependency on externally operated services, introduce a bottleneck, and raise
+security concerns.
 
 The main goal of STUNner is to allow *anyone* to deploy their own WebRTC infrastructure into
 Kubernetes, without relying on any external service other than the cloud-provider's standard hosted
 Kubernetes offering, and enjoy the unmatched
 [manageability](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) Kubernetes
 provides to cloud-bound workloads.
-
-## Description
 
 STUNner is a gateway for ingesting WebRTC media traffic into a Kubernetes cluster. This makes it
 possible to deploy WebRTC application servers and media servers into ordinary Kubernetes pods,
