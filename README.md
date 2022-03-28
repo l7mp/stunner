@@ -90,21 +90,20 @@ ecosystem.
 * **No reliance on external services for NAT traversal.** Can't afford a decent [hosted TURN
   service](https://bloggeek.me/webrtc-turn) for client-side NAT traversal? Can't get good
   audio/video quality because the TURN service poses a bottleneck? Or just want to save on your NAT
-  traversal infra? STUNner is easy to be deployed into any Kubernetes cluster and it allows *any*
-  WebRTC client to connect to your WebRTC infrastructure, deployed into the same cluster, without
-  the use of *any* public STUN/TURN service apart from STUNner itself.
+  traversal infra? STUNner can be deployed into the same cluster as the rest of your WebRTC infra,
+  and any WebRTC client can connect to it directly, without the use of *any* public STUN/TURN
+  service apart from STUNner itself.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
-  servers?  STUNner lets you deploy your media servers into a ordinary Kubernetes pods, tjus
-  scaling your media plane up can be done with a single `kubectl scale` command. What is more,
-  STUNner itself runs in the same cluster as well, so it can be scaled separately from the media
-  servers.
+  servers?  STUNner lets you deploy your media servers into a ordinary Kubernetes pods, thus
+  scaling your media plane up is as easy as issuing a `kubectl scale` command. STUNner itself can
+  be scaled with similar ease, completely separately from the media servers.
 
-* **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server;
-  with STUNner all media is received through a single ingress port. STUNner stores all STUN/TURN
-  credentials and DTLS keys in secure Kubernetes vaults, and uses standard Kubernetes Access
-  Control Lists (ACLs) to lock down network access between your application servers and the media
-  plane.
+* **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server for
+  potentially malicious access; with STUNner all media is received through a single ingress port
+  that you can tightly monitor and control. STUNner stores all STUN/TURN credentials and DTLS keys
+  in secure Kubernetes vaults, and uses standard Kubernetes Access Control Lists (ACLs) to lock
+  down network access between your application servers and the media plane.
 
 * **Simple code and extremely small size.** Written in pure Go using the battle-tested
   [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundred
@@ -115,7 +114,7 @@ ecosystem.
 
 STUNner comes with prefab deployment manifests to fire up a fully functional STUNner-based WebRTC
 media gateway in minutes. Note that the default deployment does not contain an application server
-and a media server. STUNner in itself is not a WebRTC backend, it is just an *enabler* for you to
+and a media server: STUNner in itself is not a WebRTC backend, it is just an *enabler* for you to
 deploy your *own* WebRTC infrastructure into Kubernetes and make sure your media servers are still
 reachable for WebRTC clients, despite running with a private IP address inside a Kubernetes pod.
 
@@ -165,7 +164,9 @@ $ git clone https://github.com/l7mp/stunner.git
 $ cd stunner
 ```
 
-Then, deploy the STUNner service [manifest](kubernetes/stunner.yaml).
+Then, customize the default STUNner settings (see the `ConfigMap` named `stunner-config` in the
+default namespace), deploy the STUNner service [manifest](kubernetes/stunner.yaml).
+
 ```console
 $ kubectl apply -f kubernetes/stunner.yaml
 ```
