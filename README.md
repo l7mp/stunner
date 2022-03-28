@@ -53,8 +53,8 @@ security concerns.
 
 The main goal of STUNner is to allow *anyone* to deploy their own WebRTC infrastructure into
 Kubernetes, without relying on any external service other than the cloud-provider's standard hosted
-Kubernetes offering. STUNner is a gateway for ingesting WebRTC media traffic into a Kubernetes
-cluster. This is achieved by STUNner exposing a pubic-facing STUN/TURN server that WebRTC clients
+Kubernetes offering. This is achieved by STUNner acting as a gateway for ingesting WebRTC media
+traffic into a Kubernetes cluster, exposing a public-facing STUN/TURN server that WebRTC clients
 can use to open a transport relay connection to a media server running *inside* the Kubernetes
 cluster. This makes it possible to deploy WebRTC application servers and media servers into
 ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
@@ -73,9 +73,8 @@ STUNner aims to change this state-of-the-art, by exposing a single public STUN/T
 ingesting *all* media traffic into a Kubernetes cluster in a controlled and standards-compliant
 way.
 
-You may wonder why not using a well-known [STUN/TURN server](https://github.com/coturn/coturn)
-instead of STUNner. Nothing stops you from doing that; however, STUNner comes with a set of unique
-features that allow it to seamlessly fit into the Kubernetes ecosystem.
+STUNner comes with a set of unique features that allow it to seamlessly fit into the Kubernetes
+ecosystem.
 
 * **Seamless integration with Kubernetes.** STUNner can be deployed into any Kubernetes cluster,
   even into restricted ones like GKE Autopilot, using a single command. Manage your HTTP/HTTPS
@@ -84,15 +83,22 @@ features that allow it to seamlessly fit into the Kubernetes ecosystem.
 
 * **Expose a WebRTC media server on a single external UDP port.** No more Kubernetes
   [anti-patterns](https://kubernetes.io/docs/concepts/configuration/overview) just to virtualize
-  your WebRTC media plane, No need for privileged pods and `hostNetwork`/`hostPort` services!
-  Using STUNner a typical WebRTC deployment needs only two public-facing ports, one HTTPS port for
-  the application server and a *single* UDP port one for *all* your media.
+  your WebRTC media plane, no more privileged pods and `hostNetwork`/`hostPort` services!  Using
+  STUNner a typical WebRTC deployment needs only two public-facing ports, one HTTPS port for the
+  application server and a *single* UDP port one for *all* your media.
+
+* **No reliance on external services for NAT traversal.** Can't afford a decent [hosted TURN
+  service](https://bloggeek.me/webrtc-turn) for client-side NAT traversal? Can't get good
+  audio/video quality because the TURN service poses a bottleneck? Or just want to save on your NAT
+  traversal infra? STUNner is easy to be deployed into any Kubernetes cluster and it allows *any*
+  WebRTC client to connect to your WebRTC infrastructure, deployed into the same cluster, without
+  the use of *any* public STUN/TURN service apart from STUNner itself.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
-  servers? Can't get sufficient audio/voice quality because public TURN servers pose a bottleneck?
-  STUNner can be scaled up with a single `kubectl scale` command and, since now you can deploy your
-  media servers into a ordinary Kubernetes pods behind STUNner, the same applies to the entire
-  media plane!
+  servers?  STUNner lets you deploy your media servers into a ordinary Kubernetes pods, tjus
+  scaling your media plane up can be done with a single `kubectl scale` command. What is more,
+  STUNner itself runs in the same cluster as well, so it can be scaled separately from the media
+  servers.
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server;
   with STUNner all media is received through a single ingress port. STUNner stores all STUN/TURN
