@@ -23,20 +23,20 @@
      inkscape:pagecheckerboard="0"
      showgrid="false"
      inkscape:zoom="1.2084746"
-     inkscape:cx="460.91164"
-     inkscape:cy="125.36466"
+     inkscape:cx="590"
+     inkscape:cy="140.25947"
      inkscape:window-width="1800"
      inkscape:window-height="1037"
      inkscape:window-x="112"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg76" />
+     inkscape:current-layer="t127858005" />
   <rect
-     x="130"
-     y="290"
-     width="1180"
-     height="280"
-     fill="#ffffff"
+     x="130.0"
+     y="290.0"
+     width="1180.0"
+     height="280.0"
+     fill="rgb(255,255,255)"
      id="rect2" />
   <polygon
      id="s111473554"
@@ -60,7 +60,7 @@
        y="399.99997"
        width="139.99991"
        height="100.0"
-       fill="rgb(204,255,144)"
+       fill="rgb(187,222,251)"
        stroke-width="2.0"
        stroke="rgb(0,0,0)"
        rx="20.0"
@@ -111,37 +111,36 @@
     </g>
   </g>
   <g
-     id="g12423293"
-     transform="translate(6.0000869)">
+     id="g12423293">
     <polygon
        id="s146139837"
-       points="439.9999,479.99997 359.9999,479.99985 359.9999,400.00006 439.99973,400 "
+       points="359.9999,400.00006 439.99973,400.0 439.9999,479.99997 359.9999,479.99985 "
        fill="none" />
     <g
        id="t12423293">
       <text
          xml:space="preserve"
-         x="368.49991"
+         x="368.4999"
          y="426.91602"
-         font-family="Sans, Helvetica"
-         fill="#000000"
-         font-size="14px"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
          id="text21">127.0.0.1:</text>
       <text
          xml:space="preserve"
-         x="383.99991"
-         y="445.49609"
-         font-family="Sans, Helvetica"
-         fill="#000000"
-         font-size="14px"
+         x="383.9999"
+         y="445.4961"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
          id="text23">9000</text>
       <text
          xml:space="preserve"
-         x="399.99991"
+         x="399.9999"
          y="464.07617"
-         font-family="Sans, Helvetica"
-         fill="#000000"
-         font-size="14px"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
          id="text25" />
     </g>
   </g>
@@ -238,14 +237,14 @@
     </g>
   </g>
   <g
-     id="g262107475">
+     id="g262107475"
+     transform="translate(-22)">
     <polygon
        id="s189337603"
-       points="680.5,400.0 840.49994,400.0 840.5,460.0 680.5,459.99994 "
+       points="680.5,459.99994 680.5,400 840.49994,400 840.5,460 "
        fill="none" />
     <g
-       id="t262107475"
-       transform="translate(-21.255378,-1.2881542)">
+       id="t262107475">
       <text
          xml:space="preserve"
          x="680"
@@ -265,24 +264,25 @@
     </g>
   </g>
   <g
-     id="g127858005"
-     transform="translate(-17.99994)">
+     id="g127858005">
     <polygon
        id="s105835392"
-       points="960,359.99997 820,360 820,320 960,320 "
+       points="820.0,320.0 960.0,320.0 960.0,359.99997 820.0,360.0 "
        fill="none" />
     <g
        id="t127858005">
       <text
          xml:space="preserve"
-         x="832.5"
-         y="345.49609"
-         font-family="Sans,Helvetica"
+         x="810.70404"
+         y="345.89828"
+         font-family="Sans, Helvetica"
          font-style="italic"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         fill="#000000"
+         font-size="14px"
          id="text60"
-         style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:17.3333px;font-family:Sans, Helvetica;-inkscape-font-specification:'Sans, Helvetica, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000"> Kubernetes cluster</text>
+         style="font-style:italic;font-size:14px;font-family:Sans, Helvetica;fill:#000000"><tspan
+           style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:Sans, Helvetica;-inkscape-font-specification:'Sans, Helvetica, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal"
+           id="tspan1065"> Kubernetes cluster</tspan></text>
     </g>
   </g>
   <g
@@ -294,13 +294,13 @@
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s5993913"
+       id="s57192978"
        d="M 329.178,442.26935 319.9999,449.99997 329.178,457.7306 "
        fill="none"
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s182824446"
+       id="s96566755"
        d="M 430.82175,457.73062 439.99985,450.0 430.82175,442.26938 "
        fill="none"
        stroke-width="2.0"
@@ -315,13 +315,13 @@
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s256026975"
+       id="s139457504"
        d="M 989.1781,442.26932 980.0,449.99994 989.1781,457.73056 "
        fill="none"
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s225918892"
+       id="s93931161"
        d="M 1110.8226,457.73056 1120.0007,449.99994 1110.8226,442.26932 "
        fill="none"
        stroke-width="2.0"
@@ -336,13 +336,13 @@
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s204780661"
+       id="s152821086"
        d="M 589.1778,442.26938 579.9997,450.0 589.1778,457.73062 "
        fill="none"
        stroke-width="2.0"
        stroke="rgb(0,0,0)" />
     <path
-       id="s149597194"
+       id="s50599231"
        d="M 830.8219,457.73056 840.0,449.99994 830.8219,442.26932 "
        fill="none"
        stroke-width="2.0"

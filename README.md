@@ -264,7 +264,6 @@ We test the STUNner installation by deploying a UDP echo server into the cluster
 for external access via STUNner.
 
 ![STUNner demo setup](./doc/stunner_echo.svg)
-<img src="./doc/stunner_echo.svg">
 
 First, we create a `Deployment` called `udp-echo`, currently containing only a single pod, make
 this pod available over the UDP port 9001 as a cluster-internal service with the same name, and use
