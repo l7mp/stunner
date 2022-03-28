@@ -1,11 +1,11 @@
 # STUNner: A Kubernetes ingress gateway for WebRTC
 
-**WORK IN PROGRESS**
+**(WORK IN PROGRESS)**
 
 STUNner is a cloud-native STUN/TURN server that enables hosting scalable WebRTC services over
 Kubernetes.
 
-Ever wondered how you are going to [deploy your WebRTC infrastructure into the
+Ever wondered how to [deploy your WebRTC infrastructure into the
 cloud](https://webrtchacks.com/webrtc-media-servers-in-the-cloud)? Frightened away by the
 complexities of Kubernetes container networking, and the surprising ways in which it may interact
 with your UDP/RTP media? Tried to read through the endless stream of [Stack
@@ -689,6 +689,13 @@ notable limitations at this point are as follows.
 STUN/TURN [long term credential
 mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of our TODO
 list, please bear with us for now.
+* STUNner is not intended to be used as a "conventional" STUN/TURN server. Running inside a
+  Kubernetes pod, STUNner will not be able to identify the public IP address of a client sending a
+  STUN binding request to it, and the TURN transport relay connections opened by STUNner will not
+  be reachable externally, only pods *inside* the Kubernetes cluster will be able to connect. This
+  is enough to support the intended use case of STUNner: a Kubernetes ingress gateway exposing a
+  STUN/TURN compatible server to WebRTC clients to reach the media servers running inside the
+  cluster.
 * Access through STUnner to the rest of the cluster *must* be locked down with a Kubernetes
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
   externally; see the [notes on access control](#access-control).
