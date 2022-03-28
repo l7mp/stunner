@@ -23,14 +23,14 @@
      inkscape:pagecheckerboard="0"
      showgrid="false"
      inkscape:zoom="1.2084746"
-     inkscape:cx="590"
+     inkscape:cx="952.44039"
      inkscape:cy="140.25947"
      inkscape:window-width="1800"
      inkscape:window-height="1037"
      inkscape:window-x="112"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="t127858005" />
+     inkscape:current-layer="svg76" />
   <rect
      x="130.0"
      y="290.0"
@@ -183,30 +183,32 @@
        rx="19.99998"
        ry="19.99998" />
     <g
-       id="t87700413">
+       id="t87700413"
+       transform="translate(-4)">
       <text
          xml:space="preserve"
          x="1139.5009"
-         y="446.206"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         y="446.20599"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
          id="text36">UDP echo server</text>
       <text
          xml:space="preserve"
          x="1172.5009"
          y="464.78607"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
          id="text38">socat</text>
     </g>
   </g>
   <g
-     id="g112840114">
+     id="g112840114"
+     transform="translate(-14)">
     <polygon
        id="s237549746"
-       points="1020.0,400.00006 1119.9983,400.0 1119.9988,480.0 1020.0,479.99985 "
+       points="1020,479.99985 1020,400.00006 1119.9983,400 1119.9988,480 "
        fill="none" />
     <g
        id="t112840114">
@@ -214,25 +216,25 @@
          xml:space="preserve"
          x="1023.9994"
          y="426.91602"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
          id="text44">UDP_ECHO_IP:</text>
       <text
          xml:space="preserve"
          x="1053.9994"
-         y="445.4961"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         y="445.49609"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
          id="text46">9001</text>
       <text
          xml:space="preserve"
          x="1069.9994"
          y="464.07617"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
          id="text48" />
     </g>
   </g>
