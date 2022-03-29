@@ -23,8 +23,8 @@
      inkscape:pagecheckerboard="0"
      showgrid="false"
      inkscape:zoom="1.2084746"
-     inkscape:cx="952.44039"
-     inkscape:cy="140.25947"
+     inkscape:cx="757.15286"
+     inkscape:cy="196.115"
      inkscape:window-width="1800"
      inkscape:window-height="1037"
      inkscape:window-x="112"
@@ -32,19 +32,20 @@
      inkscape:window-maximized="1"
      inkscape:current-layer="svg76" />
   <rect
-     x="130.0"
-     y="290.0"
-     width="1180.0"
-     height="280.0"
-     fill="rgb(255,255,255)"
+     x="130"
+     y="290"
+     width="1180"
+     height="280"
+     fill="#ffffff"
      id="rect2" />
   <polygon
      id="s111473554"
-     points="820.00006,360.0 1280.0,360.0 1280.0,540.00006 820.00006,540.00006 "
+     points="1280,540.00006 820.00006,540.00006 820.00006,360 1280,360 "
      fill="none"
-     stroke-width="2.0"
-     stroke="rgb(0,0,0)"
-     stroke-dasharray="7.0 7.0" />
+     stroke-width="2"
+     stroke="#000000"
+     stroke-dasharray="7, 7"
+     transform="translate(1.306617e-4)" />
   <polygon
      id="s159107826"
      points="160.00002,360.00003 600.0,360.00003 599.9995,540.00006 159.99998,539.9999 "
@@ -145,29 +146,19 @@
     </g>
   </g>
   <g
-     id="g33">
+     id="g33"
+     transform="translate(-8)">
     <rect
        id="s58822420"
-       x="840.0"
-       y="400.0"
-       width="140.0"
-       height="99.99991"
-       fill="rgb(204,255,144)"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)"
-       rx="19.99998"
-       ry="19.99998" />
-    <g
-       id="t58822420">
-      <text
-         xml:space="preserve"
-         x="882.5"
-         y="455.49603"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
-         id="text30">STUNner</text>
-    </g>
+       x="840"
+       y="400"
+       width="140"
+       height="99.999908"
+       fill="#ccff90"
+       stroke-width="2"
+       stroke="#000000"
+       rx="19.999981"
+       ry="19.999981" />
   </g>
   <g
      id="g41">
@@ -222,7 +213,7 @@
          id="text44">UDP_ECHO_IP:</text>
       <text
          xml:space="preserve"
-         x="1053.9994"
+         x="1093.9994"
          y="445.49609"
          font-family="Sans, Helvetica"
          fill="#000000"
@@ -249,7 +240,7 @@
        id="t262107475">
       <text
          xml:space="preserve"
-         x="680"
+         x="660"
          y="426.20605"
          font-family="Sans, Helvetica"
          fill="#000000"
@@ -257,7 +248,7 @@
          id="text53">STUNNER_PUBLIC_ADDR:</text>
       <text
          xml:space="preserve"
-         x="708.5"
+         x="720.5"
          y="444.78613"
          font-family="Sans, Helvetica"
          fill="#000000"
@@ -309,45 +300,72 @@
        stroke="rgb(0,0,0)" />
   </g>
   <g
-     id="la174093671">
+     id="la174093671"
+     transform="matrix(1.0354198,0,0,1,-39.670249,0)"
+     style="stroke-width:0.982747">
     <path
        id="s174093671"
-       d="M 980.0,449.99994 1120.0007,449.99994 "
+       d="m 980,449.99994 h 140.0007"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="1.96549"
+       stroke="#000000" />
     <path
        id="s139457504"
-       d="M 989.1781,442.26932 980.0,449.99994 989.1781,457.73056 "
+       d="m 989.1781,442.26932 -9.1781,7.73062 9.1781,7.73062"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="1.96549"
+       stroke="#000000" />
     <path
        id="s93931161"
-       d="M 1110.8226,457.73056 1120.0007,449.99994 1110.8226,442.26932 "
+       d="m 1110.8226,457.73056 9.1781,-7.73062 -9.1781,-7.73062"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="1.96549"
+       stroke="#000000" />
   </g>
   <g
-     id="la148719504">
+     id="la148719504"
+     transform="matrix(0.96327906,0,0,1,21.281142,0)"
+     style="stroke-width:1.01888">
     <path
        id="s148719504"
-       d="M 579.9997,450.0 840.0,449.99994 "
+       d="M 579.9997,450 840,449.99994"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="2.03776"
+       stroke="#000000" />
     <path
        id="s152821086"
-       d="M 589.1778,442.26938 579.9997,450.0 589.1778,457.73062 "
+       d="M 589.1778,442.26938 579.9997,450 l 9.1781,7.73062"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="2.03776"
+       stroke="#000000" />
     <path
        id="s50599231"
-       d="M 830.8219,457.73056 840.0,449.99994 830.8219,442.26932 "
+       d="M 830.8219,457.73056 840,449.99994 830.8219,442.26932"
        fill="none"
-       stroke-width="2.0"
-       stroke="rgb(0,0,0)" />
+       stroke-width="2.03776"
+       stroke="#000000" />
   </g>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-weight:normal;font-size:40px;line-height:125%;font-family:Sans;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="955.64771"
+     y="190.10498"
+     id="text2285"><tspan
+       sodipodi:role="line"
+       id="tspan2283"
+       x="955.64771"
+       y="190.10498" /></text>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:40px;line-height:125%;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000080;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="868.72278"
+     y="455.52008"
+     id="text4723"><tspan
+       sodipodi:role="line"
+       id="tspan5033"
+       style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
+       x="868.72278"
+       y="455.52008"><tspan
+   style="font-style:italic;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
+   id="tspan8773">STUN</tspan>ner</tspan></text>
 </svg>

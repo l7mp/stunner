@@ -60,6 +60,8 @@ cluster. This makes it possible to deploy WebRTC application servers and media s
 ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
 monitor and troubleshoot the WebRTC infrastructure like any other cloud-bound workload.
 
+![STUNner architecture](./doc/stunner_arch.svg)
+
 Don't worry about the performance implications of processing all your media through a TURN server:
 STUNner is written in [Go](https://go.dev) so it is extremely fast, it is co-located with your
 media server pool so you don't pay the round-trip time to a far-away public STUN/TURN server, and
@@ -134,7 +136,7 @@ STUNner will need the below Kubernetes resources configured and deployed in orde
    (by default, the port is UDP 3478), and finally
 4. an ACL/firewall policy to control network communication from STUNner to the rest of the cluster.
 
-The installation scripts packaged will STUNner will use hard-coded configuration defaults. Make
+The installation scripts packaged with STUNner will use hard-coded configuration defaults. Make
 sure to customize the defaults before deploying STUNner; in particular, make absolutely sure to
 customize the access tokens (`STUNNER_REALM`, `STUNNER_USERNAME` and `STUNNER_PASSWORD`), otherwise
 STUNner will use hard-coded STUN/TURN credentials. This should not pose a major security risk (see
