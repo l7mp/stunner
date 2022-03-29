@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: stunner-job
+  name: stunner-post-install
   labels: 
     job: stunner-job
 spec:
@@ -10,7 +10,7 @@ spec:
     spec:
       serviceAccountName: job-sa
       containers:
-      - name: test
+      - name: post-install
         image: l7mp/stunner-job:latest
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash"]
