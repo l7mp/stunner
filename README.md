@@ -60,7 +60,7 @@ cluster. This makes it possible to deploy WebRTC application servers and media s
 ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
 monitor and troubleshoot the WebRTC infrastructure like any other cloud-bound workload.
 
-![STUNner architecture](./doc/stunner_arch.svg | width=500)
+![STUNner architecture](./doc/stunner_arch.svg)
 
 Don't worry about the performance implications of processing all your media through a TURN server:
 STUNner is written in [Go](https://go.dev) so it is extremely fast, it is co-located with your
