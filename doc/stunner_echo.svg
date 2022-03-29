@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1180.0"
+   height="280.0"
+   viewBox="130.0 290.0 1180.0 280.0"
+   version="1.1"
+   id="svg76"
+   sodipodi:docname="stunner_echo.svg"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs80" />
+  <sodipodi:namedview
+     id="namedview78"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     showgrid="false"
+     inkscape:zoom="1.2084746"
+     inkscape:cx="757.15286"
+     inkscape:cy="81.921457"
+     inkscape:window-width="1800"
+     inkscape:window-height="1037"
+     inkscape:window-x="112"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg76" />
+  <rect
+     x="130"
+     y="290"
+     width="1180"
+     height="280"
+     fill="#ffffff"
+     id="rect2" />
+  <polygon
+     id="s111473554"
+     points="1280,540.00006 820.00006,540.00006 820.00006,360 1280,360 "
+     fill="none"
+     stroke-width="2"
+     stroke="#000000"
+     stroke-dasharray="7, 7"
+     transform="translate(1.306617e-4)" />
+  <polygon
+     id="s159107826"
+     points="160.00002,360.00003 600.0,360.00003 599.9995,540.00006 159.99998,539.9999 "
+     fill="none"
+     stroke-width="2.0"
+     stroke="rgb(0,0,0)"
+     stroke-dasharray="7.0 7.0" />
+  <g
+     id="g12">
+    <rect
+       id="s110001004"
+       x="180.0"
+       y="399.99997"
+       width="139.99991"
+       height="100.0"
+       fill="rgb(187,222,251)"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)"
+       rx="20.0"
+       ry="20.0" />
+    <g
+       id="t110001004">
+      <text
+         xml:space="preserve"
+         x="218.49995"
+         y="446.20602"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text7">UDP client</text>
+      <text
+         xml:space="preserve"
+         x="232.49995"
+         y="464.7861"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text9">socat</text>
+    </g>
+  </g>
+  <g
+     id="g18">
+    <rect
+       id="s7775352"
+       x="439.99982"
+       y="400.0"
+       width="139.99985"
+       height="100.00003"
+       fill="rgb(187,222,251)"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)"
+       rx="20.000006"
+       ry="20.000006" />
+    <g
+       id="t7775352">
+      <text
+         xml:space="preserve"
+         x="486.99976"
+         y="455.4961"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text15">turncat</text>
+    </g>
+  </g>
+  <g
+     id="g12423293">
+    <polygon
+       id="s146139837"
+       points="359.9999,400.00006 439.99973,400.0 439.9999,479.99997 359.9999,479.99985 "
+       fill="none" />
+    <g
+       id="t12423293">
+      <text
+         xml:space="preserve"
+         x="368.4999"
+         y="426.91602"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text21">127.0.0.1:</text>
+      <text
+         xml:space="preserve"
+         x="383.9999"
+         y="445.4961"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text23">9000</text>
+      <text
+         xml:space="preserve"
+         x="399.9999"
+         y="464.07617"
+         font-family="Sans,Helvetica"
+         fill="rgb(0,0,0)"
+         font-size="14"
+         id="text25" />
+    </g>
+  </g>
+  <g
+     id="g33"
+     transform="translate(-8)">
+    <rect
+       id="s58822420"
+       x="840"
+       y="400"
+       width="140"
+       height="99.999908"
+       fill="#ccff90"
+       stroke-width="2"
+       stroke="#000000"
+       rx="19.999981"
+       ry="19.999981" />
+  </g>
+  <g
+     id="g41">
+    <rect
+       id="s87700413"
+       x="1120.0007"
+       y="400.0"
+       width="140.00024"
+       height="99.99991"
+       fill="rgb(204,255,144)"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)"
+       rx="19.99998"
+       ry="19.99998" />
+    <g
+       id="t87700413"
+       transform="translate(-4)">
+      <text
+         xml:space="preserve"
+         x="1139.5009"
+         y="446.20599"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text36">UDP echo server</text>
+      <text
+         xml:space="preserve"
+         x="1172.5009"
+         y="464.78607"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text38">socat</text>
+    </g>
+  </g>
+  <g
+     id="g112840114"
+     transform="translate(-14)">
+    <polygon
+       id="s237549746"
+       points="1020,479.99985 1020,400.00006 1119.9983,400 1119.9988,480 "
+       fill="none" />
+    <g
+       id="t112840114">
+      <text
+         xml:space="preserve"
+         x="1023.9994"
+         y="426.91602"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text44">UDP_ECHO_IP:</text>
+      <text
+         xml:space="preserve"
+         x="1093.9994"
+         y="445.49609"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text46">9001</text>
+      <text
+         xml:space="preserve"
+         x="1069.9994"
+         y="464.07617"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text48" />
+    </g>
+  </g>
+  <g
+     id="g262107475"
+     transform="translate(-22)">
+    <polygon
+       id="s189337603"
+       points="680.5,459.99994 680.5,400 840.49994,400 840.5,460 "
+       fill="none" />
+    <g
+       id="t262107475">
+      <text
+         xml:space="preserve"
+         x="660"
+         y="426.20605"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text53">STUNNER_PUBLIC_ADDR:</text>
+      <text
+         xml:space="preserve"
+         x="720.5"
+         y="444.78613"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text55">STUNNER_PORT</text>
+    </g>
+  </g>
+  <g
+     id="g127858005">
+    <polygon
+       id="s105835392"
+       points="820.0,320.0 960.0,320.0 960.0,359.99997 820.0,360.0 "
+       fill="none" />
+    <g
+       id="t127858005">
+      <text
+         xml:space="preserve"
+         x="810.70404"
+         y="345.89828"
+         font-family="Sans, Helvetica"
+         font-style="italic"
+         fill="#000000"
+         font-size="14px"
+         id="text60"
+         style="font-style:italic;font-size:14px;font-family:Sans, Helvetica;fill:#000000"><tspan
+           style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:Sans, Helvetica;-inkscape-font-specification:'Sans, Helvetica, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal"
+           id="tspan1065"> Kubernetes cluster</tspan></text>
+    </g>
+  </g>
+  <g
+     id="la172684087">
+    <path
+       id="s172684087"
+       d="M 319.9999,449.99997 439.99985,450.0 "
+       fill="none"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)" />
+    <path
+       id="s57192978"
+       d="M 329.178,442.26935 319.9999,449.99997 329.178,457.7306 "
+       fill="none"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)" />
+    <path
+       id="s96566755"
+       d="M 430.82175,457.73062 439.99985,450.0 430.82175,442.26938 "
+       fill="none"
+       stroke-width="2.0"
+       stroke="rgb(0,0,0)" />
+  </g>
+  <g
+     id="la174093671"
+     transform="matrix(1.0354198,0,0,1,-39.670249,0)"
+     style="stroke-width:0.982747">
+    <path
+       id="s174093671"
+       d="m 980,449.99994 h 140.0007"
+       fill="none"
+       stroke-width="1.96549"
+       stroke="#000000" />
+    <path
+       id="s139457504"
+       d="m 989.1781,442.26932 -9.1781,7.73062 9.1781,7.73062"
+       fill="none"
+       stroke-width="1.96549"
+       stroke="#000000" />
+    <path
+       id="s93931161"
+       d="m 1110.8226,457.73056 9.1781,-7.73062 -9.1781,-7.73062"
+       fill="none"
+       stroke-width="1.96549"
+       stroke="#000000" />
+  </g>
+  <g
+     id="la148719504"
+     transform="matrix(0.96327906,0,0,1,21.281142,0)"
+     style="stroke-width:1.01888">
+    <path
+       id="s148719504"
+       d="M 579.9997,450 840,449.99994"
+       fill="none"
+       stroke-width="2.03776"
+       stroke="#000000" />
+    <path
+       id="s152821086"
+       d="M 589.1778,442.26938 579.9997,450 l 9.1781,7.73062"
+       fill="none"
+       stroke-width="2.03776"
+       stroke="#000000" />
+    <path
+       id="s50599231"
+       d="M 830.8219,457.73056 840,449.99994 830.8219,442.26932"
+       fill="none"
+       stroke-width="2.03776"
+       stroke="#000000" />
+  </g>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-weight:normal;font-size:40px;line-height:125%;font-family:Sans;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="955.64771"
+     y="190.10498"
+     id="text2285"><tspan
+       sodipodi:role="line"
+       id="tspan2283"
+       x="955.64771"
+       y="190.10498" /></text>
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:40px;line-height:125%;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000080;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     x="858.72278"
+     y="455.52008"
+     id="text4723"><tspan
+       sodipodi:role="line"
+       id="tspan5033"
+       style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
+       x="858.72278"
+       y="455.52008"><tspan
+   style="font-style:italic;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
+   id="tspan8773">STUN</tspan>ner</tspan></text>
+</svg>
