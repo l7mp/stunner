@@ -31,6 +31,9 @@ func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
 	levels := strings.Split(levelSpec, ",")
 	for _, s := range levels {
 		scopedLevel := strings.SplitN(s, ":", 2)
+		if len(scopedLevel) != 2 {
+			continue
+		}
 		scope := scopedLevel[0]
 		level := scopedLevel[1]
 		l, found := logLevels[strings.ToUpper(level)]
