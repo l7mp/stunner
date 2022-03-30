@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "stunner_helm.name" . }}
-  namespace: {{ .Values.turnServer.namespace }}
+  namespace: {{ .Values.stunner.namespace }}
   labels:
     {{- include "stunner_helm.labels" . | nindent 4 }}
 spec:
@@ -12,11 +12,11 @@ spec:
     #   targetPort: 3478
     #   protocol: TCP
     #   name: sidecar-stun-tcp
-    - port: {{ .Values.turnServer.service.port }}
-      targetPort: {{ .Values.turnServer.service.port }}
+    - port: {{ .Values.stunner.service.port }}
+      targetPort: {{ .Values.stunner.service.port }}
       protocol: UDP
       name: stunner-udp
   type: LoadBalancer
   selector:
-    {{- include "stunner_helm.turnServer.selectorLabels" . | nindent 4 }}
+    {{- include "stunner_helm.stunner.selectorLabels" . | nindent 4 }}
 ---

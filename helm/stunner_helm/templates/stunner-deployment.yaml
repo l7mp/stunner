@@ -2,22 +2,21 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "stunner_helm.name" . }}
-  namespace: {{ .Values.turnServer.namespace }}
+  namespace: {{ .Values.stunner.namespace }}
 spec:
   selector:
     matchLabels:
       {{- include "stunner_helm.labels" . | nindent 6 }}
-  replicas: 1
+  replicas: {{ .Values.stunner.deployment.replica }}
   template:
     metadata:
       labels:
         {{- include "stunner_helm.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: job-sa
       containers:
-      - name: {{ .Values.turnServer.deployment.container.name }}
-        image: "{{ .Values.turnServer.deployment.container.image.repository }}{{ .Values.turnServer.deployment.container.image.name }}:{{ .Values.turnServer.deployment.container.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.turnServer.deployment.container.image.pullPolicy }}
+      - name: {{ .Values.stunner.deployment.container.name }}
+        image: "{{ .Values.stunner.deployment.container.image.repository }}{{ .Values.stunner.deployment.container.image.name }}:{{ .Values.stunner.deployment.container.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.stunner.deployment.container.image.pullPolicy }}
         command: ["stunnerd"]
         # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
         args: []
@@ -29,7 +28,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-{{- if eq .Values.turnServer.deployment.container.netdebug "enable"}}
+        resources: {{- toYaml .Values.stunner.deployment.container.image.resources | nindent 10 }}
+{{- if eq .Values.stunner.deployment.container.netdebug "enable"}}
       - name: net-debug
         image: retvari/net-debug:latest
         command: ["/bin/sh"]

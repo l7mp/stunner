@@ -1,0 +1,4 @@
+{{ .Chart.Name }} successfully installed
+!IMPORTANT!
+Customize the default values below stunner.config
+for your own interest!

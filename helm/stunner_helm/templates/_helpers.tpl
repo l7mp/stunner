@@ -34,7 +34,7 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "stunner_helm.labels" -}}
-{{ include "stunner_helm.turnServer.selectorLabels" . }}
+{{ include "stunner_helm.stunner.selectorLabels" . }}
 helm.sh/chart: {{ include "stunner_helm.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -45,24 +45,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels for turn server
 */}}
-{{- define "stunner_helm.turnServer.selectorLabels" -}}
-app: {{ .Values.turnServer.deployment.label }}
+{{- define "stunner_helm.stunner.selectorLabels" -}}
+app: {{ .Values.stunner.deployment.label }}
 app.kubernetes.io/name: {{ include "stunner_helm.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{/*
-Selector labels for application server
-*/}}
-{{- define "stunner_helm.applicationServer.selectorLabels" -}}
-app: {{ .Values.applicationServer.deployment.name }}
-{{- end }}
-
-{{/*
-Selector labels for media server
-*/}}
-{{- define "stunner_helm.mediaServer.selectorLabels" -}}
-app: {{ .Values.mediaServer.deployment.name }}
 {{- end }}
 
 {{/*
