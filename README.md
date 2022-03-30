@@ -711,7 +711,8 @@ notable limitations at this point are as follows.
   load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
-* [TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) is not supported at the moment.
+* [TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) and the WebRTC DataChannel API are
+  not supported at the moment.
 
 ## Milestones
 
