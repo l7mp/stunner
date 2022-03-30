@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"context"
 	"strings"
+	"strconv"
 	"syscall"
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 	"errors"
 
 	// "bytes"
@@ -36,13 +38,14 @@ type connection struct {
 	serverConn net.PacketConn // Relayed UDP connection to server
 }
 
+type AuthGen func() (string, string, error)
+
 type TurncatConfig struct {
 	ListenAddr     string			// Listening socket address (local tunnel endpoint).
 	ServerAddr     string			// TURN server addrees (e.g. "turn:turn.abc.com:3478").
 	PeerAddr       string			// The remote peer to connec to.
-	Username       string			// Username.
-	Password       string			// Password.
 	Realm          string			// Realm.
+	AuthGen        AuthGen                  // Generate auth tokens
 	LoggerFactory  logging.LoggerFactory	// Logger.
 }
 
@@ -53,10 +56,9 @@ type Turncat struct {
 	listenConn    net.PacketConn
 	connTrack     map[string]*connection  // conntrack table
 	lock          *sync.Mutex             // sync access to the conntrack state
-	username      string
-	password      string
 	realm         string
-	loggerFactory logging.LoggerFactory	// Logger.
+	authGen       AuthGen                 // Generate auth tokens
+	loggerFactory logging.LoggerFactory   // Logger.
 }
 
 //////////
@@ -103,6 +105,20 @@ func reuseAddr(network, address string, conn syscall.RawConn) error {
 		syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
 	})
+}
+
+func envDefault(env, def string) string {
+	e, ok := os.LookupEnv(env)
+	if ok { return e } else { return def }
+}
+
+func envDefaultUint(env string, def int) uint {
+	r, err := strconv.ParseUint(envDefault(env, fmt.Sprintf("%d", def)), 10, 16)
+	if err != nil {
+		fmt.Printf("Invalid integer value in %s: %d\n", env, def)
+		os.Exit(1)
+	}
+	return uint(r)
 }
 
 ///////
@@ -189,9 +205,8 @@ func NewTurncat(config TurncatConfig) (*Turncat, error) {
 		listenConn:     listenConn,
 		connTrack:      make(map[string]*connection),
 		lock:           new(sync.Mutex),
-		username:       config.Username,
-		password:       config.Password,
 		realm:          config.Realm,
+		authGen:        config.AuthGen,
 		loggerFactory:  loggerFactory,
 	}
 
@@ -230,17 +245,24 @@ func (t *Turncat) NewConnection(clientAddr net.Addr) (*connection, error) {
 	// PacketConn for the TURN server as it will not create one
 	turnConn, err := net.ListenPacket("udp4", "0.0.0.0:0")
 	if err != nil {
-		log.Warnf("cannot allocate TURN listening socket for client %s: %s",
+		log.Warnf("cannot allocate TURN listening socket for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), err)
 		return nil, err
 	}
 
+	user, passwd, errAuth := t.authGen()
+	if errAuth != nil {
+		log.Warnf("cannot generate username/password pair for client %s:%s: %s",
+			clientAddr.Network(), clientAddr.String(), errAuth)
+		return nil, errAuth
+	}
+	
 	turnClient, err := turn.NewClient(&turn.ClientConfig{
 		STUNServerAddr: t.serverAddr.String(),
 		TURNServerAddr: t.serverAddr.String(),
 		Conn:           turnConn,
-		Username:       t.username,
-		Password:       t.password,
+		Username:       user,
+		Password:       passwd,
 		Realm:          t.realm,
 		LoggerFactory:  t.loggerFactory,
 	})
@@ -470,37 +492,94 @@ func (t *Turncat) Run(p context.Context) {
 //////////////////
 
 func main() {
-	var realm, level, user string
+	usage := "turncat [-a|--auth=static|long-term] [-s|--shared-secret=<my-secret> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] <udp:listener_addr:listener_port> [turn:server_addr:server_port] <udp:peer_addr:peer_port>"
+
+	// can be overriden on the command line
+	dAuth     := envDefault("STUNNER_AUTH",                   "static")
+	dSecret   := envDefault("STUNNER_SHARED_SECRET",          "my-secret")
+	dDuration := envDefault("STUNNER_CREDENTIAL_DURATION",    "1h30m")
+	dRealm    := envDefault("STUNNER_REALM",                  "stunner.l7mp.io")
+	dServer   := envDefault("STUNNER_ADDR",                   "127.0.0.1")
+	dPort 	  := envDefaultUint("STUNNER_PORT",                3478)
+	dUser     := envDefault("STUNNER_USERNAME",               "user")
+	dPasswd	  := envDefault("STUNNER_PASSWORD",               "pass")
+	dLoglevel := envDefault("STUNNER_LOGLEVEL",               "all:ERROR")
+	
+	var auth, authSecret, realm, level, user, duration string
 	var verbose bool
-	usage := "turncat <-u|--user user1=pwd1> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] <udp:listener_addr:listener_port> <turn:server_addr:server_port> <udp:peer_addr:peer_port>"
-	flag.StringVar(&user,  "u",       "user=pass",       "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&user,  "user",    "user=pass",       "A pair of username and password (default: \"user=pass\")")
-	flag.StringVar(&realm, "r",       "stunner.l7mp.io", "Realm (default: \"stunner.l7mp.io\")")
-	flag.StringVar(&realm, "realm",   "stunner.l7mp.io", "Realm (defaults to \"stunner.l7mp.io\")")
-	flag.StringVar(&level, "l",       "all:ERROR",       "Log level (default: all:ERROR)")
-	flag.StringVar(&level, "log",     "all:ERROR",       "Log level (default: all:ERROR)")
-	flag.BoolVar(&verbose, "v",       false,             "Verbose logging, identical to -l all:DEBUG")
-	flag.BoolVar(&verbose, "verbose", false,             "Verbose logging, identical to -l all:DEBUG")
+	// general flags
+	flag.StringVar(&realm, "r",       dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
+	flag.StringVar(&realm, "realm",   dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
+	flag.StringVar(&level, "l",       dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
+	flag.StringVar(&level, "log",     dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
+	flag.BoolVar(&verbose, "v",       false,                 "Verbose logging, identical to -l all:DEBUG")
+	flag.BoolVar(&verbose, "verbose", false,                 "Verbose logging, identical to -l all:DEBUG")
+
+	// authentication mode
+	flag.StringVar(&auth,  "a",    dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
+	flag.StringVar(&auth,  "auth", dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
+	// long-term credential auth
+ 	flag.StringVar(&authSecret, "s",             dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
+	flag.StringVar(&authSecret, "shared-secret", dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
+	flag.StringVar(&duration, "d",               dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
+	flag.StringVar(&duration, "duration",        dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
+	// static username/passwd auth
+	flag.StringVar(&user, "u",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
+	flag.StringVar(&user, "user", dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
 	flag.Parse()
 
-	if len(user) == 0 || flag.NArg() != 3 {
-		fmt.Println(usage)
+	var s, p string
+	switch flag.NArg() {
+	case 2:
+		// server address is taken from the env, peer address is the last arg
+		s = fmt.Sprintf("turn:%s:%s", dServer, dPort)
+		p = flag.Arg(1)
+	case 3:
+		// both server and peer address are provided as args
+		s = flag.Arg(1)
+		p = flag.Arg(2)
+	default:
+		fmt.Fprintf(os.Stderr, usage)
 		os.Exit(1)
 	}
-	cred := strings.SplitN(user, "=", 2)
-
+	
 	if verbose {
 		level = "all:DEBUG"
 	}
 	logger := newLogger(level)
-	
+
+	var authGen AuthGen
+	switch strings.ToLower(auth) {
+	case "static":
+		cred := strings.SplitN(user, "=", 2)
+		if len(cred) != 2 || cred[0] == "" || cred[1] == "" {
+			fmt.Fprintf(os.Stderr, "cannot parse static credential: '%s'\n", user)
+			os.Exit(1)
+		}
+		authGen = func() (string, string, error) {
+			return cred[0], cred[1], nil
+		}
+	case "long-term":
+		d, err := time.ParseDuration(duration)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot parse long-term credential duration '%s': %s",
+				duration, err)
+			os.Exit(1)
+		}
+		authGen = func() (string, string, error) {
+			return turn.GenerateLongTermCredentials(authSecret, d)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown authentication mode: %s", auth)
+		os.Exit(1)
+	}
+
 	cfg := &TurncatConfig{
 		ListenAddr:    flag.Arg(0),
-		ServerAddr:    flag.Arg(1),
-		PeerAddr:      flag.Arg(2),
-		Username:      cred[0],
-		Password:      cred[1],
+		ServerAddr:    s,
+		PeerAddr:      p,
 		Realm:         realm,
+		AuthGen:       authGen,
 		LoggerFactory: logger,
 	}
 
@@ -522,85 +601,3 @@ func main() {
 	t.Close()
 	
 }
-
-///////////////
-const (
-	bracketOpen  string = "{\n"
-	bracketClose string = "}"
-	pointerSign  string = "&"
-	nilSign      string = "<nil>"
-)
-
-// // PrettySprint generates a human readable representation of the value v.
-// func PrettySprint(v interface{}) string {
-// 	value := reflect.ValueOf(v)
-
-// 	// nil
-// 	switch value.Kind() {
-// 	case reflect.Interface, reflect.Map, reflect.Slice, reflect.Ptr:
-// 		if value.IsNil() {
-// 			return nilSign
-// 		}
-// 	}
-
-// 	buff := bytes.Buffer{}
-
-// 	switch value.Kind() {
-// 	case reflect.Struct:
-// 		buff.WriteString(fullName(value.Type()) + bracketOpen)
-
-// 		for i := 0; i < value.NumField(); i++ {
-// 			l := string(value.Type().Field(i).Name[0])
-// 			if strings.ToUpper(l) == l {
-// 				buff.WriteString(fmt.Sprintf("%s: %s,\n", value.Type().Field(i).Name, PrettySprint(value.Field(i).Interface())))
-// 			}
-// 		}
-
-// 		buff.WriteString(bracketClose)
-
-// 		return buff.String()
-// 	case reflect.Map:
-// 		buff.WriteString("map[" + fullName(value.Type().Key()) + "]" + fullName(value.Type().Elem()) + bracketOpen)
-
-// 		for _, k := range value.MapKeys() {
-// 			buff.WriteString(fmt.Sprintf(`"%s":%s,\n`, k.String(), PrettySprint(value.MapIndex(k).Interface())))
-// 		}
-
-// 		buff.WriteString(bracketClose)
-
-// 		return buff.String()
-// 	case reflect.Ptr:
-// 		if e := value.Elem(); e.IsValid() {
-// 			return fmt.Sprintf("%s%s", pointerSign, PrettySprint(e.Interface()))
-// 		}
-
-// 		return nilSign
-// 	case reflect.Slice:
-// 		buff.WriteString("[]" + fullName(value.Type().Elem()) + bracketOpen)
-
-// 		for i := 0; i < value.Len(); i++ {
-// 			buff.WriteString(fmt.Sprintf("%s,\n", PrettySprint(value.Index(i).Interface())))
-// 		}
-
-// 		buff.WriteString(bracketClose)
-
-// 		return buff.String()
-// 	default:
-// 		return fmt.Sprintf("%#v", v)
-// 	}
-// }
-
-// func pkgName(t reflect.Type) string {
-// 	pkg := t.PkgPath()
-// 	c := strings.Split(pkg, "/")
-
-// 	return c[len(c)-1]
-// }
-
-// func fullName(t reflect.Type) string {
-// 	if pkg := pkgName(t); pkg != "" {
-// 		return pkg + "." + t.Name()
-// 	}
-
-// 	return t.Name()
-// }
