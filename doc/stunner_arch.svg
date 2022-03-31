@@ -23,9 +23,9 @@
      inkscape:pageopacity="1"
      inkscape:pagecheckerboard="false"
      showgrid="false"
-     inkscape:zoom="0.76"
-     inkscape:cx="173.68421"
-     inkscape:cy="51.315789"
+     inkscape:zoom="1.0748023"
+     inkscape:cx="588.94552"
+     inkscape:cy="51.172201"
      inkscape:window-width="1800"
      inkscape:window-height="1037"
      inkscape:window-x="112"
@@ -39,7 +39,7 @@
   <rect
      style="fill:#ffffff;stroke:#000080;stroke-width:0;stroke-linejoin:round;paint-order:markers stroke fill"
      id="rect1022"
-     width="1200.7925"
+     width="1200.792"
      height="475.93906"
      x="130"
      y="290" />
@@ -220,6 +220,34 @@
     </g>
   </g>
   <g
+     id="g112840114-4-4"
+     transform="translate(-629.19769,59.47368)">
+    <polygon
+       id="s237549746-8-6"
+       points="1119.9988,480 1020,479.99985 1020,400.00006 1119.9983,400 "
+       fill="none" />
+    <g
+       id="t112840114-0-2"
+       transform="translate(0,-2)">
+      <text
+         xml:space="preserve"
+         x="1056.791"
+         y="437.85916"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text44-4-5">HTTPS/WebSocket</text>
+      <text
+         xml:space="preserve"
+         x="1069.9994"
+         y="464.07617"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text48-2-8" />
+    </g>
+  </g>
+  <g
      id="g262107475"
      transform="translate(-137.02564,205.03203)">
     <polygon
@@ -268,6 +296,29 @@
        stroke="#000000" />
     <path
        id="s93931161"
+       d="m 1110.8226,457.73056 9.1781,-7.73062 -9.1781,-7.73062"
+       fill="none"
+       stroke-width="2.60407"
+       stroke="#000000" />
+  </g>
+  <g
+     id="la174093671-6"
+     transform="matrix(0.4174113,0.41678552,-0.70657614,0.70763702,870.41036,-248.78655)"
+     style="stroke-width:1.30204">
+    <path
+       id="s174093671-2"
+       d="m 980,449.99994 h 140.0007"
+       fill="none"
+       stroke-width="2.60407"
+       stroke="#000000" />
+    <path
+       id="s139457504-9"
+       d="m 989.1781,442.26932 -9.1781,7.73062 9.1781,7.73062"
+       fill="none"
+       stroke-width="2.60407"
+       stroke="#000000" />
+    <path
+       id="s93931161-9"
        d="m 1110.8226,457.73056 9.1781,-7.73062 -9.1781,-7.73062"
        fill="none"
        stroke-width="2.60407"
@@ -332,13 +383,13 @@
   <text
      xml:space="preserve"
      style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:40px;line-height:125%;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:#000080;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-     x="677.69714"
+     x="679.69714"
      y="656.55212"
      id="text4723"><tspan
        sodipodi:role="line"
        id="tspan5033"
        style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
-       x="677.69714"
+       x="679.69714"
        y="656.55212"><tspan
    style="font-style:italic;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:18.6667px;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Bold Italic';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#0000ff;stroke:#000080"
    id="tspan8773">STUN</tspan>ner</tspan></text>
