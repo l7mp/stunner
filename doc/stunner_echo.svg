@@ -30,7 +30,7 @@
      inkscape:window-x="112"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="svg76" />
+     inkscape:current-layer="t262107475" />
   <rect
      x="130"
      y="290"
@@ -248,12 +248,12 @@
          id="text53">STUNNER_PUBLIC_ADDR:</text>
       <text
          xml:space="preserve"
-         x="720.5"
+         x="664.5"
          y="444.78613"
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text55">STUNNER_PORT</text>
+         id="text55">STUNNER_PUBLIC_PORT</text>
     </g>
   </g>
   <g

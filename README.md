@@ -125,9 +125,9 @@ integration](https://kubernetes.io/docs/concepts/services-networking/service/#lo
 major hosted Kubernetes services should support this, and even Minikube
 [provides](https://minikube.sigs.k8s.io/docs/handbook/accessing) standard `LoadBalancer` service
 access). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach
-your WebRTC infra. In addition, STUNner relies on Kubernetes ACLs (`NetorkPolicy`) with [port
+your WebRTC infra. In addition, STUNner relies on Kubernetes ACLs (`NetworkPolicy`) with [port
 ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-range-of-ports)
-for disabling malicious access; see [details](#access-control) later.
+to block malicious access; see [details](#access-control) later.
 
 ### Configuration
 
@@ -138,37 +138,38 @@ The STUNner installation will create the below Kubernetes resources in the clust
    (by default, the port is UDP 3478), and finally
 4. an ACL/firewall policy to control network communication from STUNner to the rest of the cluster.
 
-The installation scripts packaged with STUNner will use hard-coded configuration defaults. Make
-sure to customize the defaults before deploying STUNner; in particular, make absolutely sure to
-customize the access tokens (`STUNNER_REALM`, `STUNNER_USERNAME` and `STUNNER_PASSWORD`), otherwise
-STUNner will use hard-coded STUN/TURN credentials. This should not pose a major security risk (see
-the [security notes](#security) below), but it is still safer to customize the access tokens before
-exposing STUNner to the Internet.
+The installation scripts packaged with STUNner will use hard-coded configuration defaults that must
+be customized before deploying STUNner. In particular, make absolutely sure to customize the access
+tokens (`STUNNER_REALM`, `STUNNER_USERNAME` and `STUNNER_PASSWORD`), otherwise STUNner will use
+hard-coded STUN/TURN credentials. This should not pose a major security risk (see the [security
+notes](#security) below), but it is still safer to customize the access tokens before exposing
+STUNner to the Internet.
 
-The most important STUNner configuration parameters are as follows:
+STUNner configuration is available in the Kubernetes `ConfigMap` named `stunner-config`. The most
+important settings are as follows.
 * `STUNNER_PUBLIC_ADDR` (no default): The public IP address clients can use to reach the WebRTC
   media servers via STUNner. Clients will need to be configured with a TURN server, with this
   address as the TURN server IP address (see an
   [example](configuring-webrtc-clients-to-reach-stunner) below). By default, the public IP address
-  will be dynamically assigned by the Kubernetes during installation. The Helm chart takes care of
-  automatically setting the correct public IP address after installation; otherwise, the external
-  IP must be set manually (e.g., when using the static manifests for installation, see
-  [details](#learning-the-external-ip-and-port) below).
+  will be dynamically assigned by Kubernetes during installation. The Helm chart takes care of
+  querying the external IP address from Kubernetes and automatically configuring it during
+  installation; otherwise, the external IP must be set manually (e.g., when using the static
+  manifests for installation, see [details](#learning-the-external-ip-and-port) below).
 * `STUNNER_PUBLIC_PORT` (default: 3478): The public port used by clients to reach the WebRTC media
   servers via STUNner. Clients will need to be configured with a TURN server, with this port as the
   TURN server port (see an [example](configuring-webrtc-clients-to-reach-stunner) below). Note that
   the Helm installation scripts may overwrite this configuration if the installation falls back to
-  the NodePort service (i.e., when STUNner fails to obtain an external IP from the Kubernetes
+  the `NodePort` service (i.e., when STUNner fails to obtain an external IP from the Kubernetes
   ingress load balancer), see [details](#learning-the-external-ip-and-port) below.
 * `STUNNER_PORT` (default: 3478): The internal port used by STUNner for communication inside the
   cluster. It is safe to set this to the public port.
-* `STUNNER_REALM` (default `stunner.l7mp.io`): the
+* `STUNNER_REALM` (default: `stunner.l7mp.io`): the
   [`REALM`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.9) used to guide the user agent
   in selection of a username and password for the STUN/TURN [long-term
   credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) mechanism.
 * `STUNNER_USERNAME` (default: `user`): the
   [`USERNAME`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.3) attribute clients can use
-  the authenticate with STUNner via the the STUN/TURN [long-term
+  to authenticate with STUNner via the the STUN/TURN [long-term
   credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) mechanism. Make sure to
   customize!
 * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with STUNner
@@ -184,7 +185,7 @@ launching the STUNner pods.
 
 ### Install STUNner
 
-STUNner support two installation options: a self-contained and easy-to-use Helm chart and a manaul
+STUNner supports two installation options: a self-contained and easy-to-use Helm chart and a manaul
 installation method using static Kubernetes manifests.
 
 The simplest way to deploy STUNner is through Helm. In this case, all STUNner configuration
@@ -193,9 +194,10 @@ Values](https://helm.sh/docs/chart_template_guide/values_files).
 
 TODO
 
-If Helm is not an option, you can install STUNner using the static Kubernetes manifests packaged
-with STUNner. This mode is not recommended for general use however, since the static Kubernetes
-manifests do not provide the same flexibility and automatization as the Helm charts.
+If Helm is not an option, you can perform a manual installation using the static Kubernetes
+manifests packaged with STUNner. This mode is not recommended for general use however, since the
+static Kubernetes manifests do not provide the same flexibility and automatization as the Helm
+charts.
 
 First, clone the STUNner repository.
 
@@ -204,8 +206,8 @@ $ git clone https://github.com/l7mp/stunner.git
 $ cd stunner
 ```
 
-Then, customize the default STUNner settings, available via the `ConfigMap` named `stunner-config`
-in the default namespace, and deploy the STUNner service [manifest](kubernetes/stunner.yaml).
+Then, customize the default settings in the STUNner service [manifest](kubernetes/stunner.yaml) and
+deploy it via `kubectl`.
 
 ```console
 $ kubectl apply -f kubernetes/stunner.yaml
@@ -217,23 +219,26 @@ By default, all resources are created in the `default` namespace.
 There are two ways to expose the STUN/TURN ingress gateway service with STUNner: through a standard
 Kubernetes [`LoadBalancer`
 service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) (the
-default), or a [`NodePort`
+default) and as a [`NodePort`
 service](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport), used as a
 fallback if an ingress load-balancer is not available. In both cases the external IP address and
-port that WebRTC clients can use to reach STUNner from the Internet may be set dynamically by
-Kubernetes. (Of course, Kubernetes lets you use your own [fix IP address and domain
+port that WebRTC clients can use to reach STUNner may be set dynamically by Kubernetes. (Of course,
+Kubernetes lets you use your own [fix IP address and domain
 name](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
 but the default installation scripts do not support this.) WebRTC clients will need to learn the
 external IP and port somehow; this is outside the scope of STUNner, but see our [Kurento
 demo](#demo) for a way to communicate the STUN/TURN address and port back to WebRTC clients during
 user registration.
 
-In order to simplify the integration of STUNner with the rest of the WebRTC application, STUNner
+In order to simplify the integration of STUNner with the rest of the WebRTC services, STUNner
 stores the dynamic IP address/port assigned by Kubernetes into the `ConfigMap` named
-`stunner-config` under the key `STUNNER_PUBLIC_IP` and `STUNNER_PUBLIC_PORT`. The Helm installation
-scripts take care of this automatically, however, when using the manual installation option the
-external IP address and port will need to be handled manually during installation. The below
-instructions simplify this process.
+`stunner-config` under the key `STUNNER_PUBLIC_IP` and `STUNNER_PUBLIC_PORT`. Then, WebRTC
+applications can map this `ConfigMap` as environment variables and communicate the IP address and
+port back to the clients (see an [example](configuring-webrtc-clients-to-reach-stunner) below).
+
+The Helm installation scripts take care of setting the IP address and port automatically in the
+`ConfigMap`. However, when using the manual installation option the external IP address and port
+will need to be handled manually during installation. The below instructions simplify this process.
 
 After a successful installation, you should see something similar to the below:
 
@@ -264,9 +269,9 @@ Wait until Kubernetes assigns a valid external IP to STUNner.
 $ until [ -n "$(kubectl get svc -n default stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
 
-If this hangs for minutes, then your load-balancer integration is not working. If using
+If this hangs for minutes, then your load-balancer integration is not working (ff using
 [Minikube](https://github.com/kubernetes/minikube), make sure `minikube tunnel` is
-[running](https://minikube.sigs.k8s.io/docs/handbook/accessing). In this case, skip the next step
+[running](https://minikube.sigs.k8s.io/docs/handbook/accessing)). In this case, skip the next step
 and proceed to configure STUNner external reachability using the `NodePort` service. Otherwise,
 query the public IP address and port used by STUNner from Kubernetes.
 
@@ -287,7 +292,7 @@ $ export STUNNER_PUBLIC_PORT=$(kubectl get svc stunner -n default -o jsonpath='{
 Check that the external IP address `$STUNNER_PUBLIC_ADDR` is reachable by your WebRTC clients: some
 Kubernetes clusters (like GKE Autopilot) are installed with private node IP addresses.
 
-If all goes well, your STUNner service is now exposed on the IP address `$STUNNER_PUBLIC_ADDR` and
+If all goes well, the STUNner service is now exposed on the IP address `$STUNNER_PUBLIC_ADDR` and
 UDP port `$STUNNER_PUBLIC_PORT`. Finally, store back the public IP address and port into STUNner's
 configuration, so that the WebRTC application server can learn this information in a simple way.
 
@@ -318,22 +323,22 @@ var pc = new RTCPeerConnection(ICE_config);
 ### Testing
 
 STUNner comes with a simple STUN/TURN client called [`turncat`](utils/turncat) that can be used to
-check your installation. The `turncat` client will open a UDP tunnel through STUNner into your
+test a STUNner installation. The `turncat` client will open a UDP tunnel through STUNner into the
 Kubernetes cluster, which can be used to access any UDP service running inside the cluster. Note
-that your WebRTC clients will not need `turncat` to reach the cluster, since all WebRTC clients,
-including all major browsers, come with a STUN/TURN client included; `turncat` here is merely just
-used to simulate what a WebRTC client would do when trying to reach STUNner. For more info, see the
-`turncat` [documentation](utils/turncat).
+that your WebRTC clients will not need `turncat` to reach the cluster, since all Web browsers come
+with a STUN/TURN client included; `turncat` here is used only to simulate what a WebRTC client
+would do when trying to reach STUNner. For more info, see the `turncat`
+[documentation](utils/turncat).
 
 We test the STUNner installation by deploying a UDP echo server into the cluster and exposing it
 for external access via STUNner.
 
 ![STUNner demo setup](./doc/stunner_echo.svg)
 
-First, we create a `Deployment` called `udp-echo`, currently containing only a single pod, make
-this pod available over the UDP port 9001 as a cluster-internal service with the same name, and use
-everyone's favorite network debugging tool, [`socat(1)`](https://linux.die.net/man/1/socat), to
-deploy a simple UDP echo server into the pod.
+First, create a `Deployment` called `udp-echo` containing only a single pod and make this pod
+available over the UDP port 9001 as a cluster-internal service with the same name. Use everyone's
+favorite network debugging tool, [`socat(1)`](https://linux.die.net/man/1/socat), to deploy a
+simple UDP echo server into the pod.
 
 ```console
 $ kubectl create deployment udp-echo --image=l7mp/net-debug:0.5.3
@@ -342,12 +347,14 @@ $ kubectl exec -it $(kubectl get pod -l app=udp-echo -o jsonpath="{.items[0].met
     socat -d -d udp-l:9001,fork EXEC:cat
 ```
 
-Next, store the STUN/TURN credentials for later use.
+Store the STUN/TURN configurations and credentials for later use.
 
 ```console
-$ export STUNNER_REALM=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_REALM}')
-$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_USERNAME}')
-$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PASSWORD}')
+$ export STUNNER_PUBLIC_ADDR=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_ADDR}')
+$ export STUNNER_PUBLIC_PORT=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_PORT}')
+$ export STUNNER_REALM=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_REALM}')
+$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_USERNAME}')
+$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PASSWORD}')
 ```
 
 Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the `udp-echo` service:
@@ -357,7 +364,8 @@ $ export UDP_ECHO_IP=$(kubectl get svc udp-echo -o jsonpath='{.spec.clusterIP}')
 ```
 
 Observe that the result is a private IP address: indeed, the `udp-echo` service is not available to
-external services at this point. We shall use STUNner to expose the service to the Internet.
+external services at this point. We shall use STUNner to expose the service to the Internet via a
+TURN service.
 
 The default installation scripts install an ACL into Kubernetes that blocks *all* communication
 from STUNner to the rest of the workload. This is to minimize the risk of an improperly configured
@@ -394,18 +402,18 @@ tunnel all packets to the `udp-echo` service in your Kubernetes cluster through 
 ```console
 $ cd stunner
 $ go run utils/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:9000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PORT} udp:${UDP_ECHO_IP}:9001
+  --log=all:TRACE udp:127.0.0.1:9000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${UDP_ECHO_IP}:9001
 ```
 
-Now, in another terminal open a UDP connection through the tunnel opened by `turncat` to STUNner,
-to reach the UDP echo server running inside the cluster. 
+Now, in another terminal open a UDP connection through the tunnel opened by `turncat` and send
+something to the UDP echo server running inside the cluster.
 
 ```console
-$ socat -d -d - udp:localhost:9000
+$ echo "Hello STUNner" | socat -d -d - udp:localhost:9000
 ```
 
-If all goes well, you should see the text entered into the `socat` client to be echoed back from
-the cluster.
+If all goes well, you should see the same text echoed back from the cluster. After the test, make
+sure to lock down the ACL to the default-deny rule.
 
 ## Demo
 
@@ -467,8 +475,8 @@ demo code to make it work with STUNner and Kubernetes.
    the WebRTC application server to (1)
    [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L26)
    the STUNner configuration parameters available in the environment variables
-   `STUNNER_PUBLIC_ADDR`, `STUNNER_PORT`, `STUNNER_USERNAME`, and `STUNNER_PASSWORD` (see below) in
-   an appropriate WebRTC [ICE server
+   `STUNNER_PUBLIC_ADDR`, `STUNNER_PUBLIC_PORT`, `STUNNER_USERNAME`, and `STUNNER_PASSWORD` (see
+   below) in an appropriate WebRTC [ICE server
    configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) and (2)
    [return](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L442)
    the ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
@@ -499,9 +507,7 @@ demo code to make it work with STUNner and Kubernetes.
    by a Kubernetes `NetworkPolicy`. The demo installation script opens this ACL up so that STUNner
    can reach all WebRTC endpoints configured on the Kurento media servers, but just the WebRTC
    ports and *nothing else* (but see the below [security notice](#access-control) on access
-   control). This makes sure that the [trick](#testing) to query the Kubernetes DNS service
-   externally through STUNner will not work; external STUN/TURN clients can reach only the UDP
-   ports exposed on the media server through STUNner and nothing else.
+   control).
 
 And that's all. We added only 32 lines of code to the Kurento demo to make it work with Kubernetes,
 with most of the changes needed to return the ephemeral public STUN/TURN URI and credentials to the
@@ -518,8 +524,8 @@ of the new server continuously. This takes a lot of manual effort and considerab
 Kubernetes, however, you can use a single command to *scale STUNner to an arbitrary number of
 replicas*. Kubernetes will potentially add new nodes to the cluster if needed, and the new replicas
 will be *automatically* added to the STUN/TURN server pool accessible behind the (single) public IP
-address/port pair (`<STUNNER_PUBLIC_ADDR>:<STUNNER_PORT>`), with UDP/RTP streams conveniently being
-load-balanced across STUNner replicas.
+address/port pair (`<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>`), with UDP/RTP streams
+conveniently being load-balanced across STUNner replicas.
 
 For instance, the below command will fire up 15 STUNner replicas, usually in a matter of seconds.
 
@@ -556,11 +562,11 @@ to reach the Kubernetes DNS service through a misconfigured STUNner gateway.
 As usual, first store the STUNner configuration for later use.
 
 ```console
-$ export STUNNER_PUBLIC_ADDR=$(kubectl get service stunner -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-$ export STUNNER_PORT=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PORT}')
-$ export STUNNER_REALM=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_REALM}')
-$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_USERNAME}')
-$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PASSWORD}')
+$ export STUNNER_PUBLIC_ADDR=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_ADDR}')
+$ export STUNNER_PUBLIC_PORT=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_PORT}')
+$ export STUNNER_REALM=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_REALM}')
+$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_USERNAME}')
+$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PASSWORD}')
 ```
 
 Next, learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster DNS service:
@@ -575,7 +581,7 @@ received packets to the cluster DNS service through STUNner.
 ```console
 $ cd stunner
 $ go run utils/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PORT} udp:${KUBE_DNS_IP}:53
+  --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${KUBE_DNS_IP}:53
 ```
 
 Now, in another terminal try to query the Kubernetes DNS service through the `turncat` tunnel for
@@ -645,10 +651,10 @@ Repeating the DNS query should again time out, as before.
 
 In summary, unless properly locked down, STUNner may be used hostilely to open a UDP tunnel to any
 UDP service running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the
-pods and services inside a cluster exposed via STUNner. This can be done conveniently with an ACL,
-implemented in Kubernetes with a `NetworkPolicy`.
+pods and services inside a cluster exposed via STUNner, using a properly configured Kubernetes ACL
+(`NetworkPolicy`).
 
-The below security considerations will greatly reduce the attack surface associated by
+The below security considerations will greatly reduce the attack surface associated with
 STUNner. Overall, **a properly configured STUNner deployment will present exactly the same attack
 surface as a WebRTC infrastructure hosted on a public IP address** (possibly behind a firewall). In
 any case, use STUNner at your own risk.
@@ -678,24 +684,20 @@ to be restarted as well to learn the new credentials.
 
 ### Access control
 
-The ultimate condition for a secure STUNner deployment is correctly configured access control that
-restricts external users to open transport relay connections inside the cluster. The ACL must make
-sure that only the media servers, and only on a limited set of UDP ports, can be reached
-externally. The STUNner installation comes with a default `NetworkPolicy` that locks down *all*
-access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to enforce
-the security best practice that the access permissions of STUNner be carefully customized before
-deployment.
+The ultimate condition for a secure STUNner deployment is a correctly configured access control
+regime that restricts external users to open transport relay connections inside the cluster. The
+ACL must make sure that only the media servers, and only on a limited set of UDP ports, can be
+reached externally. The STUNner installation comes with a default `NetworkPolicy` that locks down
+*all* access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to
+enforce the security best practice that the access permissions of STUNner be carefully customized
+before deployment.
 
-It is a good practice to configure the ACL so that STUNner can access only the media server ports
-used by WebRTC media connection endpoints, and *nothing else*. Thanks to the versatility of
-Kubernetes, this is very
-[simple](https://kubernetes.io/docs/concepts/services-networking/network-policies) to do with a
-`NetworkPolicy`. For instance, in our [Kurento demo](#demo), STUNner is deployed into the `default`
+An example can be found in the [Kurento demo](#demo). Here, STUNner is deployed into the `default`
 namespace and all STUNner pods are labeled as `app=stunner`, and the media server runs in the same
 namaspace using the label `app=kms`. In addition, WebRTC endpoints on the Kurento server are
 assigned from the UDP port range [10000:20000]. Then, the below `NetworkPolicy` ensures that all
 access from any STUNner pod to any media server pod is allowed over any UDP port between 10000 and
-20000, and all other network access is denied.
+20000, and all other network access from STUNner is denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -732,8 +734,8 @@ ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies
 (i.e., the `endPort` field). Furthermore, certain Kubernetes CNIs (like the GKE data plane v2),
 even if accepting the `endPort` parameter, will fail to correctly enforce it. For such cases the
 below `NetworkPolicy` will allow STUNner to access _all_ UDP ports on the media server; this is
-less secure, but still restricts malicious users to access any service except the media server via
-STUNner.
+less secure, but still blocks malicious access via STUNner to any service other than the media
+servers.
 
 ```yaml
 $ kubectl apply -f - <<EOF
@@ -764,17 +766,18 @@ conveniently for this [purpose](#testing).
 ### Exposing internal IP addresses
 
 The trick in STUNner is that both the TURN relay transport address and the media server address are
-internal pod IP addresses, and pods in Kubernetes are always guaranteed to be able connect
+internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect
 [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model),
 without the involvement of a NAT. This makes it possible to host the entire WebRTC infrastructure
 over the private internal pod network and still allow external clients to make connections to the
 media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP
-addresses are now be exposed to the WebRTC clients in ICE candidates.
+addresses are now exposed to the WebRTC clients in ICE candidates.
 
-The threat model is that with STUNner an attacker can scan the *private* IP address of all STUNner
-pods and all media server pods. This should not pose a major security risk though: remember, none
-of these private IP addresses can be reached externally. Nevertheless, if worried about information
-exposure then STUNner may not be the best option for you.
+The threat model is that, if possessing the correct credentials, an attacker can scan the *private*
+IP address of all STUNner pods and all media server pods via STUNner. This should not pose a major
+security risk though: remember, none of these private IP addresses can be reached
+externally. Nevertheless, if worried about information exposure then STUNner may not be the best
+option for you.
 
 ## Caveats
 
@@ -795,8 +798,8 @@ notable limitations at this point are as follows.
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
   externally; see the [notes on access control](#access-control).
 * STUNner supports arbitrary scale-up without dropping active calls, but scale-down might
-  disconnect calls established through the STUNner and/or media servers being removed from the
-  load-balancing pool. Note that this problem is
+  disconnect calls established through the STUNner pods and/or media server replicas being removed
+  from the load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
 * [TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) and the WebRTC DataChannel API are
