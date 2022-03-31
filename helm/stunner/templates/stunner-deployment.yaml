@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stunner.name" . }}
+  namespace: {{ .Values.stunner.namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "stunner.labels" . | nindent 6 }}
+  replicas: {{ .Values.stunner.deployment.replica }}
+  template:
+    metadata:
+      labels:
+        {{- include "stunner.labels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.stunner.deployment.container.name }}
+        image: "{{ .Values.stunner.deployment.container.image.repository }}{{ .Values.stunner.deployment.container.image.name }}:{{ .Values.stunner.deployment.container.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.stunner.deployment.container.image.pullPolicy }}
+        command: ["stunnerd"]
+        # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
+        args: []
+        envFrom:
+          - configMapRef:
+              name: stunner-config
+        env:
+        - name: STUNNER_ADDR  # we use the POD IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        resources: {{- toYaml .Values.stunner.deployment.container.image.resources | nindent 10 }}
+{{- if eq .Values.stunner.deployment.container.netdebug "enable"}}
+      - name: net-debug
+        image: retvari/net-debug:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo hello; sleep 10;done"]
+{{- end}}
+---
