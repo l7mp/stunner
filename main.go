@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"os/signal"
-	"regexp"
 	"syscall"
 
 	"github.com/pion/logging"
@@ -71,27 +70,38 @@ func main() {
 	usage := "stunner <-u|--user user1=pwd1> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] addr:port"
 
 	// can be overriden on the command line
+	dAuth     := envDefault("STUNNER_AUTH",     "static")
+	dSecret   := envDefault("STUNNER_SHARED_SECRET", "my-secret")
 	dRealm    := envDefault("STUNNER_REALM",    "stunner.l7mp.io")
 	dServer   := envDefault("STUNNER_ADDR",     "127.0.0.1")
 	dPort 	  := envDefaultUint("STUNNER_PORT",  3478)
 	dUser     := envDefault("STUNNER_USERNAME", "user")
 	dPasswd	  := envDefault("STUNNER_PASSWORD", "pass")
 	dLoglevel := envDefault("STUNNER_LOGLEVEL", "all:ERROR")
-	var verbose bool
 
 	// comes from ENV
 	minPort := envDefaultUint("STUNNER_MIN_PORT", 10000)
-	maxPort := envDefaultUint("STUNNER_MAX_PORT", 20000) 
+	maxPort := envDefaultUint("STUNNER_MAX_PORT", 20000)
 
-	var realm, users, level string
+	var auth, authSecret, realm, user, level string
+	var verbose bool
+	// general flags
 	flag.StringVar(&realm, "r",       dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
 	flag.StringVar(&realm, "realm",   dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
-	flag.StringVar(&users, "u",       dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
-	flag.StringVar(&users, "user",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
 	flag.StringVar(&level, "l",       dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
 	flag.StringVar(&level, "log",     dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
 	flag.BoolVar(&verbose, "v",       false,                 "Verbose logging, identical to -l all:DEBUG")
 	flag.BoolVar(&verbose, "verbose", false,                 "Verbose logging, identical to -l all:DEBUG")
+
+	// authentication mode
+	flag.StringVar(&auth,  "a",       dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
+	flag.StringVar(&auth,  "auth",    dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
+	// long-term credential auth
+	flag.StringVar(&authSecret, "s",             dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
+	flag.StringVar(&authSecret, "shared-secret", dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
+	// static username/passwd auth
+	flag.StringVar(&user, "u",       dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
+	flag.StringVar(&user, "user",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
 	flag.Parse()
 
 	if verbose {
@@ -120,34 +130,44 @@ func main() {
 	}
 	defer udpListener.Close()
 
-	log.Infof("Stunner starting at %s, realm='%s'", serverAddr, realm)
-
-	// Cache -users flag for easy lookup later
-	// If passwords are stored they should be saved to your DB hashed using turn.GenerateAuthKey
-	usersMap := map[string][]byte{}
-	for _, kv := range regexp.MustCompile(`(\w+)=(\w+)`).FindAllStringSubmatch(users, -1) {
-		usersMap[kv[1]] = turn.GenerateAuthKey(kv[1], realm, kv[2])
+	var authHandler turn.AuthHandler
+	switch strings.ToLower(auth) {
+	case "static":
+		cred := strings.SplitN(user, "=", 2)
+		if len(cred) != 2 || cred[0] == "" || cred[1] == "" {
+			fmt.Fprintf(os.Stderr, "cannot parse static credential: '%s'\n", user)
+			os.Exit(1)
+		}
+		passwd := turn.GenerateAuthKey(cred[0], realm, cred[1])
+		authHandler = func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
+			if username == cred[0] {
+				return passwd, true
+			}
+			return nil, false
+		}
+	case "long-term":
+		authHandler = turn.NewLongTermAuthHandler(authSecret, log)
+	default:
+		log.Errorf("unknown authentication mode: %s", auth)
+		os.Exit(1)
 	}
-	
+
+	log.Infof("Stunner starting at %s, auth-mode: %s, realm=%s", serverAddr, auth, realm)
+
 	s, err := turn.NewServer(turn.ServerConfig{
 		Realm: realm,
 		// Set AuthHandler callback
 		// This is called everytime a user tries to authenticate with the TURN server
 		// Return the key for that user, or false when no user is found
-		AuthHandler: func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-			if key, ok := usersMap[username]; ok {
-				return key, true
-			}
-			return nil, false
-		},
+		AuthHandler: authHandler,
 		LoggerFactory:  logger,
 		// PacketConnConfigs is a list of UDP Listeners and the configuration around them
 		PacketConnConfigs: []turn.PacketConnConfig{
 			{
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
-					RelayAddress: net.ParseIP(serverIP), // Claim that we are listening on server_addr
-					Address:      "0.0.0.0",               // But actually be listening on every interface
+					RelayAddress: net.ParseIP(serverIP),
+					Address:      "0.0.0.0",
 					MinPort:      minPort,
 					MaxPort:      maxPort,
 				},
