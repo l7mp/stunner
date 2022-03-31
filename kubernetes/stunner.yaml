@@ -75,6 +75,7 @@ spec:
   ports:
     - port: 3478
       targetPort: 3478
+      nodePort: 30478
       protocol: UDP
       name: stunner-udp
   type: LoadBalancer
