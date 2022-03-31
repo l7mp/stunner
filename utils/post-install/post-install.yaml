@@ -14,7 +14,7 @@ spec:
         image: l7mp/stunner-job:latest
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash"]
-        args: ["./job.sh"]
+        args: ["./post-install.sh"]
       restartPolicy: Never
   backoffLimit: 4
 ---

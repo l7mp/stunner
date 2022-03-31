@@ -4,5 +4,5 @@ RUN apt-get update && \
     apt-get install -y wget jq curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY job.sh .
-ENTRYPOINT [ "./job.sh" ]
+COPY post-install.sh .
+ENTRYPOINT [ "./post-install.sh" ]
