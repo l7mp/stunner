@@ -33,6 +33,7 @@ spec:
 {{- if eq .Values.stunner.deployment.container.netdebug "enable"}}
       - name: net-debug
         image: retvari/net-debug:latest
+        imagePullPolicy: IfNotPresent
         command: ["/bin/sh"]
         args: ["-c", "while true; do echo hello; sleep 10;done"]
 {{- end}}
