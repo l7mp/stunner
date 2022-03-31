@@ -39,7 +39,7 @@ Currently [WebRTC](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [a](https://stackoverflow.com/questions/64232853/how-to-use-webrtc-with-rtcpeerconnection-on-kubernetes)
 [vitualization](https://stackoverflow.com/questions/68339856/webrtc-on-kubernetes-cluster/68352515#68352515)
 [story](https://stackoverflow.com/questions/52929955/akskubernetes-service-with-udp-and-tcp): there
-is no easy way to deploy a WebRTC backend service into Kubernetes to enjoy the
+is no easy way to deploy a WebRTC backend service into Kubernetes to benefit from the
 [resiliency](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce),
 [scalability](https://stackoverflow.com/questions/62088089/scaling-down-video-conference-software-in-kubernetes),
 and [high
@@ -84,7 +84,7 @@ way.
   [hacks](https://kubernetes.io/docs/concepts/configuration/overview) like privileged pods and
   `hostNetwork`/`hostPort` services typically required to containerize your WebRTC media plane.
   Using STUNner a WebRTC deployment needs only two public-facing ports, one HTTPS port for the
-  application server and a *single* UDP port one for *all* your media.
+  application server and a *single* UDP port for *all* your media.
 
 * **No reliance on external services for NAT traversal.** Can't afford a decent [hosted TURN
   service](https://bloggeek.me/webrtc-turn) for client-side NAT traversal? Can't get good
@@ -94,7 +94,7 @@ way.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
   servers?  STUNner lets you deploy your entire WebRTC infrastructure into ordinary Kubernetes
-  pods, thus scaling your media plane is as easy as issuing a `kubectl scale` command. STUNner
+  pods, thus scaling the media plane is as easy as issuing a `kubectl scale` command. STUNner
   itself can be scaled with similar ease, completely separately from the media servers.
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server for
@@ -192,7 +192,7 @@ Values](https://helm.sh/docs/chart_template_guide/values_files).
 
 TODO
 
-If Helm is not an option, you can install STUnner using the static Kubernetes manifests packaged
+If Helm is not an option, you can install STUNner using the static Kubernetes manifests packaged
 with STUNner. This mode is not recommended for general use however, since the static Kubernetes
 manifests do not provide the same flexibility and automatization as the Helm charts.
 
@@ -204,8 +204,7 @@ $ cd stunner
 ```
 
 Then, customize the default STUNner settings, available via the `ConfigMap` named `stunner-config`
-installed by default into the default namespace. Then, deploy the STUNner service
-[manifest](kubernetes/stunner.yaml).
+in the default namespace, and deploy the STUNner service [manifest](kubernetes/stunner.yaml).
 
 ```console
 $ kubectl apply -f kubernetes/stunner.yaml
@@ -219,22 +218,21 @@ Kubernetes [`LoadBalancer`
 service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) (the
 default), or a [`NodePort`
 service](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport), used as a
-fallback if an ingress load-balancer is not available. In both cases the external IP address and/or
-port WebRTC clients can use to reach STUNner may be set dynamically by Kubernetes. Therefore, the
-STUN/TURN service public IP address and port exposed by STUNner may change from deployment to
-deployment. (Of course, Kubernetes lets you use your own [fix
-IP/DNS](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
+fallback if an ingress load-balancer is not available. In both cases the external IP address and
+port that WebRTC clients can use to reach STUNner from the Internet may be set dynamically by
+Kubernetes. (Of course, Kubernetes lets you use your own [fix IP address and domain
+name](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
 but the default installation scripts do not support this.) WebRTC clients will need to learn the
 external IP and port somehow; this is outside the scope of STUNner, but see our [Kurento
 demo](#demo) for a way to communicate the STUN/TURN address and port back to WebRTC clients during
-user registration. 
+user registration.
 
 In order to simplify the integration of STUNner with the rest of the WebRTC application, STUNner
-stores the dynamic IP address/port assigned by Kubernetes to the it into the STUNner `ConfigMap`
-named `stunner-config` under the keys `STUNNER_PUBLIC_IP` and `STUNNER_PUBLIC_PORT`. The Helm
-installation scripts take care of this automatically, however, when using the manual installation
-option the external IP address and port will need to be handled manually during installation. The
-below instructions simplify this process.
+stores the dynamic IP address/port assigned by Kubernetes into the `ConfigMap` named
+`stunner-config` under the key `STUNNER_PUBLIC_IP` and `STUNNER_PUBLIC_PORT`. The Helm installation
+scripts take care of this automatically, however, when using the manual installation option the
+external IP address and port will need to be handled manually during installation. The below
+instructions simplify this process.
 
 After a successful installation, you should see something similar to the below:
 
@@ -285,12 +283,12 @@ $ export STUNNER_PUBLIC_ADDR=$(kubectl get nodes -o jsonpath='{.items[0].status.
 $ export STUNNER_PUBLIC_PORT=$(kubectl get svc stunner -n default -o jsonpath='{.spec.ports[0].nodePort}')
 ```
 
-From this point, your STUNner service is exposed on the IP address `$STUNNER_PUBLIC_ADDR` and UDP
-port `$STUNNER_PUBLIC_PORT`. 
+Check that the external IP address `$STUNNER_PUBLIC_ADDR` is reachable by your WebRTC clients: some
+Kubernetes clusters (like GKE Autopilot) are installed with private node IP addresses.
 
-Finally, we store back the public IP address and port into STUNner's configuration (in the
-`ConfigMap` called `stunner-config`), so that all STUNner configuration is available at single
-place.
+If all goes well, your STUNner service is now exposed on the IP address `$STUNNER_PUBLIC_ADDR` and
+UDP port `$STUNNER_PUBLIC_PORT`. Finally, store back the public IP address and port into STUNner's
+configuration, so that the WebRTC application server can learn this information in a simple way.
 
 ```console
 $ kubectl patch configmap/stunner-config -n default --type merge \
@@ -299,9 +297,9 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
 
 ### Configuring WebRTC clients to reach STUNner
 
-Here is a simple JavaScript snippet to direct your webRTC clients to use STUNner; make sure to
+The below JavaScript snippet will direct your WebRTC clients to use STUNner; make sure to
 substitute the placeholders below (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration
-from the above.
+from the above. For more information, see the [Kurento demo](#demo).
 
 ```js
 var ICE_config = {
@@ -362,7 +360,7 @@ external services at this point. We shall use STUNner to expose the service to t
 
 The default installation scripts install an ACL into Kubernetes that blocks *all* communication
 from STUNner to the rest of the workload. This is to minimize the risk of an improperly configured
-STUnner gateway to [expose sensitive services to the external world](#security). In order to allow
+STUNner gateway to [expose sensitive services to the external world](#security). In order to allow
 STUNner to open transport relay connections to the `udp-echo` service, we have to explicitly open
 up this ACL first.
 
@@ -767,7 +765,7 @@ notable limitations at this point are as follows.
   STUN/TURN [long term credential
   mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of our TODO
   list, please bear with us for now.
-* Access through STUnner to the rest of the cluster *must* be locked down with a Kubernetes
+* Access through STUNner to the rest of the cluster *must* be locked down with a Kubernetes
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
   externally; see the [notes on access control](#access-control).
 * STUNner supports arbitrary scale-up without dropping active calls, but scale-down might
