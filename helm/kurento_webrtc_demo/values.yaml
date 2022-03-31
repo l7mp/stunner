@@ -9,10 +9,14 @@ mediaServer:
     containerPort: 8888
     replicas: 1
     imagePullPolicy: Always
+    networkPolicy:
+      podSelector:
+        app: stunner
 
 applicationServer:
   deployment:
     enablement: enable
     name: webrtc-server
+    imagePullPolicy: Always
 
-netdebug: enable
+netdebug: disable
