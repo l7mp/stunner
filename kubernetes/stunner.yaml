@@ -1,29 +1,52 @@
 # Stunner: An ingress gateway for WebRTC
 ---
-# TURN server config: make sure to customize the below environment variables
+# STUN/TURN server config: Make sure to customize the below configurations, see the README.pm for
+# more details
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: stunner-config
   namespace: default
 data:
-# The external IP configured by the load-balancer for the Stunner service
-# STUNNER_PUBLIC_ADDR: "A.B.C.D"
-# Credential realm, default "stunner.l7mp.io"
-  STUNNER_REALM: "stunner.l7mp.io"
-# Server port, default: 3478
+  # * `STUNNER_PUBLIC_ADDR` (no default): The public IP address clients can use to reach
+  #   STUNner. By default, the public IP address will be dynamically assigned by the Kubernetes
+  #   LoadBalancer service.  The Helm installation script takes care of updating the configuration
+  #   with the correct value. However, if installing from the static manifests then the external IP
+  #   must be set manually.
+  STUNNER_PUBLIC_ADDR: "A.B.C.D"
+
+  # * `STUNNER_PUBLIC_PORT` (default: 3478): The public port used by clients to reach STUNner. It
+  #   is important that applications use the public port as found in the configuration, since the
+  #   Helm installation scripts may overwrite this configuration. This occurs when the installation
+  #   falls back to a NodePort service (i.e., when STUNner fails to obtain an external IP from the
+  #   load-balancer). 
+  STUNNER_PUBLIC_PORT: "3478"
+  
+  # * `STUNNER_PORT` (default: 3478): The internal port used by STUNner for communication inside
+  #   the cluster. It is safe to set this to the public port.
   STUNNER_PORT: "3478"
-# User name, default: "user". Make sure to customize!
+
+  # * `STUNNER_REALM` (default `stunner.l7mp.io`): the REALM used to guide the user agent in
+  #   selection of a username and password for the STUN/TURN long-term credential mechanism.
+  STUNNER_REALM: "stunner.l7mp.io"
+
+  # * `STUNNER_USERNAME` (default: `user`): the USERNAME attribute clients can use the authenticate
+  #   with STUNner via the the STUN/TURN long-term credential mechanism. Make sure to customize!
   STUNNER_USERNAME: user
-# Password, default: "pass". Make sure to customize!
+
+  # * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with
+  #   STUNner via the the STUN/TURN long-term credential mechanism. Make sure to customize!
   STUNNER_PASSWORD: pass
-# Log level, default: "all:WARN"
-#  STUNNER_LOGLEVEL: "all:WARN"
+
+  # * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
   STUNNER_LOGLEVEL: "all:INFO"
-# Lowest relay transport port, default: 10000
+
+  # * `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner.
   STUNNER_MIN_PORT: "10000"
-# Highest relay transport port, default: 20000
+
+  # * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
   STUNNER_MAX_PORT: "20000"
+
 
 ---
 apiVersion: apps/v1
@@ -75,6 +98,7 @@ spec:
   ports:
     - port: 3478
       targetPort: 3478
+      nodePort: 30478
       protocol: UDP
       name: stunner-udp
   type: LoadBalancer
