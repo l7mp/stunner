@@ -15,9 +15,9 @@ spec:
       - name: post-install
         # image: l7mp/stunner-job:latest
         image: "{{ .Values.stunner.postInstall.image.repository }}{{ .Values.stunner.postInstall.image.name }}:{{ .Values.stunner.postInstall.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.stunner.postInstall.image.pullPolicy}}
+        imagePullPolicy: {{ .Values.stunner.postInstall.image.pullPolicy }}
         command: ["/bin/bash"]
-        args: ["./job.sh"]
+        args: ["./post-install.sh"]
       restartPolicy: Never
   backoffLimit: 4
 ---
@@ -33,6 +33,9 @@ rules:
 - apiGroups: [""] 
   resources: ["configmaps"]
   verbs: ["get", "watch", "list", "patch"]
+- apiGroups: [""] 
+  resources: ["nodes"]
+  verbs: ["get", "list"]
 ---
 apiVersion: v1
 kind: ServiceAccount
