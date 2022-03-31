@@ -4,12 +4,12 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: "{{- include "stunner_helm.name" .}}-network-policy"
+  name: "{{- include "stunner.name" .}}-network-policy"
   namespace: {{ .Values.stunner.namespace }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "stunner_helm.stunner.selectorLabels" . | nindent 6 }}
+      {{- include "stunner.stunner.selectorLabels" . | nindent 6 }}
   policyTypes:
   - Egress
 {{- end}}

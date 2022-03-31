@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "stunner_helm.name" -}}
+{{- define "stunner.name" -}}
 {{- default .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "stunner_helm.fullname" -}}
+{{- define "stunner.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "stunner_helm.chart" -}}
+{{- define "stunner.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "stunner_helm.labels" -}}
-{{ include "stunner_helm.stunner.selectorLabels" . }}
-helm.sh/chart: {{ include "stunner_helm.chart" . }}
+{{- define "stunner.labels" -}}
+{{ include "stunner.stunner.selectorLabels" . }}
+helm.sh/chart: {{ include "stunner.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,18 +45,18 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels for turn server
 */}}
-{{- define "stunner_helm.stunner.selectorLabels" -}}
+{{- define "stunner.stunner.selectorLabels" -}}
 app: {{ .Values.stunner.deployment.label }}
-app.kubernetes.io/name: {{ include "stunner_helm.name" . }}
+app.kubernetes.io/name: {{ include "stunner.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "stunner_helm.serviceAccountName" -}}
+{{- define "stunner.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "stunner_helm.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "stunner.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

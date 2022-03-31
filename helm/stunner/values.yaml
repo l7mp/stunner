@@ -1,4 +1,4 @@
-# Default values for stunner_helm.
+# Default values for stunner.
 
 stunner:
   namespace: default

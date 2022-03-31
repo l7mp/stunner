@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "stunner_helm.name" . }}
+  name: {{ include "stunner.name" . }}
   namespace: {{ .Values.stunner.namespace }}
 spec:
   selector:
     matchLabels:
-      {{- include "stunner_helm.labels" . | nindent 6 }}
+      {{- include "stunner.labels" . | nindent 6 }}
   replicas: {{ .Values.stunner.deployment.replica }}
   template:
     metadata:
       labels:
-        {{- include "stunner_helm.labels" . | nindent 8 }}
+        {{- include "stunner.labels" . | nindent 8 }}
     spec:
       containers:
       - name: {{ .Values.stunner.deployment.container.name }}
