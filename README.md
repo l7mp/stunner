@@ -370,7 +370,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: stunner-network-policy
-  namespace: default
 spec:
   podSelector:
     matchLabels:
@@ -597,7 +596,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: stunner-network-policy
-  namespace: default
 spec:
   podSelector:
     matchLabels:
@@ -633,7 +631,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: stunner-network-policy
-  namespace: default
 spec:
   podSelector:
     matchLabels:
@@ -646,7 +643,7 @@ EOF
 Repeating the DNS query should again time out, as before.
 
 In summary, unless properly locked down, STUNner may be used hostilely to open a UDP tunnel to any
-UDP service running inside a Kubernetes cluster. Therefore, it is critical to tightly control the
+UDP service running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the
 pods and services inside a cluster exposed via STUNner. This can be done conveniently with an ACL,
 implemented in Kubernetes with a `NetworkPolicy`.
 
@@ -704,7 +701,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: stunner-network-policy
-  namespace: default
 spec:
 # Choose the STUNner pods as source
   podSelector:
@@ -729,11 +725,40 @@ spec:
 
 WARNING: Some Kubernetes CNIs do not support network policies, or support only a subset of what
 STUNner needs. We tested STUNner with [Calico](https://www.tigera.io/project-calico) and the
-standard GKE data plane, but your [mileage may vary](https://cilium.io). (Note that the GKE data
-plane v2 will not work due a lack of support for the `endPort` field in ACL rules.) In any case,
-[test your ACLs](https://banzaicloud.com/blog/network-policy/) before exposing STUNner publicly;
-the [`turncat`](utils/turncat) client packaged with STUNner can be used exactly for this
-[purpose](#testing).
+standard GKE data plane, but your [mileage may vary](https://cilium.io).  In particular, only
+Kubernetes versions >1.22 support [ACLs with port
+ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-range-of-ports)
+(i.e., the `endPort` field). Furthermore, certain Kubernetes CNIs (like the GKE data plane v2),
+even if accepting the `endPort` parameter, will fail to correctly enforce it. For such cases the
+below `NetworkPolicy` will allow STUNner to access _all_ UDP ports on the media server; this is
+less secure, but still restricts malicious users to access any service except the media server via
+STUNner.
+
+```yaml
+$ kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kms
+    ports:
+    - protocol: UDP
+EOF
+```
+
+In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
+publicly; e.g., the [`turncat` utility](utils/turncat) packaged with STUNner can be used
+conveniently for this [purpose](#testing).
 
 ### Exposing internal IP addresses
 
