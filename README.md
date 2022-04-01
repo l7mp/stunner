@@ -205,7 +205,7 @@ $ git clone https://github.com/l7mp/stunner.git
 $ cd stunner
 ```
 
-Then, customize the default settings in the STUNner service [manifest](kubernetes/stunner.yaml) and
+Then, customize the default settings in the STUNner service [manifest](examples/stunner.yaml) and
 deploy it via `kubectl`.
 
 ```console
@@ -436,16 +436,15 @@ Like any conventional gateway service, an improperly configured STUNner service 
 exposing sensitive services to the Internet. The below security guidelines will allow to minmize
 the risks associated with a misconfigured STUNner.
 
-### Threat model
+### Threat
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
-configured public STUN/TURN server poses.
-
-To demonstrate the risks, below we shall use `turncat`
+configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use `turncat`
 to reach the Kubernetes DNS service through a misconfigured STUNner gateway.
 
-As usual, first store the STUNner configuration for later use.
+Start with a fresh STUNner installation. As usual, we store the STUNner configuration for later
+use.
 
 ```console
 $ export STUNNER_PUBLIC_ADDR=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_ADDR}')
@@ -587,9 +586,10 @@ range `[10000:20000]`, but we don't want transport relay connections via STUNner
 *any* other pod. This will be enough to support WebRTC media, but will not allow clients to, e.g.,
 [reach the Kubernetes DNS service](#threat-model). 
 
-The below `NetworkPolicy` will then ensures that all access from any STUNner pod to any media
-server pod is allowed over any UDP port between 10000 and 20000, and all other network access from
-STUNner is denied.
+Assuming that the entire workload is deployed into the `default` namespace, the below
+`NetworkPolicy` will then ensures that all access from any STUNner pod to any media server pod is
+allowed over any UDP port between 10000 and 20000, and all other network access from STUNner is
+denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1

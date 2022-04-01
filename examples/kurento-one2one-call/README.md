@@ -1,7 +1,7 @@
 # STUNner demo: One to one video call with Kurento
 
-The Kurento [Node.js - One to one video
-call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
+This is the Kurento [Node.js - One to one video
+call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo,
 adopted for STUNner and Kubernetes. To quote the original Kurento documentation:
 
 > This web application consists of a one-to-one video call using WebRTC technology. In other words,
@@ -9,16 +9,18 @@ adopted for STUNner and Kubernetes. To quote the original Kurento documentation:
 
 The demo contains a fully featured WebRTC application server, developed using the express framework
 for Node.js, and the standard Kurento media server for exchanging audio/video media between the
-caller and the callee. Both the application server and the media server are expected to be
-reachable via a public routable IP address (in the case of the
+caller and the callee. In the original demo, both the application server and the media server are
+expected to be reachable via a public routable IP address (in the case of the
 [demo](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) this was
-the `localhost`). This demo was adopted here for using with STUNner, so that it can be installed
-into a standard Kubernetes cluster.
+the `localhost`). 
+
+This demo was adopted here for using with STUNner, so that it can be installed into a standard
+Kubernetes cluster.
 
 In this demo you will learn the following steps to:
-* integrate an application server to be used with STUNner,
-* deploy the modified application server into a Kubernetes cluster behind STUNner,
-* deploy the Kurento media server into Kubernetes,
+* integrate a typical WebRTC application server to be used with STUNner,
+* deploy the modified application server into a Kubernetes,
+* deploy the Kurento media server into Kubernetes behind STUNner,
 * secure a STUNner deployment, and
 * scale a standard WebRTC workload using Kubernetes and STUNner.
 
@@ -32,12 +34,12 @@ one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, m
 STUNner is deployed into the cluster (see the [STUNner configuration
 guide](README.md#configuration) and the [STUNner installation guide](README.md#installation)) and
 follow the steps in the [STUNner testing guide](README.md#testing) to make sure that STUNner is
-operational. Finally, the demo requires a solid understanding of the basic concepts in
+fully operational. Finally, the demo requires a solid understanding of the basic concepts in
 [Kubernetes](https://kubernetes.io/docs/home) and
 [WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
 original [Kurento One to one video
-call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo, in
-order to understand how the Kubernetes based demo differs (very little).
+call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
+locally, in order to understand how the Kubernetes based demo differs (very little).
 
 ### Quick installation
 
@@ -125,7 +127,7 @@ demo code to make it work with STUNner and Kubernetes.
 
 And that's all. We added only 32 lines of code to the Kurento demo to make it work with Kubernetes,
 with most of the changes needed to return the ephemeral public STUN/TURN URI and credentials to the
-clients. If you allocate STUNner to a stable IP or DNS name, you don't even need to modify
+clients. If you allocate STUNner to a stable IP and domain name, you don't even need to modify
 *anything* in the demo and it will just work.
 
 ### Scaling
@@ -167,8 +169,8 @@ $ kubectl scale deployment kms --replicas=20
 
 As described in the [STUNner security guide](README.md#security), it is critical to lock down
 (potentially hostile) access to sensitive services running inside the cluster via STUNner. The
-necessary ACLs are automatically configured by the installation manifests above; see below to
-understand what's happening in the background.
+necessary ACLs are automatically configured by the installation manifests above; below we describe
+what's happening in the background.
 
 For a secure STUNner deployment, we need to ensure that the only service allowed for clients to
 access via the transport relay connections allocated via STUNner is the media server pool, and only
