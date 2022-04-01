@@ -27,10 +27,9 @@ no modification to your existing WebRTC codebase.
 1. [Description](#description)
 2. [Features](#features)
 3. [Getting started](#getting-started)
-4. [Demo](#demo)
-5. [Security](#security)
-6. [Caveats](#caveats)
-7. [Milestones](#milestones)
+4. [Security](#security)
+5. [Caveats](#caveats)
+6. [Milestones](#milestones)
 
 ## Description
 
@@ -183,7 +182,7 @@ important settings are as follows.
 The default configurations can be overridden by setting custom command line arguments when
 launching the STUNner pods.
 
-### Install STUNner
+### Installation
 
 STUNner supports two installation options: a self-contained and easy-to-use Helm chart and a manaul
 installation method using static Kubernetes manifests.
@@ -226,9 +225,9 @@ port that WebRTC clients can use to reach STUNner may be set dynamically by Kube
 Kubernetes lets you use your own [fix IP address and domain
 name](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
 but the default installation scripts do not support this.) WebRTC clients will need to learn the
-external IP and port somehow; this is outside the scope of STUNner, but see our [Kurento
-demo](#demo) for a way to communicate the STUN/TURN address and port back to WebRTC clients during
-user registration.
+external IP and port somehow; this is outside the scope of STUNner, but see our [demos](#demos) for
+a way to communicate the STUN/TURN address and port back to WebRTC clients during user
+registration.
 
 In order to simplify the integration of STUNner with the rest of the WebRTC services, STUNner
 stores the dynamic IP address/port assigned by Kubernetes into the `ConfigMap` named
@@ -305,7 +304,7 @@ $ kubectl patch configmap/stunner-config -n default --type merge \
 
 The below JavaScript snippet will direct your WebRTC clients to use STUNner; make sure to
 substitute the placeholders below (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration
-from the above. For more information, see the [Kurento demo](#demo).
+from the above. For more information, see the [demos](#demos).
 
 ```js
 var ICE_config = {
@@ -333,7 +332,7 @@ would do when trying to reach STUNner. For more info, see the `turncat`
 We test the STUNner installation by deploying a UDP echo server into the cluster and exposing it
 for external access via STUNner.
 
-![STUNner demo setup](./doc/stunner_echo.svg)
+![STUNner test setup](./doc/stunner_echo.svg)
 
 First, create a `Deployment` called `udp-echo` containing only a single pod and make this pod
 available over the UDP port 9001 as a cluster-internal service with the same name. Use everyone's
@@ -415,148 +414,35 @@ $ echo "Hello STUNner" | socat -d -d - udp:localhost:9000
 If all goes well, you should see the same text echoed back from the cluster. After the test, make
 sure to lock down the ACL to the default-deny rule.
 
-## Demo
+### Demos
 
-STUNner comes with a demo to show how to use it to deploy a WebRTC application into Kubernetes. The
-demo has been adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
-tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), with
-minimal
-[modifications](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call) to
-deploy it into Kubernetes and integrate it with STUNner. The demo contains a
-[Node.js](https://nodejs.org) application server for creating browser-based two-party WebRTC
-video-calls, plus the Kurento media server deployed behind STUNner for media exchange and,
-potentially, automatic audio/video transcoding.
+STUNner comes with several demos to show how to use it to deploy a WebRTC application into
+Kubernetes. 
 
-### Installation
-
-The simplest way to deploy the demo is to use the [manifest](kubernetes/kurento-webrtc.yaml)
-packaged with STUNner. Note: you need to have the STUNner git repository cloned locally for the
-demo to work, and STUNner must be running with the default configuration.
-
-```console
-$ kubectl apply -f kubernetes/kurento-webrtc.yaml
-```
-
-The demo exposes a publicly available HTTPS web service on port 8443. Again, Kubernetes assigns an
-ephemeral public IP address to the web service, so first we need to learn the external IP.
-
-```console
-$ kubectl get service webrtc-server -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
-
-The result should be a valid IP address in the form `A.B.C.D`. If no IP address is returned, wait a
-bit more until Kubernetes successfully assigns the external IP. Then, direct your browser to the
-URL `https://<A.B.C.D>:8443` (of course, make sure substitute the previous IP address), accept the
-self-signed certificate, register some user name, and you can immediately start to video-chat with
-anyone registered at the service. To try it out, open another browser tab, repeat the above
-registration steps and enjoy a nice video-call with yourself.
-
-### Understanding what's happening
-
-The [Kurento
-docs](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html) cover all
-the WebRTC related information, below we just summarize the changes we have made to the Kurento
-demo code to make it work with STUNner and Kubernetes.
-
-1. Store the TLS certificate in a Kubernetes `Secret` (called `webrtc-server-secret`) and map the
-   keys into the file system of the application server pod. This allows easy and dynamic
-   customization of the TLS certificates used with the demo.
-2. Deploy the Kurento media server into a `Deployment` (called `kms`). Observe that Kurento has
-   been configured with *no STUN and TURN servers* and *no external IP addresses*, and it runs in
-   an ordinary Kubernetes pod at an ephemeral private IP address which is not available from
-   browsers directly. Here is where the *magic* happens: STUNner makes sure that WebRTC media just
-   keeps flowing between clients and the media server, without *any* of the two being directly
-   accessible via a public IP.
-3. Expose the media server pool, i.e., the Kurento media server deployment, over the Kubernetes
-   service `kms-control` over the TCP port 8888. This assigns a virtual IP address (a `ClusterIP`)
-   that the application server can use to configure the WebRTC endpoints and media pipelines in
-   Kurento. Note that this address is private and it is not reachable from outside the cluster.
-4. [Modify](https://github.com/l7mp/kurento-tutorial-node/commit/54289c2c6592d9237f3b465a0e10fa425b8ade8b#diff-70406ec94adfebba544257cb82e2aed222a8941c8b8db766aee488272446f1acR26)
-   the WebRTC application server to (1)
-   [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L26)
-   the STUNner configuration parameters available in the environment variables
-   `STUNNER_PUBLIC_ADDR`, `STUNNER_PUBLIC_PORT`, `STUNNER_USERNAME`, and `STUNNER_PASSWORD` (see
-   below) in an appropriate WebRTC [ICE server
-   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) and (2)
-   [return](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L442)
-   the ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
-   successful user registration.
-5. [Modify](https://github.com/l7mp/kurento-tutorial-node/commit/54289c2c6592d9237f3b465a0e10fa425b8ade8b#diff-70406ec94adfebba544257cb82e2aed222a8941c8b8db766aee488272446f1acR26)
-   the [JavaScript
-   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
-   served to clients to (1)
-   [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L134)
-   the ICE server configuration returned from the application server, and (2) set up the WebRTC
-   PeerConnections at both the
-   [caller](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L255)
-   and the
-   [callee](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L186)
-   to use STUNner's public address and port with the correct STUN/TURN credentials.
-6. Use the
-   [Dockerfile](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/Dockerfile)
-   packaged with STUNner to build the modified WebRTC application server container image or deploy
-   the [prebuilt image](https://hub.docker.com/repository/docker/l7mp/kurento-webrtc-server).
-7. Start the modified WebRTC application server in a Kubernetes `Deployment` (called
-   `webrtc-server`). Note that the STUNner configuration is made available to the application
-   server in environment variables taken from STUNner's default Kubernetes `ConfigMap` and the TLS
-   keys are taken from the Kubernetes `Secret` configured above.
-8. Expose the application server on a Kubernetes `LoadBalancer` service so that external clients
-   can reach it via the TCP port 8443.
-9. And finally, as a critical step, make sure that STUNner is permitted to forward UDP/RTP media
-   packets to the media servers. Recall, by default all internal access from STUNner is locked down
-   by a Kubernetes `NetworkPolicy`. The demo installation script opens this ACL up so that STUNner
-   can reach all WebRTC endpoints configured on the Kurento media servers, but just the WebRTC
-   ports and *nothing else* (but see the below [security notice](#access-control) on access
-   control).
-
-And that's all. We added only 32 lines of code to the Kurento demo to make it work with Kubernetes,
-with most of the changes needed to return the ephemeral public STUN/TURN URI and credentials to the
-clients. If you allocate STUNner to a stable IP or DNS name, you don't even need to modify
-*anything* in the demo and it will just work.
-
-### Scaling
-
-Suppose that the single STUNner instance fired up by the default installation script is no longer
-sufficient; e.g., due to concerns related to performance or availability.  In a "conventional"
-privately hosted setup, you would need to provision a new physical STUN/TURN server instance,
-allocate a public IP, add the new server to your STUN/TURN server pool, and monitor the liveliness
-of the new server continuously. This takes a lot of manual effort and considerable time. In
-Kubernetes, however, you can use a single command to *scale STUNner to an arbitrary number of
-replicas*. Kubernetes will potentially add new nodes to the cluster if needed, and the new replicas
-will be *automatically* added to the STUN/TURN server pool accessible behind the (single) public IP
-address/port pair (`<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>`), with UDP/RTP streams
-conveniently being load-balanced across STUNner replicas.
-
-For instance, the below command will fire up 15 STUNner replicas, usually in a matter of seconds.
-
-```console
-$ kubectl scale deployment stunner --replicas=15
-```
-You can even use Kubernetes
-[autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
-the size of the STUNner pool to the actual demand.
-
-Notably, the media server pool can likewise be (auto-)scaled with Kubernetes
-effortlessly. Conventional WebRTC media servers are unique snowflakes: tied to a public IP address
-and managed by hand. With STUNner the entire WebRTC infrastructure can be deployed into
-Kubernetes. As media servers are now ephemeral and disposable, running in ordinary Kubernetes pods,
-it is easy to replicate and scale the media plane with automated tools.
-
-The below command will scale the media server pool in the [Kurento demo](#demo) deployment to 20
-instances and again, automatic health-checks and load-balancing should just work as expected.
-
-```console
-$ kubectl scale deployment kms --replicas=20
-```
+* [One to one video call with Kurento](examples/kurento-one2one-call): This simple demo has been
+  adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
+  tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html),
+  with minimal
+  [modifications](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call)
+  that make it possible to deploy it into Kubernetes and integrate it with STUNner. The demo
+  contains a [Node.js](https://nodejs.org) application server for creating a browser-based
+  two-party WebRTC video-call, plus the Kurento media server deployed behind STUNner for media
+  exchange and, potentially, automatic audio/video transcoding.
+* TODO
 
 ## Security
+
+Like any conventional gateway service, an improperly configured STUNner service may easily end up
+exposing sensitive services to the Internet. The below security guidelines will allow to minmize
+the risks associated with a misconfigured STUNner.
+
+### Threat model
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.
 
-Like any conventional gateway service, an improperly configured STUNner service may easily end up
-exposing sensitive services to the Internet. To demonstrate the risks, below we shall use `turncat`
+To demonstrate the risks, below we shall use `turncat`
 to reach the Kubernetes DNS service through a misconfigured STUNner gateway.
 
 As usual, first store the STUNner configuration for later use.
@@ -687,17 +573,23 @@ to be restarted as well to learn the new credentials.
 The ultimate condition for a secure STUNner deployment is a correctly configured access control
 regime that restricts external users to open transport relay connections inside the cluster. The
 ACL must make sure that only the media servers, and only on a limited set of UDP ports, can be
-reached externally. The STUNner installation comes with a default `NetworkPolicy` that locks down
-*all* access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to
-enforce the security best practice that the access permissions of STUNner be carefully customized
-before deployment.
+reached externally.  This can be achieved using an Access Control List, essentially an "internal"
+firewall in the cluster, which in Kubernetes is called a `NetworkPolicy`. 
 
-An example can be found in the [Kurento demo](#demo). Here, STUNner is deployed into the `default`
-namespace and all STUNner pods are labeled as `app=stunner`, and the media server runs in the same
-namaspace using the label `app=kms`. In addition, WebRTC endpoints on the Kurento server are
-assigned from the UDP port range [10000:20000]. Then, the below `NetworkPolicy` ensures that all
-access from any STUNner pod to any media server pod is allowed over any UDP port between 10000 and
-20000, and all other network access from STUNner is denied.
+The STUNner installation comes with a default ACL (i.e., `NetworkPolicy`) that locks down *all*
+access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to enforce
+the security best practice that the access permissions of STUNner be carefully customized before
+deployment.
+
+Here is how to customize this ACL to secure the WebRTC media plane.  Suppose that we want STUNner
+to be able to reach *any* media server replica labeled as `app=media-server` over the UDP port
+range `[10000:20000]`, but we don't want transport relay connections via STUNner to succeed to
+*any* other pod. This will be enough to support WebRTC media, but will not allow clients to, e.g.,
+[reach the Kubernetes DNS service](#threat-model). 
+
+The below `NetworkPolicy` will then ensures that all access from any STUNner pod to any media
+server pod is allowed over any UDP port between 10000 and 20000, and all other network access from
+STUNner is denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -717,7 +609,7 @@ spec:
     # Choose the media server pods as destination
     - podSelector:
         matchLabels:
-          app: kms
+          app: media-server
     ports:
     # Only UDP ports 10000-20000 are allowed between 
     #   the source-destination pairs
@@ -753,7 +645,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          app: kms
+          app: media-server
     ports:
     - protocol: UDP
 EOF
