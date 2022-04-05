@@ -1,1 +1,1 @@
-Install of the kurento_webrtc_demo chart was successful.
+Install of the stunner-kurento-one2one-call chart was successful.
