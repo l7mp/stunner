@@ -12,15 +12,15 @@ Overflow](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [how](https://stackoverflow.com/questions/68339856/webrtc-on-kubernetes-cluster/68352515#68352515)
 [to](https://stackoverflow.com/questions/52929955/akskubernetes-service-with-udp-and-tcp)
 [scale](https://stackoverflow.com/questions/62088089/scaling-down-video-conference-software-in-kubernetes)
-WebRTC services with Kubernetes, just to get (mostly) insufficient answers?  Want to connect users
-behind a NAT without replying on expensive third-party TURN services?
+WebRTC services with Kubernetes, just to get (mostly) insufficient answers?  Want to safely connect
+your users behind a NAT, without relying on expensive [third-party TURN
+services](https://bloggeek.me/managed-webrtc-turn-speed)?
 
 Worry no more! STUNner allows you to deploy *any* WebRTC service into Kubernetes, smoothly
-integrating it into the [cloud-native ecosystem](https://landscape.cncf.io), and enjoy the
-convenience of the management, security and observability features provided by a cloud-based
-deployment.  STUNner exposes a standards-compliant STUN/TURN gateway for clients to access your
-virtualized WebRTC infrastructure running in Kubernetes, maintaining full browser compatibility and
-requiring minimal or no modification to your existing WebRTC codebase.
+integrating it into the [cloud-native ecosystem](https://landscape.cncf.io).  STUNner exposes a
+standards-compliant STUN/TURN gateway for clients to access your virtualized WebRTC infrastructure
+running in Kubernetes, maintaining full browser compatibility and requiring minimal or no
+modification to your existing WebRTC codebase.
 
 ## Table of Contents
 1. [Description](#description)
@@ -45,7 +45,7 @@ availability](https://blog.cloudflare.com/announcing-our-real-time-communication
 features we have come to expect from modern network services. Worse yet, the entire industry relies
 on a handful of [public](https://bloggeek.me/google-free-turn-server/) [STUN
 servers](https://www.npmjs.com/package/freeice) and [hosted TURN
-services](https://bloggeek.me/managed-webrtc-turn-speed) to connect clients behind a firewall,
+services](https://bloggeek.me/managed-webrtc-turn-speed) to connect clients behind a NAT/firewall,
 which may create a useless dependency on externally operated services, introduce a bottleneck,
 raise security concerns, and come with a non-trivial price tag.
 
@@ -340,10 +340,11 @@ Kubernetes.
   [Node.js](https://nodejs.org) application server for creating a browser-based two-party WebRTC
   video-call, plus the Kurento media server deployed behind STUNner for media exchange and,
   potentially, automatic audio/video transcoding.
-* [Direct one to one video call via STUNner](examples/direct-one2one-call): This simple demo has been adopted
-  from the [Kurento](https://www.kurento.org/) [one-to-one video call
-  tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), bit
-  this time the clients connect directly to each other via a Kubernetes based STUNner service.
+* [Direct one to one video call via STUNner](examples/direct-one2one-call): This simple demo has
+  been adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
+  tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), but
+  this time the clients connect directly to each other via STUNner, without the assistance of a
+  media server.
 
 ## Security
 
@@ -355,8 +356,9 @@ the risks associated with a misconfigured STUNner.
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
-configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use `turncat`
-to reach the Kubernetes DNS service through a misconfigured STUNner gateway.
+configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
+[`turncat`](/utils/turncat) utility to reach the Kubernetes DNS service through a misconfigured
+STUNner gateway.
 
 Start with a fresh STUNner installation. As usual, we store the STUNner configuration for later
 use.
@@ -391,11 +393,11 @@ the internal service address allocated by Kubernetes for STUNner:
 $ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
 ```
 
-If all goes well, this should hang until `dig` times out. Recall, the default installation scripts
-block *all* communication from STUNner to the rest of the workload, and the default-deny ACL needs
-to be explicitly opened up for STUNner to be able to reach a specific service. To demonstrate the
-risk of an improperly configured STUNner gateway, we temporarily allow STUNner to access the Kube
-DNS service.
+If all goes well, this should hang until `dig` times out. This is because the [default installation
+scripts block *all* communication](#access-control) from STUNner to the rest of the workload, and
+the default-deny ACL needs to be explicitly opened up for STUNner to be able to reach a specific
+service. To demonstrate the risk of an improperly configured STUNner gateway, we temporarily allow
+STUNner to access the Kube DNS service.
 
 ```console
 $ kubectl apply -f - <<EOF
@@ -499,12 +501,11 @@ Here is how to customize this ACL to secure the WebRTC media plane.  Suppose tha
 to be able to reach *any* media server replica labeled as `app=media-server` over the UDP port
 range `[10000:20000]`, but we don't want transport relay connections via STUNner to succeed to
 *any* other pod. This will be enough to support WebRTC media, but will not allow clients to, e.g.,
-[reach the Kubernetes DNS service](#threat-model). 
+[reach the Kubernetes DNS service](#threat). 
 
 Assuming that the entire workload is deployed into the `default` namespace, the below
-`NetworkPolicy` will then ensures that all access from any STUNner pod to any media server pod is
-allowed over any UDP port between 10000 and 20000, and all other network access from STUNner is
-denied.
+`NetworkPolicy` ensures that all access from any STUNner pod to any media server pod is allowed
+over any UDP port between 10000 and 20000, and all other network access from STUNner is denied.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -568,7 +569,7 @@ EOF
 
 In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
 publicly; e.g., the [`turncat` utility](utils/turncat) packaged with STUNner can be used
-conveniently for this [purpose](#testing).
+conveniently for this [purpose](/examples/simple-tunnel/README.pm).
 
 ### Exposing internal IP addresses
 
@@ -596,7 +597,7 @@ notable limitations at this point are as follows.
   the public IP address of a client sending a STUN binding request to it, and the TURN transport
   relay connections opened by STUNner will not be reachable externally. This is intended: STUNner
   is a Kubernetes ingress gateway which happens to expose a STUN/TURN compatible server to WebRTC
-  clients for compatibility.
+  clients, and not a public TURN service.
 * Only simple plain-text username/password authentication is implemented. Support for the standard
   STUN/TURN [long term credential
   mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of our TODO
