@@ -319,116 +319,27 @@ var ICE_config = {
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
-### Testing
-
-STUNner comes with a simple STUN/TURN client called [`turncat`](utils/turncat) that can be used to
-test a STUNner installation. The `turncat` client will open a UDP tunnel through STUNner into the
-Kubernetes cluster, which can be used to access any UDP service running inside the cluster. Note
-that your WebRTC clients will not need `turncat` to reach the cluster, since all Web browsers come
-with a STUN/TURN client included; `turncat` here is used only to simulate what a WebRTC client
-would do when trying to reach STUNner. For more info, see the `turncat`
-[documentation](utils/turncat).
-
-We test the STUNner installation by deploying a UDP echo server into the cluster and exposing it
-for external access via STUNner.
-
-![STUNner test setup](./doc/stunner_echo.svg)
-
-First, create a `Deployment` called `udp-echo` containing only a single pod and make this pod
-available over the UDP port 9001 as a cluster-internal service with the same name. Use everyone's
-favorite network debugging tool, [`socat(1)`](https://linux.die.net/man/1/socat), to deploy a
-simple UDP echo server into the pod.
-
-```console
-$ kubectl create deployment udp-echo --image=l7mp/net-debug:0.5.3
-$ kubectl expose deployment udp-echo --name=udp-echo --type=ClusterIP --protocol=UDP --port=9001
-$ kubectl exec -it $(kubectl get pod -l app=udp-echo -o jsonpath="{.items[0].metadata.name}") -- \
-    socat -d -d udp-l:9001,fork EXEC:cat
-```
-
-Store the STUN/TURN configurations and credentials for later use.
-
-```console
-$ export STUNNER_PUBLIC_ADDR=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_ADDR}')
-$ export STUNNER_PUBLIC_PORT=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_PORT}')
-$ export STUNNER_REALM=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_REALM}')
-$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_USERNAME}')
-$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PASSWORD}')
-```
-
-Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the `udp-echo` service:
-
-```console
-$ export UDP_ECHO_IP=$(kubectl get svc udp-echo -o jsonpath='{.spec.clusterIP}')
-```
-
-Observe that the result is a private IP address: indeed, the `udp-echo` service is not available to
-external services at this point. We shall use STUNner to expose the service to the Internet via a
-TURN service.
-
-The default installation scripts install an ACL into Kubernetes that blocks *all* communication
-from STUNner to the rest of the workload. This is to minimize the risk of an improperly configured
-STUNner gateway to [expose sensitive services to the external world](#security). In order to allow
-STUNner to open transport relay connections to the `udp-echo` service, we have to explicitly open
-up this ACL first.
-
-```console
-$ kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: udp-echo
-    ports:
-    - protocol: UDP
-      port: 9001
-EOF
-```
-
-And finally fire up `turncat` locally; this will open a UDP server port on `localhost:9000` and
-tunnel all packets to the `udp-echo` service in your Kubernetes cluster through STUNner.
-
-```console
-$ cd stunner
-$ go run utils/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:9000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${UDP_ECHO_IP}:9001
-```
-
-Now, in another terminal open a UDP connection through the tunnel opened by `turncat` and send
-something to the UDP echo server running inside the cluster.
-
-```console
-$ echo "Hello STUNner" | socat -d -d - udp:localhost:9000
-```
-
-If all goes well, you should see the same text echoed back from the cluster. After the test, make
-sure to lock down the ACL to the default-deny rule.
-
-### Demos
+### Examples
 
 STUNner comes with several demos to show how to use it to deploy a WebRTC application into
 Kubernetes. 
 
-* [One to one video call with Kurento](examples/kurento-one2one-call): This simple demo has been
+* [Simple STUNner tunnel](examples/simple-tunnel): This introductory demo shows how to tunnel an
+  external connection via STUNner to a UDP service deployed into Kubernetes. The demo can be used
+  to quickly check a STUNner installation.
+* [One to one video call with Kurento via STUNner](examples/kurento-one2one-call): This simple demo has been
   adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
   tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html),
   with minimal
   [modifications](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call)
-  that make it possible to deploy it into Kubernetes and integrate it with STUNner. The demo
-  contains a [Node.js](https://nodejs.org) application server for creating a browser-based
-  two-party WebRTC video-call, plus the Kurento media server deployed behind STUNner for media
-  exchange and, potentially, automatic audio/video transcoding.
-* TODO
+  to deploy it into Kubernetes and integrate it with STUNner. The demo contains a
+  [Node.js](https://nodejs.org) application server for creating a browser-based two-party WebRTC
+  video-call, plus the Kurento media server deployed behind STUNner for media exchange and,
+  potentially, automatic audio/video transcoding.
+* [Direct one to one video call via STUNner](examples/direct-one2one-call): This simple demo has been adopted
+  from the [Kurento](https://www.kurento.org/) [one-to-one video call
+  tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), bit
+  this time the clients connect directly to each other via a Kubernetes based STUNner service.
 
 ## Security
 
