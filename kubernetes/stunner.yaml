@@ -82,7 +82,7 @@ spec:
               fieldPath: status.podIP
       # Uncomment this if you want to deploy a sidecar container with stunner to sniff traffic
       # - name: net-debug
-      #   image: retvari/net-debug:latest
+      #   image: l7mp/net-debug:latest
       #   command: ["/bin/sh"]
       #   args: ["-c", "while true; do echo hello; sleep 10;done"]
 
