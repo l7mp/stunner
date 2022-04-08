@@ -32,8 +32,8 @@ You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line to
 configured to communicate with your cluster. If you do not already have a cluster, you can create
 one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
 STUNner is deployed into the cluster (see the [STUNner configuration
-guide](README.md#configuration) and the [STUNner installation guide](README.md#installation)) and
-follow the steps in the [STUNner testing guide](README.md#testing) to make sure that STUNner is
+guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
+follow the steps in the [STUNner testing guide](/README.md#testing) to make sure that STUNner is
 fully operational. Finally, the demo requires a solid understanding of the basic concepts in
 [Kubernetes](https://kubernetes.io/docs/home) and
 [WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
@@ -45,7 +45,7 @@ locally, in order to understand how the Kubernetes based demo differs (very litt
 
 The simplest way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](/examples/kurento-one2one-call) packaged with STUNner. 
+[manifest](/examples/kurento-one2one-call) packaged with STUNner.
 
 ```console
 $ git clone https://github.com/l7mp/stunner
@@ -122,8 +122,7 @@ demo code to make it work with STUNner and Kubernetes.
    packets to the media servers. Recall, by default all internal access from STUNner is locked down
    by a Kubernetes `NetworkPolicy`. The demo installation script opens this ACL up so that STUNner
    can reach all WebRTC endpoints configured on the Kurento media servers, but just the WebRTC
-   ports and *nothing else* (but see the below [security notice](#access-control) on access
-   control).
+   ports and *nothing else* (but see the below [security notice](/#security) on access control).
 
 And that's all. We added only 32 lines of code to the Kurento demo to make it work with Kubernetes,
 with most of the changes needed to return the ephemeral public STUN/TURN URI and credentials to the
@@ -158,8 +157,8 @@ and managed by hand. With STUNner the entire WebRTC infrastructure can be deploy
 Kubernetes. As media servers are now ephemeral and disposable, running in ordinary Kubernetes pods,
 it is easy to replicate and scale the media plane with automated tools.
 
-The below command will scale the media server pool in the [Kurento demo](#demo) deployment to 20
-instances and again, automatic health-checks and load-balancing should just work as expected.
+The below command will scale the Kurento media server pool to 20 instances and again, automatic
+health-checks and load-balancing should just work as expected.
 
 ```console
 $ kubectl scale deployment kms --replicas=20
@@ -167,7 +166,7 @@ $ kubectl scale deployment kms --replicas=20
 
 ## Security
 
-As described in the [STUNner security guide](README.md#security), it is critical to lock down
+As described in the [STUNner security guide](/README.md#security), it is critical to lock down
 (potentially hostile) access to sensitive services running inside the cluster via STUNner. The
 necessary ACLs are automatically configured by the installation manifests above; below we describe
 what's happening in the background.
@@ -243,13 +242,13 @@ EOF
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
 
-MIT License - see [LICENSE](LICENSE) for full text.
+MIT License - see [LICENSE](/LICENSE) for full text.
 
 ## Acknowledgments
 

@@ -32,7 +32,7 @@ $ ./turncat --user test=test --realm=REALM --log=all:INFO,turncat:DEBUG \
 The below will execute an [`iperfv2` benchmark](https://iperf.fr) to measure the available
 bandwidth and/or latency from the local endhost to the Kubernetes cluster through STUNner.
 
-If you haven't done that so far, [deploy](README.md/#getting-started) STUNner into
+If you haven't done that so far, [deploy](/README.md/#getting-started) STUNner into
 Kubernetes. Then, fire up an `iperfv2` UDP server in the cluster and store the service IP: this
 will be the peer address for our TURN tunnel.
 
@@ -151,9 +151,9 @@ $ kubectl delete deployment iperf-server
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](/LICENSE) for full text.
 
 ## Acknowledgments
 

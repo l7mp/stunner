@@ -8,21 +8,21 @@ quote the original Kurento documentation:
 > this application provides a simple video softphone.
 
 This demo is essentially the same as the STUNner [One to one video
-call](examples/kurento-one2one-call) demo, with the exception that this demo does not feature a
+call](/examples/kurento-one2one-call) demo, with the exception that this demo does not feature a
 media server, that is, users connect directly via STUNner, without the mediation of a media server.
 
 For more information, consult the documentation for the STUNner [One to one video
-call](examples/kurento-one2one-call/README.md) documentation.
+call](/examples/kurento-one2one-call/README.md) documentation.
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
 
-MIT License - see [LICENSE](LICENSE) for full text.
+MIT License - see [LICENSE](/LICENSE) for full text.
 
 ## Acknowledgments
 
