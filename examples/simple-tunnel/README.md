@@ -4,11 +4,11 @@ This introductory demo shows how to tunnel an external connection via STUNner to
 deployed into Kubernetes. The demo can be used to quickly check a STUNner installation.
 
 In this demo you will learn the following steps to:
-* integrate a typical WebRTC application server to be used with STUNner,
-* deploy the modified application server into a Kubernetes,
-* deploy the Kurento media server into Kubernetes behind STUNner,
-* secure a STUNner deployment, and
-* scale a standard WebRTC workload using Kubernetes and STUNner.
+* configure a UDP echo service in Kubernetes,
+* use the [`turncat`](/utils/turncat) utility to connect to STUNner,
+* secure the STUNner deployment,
+* connect a local UDP sender to the echo service running in Kubernetes via STUNner, and
+* test a STUNner installation with [`turncat`](/utils/turncat).
 
 ## Installation
 
@@ -50,7 +50,7 @@ favorite network debugging tool, [`socat(1)`](https://linux.die.net/man/1/socat)
 simple UDP echo server into the pod.
 
 ```console
-$ kubectl create deployment udp-echo --image=l7mp/net-debug:0.5.3
+$ kubectl create deployment udp-echo --image=l7mp/net-debug:latest
 $ kubectl expose deployment udp-echo --name=udp-echo --type=ClusterIP --protocol=UDP --port=9001
 $ kubectl exec -it $(kubectl get pod -l app=udp-echo -o jsonpath="{.items[0].metadata.name}") -- \
     socat -d -d udp-l:9001,fork EXEC:cat
