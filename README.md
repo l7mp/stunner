@@ -324,9 +324,9 @@ var pc = new RTCPeerConnection(ICE_config);
 STUNner comes with several demos to show how to use it to deploy a WebRTC application into
 Kubernetes. 
 
-* [Simple STUNner tunnel](examples/simple-tunnel): This introductory demo shows how to tunnel an
-  external connection via STUNner to a UDP service deployed into Kubernetes. The demo can be used
-  to quickly check a STUNner installation.
+* [Opening a UDP tunnel via STUNner](examples/simple-tunnel): This introductory demo shows how to
+  tunnel an external connection via STUNner to a UDP service deployed into Kubernetes. The demo can
+  be used to quickly check a STUNner installation.
 * [One to one video call with Kurento via STUNner](examples/kurento-one2one-call): This simple demo has been
   adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
   tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html),

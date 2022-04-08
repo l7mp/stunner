@@ -1,4 +1,4 @@
-# STUNner demo: Simple tunnel
+# STUNner testing: Opening a UDP tunnel via STUNner
 
 This introductory demo shows how to tunnel an external connection via STUNner to a UDP service
 deployed into Kubernetes. The demo can be used to quickly check a STUNner installation.
@@ -18,10 +18,9 @@ You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line to
 configured to communicate with your cluster. If you do not already have a cluster, you can create
 one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
 STUNner is deployed into the cluster (see the [STUNner configuration
-guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
-follow the steps in the [STUNner testing guide](/README.md#testing) to make sure that STUNner is
-fully operational. Finally, the demo requires a solid understanding of the basic concepts in
-[Kubernetes](https://kubernetes.io/docs/home) and
+guide](/README.md#configuration) and the [STUNner installation
+guide](/README.md#installation). Finally, the demo requires a solid understanding of the basic
+concepts in [Kubernetes](https://kubernetes.io/docs/home) and
 [WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
 original [Kurento One to one video
 call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
