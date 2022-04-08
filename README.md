@@ -145,21 +145,19 @@ STUNner to the Internet.
 
 STUNner configuration is available in the Kubernetes `ConfigMap` named `stunner-config`. The most
 important settings are as follows.
-* `STUNNER_PUBLIC_ADDR` (no default): The public IP address clients can use to reach the WebRTC
-  media servers via STUNner. When configuring [WebRTC clients with TURN server
-  URI](configuring-webrtc-clients-to-reach-stunner), this setting specifies the IP address in the
-  TURN server URI.  By default, the public IP address will be dynamically assigned by Kubernetes
-  during installation.  The STUNner installation scripts take care of querying the external IP
-  address from Kubernetes and automatically setting `STUNNER_PUBLIC_ADDR` during installation; for
-  manual installation the external IP must be set by hand (see
+* `STUNNER_PUBLIC_ADDR` (no default): The public IP address clients can use to reach STUNner. When
+  configuring [WebRTC clients with a TURN server URI](configuring-webrtc-clients-to-reach-stunner),
+  this setting specifies the IP address in the TURN server URI.  By default, the public IP address
+  will be dynamically assigned during installation.  The STUNner installation scripts take care of
+  querying the external IP address from Kubernetes and automatically setting `STUNNER_PUBLIC_ADDR`;
+  for manual installation the external IP must be set by hand (see
   [details](#learning-the-external-ip-and-port) below).
-* `STUNNER_PUBLIC_PORT` (default: 3478): The public port used by clients to reach the WebRTC media
-  servers via STUNner. When configuring [WebRTC clients with TURN server
-  URI](configuring-webrtc-clients-to-reach-stunner), this setting specifies the port in the TURN
-  server URI.  Note that the Helm installation scripts may overwrite this configuration if the
-  installation falls back to the `NodePort` service (i.e., when STUNner fails to obtain an external
-  IP from the Kubernetes ingress load balancer), see [details](#learning-the-external-ip-and-port)
-  below.
+* `STUNNER_PUBLIC_PORT` (default: 3478): The public port used by clients to reach STUNner. When
+  configuring [WebRTC clients with a TURN server URI](configuring-webrtc-clients-to-reach-stunner),
+  this setting specifies the port in the TURN server URI.  Note that the Helm installation scripts
+  may overwrite this configuration if the installation falls back to the `NodePort` service (i.e.,
+  when STUNner fails to obtain an external IP from the Kubernetes ingress load balancer), see
+  [details](#learning-the-external-ip-and-port) below.
 * `STUNNER_PORT` (default: 3478): The internal port used by STUNner for communication inside the
   cluster. It is safe to set this to the public port.
 * `STUNNER_REALM` (default: `stunner.l7mp.io`): the
@@ -314,10 +312,16 @@ var ICE_config = {
       'username': <STUNNER_USERNAME>,
       'credential': <STUNNER_PASSWORD>,
     },
-  ]
+  ],
+  iceTransportPolicy: 'relay',
 };
 var pc = new RTCPeerConnection(ICE_config);
 ```
+
+The `iceTransportPolicy` can be optionally set to `relay`, which will make sure that the client
+will skip the generation of host and server-reflexive ICE candidates (which will never work with
+STUNner anyway) and immediately start by TURN relay candidates. Setting this policy will speed up
+call establishment substantially, especially with trickle ICE.
 
 ### Examples
 
