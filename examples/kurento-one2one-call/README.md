@@ -185,6 +185,7 @@ media server pod is allowed over any UDP port between 10000 and 20000, and all o
 from STUNner is denied.
 
 ```yaml
+$ kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -209,6 +210,7 @@ spec:
     - protocol: UDP
       port: 10000
       endPort: 20000
+EOF
 ```
 
 Note that certain Kubernetes CNIs do not support network policies, or support only a subset of what
