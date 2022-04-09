@@ -52,7 +52,7 @@ jobs:
           cp stunner/helm/*.tgz l7mp.io/stunner
           helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
           cd l7mp.io
-          git config --global user.email "L7mp.info@gmail.com"
+          git config --global user.email "l7mp.info@gmail.com"
           git config --global user.name "BotL7mp"
           git add .
           git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
