@@ -189,7 +189,21 @@ The simplest way to deploy STUNner is through Helm. In this case, all STUNner co
 parameters are available for customization as [Helm
 Values](https://helm.sh/docs/chart_template_guide/values_files).
 
-TODO
+```
+$ helm repo add stunner https://l7mp.io/stunner
+$ helm repo update
+$ helm install stunner stunner/stunner
+```
+To customize your chart overwrite the [default values](https://github.com/l7mp/stunner/blob/main/helm/stunner/values.yaml).
+
+```
+# examples
+# set own namespace to install to
+$ helm install stunner stunner/stunner --set stunner.namespace=<your-namespace-here>
+
+# set STUNNER_REALM variable in the stunner ConfigMap
+helm install stunner stunner/stunner --set stunner.config.STUNNER_REALM=<your-realm-here>
+```
 
 If Helm is not an option, you can perform a manual installation using the static Kubernetes
 manifests packaged with STUNner. This mode is not recommended for general use however, since the

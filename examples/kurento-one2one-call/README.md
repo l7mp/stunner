@@ -43,7 +43,20 @@ locally, in order to understand how the Kubernetes based demo differs (very litt
 
 ### Quick installation
 
-The simplest way to deploy the demo is to clone the [STUNner git
+STUNner supports two installation options: a self-contained and easy-to-use Helm chart and a manual
+installation method using static Kubernetes manifests.
+
+The simplest way to deploy the demo is using its Helm chart. It is important to wait with the installation 
+until the STUNNER_PUBLIC_ADDR key is added with a valid address to the `ConfigMap` called `stunner-config`.
+
+```
+# if you have not added the repo yet do it otherwise do not
+$ helm repo add stunner https://l7mp.io/stunner
+$ helm repo update
+$ helm install kurento-one2one-call stunner/kurento_webrtc_demo
+```
+
+The other way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
 [manifest](/examples/kurento-one2one-call) packaged with STUNner.
 
