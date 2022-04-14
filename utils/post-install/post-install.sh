@@ -25,8 +25,8 @@ STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer
 sleep 1
 ((TIMERCNT++))
 
-#this is triggered if the external IP address didn't occure for 20 seconds
-if [[ "$TIMERCNT" -eq 20 ]]; then
+#this is triggered if the external IP address didn't occure for 40 seconds
+if [[ "$TIMERCNT" -eq 40 ]]; then
   STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/nodes / |
     jq '.items[0].status.addresses[] | select(.type=="ExternalIP").address')
   STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner / |
@@ -60,9 +60,7 @@ JSON_STRING=$( jq -n \
                   --argjson addr $STUNNER_PUBLIC_ADDR \
                   --argjson port $STUNNER_PUBLIC_PORT \
                   '[{"op": "add", "path": "/data/STUNNER_PUBLIC_ADDR", "value": $addr},{"op": "add", "path": "/data/STUNNER_PUBLIC_PORT", "value": $port|tostring}]' )
-cat << EOF
-    External IP has been found for the Stunner LoadBalancer Service
-EOF 
+echo 'External IP has been found for the Stunner LoadBalancer Service ' 
 echo $JSON_STRING
 
 curl -k \
