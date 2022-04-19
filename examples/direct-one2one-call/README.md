@@ -13,13 +13,10 @@ no media server in the media pipeline.
 ![STUNner standalone deployment architecture](../../doc/stunner_standalone_arch.svg)
 
 In this demo you will learn how to:
-* integrate a WebRTC application server with STUNner,
-* deploy the modified WebRTC application server into a Kubernetes,
+* integrate a typical WebRTC application server with STUNner,
+* deploy the modified application server into a Kubernetes,
 * secure a STUNner deployment, and
-* scale-up STUNner with load.
-
-For more information, consult the documentation for the STUNner [One to one video
-call](/examples/kurento-one2one-call/README.md) documentation.
+* scale STUNner using Kubernetes.
 
 ## Installation
 
@@ -31,9 +28,9 @@ one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, m
 STUNner is deployed into the cluster (see the [STUNner configuration
 guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
 follow the steps in the [STUNner testing guide](/examples/simple-tunnel/README.md) to make sure
-that STUNner is fully operational. The below examples assume that STUNner has been installed into a
-default namespace with simple plain text authentication. The demo requires a solid understanding of
-the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
+that STUNner is fully operational. The below examples assume that STUNner has been installed into
+the default namespace with simple plain text authentication. The demo requires a solid
+understanding of the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
 [WebRTC](https://webrtc.org/getting-started/overview).
 
 ### Quick installation
@@ -51,17 +48,20 @@ The demo exposes a publicly available HTTPS web service on port 8443. Kubernetes
 ephemeral public IP address to the web service, so first we need to learn the external IP.
 
 ```console
-$ kubectl get service webrtc-server -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+$ kubectl get service webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
 The result should be a valid IP address in the form `A.B.C.D`. If no IP address is returned, wait a
-bit more until Kubernetes successfully assigns the external IP. Then, direct your browser to the
-URL `https://<A.B.C.D>:8443` (of course, make sure substitute the previous IP address), accept the
-self-signed certificate, register some user name, and you can immediately start to video-chat with
-anyone registered at the service. To try it out, open another browser tab, repeat the above
-registration steps and enjoy a nice video-call with yourself.
+bit more until Kubernetes successfully assigns the external IP. If still no success, try to use the
+[`NodePort`
+service](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) to reach
+the application server. Then, direct your browser to the URL `https://<A.B.C.D>:8443` (but
+substitute the external IP address first), accept the self-signed certificate, register some user
+name, and you can immediately start to video-chat with anyone registered at the service. To try it
+out, open another browser tab, repeat the above registration steps and enjoy a nice video-call with
+yourself.
 
-### Porting a WebRTC application to STUNner
+## Porting a WebRTC application to STUNner
 
 The tutorial has been adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
 tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), after
@@ -83,7 +83,7 @@ usable with STUNner and Kubernetes.  The full source code of the application ser
    configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer), (2) return the
    ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
    successful user registration, (3) pass on the caller's SDP Offer to the callee in the
-   `incomingCall` message, and (4) return the callee's SDP answer to the caller in the
+   `incomingCall` message, and (4) return the callee's SDP Answer to the caller in the
    `callResponse` message.
 3. Modify the [JavaScript
    code](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/static/js/index.js)
@@ -108,7 +108,7 @@ And that's all. Note that, unlike in the other demos there is no need to modify 
 ACL (i.e., the Kubernetes `NetworkPolicy`) in this case, since STUNner will never reach any
 internal service in Kubernetes (see the below [security notice](/#security) on access control).
 
-### Scaling
+## Scaling
 
 Suppose that the single STUNner instance fired up by the default installation script is no longer
 sufficient; e.g., due to concerns related to performance or availability.  In a "conventional"
@@ -129,6 +129,14 @@ $ kubectl scale deployment stunner --replicas=15
 You can even use Kubernetes
 [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
 the size of the STUNner pool to the actual demand.
+
+## Clean up
+
+Delete the demo deployment using the below command:
+
+```console
+$ kubectl delete -f examples/direct-one2one-call/direct-one2one-call.yaml
+```
 
 ## Help
 
