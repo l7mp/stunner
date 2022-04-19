@@ -53,9 +53,19 @@ The main goal of STUNner is to allow *anyone* to deploy their own WebRTC infrast
 Kubernetes, without relying on any external service other than the cloud-provider's standard hosted
 Kubernetes offering. This is achieved by STUNner acting as a gateway for ingesting WebRTC media
 traffic into a Kubernetes cluster, exposing a public-facing STUN/TURN server that WebRTC clients
-can use to open a transport relay connection to the media servers running *inside* the Kubernetes
-cluster. This makes it possible to deploy WebRTC application servers and media servers into
-ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
+can connect to.
+
+In the *standalone deployment model* STUNner acts as a simple scalable STUN/TURN server that WebRTC
+clients can use as a rendezvous point to exchange media streams. This is not much different from a
+standard public STUN/TURN server setup, but in this case the servers are deployed to Kubernetes
+which makes lifecycle management, scaling and cost optimization infinitely simpler.
+
+![STUNner architecture](./doc/stunner_standalone_arch.svg)
+
+In the *media-plane deployment model* STUNner implements a STUN/TURN ingress gateway that WebRTC
+clients can use to open a transport relay connection to the media servers running *inside* the
+Kubernetes cluster. This makes it possible to deploy WebRTC application servers and media servers
+into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
 monitor and troubleshoot the WebRTC infrastructure like any other cloud-bound workload.
 
 ![STUNner architecture](./doc/stunner_arch.svg)
