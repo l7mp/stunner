@@ -1,24 +1,16 @@
-// creates a tunnel through a TURN server
-// go run main.go --user test=test --verbose 127.0.0.1:5000 34.118.22.69:3478 10.116.0.10:11111
-
 package main
 
 import (
-	"flag"
 	"net"
+	"net/url"
 	"fmt"
 	"context"
 	"strings"
 	"strconv"
 	"syscall"
 	"os"
-	"os/signal"
 	"sync"
-	"time"
 	"errors"
-
-	// "bytes"
-	// "reflect"
 	
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
@@ -34,8 +26,8 @@ type packet struct {
 type connection struct {
 	clientAddr net.Addr       // Address of the client
 	turnClient *turn.Client   // TURN client associated with connection
-	clientConn net.Conn       // UDP connection connected back to the client
-	serverConn net.PacketConn // Relayed UDP connection to server
+	clientConn net.Conn       // connection connected back to the client
+	serverConn net.Conn       // Relayed UDP connection to server
 }
 
 type AuthGen func() (string, string, error)
@@ -62,42 +54,45 @@ type Turncat struct {
 }
 
 //////////
-func resolveAddr(addr string) (net.Addr, error) {
-	netaddr := strings.SplitN(addr, ":", 2)
+func resolveAddr(uri string) (net.Addr, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(netaddr) != 2 {
-		return nil, fmt.Errorf("invalid address '%s', expecting <type>:<addr>[:<port>]", addr)
+	proto := string.ToLower(u.Scheme)
+	if proto ==  "turn" {
+		proto = "udp"
+		if m, err := url.ParseQuery(u.RawQuery); err != nil {
+			if len(m["transport"]) > 0 {
+				proto = m["protocol"][0]
+			}
+		}
 	}
 
 	// default to IPv4
-	switch netaddr[0] {
-	case "udp", "turn":
-		a, err := net.ResolveUDPAddr("udp", netaddr[1])
+	switch proto {
+	case "udp":
+		a, err := net.ResolveUDPAddr("udp", u.Hostname())
 		if err != nil {
-			return nil, fmt.Errorf("cannot resolve UDP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
+			return nil, err
 		}
 		return a, nil
 	case "tcp":
-		a, err := net.ResolveTCPAddr("tcp", netaddr[1])
+		a, err := net.ResolveTCPAddr("tcp", u.Hostname())
 		if err != nil {
-			return nil, fmt.Errorf("cannot resolve TCP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
+			return nil, err
 		}
 		return a, nil
 	case "ip":
-		a, err := net.ResolveIPAddr("ip", netaddr[1])
+		a, err := net.ResolveIPAddr("ip", u.Hostname())
 		if err != nil {
-			return nil, fmt.Errorf("cannot resolve IP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
+			return nil, err
 		}
 		return a, nil
 	default:
-		return nil, fmt.Errorf("invalid address '%s', expecting <type>:<addr>[:<port>]",
-			addr)
+		return nil, fmt.Errorf("invalid protocol %s", proto)
 	}
-	
-	panic("cannot happen")
 }
 
 func reuseAddr(network, address string, conn syscall.RawConn) error {
@@ -121,7 +116,6 @@ func envDefaultUint(env string, def int) uint {
 	return uint(r)
 }
 
-///////
 func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
 	logger := logging.NewDefaultLoggerFactory()
 	logger.ScopeLevels["turncat"] = logging.LogLevelError
@@ -190,6 +184,8 @@ func NewTurncat(config TurncatConfig) (*Turncat, error) {
 	
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client
+	var listener net.Conn
+	
 	listenConf := &net.ListenConfig{Control: reuseAddr}
 	listenConn, err := listenConf.ListenPacket(context.Background(), listenAddr.Network(), listenAddr.String())
 	if err != nil {
@@ -487,117 +483,4 @@ func (t *Turncat) Run(p context.Context) {
 			}
 		}
 	}()
-}
-
-//////////////////
-
-func main() {
-	usage := "turncat [-a|--auth=static|long-term] [-s|--shared-secret=<my-secret> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] <udp:listener_addr:listener_port> [turn:server_addr:server_port] <udp:peer_addr:peer_port>"
-
-	// can be overriden on the command line
-	dAuth     := envDefault("STUNNER_AUTH",                   "static")
-	dSecret   := envDefault("STUNNER_SHARED_SECRET",          "my-secret")
-	dDuration := envDefault("STUNNER_CREDENTIAL_DURATION",    "1h30m")
-	dRealm    := envDefault("STUNNER_REALM",                  "stunner.l7mp.io")
-	dServer   := envDefault("STUNNER_ADDR",                   "127.0.0.1")
-	dPort 	  := envDefaultUint("STUNNER_PORT",                3478)
-	dUser     := envDefault("STUNNER_USERNAME",               "user")
-	dPasswd	  := envDefault("STUNNER_PASSWORD",               "pass")
-	dLoglevel := envDefault("STUNNER_LOGLEVEL",               "all:ERROR")
-	
-	var auth, authSecret, realm, level, user, duration string
-	var verbose bool
-	// general flags
-	flag.StringVar(&realm, "r",       dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
-	flag.StringVar(&realm, "realm",   dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
-	flag.StringVar(&level, "l",       dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
-	flag.StringVar(&level, "log",     dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
-	flag.BoolVar(&verbose, "v",       false,                 "Verbose logging, identical to -l all:DEBUG")
-	flag.BoolVar(&verbose, "verbose", false,                 "Verbose logging, identical to -l all:DEBUG")
-
-	// authentication mode
-	flag.StringVar(&auth,  "a",    dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
-	flag.StringVar(&auth,  "auth", dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
-	// long-term credential auth
- 	flag.StringVar(&authSecret, "s",             dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
-	flag.StringVar(&authSecret, "shared-secret", dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
-	flag.StringVar(&duration, "d",               dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
-	flag.StringVar(&duration, "duration",        dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
-	// static username/passwd auth
-	flag.StringVar(&user, "u",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
-	flag.StringVar(&user, "user", dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
-	flag.Parse()
-
-	var s, p string
-	switch flag.NArg() {
-	case 2:
-		// server address is taken from the env, peer address is the last arg
-		s = fmt.Sprintf("turn:%s:%s", dServer, dPort)
-		p = flag.Arg(1)
-	case 3:
-		// both server and peer address are provided as args
-		s = flag.Arg(1)
-		p = flag.Arg(2)
-	default:
-		fmt.Fprintf(os.Stderr, usage)
-		os.Exit(1)
-	}
-	
-	if verbose {
-		level = "all:DEBUG"
-	}
-	logger := newLogger(level)
-
-	var authGen AuthGen
-	switch strings.ToLower(auth) {
-	case "static":
-		cred := strings.SplitN(user, "=", 2)
-		if len(cred) != 2 || cred[0] == "" || cred[1] == "" {
-			fmt.Fprintf(os.Stderr, "cannot parse static credential: '%s'\n", user)
-			os.Exit(1)
-		}
-		authGen = func() (string, string, error) {
-			return cred[0], cred[1], nil
-		}
-	case "long-term":
-		d, err := time.ParseDuration(duration)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cannot parse long-term credential duration '%s': %s",
-				duration, err)
-			os.Exit(1)
-		}
-		authGen = func() (string, string, error) {
-			return turn.GenerateLongTermCredentials(authSecret, d)
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "unknown authentication mode: %s", auth)
-		os.Exit(1)
-	}
-
-	cfg := &TurncatConfig{
-		ListenAddr:    flag.Arg(0),
-		ServerAddr:    s,
-		PeerAddr:      p,
-		Realm:         realm,
-		AuthGen:       authGen,
-		LoggerFactory: logger,
-	}
-
-	t, err := NewTurncat(*cfg)
-	if err != nil {
-		fmt.Println("cannot init Turncat")
-		os.Exit(1)
-	}
-
-	// exitCh := make(chan os.Signal, 1)
-	// signal.Notify(exitCh, os.Interrupt)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
-	t.Run(ctx)
-
-	<- ctx.Done()
-	t.Close()
-	
 }
