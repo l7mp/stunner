@@ -127,7 +127,7 @@ deploy your *own* WebRTC infrastructure into Kubernetes and make sure your media
 reachable for WebRTC clients, despite running with a private IP address inside a Kubernetes pod.
 
 The below installation instructions require an operational cluster running a supported version of
-Kubernetes (>1.20). You can use any supported platform, for example
+Kubernetes (>1.22). You can use any supported platform, for example
 [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube) or any
 [hosted](https://cloud.google.com/kubernetes-engine) or private Kubernetes cluster, but make sure
 that the cluster comes with a functional [load-balancer
