@@ -3,7 +3,7 @@
 This introductory demo shows how to tunnel an external connection via STUNner to a UDP service
 deployed into Kubernetes. The demo can be used to quickly check a STUNner installation.
 
-In this demo you will learn the following steps to:
+In this demo you will learn how to:
 * configure a UDP echo service in Kubernetes,
 * use the [`turncat`](/utils/turncat) utility to connect to STUNner,
 * secure the STUNner deployment,
@@ -19,8 +19,9 @@ configured to communicate with your cluster. If you do not already have a cluste
 one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
 STUNner is deployed into the cluster (see the [STUNner configuration
 guide](/README.md#configuration) and the [STUNner installation
-guide](/README.md#installation). Finally, the demo requires a solid understanding of the basic
-concepts in [Kubernetes](https://kubernetes.io/docs/home) and
+guide](/README.md#installation)). The below examples assume that STUNner has been installed into a
+default namespace with simple plain text authentication. The demo requires a solid understanding of
+the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
 [WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
 original [Kurento One to one video
 call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
@@ -30,11 +31,11 @@ locally, in order to understand how the Kubernetes based demo differs (very litt
 
 STUNner comes with a simple STUN/TURN client called [`turncat`](/utils/turncat) that can be used to
 test a STUNner installation. The `turncat` client will open a UDP tunnel through STUNner into the
-Kubernetes cluster, which can be used to access any UDP service running inside the cluster. Note
-that your WebRTC clients will not need `turncat` to reach the cluster, since all Web browsers come
-with a STUN/TURN client included; `turncat` here is used only to simulate what a WebRTC client
-would do when trying to reach STUNner. For more info, see the `turncat`
-[documentation](/utils/turncat).
+Kubernetes cluster, which can be used to access any UDP service running inside the cluster (unless
+blocked by a [properly configured](/README.md#security) `NetworkPolicy`). Note that your WebRTC
+clients will not need `turncat` to reach the cluster, since all Web browsers come with a STUN/TURN
+client included; `turncat` here is used only to simulate what a WebRTC client would do when trying
+to reach STUNner. For more info, see the `turncat` [documentation](/utils/turncat).
 
 In this demo we test the STUNner installation by deploying a UDP echo server into the cluster and
 exposing it for external access via STUNner.
@@ -136,7 +137,3 @@ STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to a
 Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
 
 MIT License - see [LICENSE](/LICENSE) for full text.
-
-## Acknowledgments
-
-Demo adopted from [Kurento](https://www.kurento.org).
