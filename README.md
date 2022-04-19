@@ -146,7 +146,8 @@ The STUNner installation will create the below Kubernetes resources in the clust
 2. a `Deployment` running one or more STUNner daemon replicas,
 3. a `LoadBalancer` service to expose the STUNner deployment on a public IP address and UDP port
    (by default, the port is UDP 3478), and finally
-4. an ACL/firewall policy to control network communication from STUNner to the rest of the cluster.
+4. a `NetworkPolicy`, i.e., an ACL/firewall policy to control network communication from STUNner to
+   the rest of the cluster.
 
 The installation scripts packaged with STUNner will use hard-coded configuration defaults that must
 be customized prior to deployment. In particular, make absolutely sure to customize the access
@@ -193,8 +194,8 @@ namespace; see the installation notes below on how to override this.
 
 ### Installation
 
-STUNner supports two installation options: a self-contained and easy-to-use Helm chart and a manaul
-installation method using static Kubernetes manifests. 
+STUNner supports two installation options: a self-contained and easy-to-use Helm chart and a manual
+installation method using static Kubernetes manifests.
 
 #### Helm
 
@@ -218,11 +219,10 @@ $ helm install stunner stunner/stunner --set stunner.namespace=<insert-namespace
 ```
 
 The following will set a custom [STUN/TURN
-realm](https://datatracker.ietf.org/doc/html/rfc8656#section-2) and store it with the key
-`STUNNER_REALM` in STUNner `ConfigMap`.
+realm](https://datatracker.ietf.org/doc/html/rfc8656#section-2).
 
 ```console
-helm install stunner stunner/stunner --set stunner.config.STUNNER_REALM=<your-realm-here>
+$ helm install stunner stunner/stunner --set stunner.config.STUNNER_REALM=<your-realm-here>
 ```
 
 #### Manual installation
@@ -300,7 +300,7 @@ STUNner.
 Wait until Kubernetes assigns a valid external IP to STUNner.
 
 ```console
-$ until [ -n "$(kubectl get svc -n default stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+$ until [ -n "$(kubectl get svc stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
 
 If this hangs for minutes, then your load-balancer integration is not working (if using
@@ -332,7 +332,7 @@ configuration, so that the WebRTC application server can learn this information 
 the clients.
 
 ```console
-$ kubectl patch configmap/stunner-config -n default --type merge \
+$ kubectl patch configmap/stunner-config --type merge \
   -p "{\"data\":{\"STUNNER_PUBLIC_ADDR\":\"${STUNNER_PUBLIC_ADDR}\",\"STUNNER_PUBLIC_PORT\":\"${STUNNER_PUBLIC_PORT}\"}}"
 ```
 
@@ -378,7 +378,7 @@ Kubernetes.
   server.  The demo contains a [Node.js](https://nodejs.org) application server for creating a
   browser-based two-party WebRTC video-call, plus a STUNner service that clients use as a TURN
   server to connect to each other.  Note that no transcoding/transsizing option is available in
-  this demo, since there is not media server in the media pipeline.
+  this demo, since there is no media server in the media pipeline.
 * [Media-plane mode: One to one video call with Kurento via
   STUNner](examples/kurento-one2one-call): This tutorial extends the previous demo to demonstrate
   the fully fledged *media-plane deployment model* of STUNner, that is, when WebRTC clients connect
