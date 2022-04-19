@@ -10,7 +10,7 @@ two-party WebRTC video-call, plus a STUNner service that clients use as a TURN s
 each other.  Note that no transcoding/transsizing option is available in this demo, since there is
 no media server in the media pipeline.
 
-![STUNner standalone deployment architecture](doc/stunner_standalone_arch.svg)
+![STUNner standalone deployment architecture](../../doc/stunner_standalone_arch.svg)
 
 In this demo you will learn how to:
 * integrate a WebRTC application server with STUNner,
