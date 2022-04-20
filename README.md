@@ -139,6 +139,19 @@ your WebRTC infra. In addition, STUNner relies on Kubernetes ACLs (`NetworkPolic
 ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-range-of-ports)
 to block malicious access; see [details](#access-control) later.
 
+### TL;DR
+
+With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should not take more than
+10 minutes.
+
+* [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and [expose
+  it](#learning-the-external-ip-and-port) over a public IP address and port.
+* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call) into Kubernetes as well.
+* [Set STUNner as the ICE server](#configuring-webbrtc-clients-to-reach-stunner) in your WebRTC
+  clients.
+* ...
+* Profit!!
+
 ### Configuration
 
 The STUNner installation will create the below Kubernetes resources in the cluster:
