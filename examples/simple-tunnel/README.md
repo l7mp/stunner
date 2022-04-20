@@ -125,8 +125,15 @@ something to the UDP echo server running inside the cluster.
 $ echo "Hello STUNner" | socat -d -d - udp:localhost:9000
 ```
 
-If all goes well, you should see the same text echoed back from the cluster. After the test, make
-sure to lock down the ACL to the default-deny rule.
+If all goes well, you should see the same text echoed back from the cluster. 
+```console
+socat[15127] N starting data transfer loop with FDs [0,1] and [5,5]
+socat[15127] N socket 1 (fd 0) is at EOF
+Hello STUNner
+socat[15127] N socket 1 (fd 0) is at EOF
+socat[15127] N socket 1 (fd 0) is at EOF
+```
+After the test, make sure to lock down the ACL to the default-deny rule.
 
 ## Help
 
