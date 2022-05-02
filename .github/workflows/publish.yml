@@ -24,6 +24,7 @@ jobs:
         run: docker build . --file Dockerfile --tag l7mp/stunnerd:latest
       - name: Push the latest Docker image
         run: docker push l7mp/stunnerd:latest
+
   push_chart:
     name: Push charts to the web
     runs-on: ubuntu-latest
@@ -57,3 +58,47 @@ jobs:
           git add .
           git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
           git push origin master
+
+  add_binaries:
+    name: Add binaries to the release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.18.0'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Compile stunnerd
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd .
+
+      - name: Compile turncat
+        run: |
+          cd utils/turncat
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat .
+
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.2.3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Add stunnerd binary
+        uses: shogo82148/actions-upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: stunnerd
+
+      - name: Add turncat binary
+        uses: shogo82148/actions-upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_name: turncat
+          asset_path: "utils/turncat/turncat"
