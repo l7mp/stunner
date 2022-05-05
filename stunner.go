@@ -27,12 +27,12 @@ func NewStunner(conf *StunnerConfig) (*Stunner, error) {
 	s := Stunner{}
 
 	// if conf.admin == nil { conf.admin = AdminConfig{} }
-	if conf.Admin.LogLevel == "" { conf.Admin.LogLevel = defaultLogLevel }
+	if conf.Admin.LogLevel == "" { conf.Admin.LogLevel = DefaultLogLevel }
 	s.logLevel = conf.Admin.LogLevel
 	s.logger = NewLoggerFactory(conf.Admin.LogLevel)
 	s.log = s.logger.NewLogger("stunner")
 	
-	if conf.ApiVersion != apiVersion {
+	if conf.ApiVersion != ApiVersion {
 		return nil, fmt.Errorf("unsupported API version: %s", conf.ApiVersion)
 	}
 	s.version = conf.ApiVersion
@@ -51,7 +51,9 @@ func NewStunner(conf *StunnerConfig) (*Stunner, error) {
 	s.log.Debugf("NewStunner: Starting with config: %#v", conf)
 	
 	static := conf.Static
+	
 	s.log.Tracef("NewStunner: setting up authenticator")
+	if static.Auth.Type == "" { static.Auth.Type = DefaultAuthType }
 	auth, authErr := s.newAuthenticator(static.Auth)
 	if authErr != nil {
 		return nil, authErr
@@ -181,7 +183,7 @@ func NewDefaultStunnerConfig(uri, logLevel string) (*StunnerConfig, error) {
 	}
 
 	return &StunnerConfig{
-			ApiVersion: apiVersion,
+			ApiVersion: ApiVersion,
 			Admin: AdminConfig{
 				LogLevel: logLevel,
 				Realm: DefaultRealm,

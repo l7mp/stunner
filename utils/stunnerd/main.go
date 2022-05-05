@@ -5,7 +5,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-
+	"encoding/json"
+	
 	flag "github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
 
@@ -46,10 +47,15 @@ func main() {
 		e := os.ExpandEnv(string(c))
 
 		s := stunner.StunnerConfig{}
+		// try YAML first
 		if err = yaml.Unmarshal([]byte(e), &s); err != nil {
-			fmt.Fprintf(os.Stderr, "Could not parse config file at '%s': %s\n",
-				*config, err.Error())
-			os.Exit(1)
+			// if it fails, try to json
+			if errJ := json.Unmarshal([]byte(e), &s); err != nil {
+				fmt.Fprintf(os.Stderr, "Could not parse config file at '%s': " +
+					"YAML parse error: %s / JSON parse  error: %s\n",
+					*config, err.Error(), errJ.Error())
+				os.Exit(1)
+			}
 		}
 
 		// command line loglevel overrides config

@@ -72,8 +72,10 @@ func  (s *Stunner) newAuthenticator(req AuthConfig) (*authenticator, error) {
 		username, userFound := req.Credentials["username"]
 		password, passFound := req.Credentials["password"]
 		if !userFound || !passFound {
-			return nil, fmt.Errorf("cannot handle auth config for type %s: invalid username or password",
+			auth.log.Warnf("%s: empty username or password, using insecure defaults",
 				authTypePlainTextStr)
+			username = DefaultUsername
+			password = DefaultPassword
 		}
 		auth.username = username
 		auth.password = password

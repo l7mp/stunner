@@ -67,6 +67,10 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		return nil, fmt.Errorf("error resolving server address %s: %s",
 			config.ServerAddr, sErr.Error())
 	}
+	if server.Address == "" || server.Port == 0 {
+		return nil, fmt.Errorf("error resolving TURN server address %s: empty address (\"%s\") "+
+			"or invalid port (%d)", config.ServerAddr, server.Address, server.Port)
+	}
 
 	log.Tracef("Resolving listener address: %s", config.ListenerAddr)
 	listener, lErr := ParseUri(config.ListenerAddr)
@@ -74,12 +78,21 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		return nil, fmt.Errorf("error resolving listener address %s: %s",
 			config.ListenerAddr, lErr.Error())
 	}
+	if listener.Port == 0 {
+		return nil, fmt.Errorf("error resolving listener address %s: invalid port (%d)",
+			config.ListenerAddr, listener.Port)
+	}
 
 	log.Tracef("Resolving peer address: %s", config.PeerAddr)
 	peer, pErr := ParseUri(config.PeerAddr)
 	if pErr != nil {
 		return nil, fmt.Errorf("error resolving peer address %s: %s",
 			config.PeerAddr, pErr.Error())
+	}
+	if peer.Address == "" || peer.Port == 0 || !strings.HasPrefix(peer.Protocol, "udp") {
+		return nil, fmt.Errorf("error resolving peer address %s: invalid protocol (\"%s\"), " +
+			"empty address (\"%s\") or invalid port (%d)", config.PeerAddr,
+			peer.Protocol, peer.Address, peer.Port)
 	}
 
 	if config.Realm == "" { config.Realm = DefaultRealm }

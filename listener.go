@@ -87,9 +87,9 @@ func (s *Stunner) newListener(req ListenerConfig) (*listener, error) {
 	}
 	l.rawAddr = req.Addr
 	
-	if req.Port == 0 {req.Port = defaultPort }
-	if req.MinRelayPort == 0 {req.MinRelayPort = defaultMinRelayPort }
-	if req.MaxRelayPort == 0 {req.MaxRelayPort = defaultMaxRelayPort }
+	if req.Port == 0 {req.Port = DefaultPort }
+	if req.MinRelayPort == 0 {req.MinRelayPort = DefaultMinRelayPort }
+	if req.MaxRelayPort == 0 {req.MaxRelayPort = DefaultMaxRelayPort }
 	for _, p := range []int{req.Port, req.MinRelayPort, req.MaxRelayPort} {
 		if p <=0 || p > 65535 {
 			return nil, fmt.Errorf("invalid port: %d", p)
