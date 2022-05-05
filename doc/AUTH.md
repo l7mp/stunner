@@ -1,3 +1,3 @@
-# The STUNner Authentication Guide
+# The STUNner authentication guide
 
 <TODO>
