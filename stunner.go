@@ -1,56 +1,66 @@
-package main
+package stunner
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
-	"strconv"
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
+	"github.com/pion/transport/vnet"
 	"github.com/google/uuid"
 	"github.com/google/go-cmp/cmp"
 )
 
+// Stunner is an instance of the STUNner deamon
 type Stunner struct {
 	version, name, logLevel, realm string
+	logger    logging.LoggerFactory
 	log       logging.LeveledLogger
 	auth      *authenticator
 	server    *turn.Server
 	listeners []*listener
+	net       *vnet.Net
 }
 
-func NewStunner(req StunnerRequest) (*Stunner, error) {
+// NewStunner creates the STUNner deamon using the specified configuration
+func NewStunner(conf *StunnerConfig) (*Stunner, error) {
 	s := Stunner{}
 
-	// if req.admin == nil { req.admin = AdminRequest{} }
-	if req.Admin.LogLevel == "" { req.Admin.LogLevel = defaultLogLevel }
-	s.logLevel = req.Admin.LogLevel
-	logger := NewLogger(req.Admin.LogLevel, "stunner")
-
-	s.log = logger.NewLogger("stunner")
-	s.log.Debugf("NewStunner: req: %#v", req)
+	// if conf.admin == nil { conf.admin = AdminConfig{} }
+	if conf.Admin.LogLevel == "" { conf.Admin.LogLevel = defaultLogLevel }
+	s.logLevel = conf.Admin.LogLevel
+	s.logger = NewLoggerFactory(conf.Admin.LogLevel)
+	s.log = s.logger.NewLogger("stunner")
 	
-	if req.ApiVersion != apiVersion {
-		return nil, fmt.Errorf("unsupported API version: %s", req.ApiVersion)
+	if conf.ApiVersion != apiVersion {
+		return nil, fmt.Errorf("unsupported API version: %s", conf.ApiVersion)
 	}
-	s.version = req.ApiVersion
+	s.version = conf.ApiVersion
+
+	if conf.Net == nil {
+		s.net = vnet.NewNet(nil)
+	} else {
+		s.net = conf.Net
+		s.log.Warn("vnet is enabled")
+	}
 	
-	if req.Admin.Name  == "" { req.Admin.Name = uuid.NewString() }
-	if req.Admin.Realm == "" { req.Admin.Realm = defaultRealm }
-	s.name, s.realm = req.Admin.Name, req.Admin.Realm
+	if conf.Admin.Name  == "" { conf.Admin.Name = fmt.Sprintf("stunnerd:%s", uuid.NewString()) }
+	if conf.Admin.Realm == "" { conf.Admin.Realm = DefaultRealm }
+	s.name, s.realm = conf.Admin.Name, conf.Admin.Realm
+
+	s.log.Debugf("NewStunner: Starting with config: %#v", conf)
 	
-	static := req.Static
+	static := conf.Static
 	s.log.Tracef("NewStunner: setting up authenticator")
-	auth, authErr := newAuthenticator(static.Auth, s.realm, logger.NewLogger("stunner-auth"))
+	auth, authErr := s.newAuthenticator(static.Auth)
 	if authErr != nil {
 		return nil, authErr
 	}
 	s.auth = auth
 
-	for _, lreq := range static.Listeners {
-		s.log.Tracef("NewStunner: setting up listener from %#v", lreq)
-		l, err := newListener(lreq, logger.NewLogger("stunner-listener"))
+	for _, lconf := range static.Listeners {
+		s.log.Tracef("setting up listener with config: %#v", lconf)
+		l, err := s.newListener(lconf)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +83,7 @@ func NewStunner(req StunnerRequest) (*Stunner, error) {
 	t, err := turn.NewServer(turn.ServerConfig{
 		Realm: s.realm,
 		AuthHandler: s.auth.handler,
-		LoggerFactory:  logger,
+		LoggerFactory:  s.logger,
 		PacketConnConfigs: pconn,
 		ListenerConfigs: conn,
 	})
@@ -90,20 +100,20 @@ func NewStunner(req StunnerRequest) (*Stunner, error) {
 	return &s, nil
 }
 
-func (s *Stunner) GetConfig() StunnerRequest {
+func (s *Stunner) GetConfig() StunnerConfig {
 	s.log.Tracef("GetConfig")
 
-	c := StunnerRequest{
+	c := StunnerConfig{
 		ApiVersion: s.version,
-		Admin: AdminRequest{
+		Admin: AdminConfig{
 			Name: s.name,
 			LogLevel: s.logLevel,
 			Realm: s.realm,
 			// AccessLog: s.accessLog,
 		},
-		Static: StaticResourceRequest{
+		Static: StaticResourceConfig{
 			Auth: s.auth.getConfig(),
-			Listeners: make([]ListenerRequest, len(s.listeners)),
+			Listeners: make([]ListenerConfig, len(s.listeners)),
 		},
 	}
 	
@@ -114,14 +124,19 @@ func (s *Stunner) GetConfig() StunnerRequest {
 	return c
 }
 
+// Close stops the STUNner daemon. It cleans up any associated state and closes all connections it is managing
 func  (s *Stunner) Close(){
 	s.log.Debug("Closing Stunner")
 	s.server.Close()
 }
 
-// at the moment, all updates are destructive: we close the server and restart with new config
-// Reconcile is idempontent
-func (s *Stunner) Reconcile(newConfig StunnerRequest) error {
+// GetServer returns the TURN server instance running the STUNner daemon
+func  (s *Stunner) GetServer() *turn.Server {
+	return s.server
+}
+
+// Reconcile handles the updates to the STUNner configuration. At the moment, all updates are destructive: the server is closed and restarted with the new configuration
+func (s *Stunner) Reconcile(newConfig *StunnerConfig) error {
 	s.log.Trace("Reconcile")
 
 	oldConfig := s.GetConfig()
@@ -147,48 +162,42 @@ func (s *Stunner) Reconcile(newConfig StunnerRequest) error {
 	return nil
 }
 
-/////
-func DefaultStunnerConfig(uri, logLevel string) (*StunnerRequest, error) {
-	u, err := url.Parse(uri)
+// NewDefaultStunnerConfig builds a default configuration from a STUNner URI. Example: the URI
+// `turn://user:pass@127.0.0.1:3478` will be parsed into a STUNner configuration with a server
+// running on the localhost at port 3478, with plain-text authentication using the
+// username/password pair `user:pass`.
+func NewDefaultStunnerConfig(uri, logLevel string) (*StunnerConfig, error) {
+	u, err := ParseUri(uri)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid URI '%s': %s", uri, err)
 	}
 
-	if u.Scheme != "turn" && u.Scheme != "udp" {
-		return nil, fmt.Errorf("Invalid protocol: %s", u.Scheme)
+	if u.Protocol != "udp" {
+		return nil, fmt.Errorf("Invalid protocol: %s", u.Protocol)
 	}
 
-	password, found := u.User.Password()
-	if !found {
-		return nil, fmt.Errorf("Invalid user:passwd pair: %s", u.User)
-	}
-	
-	proto := "UDP"
-	if m, err := url.ParseQuery(u.RawQuery); err != nil {
-		if len(m["transport"]) > 0 {
-			proto = m["protocol"][0]
-		}
+	if u.Username == "" || u.Password == "" {
+		return nil, fmt.Errorf("Username/password must be set: '%s'", uri)
 	}
 
-	port, _ := strconv.Atoi(u.Port())
-	return &StunnerRequest{
+	return &StunnerConfig{
 			ApiVersion: apiVersion,
-			Admin: AdminRequest{
+			Admin: AdminConfig{
 				LogLevel: logLevel,
-				Realm: defaultRealm,
+				Realm: DefaultRealm,
 			},
-			Static: StaticResourceRequest{
-				Auth: AuthRequest{
+			Static: StaticResourceConfig{
+				Auth: AuthConfig{
 					Type: "plaintext",
 					Credentials: map[string]string{
-						"username": u.User.Username(),
-						"password": password,
+						"username": u.Username,
+						"password": u.Password,
 					},
 				},
-				Listeners: []ListenerRequest{{
-					Protocol: proto,
-					Addr: u.Hostname(),
-					Port: port,
+				Listeners: []ListenerConfig{{
+					Protocol: u.Protocol,
+					Addr: u.Address,
+					Port: u.Port,
 				}},
 			},
 	}, nil
