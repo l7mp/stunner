@@ -105,7 +105,7 @@ way.
 * **Simple code and extremely small size.** Written in pure Go using the battle-tested
   [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is just a couple of hundred
   lines of fully open-source code. The server is extremely lightweight: the typical STUNner
-  container image size is only about 2.5 Mbytes.
+  container image size is only about 5 Mbytes.
 
 ## Getting Started
 
@@ -163,17 +163,18 @@ important settings are as follows.
   cluster. It is safe to set this to the public port.
 * `STUNNER_REALM` (default: `stunner.l7mp.io`): the
   [`REALM`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.9) used to guide the user agent
-  in selection of a username and password for the STUN/TURN [long-term
-  credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) mechanism.
+  in authenticating with STUNner.
+* `STUNNER_AUTH_TYPE` (default: `plaintext`): the STUN/TURN authentication mode, either `plaintext`
+  using the username/password pair `$STUNNER_USERNAME`/`$STUNNER_PASSWORD`, or `longterm`, using
+  the [STUN/TURN long-term credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2)
+  mechanism with the share secret `$STUNNER_SECRET`.
 * `STUNNER_USERNAME` (default: `user`): the
   [`USERNAME`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.3) attribute clients can use
-  to authenticate with STUNner via the the STUN/TURN [long-term
-  credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) mechanism. Make sure to
-  customize!
+  to authenticate with STUNner over plain-text authentication. Make sure to customize!
 * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with STUNner
-  via the the STUN/TURN [long-term
-  credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) mechanism. Make sure to
-  customize!
+   over plain-text authentication. Make sure to customize!
+* `STUNNER_SHARED_SECRET`: the shared secret used for [STUN/TURN long-term
+  credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2).
 * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
 * `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner. 
 * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner. 
