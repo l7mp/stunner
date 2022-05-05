@@ -22,10 +22,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var level string = "all:ERROR"
-//var level string = "all:TRACE"
+var stunnerTestLoglevel string = "all:ERROR"
+//var stunnerTestLoglevel string = "all:TRACE"
 
-type echoTestConfig struct {
+type stunnerEchoTestConfig struct {
 	t *testing.T
 	// net
 	podnet, wan *vnet.Net
@@ -41,7 +41,7 @@ type echoTestConfig struct {
 	loggerFactory *logging.DefaultLoggerFactory
 }
 
-func echoTest(conf echoTestConfig){
+func stunnerEchoTest(conf stunnerEchoTestConfig){
 	t := conf.t
 	log := conf.loggerFactory.NewLogger("test")
 
@@ -246,7 +246,8 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 	defer report()
 
 	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(level)
+	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
 
 	for _, conf := range []string{
 		"turn://user1:passwd1@1.2.3.4:3478?transport=udp",
@@ -254,35 +255,32 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 		 "udp://user1:passwd1@1.2.3.4:3478",
 	}{
 		t.Run(fmt.Sprintf("TestStunner_NewDefaultStunnerConfig_URI:%s", conf), func(t *testing.T) {
-			log := loggerFactory.NewLogger("test")
-
 			log.Debug("creating default stunner config")
-			c, err := NewDefaultStunnerConfig(conf, level)
+			c, err := NewDefaultStunnerConfig(conf, stunnerTestLoglevel)
 			assert.NoError(t, err, err)
 
 			// patch in the vnet
 			log.Debug("building virtual network")
 			v, err := buildVNet(loggerFactory)
 			assert.NoError(t, err, err)
-			defer func() {
-				assert.NoError(t, v.Close(), "cannot close VNet")
-			}()
 			c.Net = v.podnet
 
 			log.Debug("creating a stunnerd")
 			stunner, err := NewStunner(c)
 			assert.NoError(t, err)
-			defer stunner.Close()
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
 			assert.NoError(t, err, "cannot create client listening socket")
-			defer func() { assert.NoError(t, lconn.Close(), "cannot close TURN client connection")}()
 
-			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+			testConfig := stunnerEchoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, "user1", "passwd1", net.IPv4(5, 6, 7, 8),
 				"1.2.3.5:5678", loggerFactory}
-			echoTest(testConfig)
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
 		})
 	}
 }
@@ -291,7 +289,7 @@ var testVNetConfigs = []StunnerConfig{
 	{
 		ApiVersion: "v1alpha1",
 		Admin: AdminConfig{
-			LogLevel: level,
+			LogLevel: stunnerTestLoglevel,
 		},
 		Static: StaticResourceConfig{
 			Auth: AuthConfig{
@@ -311,7 +309,7 @@ var testVNetConfigs = []StunnerConfig{
 	{
 		ApiVersion: "v1alpha1",
 		Admin: AdminConfig{
-			LogLevel: level,
+			LogLevel: stunnerTestLoglevel,
 		},
 		Static: StaticResourceConfig{
 			Auth: AuthConfig{
@@ -336,28 +334,22 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(level)
+	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
 
 	for _, c := range testVNetConfigs {
 		auth := c.Static.Auth.Type
 		testName := fmt.Sprintf("TestStunner_NewStunner_VNet_auth:%s", auth)
 		t.Run(testName, func(t *testing.T) {
-			log := loggerFactory.NewLogger("test")
-
 			// patch in the vnet
 			log.Debug("building virtual network")
 			v, err := buildVNet(loggerFactory)
 			assert.NoError(t, err, err)
-			defer func() {
-				assert.NoError(t, v.Close(), "cannot close VNet")
-			}()
 			c.Net = v.podnet
 
 			log.Debug("creating a stunnerd")
 			stunner, err := NewStunner(&c)
 			assert.NoError(t, err, err)
-			defer stunner.Close()
 
 			var u, p string
 			switch auth {
@@ -374,12 +366,15 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
 			assert.NoError(t, err, "cannot create client listening socket")
-			defer func() { assert.NoError(t, lconn.Close(), "cannot close TURN client connection")}()
 
-			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+			testConfig := stunnerEchoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
 				"1.2.3.5:5678", loggerFactory}
-			echoTest(testConfig)
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
 		})
 	}
 }
@@ -389,9 +384,9 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 // *****************
 // Topology:
 //
-//                /----- STUNner (lo:23478)
+//                /----- STUNner (udp/tcp/tls/dtls:23478)
 //     client--- lo
-//                \----- echo-server (lo:25678)
+//                \----- echo-server (udp:25678)
 //
 
 func TestStunnerServerLocalhost(t *testing.T) {
@@ -402,7 +397,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 	defer report()
 
 	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(level)
+	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
 
 	certFile, err := os.CreateTemp("", "stunner_test.*.cert")
 	assert.NoError(t, err, "cannot create temp file for SSL cert")
@@ -422,7 +418,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -443,7 +439,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -463,7 +459,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -484,7 +480,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -504,7 +500,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -527,7 +523,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -549,7 +545,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -572,7 +568,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
-				LogLevel: level,
+				LogLevel: stunnerTestLoglevel,
 			},
 			Static: StaticResourceConfig{
 				Auth: AuthConfig{
@@ -598,12 +594,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		testName := fmt.Sprintf("TestStunner_NewStunner_Localhost_auth:%s_client:%s", auth, proto)
 
 		t.Run(testName, func(t *testing.T) {
-			log := loggerFactory.NewLogger("test")
-
 			log.Debug("creating a stunnerd")
 			stunner, err := NewStunner(&c)
 			assert.NoError(t, err, err)
-			defer stunner.Close()
 
 			var u, p string
 			switch auth {
@@ -654,12 +647,13 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				assert.NoError(t, fmt.Errorf("internal error: unknown client protocol in test"))
 			}
 
-			defer func() { assert.NoError(t, lconn.Close(), "cannot close TURN client connection")}()
-
-			testConfig := echoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
+			testConfig := stunnerEchoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
 				stunnerAddr, lconn, u, p, net.IPv4(127, 0, 0, 1),
 				"127.0.0.1:25678", loggerFactory}
-			echoTest(testConfig)
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
 		})
 	}
 }
