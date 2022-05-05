@@ -222,7 +222,7 @@ EOF
 ```
 
 In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
-publicly; e.g., the [`turncat` utility](utils/turncat) packaged with STUNner can be used
+publicly; e.g., the [`turncat` utility](/utils/turncat) packaged with STUNner can be used
 conveniently for this [purpose](/examples/simple-tunnel/README.pm).
 
 ## Exposing internal IP addresses
@@ -243,13 +243,13 @@ option for you.
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
 
 ## License
 
 Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](AUTHORS).
 
-MIT License - see [LICENSE](LICENSE) for full text.
+MIT License - see [LICENSE](/LICENSE) for full text.
 
 ## Acknowledgments
 

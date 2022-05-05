@@ -166,7 +166,7 @@ $ kubectl scale deployment kms --replicas=20
 
 ## Security
 
-As described in the [STUNner security guide](/README.md#security), it is critical to lock down
+As described in the [STUNner Security Guide](doc/SECURITY.md), it is critical to lock down
 (potentially hostile) access to sensitive services running inside the cluster via STUNner. The
 necessary ACLs are automatically configured by the installation manifests above; below we describe
 what's happening in the background.

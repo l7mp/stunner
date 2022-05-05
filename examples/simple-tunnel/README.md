@@ -48,6 +48,14 @@ available over the UDP port 9001 as a cluster-internal service with the same nam
 favorite network debugging tool, [`socat(1)`](https://linux.die.net/man/1/socat), to deploy a
 simple UDP echo server into the pod.
 
+First, make sure STUNner is using plain-text authentication:
+```console
+$ kubectl get cm stunner-config -o jsonpath="{.data.STUNNER_AUTH_TYPE}"
+```
+
+If the output is `plaintext` you're good to go. Otherwise, consult the [STUNner Authentication
+Guide](doc/AUTH.md) on how to restart STUNner with plain-text authentication.
+
 ```console
 $ kubectl create deployment udp-echo --image=l7mp/net-debug:latest
 $ kubectl expose deployment udp-echo --name=udp-echo --type=ClusterIP --protocol=UDP --port=9001
@@ -79,9 +87,9 @@ TURN service.
 
 The default installation scripts install an ACL into Kubernetes that blocks *all* communication
 from STUNner to the rest of the workload. This is to minimize the risk of an improperly configured
-STUNner gateway to [expose sensitive services to the external world](/README.md#security). In order
-to allow STUNner to open transport relay connections to the `udp-echo` service, we have to
-explicitly open up this ACL first.
+STUNner gateway to [expose sensitive services to the external world](doc/SECURITY.md). In order to
+allow STUNner to open transport relay connections to the `udp-echo` service, we have to explicitly
+open up this ACL first.
 
 ```console
 $ kubectl apply -f - <<EOF
@@ -124,8 +132,33 @@ something to the UDP echo server running inside the cluster.
 $ echo "Hello STUNner" | socat -d -d - udp:localhost:9000
 ```
 
-If all goes well, you should see the same text echoed back from the cluster. After the test, make
-sure to lock down the ACL to the default-deny rule.
+If all goes well, you should see the same text echoed back from the cluster. 
+
+### Cleaning up
+
+First, make sure to lock down the ACL to the [default-deny rule](locking-down-STUNner):
+
+```console
+$ kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
+EOF
+```
+
+Then, exit `turncat` and delete the resources created for the test.
+
+```console
+$ kubectl delete deployment udp-echo
+$ kubectl delete service udp-echo
+```
 
 ## Help
 
