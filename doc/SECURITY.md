@@ -4,6 +4,13 @@ Like any conventional gateway service, an improperly configured STUNner service 
 exposing sensitive services to the Internet. The below security guidelines will allow to minmize
 the risks associated with a misconfigured STUNner.
 
+## Table of Contents
+1. [Threat](#threat)
+2. [Locking down STUNner](#locking-downstunner)
+3. [Authentication](#authentication)
+4. [Access control](#access-control)
+5. [Exposing internal IP addresses](#exposing-internal-ip-addresses)
+
 ## Threat
 
 Before deploying STUNner, it is worth evaluating the potential [security
