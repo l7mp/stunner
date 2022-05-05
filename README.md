@@ -368,20 +368,15 @@ notable limitations at this point are as follows.
   relay connections opened by STUNner will not be reachable externally. This is intended: STUNner
   is a Kubernetes ingress gateway which happens to expose a STUN/TURN compatible server to WebRTC
   clients, and not a public TURN service.
-* Only simple plain-text username/password authentication is implemented. Support for the standard
-  STUN/TURN [long term credential
-  mechanism](https://datatracker.ietf.org/doc/html/rfc8489#section-9.2) is on the top of our TODO
-  list, please bear with us for now.
 * Access through STUNner to the rest of the cluster *must* be locked down with a Kubernetes
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
-  externally; see the [notes on access control](#access-control).
+  externally; see the [notes on access control](/doc/SECURITY.md#access-control).
 * STUNner supports arbitrary scale-up without dropping active calls, but scale-down might
   disconnect calls established through the STUNner pods and/or media server replicas being removed
   from the load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
-* [TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) and the WebRTC DataChannel API are
-  not supported at the moment.
+* The WebRTC DataChannel API is not supported at the moment.
 
 ## Milestones
 
