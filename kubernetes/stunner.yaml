@@ -30,13 +30,21 @@ data:
   #   selection of a username and password for the STUN/TURN long-term credential mechanism.
   STUNNER_REALM: "stunner.l7mp.io"
 
+  # * `STUNNER_AUTH_TYPE` (default: `plaintext`): the STUN/TURN authentication mode, either
+  #   "plaintext" over the username/password pair $STUNNER_USERNAME/$STUNNER_PASSWORD, or
+  #   "longterm", using $STUNNER_SECRET. Make sure to customize!
+  STUNNER_AUTH_TYPE: plaintext
+
   # * `STUNNER_USERNAME` (default: `user`): the USERNAME attribute clients can use the authenticate
   #   with STUNner via the the STUN/TURN long-term credential mechanism. Make sure to customize!
-  STUNNER_USERNAME: user
+  STUNNER_USERNAME: user1
 
   # * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with
   #   STUNner via the the STUN/TURN long-term credential mechanism. Make sure to customize!
-  STUNNER_PASSWORD: pass
+  STUNNER_PASSWORD: passwd1
+
+  # * `STUNNER_SHARED_SECRET`: the shared secret used for longterm authentication
+  STUNNER_SHARED_SECRET: "my-shared-secret"
 
   # * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
   STUNNER_LOGLEVEL: "all:INFO"
@@ -46,7 +54,6 @@ data:
 
   # * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
   STUNNER_MAX_PORT: "20000"
-
 
 ---
 apiVersion: apps/v1
@@ -70,8 +77,8 @@ spec:
         # imagePullPolicy: Never
         imagePullPolicy: Always
         command: ["stunnerd"]
-        # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
-        args: []
+        args: ["-v", "-c", "/stunnerd.conf"]
+        # args: ["-c", "/stunnerd.conf"]
         envFrom:
           - configMapRef:
               name: stunner-config
