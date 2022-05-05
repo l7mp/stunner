@@ -386,23 +386,23 @@ notable limitations at this point are as follows.
 ## Milestones
 
 * v0.9.2: Basic connectivity: STUNner + helm chart + simple use cases (Kurento demo).
-* v0.9.3: Security: long-term STUN/TURN credentials, STUN/TURN over TCP/TLS/DTLS.
+* v0.9.3: Security: long-term STUN/TURN credentials, [STUN/TURN over
+  TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
 * v0.9.4: Performance: eBPF STUN/TURN acceleration.
 * v0.9.5: Observability: Prometheus + Grafana dashboard.
-* v0.9.6: Ubiquity: implement [TURN over TCP](https://www.rfc-editor.org/rfc/rfc6062.txt) and make
-  STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
+* v0.9.6: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
 * v1.0: GA
 * v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
 
-MIT License - see [LICENSE](LICENSE) for full text.
+MIT License - see [LICENSE](/LICENSE) for full text.
 
 ## Acknowledgments
 
