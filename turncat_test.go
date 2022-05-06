@@ -17,8 +17,9 @@ var turncatTestLoglevel string = "all:ERROR"
 //var turncatTestLoglevel string = "all:TRACE"
 
 var sharedSecret = "my-secret"
+var defaultDuration = "10m"
 var longtermAuthGen = func() (string, string, error) {
-	d, _ := time.ParseDuration("10m")
+	d, _ := time.ParseDuration(defaultDuration)
 	return turn.GenerateLongTermCredentials(sharedSecret, d)
 }
 var plaintextAuthGen = func() (string, string, error) {
@@ -165,6 +166,111 @@ func TestTurncatPlaintext(t *testing.T) {
 		assert.NoError(t, err, "cannot parse server URI")
 
 		testName := fmt.Sprintf("TestTurncat_NewTurncat_Plaintext_client:%s_server:%s",
+			listener.Protocol, server.Protocol)
+
+		t.Run(testName, func(t *testing.T) {
+			peer, err := ParseUri(c.PeerAddr)
+			assert.NoError(t, err, "cannot parse peer URI")
+
+			log.Debug("creating turncat relay")
+			turncat, err := NewTurncat(&c)
+			assert.NoError(t, err, "cannot create turncat relay")
+
+			lconn, err := net.Dial(listener.Protocol,
+				fmt.Sprintf("%s:%d", listener.Address, listener.Port))
+			assert.NoError(t, err, "cannot create client socket")
+
+			if strings.HasPrefix(listener.Protocol, "tcp") {
+				// prevent "addess already in use" errors: close sends RST
+				assert.NoError(t, lconn.(*net.TCPConn).SetLinger(0),
+					"cannnot set TCP linger")
+			}
+
+			testConfig := turncatEchoTestConfig{t, stunner, lconn, peer, logger}
+			turncatEchoTest(testConfig)
+
+			turncat.Close()
+			assert.NoError(t, lconn.Close(), "cannot close client connection")
+		})
+	}
+}
+
+func TestTurncatLongterm(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	logger := NewLoggerFactory(turncatTestLoglevel)
+	log := logger.NewLogger("test")
+
+	log.Debug("creating a stunnerd")
+	stunner, err := NewStunner(&StunnerConfig{
+		ApiVersion: "v1alpha1",
+		Admin: AdminConfig{
+			LogLevel: turncatTestLoglevel,
+		},
+		Static: StaticResourceConfig{
+			Auth: AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": sharedSecret,
+				},
+			},
+			Listeners: []ListenerConfig{{
+				Protocol: "udp",
+				Addr: "127.0.0.1",
+				Port: 23478,
+			},{
+				Protocol: "tcp",
+				Addr: "127.0.0.1",
+				Port: 23478,
+			}},
+		},
+	})
+	assert.NoError(t, err, "cannot set up STUNner daemon")
+	defer stunner.Close()
+
+	testTurncatConfigs := []TurncatConfig{
+		{
+			ListenerAddr:  "udp://127.0.0.1:25000",
+			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
+			PeerAddr:      "udp://localhost:25678",
+			AuthGen:       longtermAuthGen,
+			LoggerFactory: logger,
+		},
+		{
+			ListenerAddr:  "udp://127.0.0.1:25000",
+			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
+			PeerAddr:      "udp://localhost:25678",
+			AuthGen:       longtermAuthGen,
+			LoggerFactory: logger,
+		},
+		{
+			ListenerAddr:  "tcp://127.0.0.1:25000",
+			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
+			PeerAddr:      "udp://localhost:25678",
+			AuthGen:       longtermAuthGen,
+			LoggerFactory: logger,
+		},
+		{
+			ListenerAddr:  "tcp://127.0.0.1:25000",
+			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
+			PeerAddr:      "udp://localhost:25678",
+			AuthGen:       longtermAuthGen,
+			LoggerFactory: logger,
+		},
+	}
+	
+	for _, c := range testTurncatConfigs {
+		listener, err := ParseUri(c.ListenerAddr)
+		assert.NoError(t, err, "cannot parse turncat listener URI")
+
+		server, err := ParseUri(c.ServerAddr)
+		assert.NoError(t, err, "cannot parse server URI")
+
+		testName := fmt.Sprintf("TestTurncat_NewTurncat_Longterm_client:%s_server:%s",
 			listener.Protocol, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
