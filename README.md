@@ -362,17 +362,21 @@ supported by STUNner.
 STUNner is a work-in-progress. Some features are missing, others may not work as expected. The
 notable limitations at this point are as follows.
 
-* STUNner is not intended to be used as a public STUN/TURN server (there are much better
-  [alternatives](https://github.com/coturn/coturn) for this). Thus, it will not be able to identify
-  the public IP address of a client sending a STUN binding request to it, and the TURN transport
-  relay connections opened by STUNner will not be reachable externally. This is intended: STUNner
-  is a Kubernetes ingress gateway which happens to expose a STUN/TURN compatible server to WebRTC
-  clients, and not a public TURN service.
+* STUNner *is not intended to be used as a public STUN/TURN server* (there are much better
+  [alternatives](https://github.com/coturn/coturn) for this). being deployed into a Kubernetes
+  service, it will not be able to identify the public IP address of a client sending a STUN binding
+  request to it (without special
+  [hacks](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip)),
+  and the TURN transport relay connections opened by STUNner will not be reachable externally
+  (again, without further
+  [hacks](https://kubernetes.io/docs/concepts/security/pod-security-policy/#host-namespaces)). This
+  is intended: STUNner is a Kubernetes ingress gateway which happens to expose a STUN/TURN
+  compatible service to WebRTC clients, and not a public TURN service.
 * Access through STUNner to the rest of the cluster *must* be locked down with a Kubernetes
   `NetworkPolicy`. Otherwise, certain internal Kubernetes services would become available
   externally; see the [notes on access control](/doc/SECURITY.md#access-control).
-* STUNner supports arbitrary scale-up without dropping active calls, but scale-down might
-  disconnect calls established through the STUNner pods and/or media server replicas being removed
+* STUNner supports arbitrary scale-up without dropping active calls, but *scale-down might
+  disconnect calls* established through the STUNner pods and/or media server replicas being removed
   from the load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
@@ -380,12 +384,14 @@ notable limitations at this point are as follows.
 
 ## Milestones
 
-* v0.9.2: Basic connectivity: STUNner + helm chart + simple use cases (Kurento demo).
+* v0.9.2: On-boarding: STUNner basic UDP/TURN connectivity + helm chart + simple use cases (Kurento
+  demos).
 * v0.9.3: Security: long-term STUN/TURN credentials, [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
-* v0.9.4: Performance: eBPF STUN/TURN acceleration.
-* v0.9.5: Observability: Prometheus + Grafana dashboard.
-* v0.9.6: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
+* v0.9.4: Day-2 operations: STUNner Kubernetes operator.
+* v0.9.5: Performance: eBPF STUN/TURN acceleration.
+* v0.9.6: Observability: Prometheus + Grafana dashboard.
+* v0.9.7: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
 * v1.0: GA
 * v2.0: Service mesh: adaptive scaling & resiliency
 
