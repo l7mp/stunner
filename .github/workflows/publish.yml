@@ -24,3 +24,36 @@ jobs:
         run: docker build . --file Dockerfile --tag l7mp/stunnerd:latest
       - name: Push the latest Docker image
         run: docker push l7mp/stunnerd:latest
+  push_chart:
+    name: Push charts to the web
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+        with:
+          path: stunner
+      - name: Get the version
+        id: vars
+        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
+      - name: second checkout
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WEB_PAT_TOKEN }}
+          path: l7mp.io
+          repository: l7mp/l7mp.io
+      - name: Build helm charts
+        run: |
+          cd stunner/helm
+          sed -ri 's/^(\s*)(version\s*:\s*0.1.0\s*$)/\1version: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(appVersion\s*:\s*0.1.0\s*$)/\1appVersion: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          helm package *
+      - name: Update l7mp.io
+        run: |
+          cp stunner/helm/*.tgz l7mp.io/stunner
+          helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
+          cd l7mp.io
+          git config --global user.email "l7mp.info@gmail.com"
+          git config --global user.name "BotL7mp"
+          git add .
+          git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
+          git push origin master

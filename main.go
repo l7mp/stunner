@@ -167,7 +167,7 @@ func main() {
 				PacketConn: udpListener,
 				RelayAddressGenerator: &turn.RelayAddressGeneratorPortRange{
 					RelayAddress: net.ParseIP(serverIP),
-					Address:      "0.0.0.0",
+					Address:      serverIP,
 					MinPort:      minPort,
 					MaxPort:      maxPort,
 				},

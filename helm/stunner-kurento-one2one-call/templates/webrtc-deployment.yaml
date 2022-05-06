@@ -17,10 +17,9 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        image: l7mp/kurento-webrtc-server
+        image: l7mp/kurento-one2one-call-server:latest
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
-        # imagePullPolicy: Never
         imagePullPolicy: {{ .Values.applicationServer.deployment.imagePullPolicy }}
         ports:
         - containerPort: 8443
