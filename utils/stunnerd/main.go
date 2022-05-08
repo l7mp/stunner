@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"os/signal"
 	"syscall"
 	"encoding/json"
-	
+
 	flag "github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
 
@@ -44,6 +46,20 @@ func main() {
 		}
 
 		// substitute environtment variables
+		// default port: STUNNER_PUBLIC_PORT -> STUNNER_PORT
+		re := regexp.MustCompile(`^[0-9]+$`)
+		port, ok := os.LookupEnv("STUNNER_PORT")
+		if !ok || (ok && port == "") || (ok && !re.Match([]byte(port))) {
+			publicPort := stunner.DefaultPort
+			publicPortStr, ok := os.LookupEnv("STUNNER_PUBLIC_PORT")
+			if ok {
+				if p, err := strconv.Atoi(publicPortStr); err == nil {
+					publicPort = p
+				}
+			}
+			os.Setenv("STUNNER_PORT", fmt.Sprintf("%d", publicPort))
+		}
+
 		e := os.ExpandEnv(string(c))
 
 		s := stunner.StunnerConfig{}
@@ -54,6 +70,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Could not parse config file at '%s': " +
 					"YAML parse error: %s / JSON parse  error: %s\n",
 					*config, err.Error(), errJ.Error())
+				fmt.Fprintf(os.Stderr, "Failed configuration:\n%s\n",e)
 				os.Exit(1)
 			}
 		}
