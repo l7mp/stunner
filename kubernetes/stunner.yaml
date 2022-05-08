@@ -77,7 +77,7 @@ spec:
         # imagePullPolicy: Never
         imagePullPolicy: Always
         command: ["stunnerd"]
-        args: ["-v", "-c", "/stunnerd.conf"]
+        args: ["-c", "/stunnerd.conf"]
         # args: ["-c", "/stunnerd.conf"]
         envFrom:
           - configMapRef:
