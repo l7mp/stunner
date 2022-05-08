@@ -161,6 +161,8 @@ important settings are as follows.
   [details](#learning-the-external-ip-and-port) below.
 * `STUNNER_PORT` (default: 3478): The internal port used by STUNner for communication inside the
   cluster. It is safe to set this to the public port.
+* `STUNNER_TRANSPORT_UDP_ENABLE` (default: "1", enabled): Enable UDP TURN transport.
+* `STUNNER_TRANSPORT_TCP_ENABLE` (default: "", disabled): Enable TCP TURN transport.
 * `STUNNER_REALM` (default: `stunner.l7mp.io`): the
   [`REALM`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.9) used to guide the user agent
   in authenticating with STUNner.
@@ -169,8 +171,8 @@ important settings are as follows.
   the [STUN/TURN long-term credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2)
   mechanism with the share secret `$STUNNER_SECRET`.
 * `STUNNER_USERNAME` (default: `user`): the
-  [`USERNAME`](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.3) attribute clients can use
-  to authenticate with STUNner over plain-text authentication. Make sure to customize!
+  [username](https://www.rfc-editor.org/rfc/rfc8489.html#section-14.3) attribute clients can use to
+  authenticate with STUNner over plain-text authentication. Make sure to customize!
 * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with STUNner
    over plain-text authentication. Make sure to customize!
 * `STUNNER_SHARED_SECRET`: the shared secret used for [STUN/TURN long-term
