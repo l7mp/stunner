@@ -47,10 +47,10 @@ type ListenerConfig struct {
 	Port int			`json:"port",omitempty`
 	// MinRelayPort is the smallest relay port assigned for the relay connections spawned by
 	// the listener
-	MinRelayPort int		`json:"minPort",omitempty`
+	MinRelayPort int		`json:"min_relay_port",omitempty`
 	// MaxRelayPort is the highest relay port assigned for the relay connections spawned by the
 	// listener
-	MaxRelayPort int		`json:"maxPort",omitempty`
+	MaxRelayPort int		`json:"max_relay_port",omitempty`
 	// Cert is the TLS cert
 	Cert string			`json:"cert",omitempty`
 	// Key is the TLS key
