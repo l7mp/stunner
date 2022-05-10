@@ -220,8 +220,8 @@ Kubernetes.
   [Node.js](https://nodejs.org) application server for creating a browser-based two-party WebRTC
   video-call, plus the Kurento media server deployed behind STUNner for media exchange and,
   potentially, automatic audio/video transcoding.
-* [Magic mirror via STUNner](examples/magic-mirror): This example has been adopted from the
-  [Kurento](https://www.kurento.org) [magic
+* [Magic mirror via STUNner](examples/kurento-magic-mirror/README.md): This example has been
+  adopted from the [Kurento](https://www.kurento.org) [magic
   mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
   demo. The demo shows a basic WebRTC loopback server with some media processing added: the
   application uses computer vision and augmented reality techniques to add a funny hat on top of
