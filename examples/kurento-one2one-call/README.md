@@ -45,7 +45,7 @@ locally, in order to understand how the Kubernetes based demo differs (very litt
 
 The simplest way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](/examples/kurento-one2one-call) packaged with STUNner.
+[manifest](/examples/kurento-one2one-call.yaml) packaged with STUNner.
 
 ```console
 $ git clone https://github.com/l7mp/stunner

@@ -1,5 +1,12 @@
 # STUNner documentation
 
+<!-- Installation -->
+<!--   helm -->
+<!--   learning the external address/port -->
+<!-- Enabling TURN transports (TCP/TLS/DTLS) -->
+<!-- Authentication   -->
+<!-- Security -->
+
 * The [STUNner Security Guide](/doc/SECURITY.md) describes the best-practices to minmize the
 security risks associated with a misconfigured STUNner gateway.
 * The [STUNner Authentication Guide](/doc/AUTH.md) describes the different user authentication modes

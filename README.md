@@ -349,6 +349,12 @@ Kubernetes.
   tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), but
   this time the clients connect directly to each other via STUNner, without the assistance of a
   media server.
+* [Magic mirror via STUNner](examples/magic-mirror): This simple demo has been adopted from the
+  [Kurento](https://www.kurento.org/) [magic
+  mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
+  demo. The demo shows a basic WebRTC loopback server with some media processing added: the
+  application uses computer vision and augmented reality techniques to add a funny hat on top of
+  faces.
 
 ## Documentation
 
