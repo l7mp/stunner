@@ -8,6 +8,10 @@ DTLS/UDP listeners, complete confidentiality. To complete the CIA triad, the thi
 to add user authentication to STUNner.
 
 ## Table of Contents
+1. [The long-term credential mechanism](#the-long-term-credential-mechanism)
+2. [STUNner authentication workflow](#stunner-authentication-workflow)
+3. [Plaintext authentication](#plaintext-authentication)
+4. [Longterm authentication](#longterm-authentication)
 
 ## The long-term credential mechanism
 
