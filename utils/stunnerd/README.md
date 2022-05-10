@@ -8,7 +8,7 @@ Installation is as easy as it gets:
 
 ```console
 $ cd stunner
-$ go run utils/stunnerd/main.go --log=all:TRACE turn://user1:passwd1@127.0.0.1:3478
+$ go build stunnerd utils/stunnerd/main.go
 ```
 
 ## Features
@@ -20,17 +20,16 @@ $ go run utils/stunnerd/main.go --log=all:TRACE turn://user1:passwd1@127.0.0.1:3
 * [RFC 6062](https://tools.ietf.org/html/rfc6062): Traversal Using Relays around NAT (TURN)
   Extensions for TCP Allocations
 * TURN transport over UDP, TCP, TLS/TCP and DTLS/UDP.
-* Two authentication modes via long-term STUN/TURN credential mechanism: `plaintext` using a static
-  username/password pair, and `longterm` with dynamically generated time-scoped credentials.
+* Two authentication modes via the long-term STUN/TURN credential mechanism: `plaintext` using a
+  static username/password pair, and `longterm` with dynamically generated time-scoped credentials.
 
 ## Usage
 
-Open a `stunnerd` UDP listener service at `127.0.0.1:5000` with the username/password pair
-`user1/passwrd1` for `plaintext` authentication using the long-term STUN/TURN credential mechanism
-and set the maximum debug level.
+The below command will open a `stunnerd` UDP listener service at `127.0.0.1:5000` with `plaintext`
+authentication using the username/password pair `user1/passwrd1`, and set the maximum debug level.
 
 ```console
-$ ./stunnerd --log=all:TRACE turn://user1:passwd1@127.0.0.1:3478
+$ ./stunnerd --log=all:TRACE turn://user1:passwd1@127.0.0.1:5000
 ```
 
 Alternatively, run `stunnerd` in verbose mode with the configuration file taken from
@@ -48,10 +47,13 @@ image](https://hub.docker.com/repository/docker/l7mp/stunnerd) in Kubernetes usi
 
 ## Configuration
 
-The below configuration will open a 4 STUNner listeners, two for unencrypted connections at
-UDP/3478 and TCP/3478, and two encrypted connections at TLS/TCP/3479 and DTLS/UDP/3479. The daemon
-will use `longterm` authentication, using a shared secret read from the environment variable
-`$STUNNER_SHARED_SECRET`. The relay address 
+Using the below configuration, `stunnerd` will open 4 STUNner listeners: two for accepting
+unencrypted connections at UDP/3478 and TCP/3478, and two for encrypted connections at TLS/TCP/3479
+and DTLS/UDP/3479. For easier debugging, the port for the transport relay connections opened by
+`stunnerd` will be taken from [10000:19999] for the UDP listener, [20000:29999] for the TCP
+listener, etc.  The daemon will use `longterm` authentication, with the shared secret read from the
+environment variable `$STUNNER_SHARED_SECRET` during initialization. The relay address is set to
+`$STUNNER_ADDR`.
 
 ``` yaml
 version: v1alpha1
