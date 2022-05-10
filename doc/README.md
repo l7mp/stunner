@@ -2,6 +2,10 @@
 
 ## Concepts
 
+TODO
+
+## User guides
+
 * The [Installation and Configuration Guide](/doc/INSTALL.md) helps getting started with STUnner
   and describes the most important configuration knobs.
 * The [Security Guide](/doc/SECURITY.md) discusses the best-practices to minmize the security risks

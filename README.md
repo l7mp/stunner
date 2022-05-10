@@ -230,7 +230,7 @@ Kubernetes.
 
 ## Documentation
 
-See further documentation [here](doc/REAMDE.md):
+See further documentation [here](doc/README.md).
 
 ## Caveats
 

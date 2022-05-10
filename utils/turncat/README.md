@@ -12,8 +12,8 @@ the cluster.
 As simple as it gets:
 
 ```console
-$ cd utils/turncat
-$ go build -o turncat main.go
+$ cd stunner
+$ go build -o turncat utils/turncat/main.go
 ```
 
 ### Usage
@@ -23,8 +23,8 @@ remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN cre
 user/passwd `test/test` and realm `REALM`:
 
 ```console
-$ ./turncat --user test:test --realm=REALM --log=all:INFO,turncat:DEBUG \
-      udp:127.0.0.1:5000 turn:192.0.2.1:3478 udp:192.0.2.2:53
+$ ./turncat --realm=REALM --log=all:INFO,turncat:DEBUG \
+      udp://127.0.0.1:5000 turn://test:test@192.0.2.1:3478 udp://192.0.2.2:53
 ```
 
 ### Advanced usage
@@ -32,9 +32,10 @@ $ ./turncat --user test:test --realm=REALM --log=all:INFO,turncat:DEBUG \
 The below will execute an [`iperfv2` benchmark](https://iperf.fr) to measure the available
 bandwidth and/or latency from the local endhost to the Kubernetes cluster through STUNner.
 
-If you haven't done that so far, [deploy](/README.md/#getting-started) STUNner into
-Kubernetes. Then, fire up an `iperfv2` UDP server in the cluster and store the service IP: this
-will be the peer address for our TURN tunnel.
+If you haven't done that so far, [deploy](/README.md/#getting-started) STUNner into Kubernetes. The
+below description assumes `plaintext` authentication (this is the default), see the [authentication
+guide](/doc/AUTH.md) on how to enable this mode. Then, fire up an `iperfv2` UDP server in the
+cluster and store the service IP: this will be the peer address for our TURN tunnel.
 
 ```console
 $ kubectl create deployment iperf-server --image=l7mp/net-debug:0.5.3
@@ -51,15 +52,14 @@ Next, start `turncat` in a local terminal to tunnel the `localhost:5001` UDP con
 STUNner to the `iperf` server.
 
 ```console
-$ cd utils/turncat
 $ export IPERF_ADDR=$(kubectl get pod -l app=iperf-server -o jsonpath="{.items[0].status.podIP}")
 $ export STUNNER_PUBLIC_ADDR=$(kubectl get service stunner -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 $ export STUNNER_PORT=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PORT}')
 $ export STUNNER_REALM=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_REALM}')
 $ export STUNNER_USERNAME=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_USERNAME}')
 $ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -n default -o jsonpath='{.data.STUNNER_PASSWORD}')
-$ ./turncat --user $STUNNER_USERNAME=$STUNNER_PASSWORD --realm=$STUNNER_REALM --log=all:INFO \
-    udp:127.0.0.1:5001 turn:$STUNNER_PUBLIC_ADDR:$STUNNER_PORT udp:$IPERF_ADDR:5001
+$ ./turncat --realm=$STUNNER_REALM --log=all:INFO udp://127.0.0.1:5001 \
+    turn://$STUNNER_USERNAME:$STUNNER_PASSWORD@$STUNNER_PUBLIC_ADDR:$STUNNER_PORT udp://$IPERF_ADDR:5001
 ```
 
 Temporarily open up the STUNner `NetworkPolicy` to allow STUNner to send traffic to the
@@ -91,16 +91,17 @@ spec:
 EOF
 ```
 
-And finally start the `iperf` client to execute the benchmark. The `iperfv2` utility must be
-installed locally for this to work; e.g., use `apt-get install iperf` to install it on Debian. The
-below will send 100-byte UDP test packets through STUNner at 10pps rate for 10 seconds.
+And finally start the `iperf` client locally to execute the benchmark. The `iperfv2` utility must
+be installed locally for this to work; e.g., use `apt-get install iperf` to install it on
+Debian/Ubuntu. The below will send 100-byte UDP test packets through STUNner at 10pps rate for 10
+seconds.
 
 ```console
 $ iperf -c -u localhost -p 5001 -i 1 -l 100 -b 8000 -t 10
 ```
 
 The `iperf` server output will contain the results, something akin to the below:
-```console
+```
 ------------------------------------------------------------
 Server listening on UDP port 5001 with pid 50
 Read buffer size: 1.44 KByte (Dist bin width= 183 Byte)
@@ -119,8 +120,8 @@ $ iperf -u -c localhost -p 5001 -i 1 -l 100 -b 3200000 -t 10
 
 ### Cleanup
 
-Make sure to revert the STUNner `NetworkPolicy` to close down all unintended external access to
-sensitive services running inside the cluster.
+Make sure to revert the STUNner `NetworkPolicy` in order to close down all unintended external
+access to sensitive services running inside the cluster.
 
 ```console
 $ kubectl apply -f - <<EOF
