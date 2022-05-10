@@ -1,591 +1,82 @@
-// creates a tunnel through a TURN server
-// go run main.go --user test=test --verbose 127.0.0.1:5000 34.118.22.69:3478 10.116.0.10:11111
-
 package main
 
 import (
-	"flag"
-	"net"
 	"fmt"
 	"context"
-	"strings"
-	"strconv"
-	"syscall"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
-	"errors"
 
 	// "bytes"
 	// "reflect"
-	
-	"github.com/pion/logging"
+
+	flag "github.com/spf13/pflag"
 	"github.com/pion/turn/v2"
+
+	"github.com/l7mp/stunner/v1"
 )
 
-const UDP_PACKET_SIZE = 1500
-
-type packet struct {
-	clientAddr net.Addr       // Address of the client
-	buffer *[]byte            // packet content
-}
-
-type connection struct {
-	clientAddr net.Addr       // Address of the client
-	turnClient *turn.Client   // TURN client associated with connection
-	clientConn net.Conn       // UDP connection connected back to the client
-	serverConn net.PacketConn // Relayed UDP connection to server
-}
-
-type AuthGen func() (string, string, error)
-
-type TurncatConfig struct {
-	ListenAddr     string			// Listening socket address (local tunnel endpoint).
-	ServerAddr     string			// TURN server addrees (e.g. "turn:turn.abc.com:3478").
-	PeerAddr       string			// The remote peer to connec to.
-	Realm          string			// Realm.
-	AuthGen        AuthGen                  // Generate auth tokens
-	LoggerFactory  logging.LoggerFactory	// Logger.
-}
-
-type Turncat struct {
-	listenAddr    net.Addr
-	serverAddr    net.Addr
-	peerAddr      net.Addr
-	listenConn    net.PacketConn
-	connTrack     map[string]*connection  // conntrack table
-	lock          *sync.Mutex             // sync access to the conntrack state
-	realm         string
-	authGen       AuthGen                 // Generate auth tokens
-	loggerFactory logging.LoggerFactory   // Logger.
-}
-
-//////////
-func resolveAddr(addr string) (net.Addr, error) {
-	netaddr := strings.SplitN(addr, ":", 2)
-
-	if len(netaddr) != 2 {
-		return nil, fmt.Errorf("invalid address '%s', expecting <type>:<addr>[:<port>]", addr)
-	}
-
-	// default to IPv4
-	switch netaddr[0] {
-	case "udp", "turn":
-		a, err := net.ResolveUDPAddr("udp", netaddr[1])
-		if err != nil {
-			return nil, fmt.Errorf("cannot resolve UDP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
-		}
-		return a, nil
-	case "tcp":
-		a, err := net.ResolveTCPAddr("tcp", netaddr[1])
-		if err != nil {
-			return nil, fmt.Errorf("cannot resolve TCP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
-		}
-		return a, nil
-	case "ip":
-		a, err := net.ResolveIPAddr("ip", netaddr[1])
-		if err != nil {
-			return nil, fmt.Errorf("cannot resolve IP address '%s', expecting <type>:<addr>[:<port>]: %s",
-				addr, err)
-		}
-		return a, nil
-	default:
-		return nil, fmt.Errorf("invalid address '%s', expecting <type>:<addr>[:<port>]",
-			addr)
-	}
-	
-	panic("cannot happen")
-}
-
-func reuseAddr(network, address string, conn syscall.RawConn) error {
-	return conn.Control(func(descriptor uintptr) {
-		syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
-	})
-}
-
-func envDefault(env, def string) string {
-	e, ok := os.LookupEnv(env)
-	if ok { return e } else { return def }
-}
-
-func envDefaultUint(env string, def int) uint {
-	r, err := strconv.ParseUint(envDefault(env, fmt.Sprintf("%d", def)), 10, 16)
-	if err != nil {
-		fmt.Printf("Invalid integer value in %s: %d\n", env, def)
-		os.Exit(1)
-	}
-	return uint(r)
-}
-
-///////
-func newLogger(levelSpec string) *logging.DefaultLoggerFactory{
-	logger := logging.NewDefaultLoggerFactory()
-	logger.ScopeLevels["turncat"] = logging.LogLevelError
-
-	logLevels := map[string]logging.LogLevel{
-		"DISABLE": logging.LogLevelDisabled,
-		"ERROR":   logging.LogLevelError,
-		"WARN":    logging.LogLevelWarn,
-		"INFO":    logging.LogLevelInfo,
-		"DEBUG":   logging.LogLevelDebug,
-		"TRACE":   logging.LogLevelTrace,
-	}
-
-	levels := strings.Split(levelSpec, ",")
-	for _, s := range levels {
-		scopedLevel := strings.SplitN(s, ":", 2)
-		if len(scopedLevel) != 2 {
-			continue
-		}
-		scope := scopedLevel[0]
-		level := scopedLevel[1]
-		l, found := logLevels[strings.ToUpper(level)]
-		if found == false {
-			continue
-		}
-		
-		if strings.ToLower(scope) == "all" {
-			logger.DefaultLogLevel = l
-			logger.ScopeLevels["turncat"] = l
-			continue
-		}
-
-		logger.ScopeLevels[scope] = l
-	}
-	return logger
-}
-
-func NewTurncat(config TurncatConfig) (*Turncat, error) {
-	loggerFactory := config.LoggerFactory
-	if loggerFactory == nil {
-		loggerFactory = logging.NewDefaultLoggerFactory()
-	}
-	log := loggerFactory.NewLogger("turncat")
-
-	log.Tracef("Resolving address %s", config.ServerAddr)
-	
-	serverAddr, serverErr := resolveAddr(config.ServerAddr)
-	if serverErr != nil {
-		log.Errorf("error resolving server address: %s", serverErr.Error())
-		return nil, serverErr
-	}
-	
-	listenAddr, listenErr := resolveAddr(config.ListenAddr)
-	if listenErr != nil {
-		log.Errorf("error resolving listener address: %s", listenErr.Error())
-		return nil, listenErr
-	}
-
-	peerAddr, peerErr := resolveAddr(config.PeerAddr)
-	if peerErr != nil {
-		log.Errorf("error resolving peer address: %s", peerErr.Error())
-		return nil, serverErr
-	}
-
-	log.Tracef("Setting up listener connection on %s", config.PeerAddr)
-	
-	// a global listener connection for the local tunnel endpoint
-	// per-client connections will connect back to the client
-	listenConf := &net.ListenConfig{Control: reuseAddr}
-	listenConn, err := listenConf.ListenPacket(context.Background(), listenAddr.Network(), listenAddr.String())
-	if err != nil {
-		log.Warnf("cannot create listening client socket at %s: %s",
-			config.ListenAddr, err)
-		return nil, err
-	}
-
-	t := &Turncat{
-		listenAddr:     listenAddr,
-		serverAddr:     serverAddr,
-		peerAddr:       peerAddr,
-		listenConn:     listenConn,
-		connTrack:      make(map[string]*connection),
-		lock:           new(sync.Mutex),
-		realm:          config.Realm,
-		authGen:        config.AuthGen,
-		loggerFactory:  loggerFactory,
-	}
-
-	log.Infof("Turncat client listening on %s, TURN server: %s, peer address: %s",
-		config.ListenAddr, config.ServerAddr, config.PeerAddr)
-	
-	return t, nil
-}
-
-func (t *Turncat) Close() {
-	log := t.loggerFactory.NewLogger("turncat")
-	log.Info("closing Turncat")
-
-	// close all active connections
-	for _, conn := range t.connTrack {
-		t.DeleteConnection(conn)
-	}
-
-	// close the clobal listener socket
-	if err := t.listenConn.Close(); err != nil {
-		log.Warnf("error closing listener connection: %s", err.Error())
-	}
-}
-
-// Generate a new connection by opening a UDP connection to the server
-func (t *Turncat) NewConnection(clientAddr net.Addr) (*connection, error) {
-	log := t.loggerFactory.NewLogger("turncat")
-	log.Debugf("new connection from client %s", clientAddr.String())
-
-	conn := new(connection)
-	conn.clientAddr = clientAddr
-
-	log.Tracef("Setting up TURN client to server %s:%s",
-		t.serverAddr.Network(), t.serverAddr.String())
-	
-	// PacketConn for the TURN server as it will not create one
-	turnConn, err := net.ListenPacket("udp4", "0.0.0.0:0")
-	if err != nil {
-		log.Warnf("cannot allocate TURN listening socket for client %s:%s: %s",
-			clientAddr.Network(), clientAddr.String(), err)
-		return nil, err
-	}
-
-	user, passwd, errAuth := t.authGen()
-	if errAuth != nil {
-		log.Warnf("cannot generate username/password pair for client %s:%s: %s",
-			clientAddr.Network(), clientAddr.String(), errAuth)
-		return nil, errAuth
-	}
-	
-	turnClient, err := turn.NewClient(&turn.ClientConfig{
-		STUNServerAddr: t.serverAddr.String(),
-		TURNServerAddr: t.serverAddr.String(),
-		Conn:           turnConn,
-		Username:       user,
-		Password:       passwd,
-		Realm:          t.realm,
-		LoggerFactory:  t.loggerFactory,
-	})
-	if err != nil {
-		log.Warnf("cannot allocate TURN client for client %s:%s: %s",
-			clientAddr.Network(), clientAddr.String(), err)
-		turnConn.Close()
-		return nil, err
-	}
-
-	// Start the TURN client
-	if err = turnClient.Listen(); err != nil {
-		log.Warnf("cannot listen on TURN client: %s", err)
-		turnConn.Close()
-		return nil, err
-	}
-	conn.turnClient = turnClient
-	
-	log.Tracef("Allocating relay transport for client %s:%s", clientAddr.Network(), clientAddr.String())
-	
-	serverConn, serverErr := turnClient.Allocate()
-	if serverErr != nil {
-		log.Warnf("could not allocate new TURN relay transport for client %s:%s: %s",
-			clientAddr.Network(), clientAddr.String(), serverErr.Error())
-		turnClient.Close()
-		return nil, serverErr
-	}
-	conn.serverConn = serverConn
-
-	log.Tracef("Connnecting back to client %s:%s", clientAddr.Network(), clientAddr.String())
-	
-	dialer := &net.Dialer{LocalAddr: t.listenAddr, Control: reuseAddr}
-	clientConn, clientErr := dialer.Dial(clientAddr.Network(), clientAddr.String())
-	if clientErr != nil {
-		log.Warnf("cannot connect back to client %s:%s: %s",
-			clientAddr.Network(), clientAddr.String(), clientErr.Error())
-		turnClient.Close()
-		return nil, clientErr
-	}
-	conn.clientConn = clientConn
-
-	// The relayConn's local address is actually the transport
-	// address assigned on the TURN server.
-	log.Infof("new connection: client-address=%s, relayed-address=%s",
-		clientAddr.String(), conn.serverConn.LocalAddr().String())
-
-	return conn, nil
-}
-
-// don't err, just warn
-func (t *Turncat) DeleteConnection(conn *connection) {
-	log := t.loggerFactory.NewLogger("turncat")
-	caddr := fmt.Sprintf("%s:%s", conn.clientAddr.Network(), conn.clientAddr.String())
-
-	t.lock.Lock()
-	_, found := t.connTrack[caddr]
-	if !found {
-		// already deleted
-		t.lock.Unlock()
-		return
-	}
-	delete(t.connTrack, caddr)
-	t.lock.Unlock()
-	
-	log.Infof("closing client connection to %s", caddr)
-
-	if err := conn.clientConn.Close(); err != nil {
-		log.Warnf("error closing client connection for %s:%s: %s",
-			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
-		}
-	if err := conn.serverConn.Close(); err != nil {
-		log.Warnf("error closing relayed TURN server connection for %s:%s: %s",
-			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
-	}
-
-	conn.turnClient.Close()
-}
-
-// any error on read/write will delete the connection and terminate the goroutine
-func (t *Turncat) RunConnection(conn *connection) {
-	log := t.loggerFactory.NewLogger("turncat")
-
-	// Read from server
-	go func() {
-		buffer := make([]byte, UDP_PACKET_SIZE)
-		for {
-			n, peerAddr, readErr := conn.serverConn.ReadFrom(buffer[0:])
-			if readErr != nil {
-				// fmt.Println(PrettySprint(readErr.Error()))
-				
-				// ignore "use of closed network connection" errors on exit (DeleteConn already called)
-				// unfoftunately, the PacketConn forged by pion/turn fails to check for net.ErrClosed...
-				if !errors.Is(readErr, net.ErrClosed) &&
-					!strings.Contains(readErr.Error(), "use of closed network connection"){
-					log.Debugf("cannot read from TURN relay connection for client %s:%s (likely hamrless): %s",
-						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
-					t.DeleteConnection(conn)
-				}
-				return
-			}
-
-			log.Tracef("forwarding packet of %d bytes from peer %s:%s on TURN relay connection for client %s:%s",
-				n, peerAddr.Network(), peerAddr.String(),
-				conn.clientAddr.Network(), conn.clientAddr.String())
-
-			if _, writeErr := conn.clientConn.Write(buffer[0:n]); writeErr != nil {
-				log.Debugf("cannot write to client connection for client %s:%s (likely harmless): %s",
-					conn.clientAddr.Network(), conn.clientAddr.String(), writeErr.Error())
-				t.DeleteConnection(conn)
-				return
-			}
-		}
-	}()
-
-	// Read from client
-	go func() {
-		buffer := make([]byte, UDP_PACKET_SIZE)
-		for {
-			n, readErr := conn.clientConn.Read(buffer[0:])
-			if readErr != nil {
-				if !errors.Is(readErr, net.ErrClosed) {
-					log.Debugf("cannot read from client connection for client %s:%s (likely hamrless): %s",
-						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
-					t.DeleteConnection(conn)
-				}
-				return
-			}
-
-			log.Tracef("forwarding packet of %d bytes from client %s:%s to peer %s:%s on TURN relay connection",
-				n, conn.clientAddr.Network(), conn.clientAddr.String(),
-				t.peerAddr.Network(), t.peerAddr.String())
-			
-			if _, writeErr := conn.serverConn.WriteTo(buffer[0:n], t.peerAddr); writeErr != nil {
-				log.Debugf("cannot write to TURN relay connection for client %s (likely hamrless): %s",
-					conn.clientAddr.String(), writeErr.Error())
-				t.DeleteConnection(conn)
-				return
-			}
-		}
-	}()
-}
-
-func (t *Turncat) Run(p context.Context) {
-	// main loop: for every new packet, create a new connection 'conn'
-	// the rest of the packets of the connection should be received on conn.ClientConn
-	log := t.loggerFactory.NewLogger("turncat")
-	ctx, _ := context.WithCancel(p)
-	c := make(chan packet, 10)
-
-	// Read from server
-	go func() {
-		defer func() {close(c)}()
-		buffer := make([]byte, UDP_PACKET_SIZE)
-
-		for {
-			n, clientAddr, err := t.listenConn.ReadFrom(buffer[0:])
-			if err != nil {
-				if !errors.Is(err, net.ErrClosed) {
-					log.Warnf("cannot read from listener connection: %s", err.Error())
-				}
-				return
-			}
-
-			log.Tracef("read initial packet of %d bytes on listener connnection from client %s:%s",
-				n, clientAddr.Network(), clientAddr.String())
-
-			b := make([]byte, n)
-			copy(b, buffer)
-			
-			c <- packet{clientAddr: clientAddr, buffer: &b}
-		}
-	}()
-
-	// create relayed connection and write packet
-	go func() {
-		for {
-			select {
-			case p := <- c:
-				caddr := fmt.Sprintf("%s:%s", p.clientAddr.Network(), p.clientAddr.String())
-				
-				t.lock.Lock()
-				trackConn, found := t.connTrack[caddr]
-				if !found {
-					conn, err := t.NewConnection(p.clientAddr)
-					if err != nil {
-						t.lock.Unlock()
-						log.Warnf("relay setup failed for client %s, dropping client connection",
-							caddr)
-					} else {
-						t.connTrack[caddr] = conn
-						t.lock.Unlock()
-						
-						// Fire up routine to manage new connection
-						// terminated once we kill their connection
-						t.RunConnection(conn)
-						
-						// and send the packet out
-						if _, err := conn.serverConn.WriteTo(*p.buffer, t.peerAddr); err != nil {
-							log.Warnf("cannot write initial packet to TURN relay connection for client %s: %s",
-								caddr, err.Error())
-							t.DeleteConnection(conn)
-						}
-					}
-				} else {
-					t.lock.Unlock()
-					
-					// we should never receive a packet for an established
-					// client here, but it can happen that the client is too
-					// fast and a couple of packets are left stuck in the
-					// global listener socket
-					log.Debugf("received packet from a known client %s on the listener connection, sender too fast?", caddr)
-					// send out anyway!
-					if _, err := trackConn.serverConn.WriteTo(*p.buffer, t.peerAddr); err != nil {
-						log.Warnf("cannot write packet to TURN relay connection for client %s: %s",
-							caddr, err.Error())
-						t.DeleteConnection(trackConn)
-					}
-				}
-			case <- ctx.Done():
-				log.Debug("terminating main Run() thread")
-				return
-			}
-		}
-	}()
-}
-
-//////////////////
-
 func main() {
-	usage := "turncat [-a|--auth=static|long-term] [-s|--shared-secret=<my-secret> [-r|--realm realm] [-l|--log <turn:TRACE,all:INFO>] <udp:listener_addr:listener_port> [turn:server_addr:server_port] <udp:peer_addr:peer_port>"
+	var Usage = func() {
+		fmt.Fprintf(os.Stderr, "turncat [-s|--secret=<my-secret> [-d|--duration=<duration>] [-r|--realm realm] [-l|--log <level>] <udp|tcp|unix>://<listener_addr>:<listener_port> turn://<username>:<password>@<server_addr>:<server_port>[?transport=<udp|tcp>] udp://<peer_addr>:<peer_port>")
+		flag.PrintDefaults()
+	}
 
-	// can be overriden on the command line
-	dAuth     := envDefault("STUNNER_AUTH",                   "static")
-	dSecret   := envDefault("STUNNER_SHARED_SECRET",          "my-secret")
-	dDuration := envDefault("STUNNER_CREDENTIAL_DURATION",    "1h30m")
-	dRealm    := envDefault("STUNNER_REALM",                  "stunner.l7mp.io")
-	dServer   := envDefault("STUNNER_ADDR",                   "127.0.0.1")
-	dPort 	  := envDefaultUint("STUNNER_PORT",                3478)
-	dUser     := envDefault("STUNNER_USERNAME",               "user")
-	dPasswd	  := envDefault("STUNNER_PASSWORD",               "pass")
-	dLoglevel := envDefault("STUNNER_LOGLEVEL",               "all:ERROR")
-	
-	var auth, authSecret, realm, level, user, duration string
-	var verbose bool
-	// general flags
-	flag.StringVar(&realm, "r",       dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
-	flag.StringVar(&realm, "realm",   dRealm,                fmt.Sprintf("Realm (default: %s)",dRealm))
-	flag.StringVar(&level, "l",       dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
-	flag.StringVar(&level, "log",     dLoglevel,             fmt.Sprintf("Log level (default: %s)", dLoglevel))
-	flag.BoolVar(&verbose, "v",       false,                 "Verbose logging, identical to -l all:DEBUG")
-	flag.BoolVar(&verbose, "verbose", false,                 "Verbose logging, identical to -l all:DEBUG")
-
-	// authentication mode
-	flag.StringVar(&auth,  "a",    dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
-	flag.StringVar(&auth,  "auth", dAuth, fmt.Sprintf("Authentication mode: static or long-term (default: %s)", dAuth))
-	// long-term credential auth
- 	flag.StringVar(&authSecret, "s",             dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
-	flag.StringVar(&authSecret, "shared-secret", dSecret, fmt.Sprintf("Shared secret (default: %s)", dSecret))
-	flag.StringVar(&duration, "d",               dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
-	flag.StringVar(&duration, "duration",        dDuration, fmt.Sprintf("Long term credential duration (default: %s)", dDuration))
-	// static username/passwd auth
-	flag.StringVar(&user, "u",    dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
-	flag.StringVar(&user, "user", dUser + "=" + dPasswd, fmt.Sprintf("Credentials (default: %s)", dUser + ":" + dPasswd))
+	os.Args[0] = "turncat"
+	defaultDuration, _ := time.ParseDuration("1h")
+ 	var realm    = flag.StringP("realm",      "r", "stunner.l7mp.io", "Realm (default: stunner.l7mp.io).")
+	var level    = flag.StringP("log",        "l", "all:WARN",        "Log level (default: all:WARN).")
+	var verbose  = flag.BoolP("verbose",      "v", false,             "Verbose logging, identical to -l all:DEBUG.")
+ 	var secret   = flag.StringP("secret",     "s", "",                "Long-term credential shared secret.")
+	var duration = flag.DurationP("duration", "d", defaultDuration,   "Long-term credential duration (default: 1h)")
 	flag.Parse()
 
-	var s, p string
-	switch flag.NArg() {
-	case 2:
-		// server address is taken from the env, peer address is the last arg
-		s = fmt.Sprintf("turn:%s:%s", dServer, dPort)
-		p = flag.Arg(1)
-	case 3:
-		// both server and peer address are provided as args
-		s = flag.Arg(1)
-		p = flag.Arg(2)
-	default:
-		fmt.Fprintf(os.Stderr, usage)
+	if flag.NArg() != 3 {
+		Usage()
 		os.Exit(1)
 	}
-	
-	if verbose {
-		level = "all:DEBUG"
-	}
-	logger := newLogger(level)
 
-	var authGen AuthGen
-	switch strings.ToLower(auth) {
-	case "static":
-		cred := strings.SplitN(user, "=", 2)
-		if len(cred) != 2 || cred[0] == "" || cred[1] == "" {
-			fmt.Fprintf(os.Stderr, "cannot parse static credential: '%s'\n", user)
-			os.Exit(1)
-		}
+	var authGen stunner.AuthGen
+	if len(*secret) != 0 {
+		// switch to long-term credential auth mode
 		authGen = func() (string, string, error) {
-			return cred[0], cred[1], nil
+			return turn.GenerateLongTermCredentials(*secret, *duration)
 		}
-	case "long-term":
-		d, err := time.ParseDuration(duration)
+	} else {
+		// plaintext username/passwd
+		u := flag.Arg(1)
+		uri, err := stunner.ParseUri(u)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cannot parse long-term credential duration '%s': %s",
-				duration, err)
+			fmt.Fprintf(os.Stderr, "could parse Stunner URI '%s': %s\n", u, err)
+			os.Exit(1)
+		}
+
+		if len(uri.Username) == 0 || len(uri.Password) == 0 {
+			fmt.Fprintf(os.Stderr, "no username/password available in Stunner URI: '%s'\n", u)
 			os.Exit(1)
 		}
 		authGen = func() (string, string, error) {
-			return turn.GenerateLongTermCredentials(authSecret, d)
+			return uri.Username, uri.Password, nil
 		}
-	default:
-		fmt.Fprintf(os.Stderr, "unknown authentication mode: %s", auth)
-		os.Exit(1)
 	}
 
-	cfg := &TurncatConfig{
-		ListenAddr:    flag.Arg(0),
-		ServerAddr:    s,
-		PeerAddr:      p,
-		Realm:         realm,
+	if *verbose {
+		*level = "all:DEBUG"
+	}
+	logger := stunner.NewLoggerFactory(*level)
+
+	cfg := &stunner.TurncatConfig{
+		ListenerAddr:  flag.Arg(0),
+		ServerAddr:    flag.Arg(1),
+		PeerAddr:      flag.Arg(2),
+		Realm:         *realm,
 		AuthGen:       authGen,
 		LoggerFactory: logger,
 	}
 
-	t, err := NewTurncat(*cfg)
+	t, err := stunner.NewTurncat(cfg)
 	if err != nil {
-		fmt.Println("cannot init Turncat")
+		fmt.Fprintf(os.Stderr, "could not init turncat: %s\n", err)
 		os.Exit(1)
 	}
 
@@ -595,9 +86,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	t.Run(ctx)
-
 	<- ctx.Done()
 	t.Close()
-	
+
 }
