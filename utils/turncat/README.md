@@ -7,7 +7,7 @@ the cluster.
 
 ## Getting Started
 
-### Installing
+### Installation
 
 As simple as it gets:
 
