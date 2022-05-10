@@ -132,7 +132,7 @@ With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should 
 * [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and expose it over
   a public IP address and port.
 * Optionally [deploy a WebRTC media server](examples/kurento-one2one-call) into Kubernetes as well.
-* [Set STUNner as the ICE server](#configuring-webbrtc-clients-to-reach-stunner) in your WebRTC
+* [Set STUNner as the ICE server](#configuring-webrtc-clients-to-reach-stunner) in your WebRTC
   clients.
 * ...
 * Profit!!
@@ -150,9 +150,8 @@ $ helm install stunner stunner/stunner
 ```
 
 And that's all: a standalone deployment of STUNner is up and running, waiting for WebRTC clients to
-connect to it. The last step to do is to direct clients to indeed connect to STUNner.
-
-See the complete STUNner installation guide [here](/doc/INSTALL.md). 
+connect to it. See the [STUNner installation guide](/doc/INSTALL.md) on how to customize STUNner or
+deploy it without Helm, using a static [Kubernetes manifest](/kubernetes/stunner.yaml).
 
 ### Configuration
 
@@ -162,14 +161,15 @@ Wait until Kubernetes assigns a public IP address for STUNner; this should not t
 $ until [ -n "$(kubectl get svc stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
 
-Query the actual STUNner configuration, in particular, the public IP address and port assigned by
+Query the actual STUNner configuration in order to learn the public IP address and port assigned by
 Kubernetes for the STUNner service.
 
 ```console
 $ kubectl get cm stunner-config -o yaml
 ```
 
-The result should be something like the below.
+The result should be something like the below. The public IP address allocated by Kubernetes for
+STUNner is marked with a placeholder `A.B.C.D` below.
 
 ```yaml
 apiVersion: v1
@@ -189,7 +189,7 @@ data:
 Note that any change to the STUNner `ConfigMap` will take effect only once STUNner is restarted.
 
 ``` console
-kubectl rollout restart deployment/stunner
+kubectl rollout restart deployment stunner
 ```
 
 ## Configuring WebRTC clients to reach STUNner
@@ -275,7 +275,7 @@ notable limitations at this point are as follows.
   request to it (without special
   [hacks](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip)),
   and the TURN transport relay connection opened by a WebRTC client via STUNner is reachable only
-  to clients that likewise open a TURN transport via STUNner (again, without further
+  to clients configured to use the same STUNner service (again, without further
   [hacks](https://kubernetes.io/docs/concepts/security/pod-security-policy/#host-namespaces)). This
   is intended: STUNner is a Kubernetes ingress gateway which happens to expose a STUN/TURN
   compatible service to WebRTC clients, and not a public TURN service.

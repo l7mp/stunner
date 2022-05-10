@@ -50,7 +50,6 @@ data:
   # * over longterm authentication.
   STUNNER_DURATION: 86400
 
-
   # * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
   STUNNER_LOGLEVEL: "all:INFO"
 
