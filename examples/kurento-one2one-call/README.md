@@ -68,7 +68,7 @@ $ helm install kurento-one2one-call stunner/kurento_webrtc_demo
 
 The other way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](/examples/kurento-one2one-call) packaged with STUNner.
+[manifest](/examples/kurento-one2one-call.yaml) packaged with STUNner.
 
 ```console
 $ git clone https://github.com/l7mp/stunner
@@ -195,7 +195,7 @@ $ kubectl scale deployment kms --replicas=20
 
 ## Security
 
-As described in the [STUNner security guide](/README.md#security), it is critical to lock down
+As described in the [STUNner Security Guide](doc/SECURITY.md), it is critical to lock down
 (potentially hostile) access to sensitive services running inside the cluster via STUNner. The
 necessary ACLs are automatically configured by the installation manifests above; below we describe
 what's happening in the background.

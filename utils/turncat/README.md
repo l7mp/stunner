@@ -23,7 +23,7 @@ remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN cre
 user/passwd `test/test` and realm `REALM`:
 
 ```console
-$ ./turncat --user test=test --realm=REALM --log=all:INFO,turncat:DEBUG \
+$ ./turncat --user test:test --realm=REALM --log=all:INFO,turncat:DEBUG \
       udp:127.0.0.1:5000 turn:192.0.2.1:3478 udp:192.0.2.2:53
 ```
 
