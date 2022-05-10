@@ -1,7 +1,5 @@
 # STUNner: A Kubernetes ingress gateway for WebRTC
 
-**(WORK IN PROGRESS)**
-
 Ever wondered how to [deploy your WebRTC infrastructure into the
 cloud](https://webrtchacks.com/webrtc-media-servers-in-the-cloud)? Frightened away by the
 complexities of Kubernetes container networking, and the surprising ways in which it may interact
