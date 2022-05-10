@@ -126,6 +126,19 @@ deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner
 your media servers are readily reachable to WebRTC clients, despite running with a private IP
 address inside a Kubernetes pod.
 
+With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should not take more than
+5 minutes.
+
+* [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and expose it over
+  a public IP address and port.
+* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call) into Kubernetes as well.
+* [Set STUNner as the ICE server](#configuring-webbrtc-clients-to-reach-stunner) in your WebRTC
+  clients.
+* ...
+* Profit!!
+
+### Installation
+
 The simplest way to deploy STUNner is through [Helm](https://helm.sh). In this case, all STUNner
 configuration parameters are available for customization as [Helm
 Values](https://helm.sh/docs/chart_template_guide/values_files).
@@ -138,6 +151,10 @@ $ helm install stunner stunner/stunner
 
 And that's all: a standalone deployment of STUNner is up and running, waiting for WebRTC clients to
 connect to it. The last step to do is to direct clients to indeed connect to STUNner.
+
+See the complete STUNner installation guide [here](/doc/INSTALL.md). 
+
+### Configuration
 
 Wait until Kubernetes assigns a public IP address for STUNner; this should not take more than a minute.
 
@@ -169,9 +186,17 @@ data:
   ...
 ```
 
-The below JavaScript snippet will then direct your WebRTC clients to use STUNner; make sure to
-substitute the placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the
-above.
+Note that any change to the STUNner `ConfigMap` will take effect only once STUNner is restarted.
+
+``` console
+kubectl rollout restart deployment/stunner
+```
+
+## Configuring WebRTC clients to reach STUNner
+
+The last step is to configure your WebRTC clients to use STUNner as the TURN server.  The below
+JavaScript snippet will then direct your WebRTC clients to use STUNner; make sure to substitute the
+placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the above.
 
 ```js
 var ICE_config = {
@@ -186,7 +211,9 @@ var ICE_config = {
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
-See the complete STUNner installation guide [here](/doc/INSTALL.md).
+Note that STUNner comes with a [small Node.js
+library]https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
+ICE configurations and STUNner credentials in the application server.
 
 ## Examples
 
