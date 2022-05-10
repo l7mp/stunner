@@ -18,7 +18,7 @@ $ go build -o turncat main.go
 
 ### Usage
 
-Tunnel the local UDP connection `127.0.0.1:5000` through the TURN server `192.0.2.1:3478` to the
+Tunnel the local UDP connection at `127.0.0.1:5000` through the TURN server `192.0.2.1:3478` to the
 remote DNS server located at `192.0.2.2:53`, and use the long-term STUN/TURN credential with
 user/passwd `test/test` and realm `REALM`:
 
@@ -143,11 +143,6 @@ Then, stop `turncat` and delete the `iperf-server` deployment and service.
 $ kubectl delete service iperf-server 
 $ kubectl delete deployment iperf-server 
 ```
-
-# Caveats
-
-* Currently only UDP is supported.
-* Only static user/password authentication is supported.
 
 ## License
 
