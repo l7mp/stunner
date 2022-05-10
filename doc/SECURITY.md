@@ -1,4 +1,4 @@
-# The STUNner security guide
+# Security
 
 Like any conventional gateway service, an improperly configured STUNner service may easily end up
 exposing sensitive services to the Internet. The below security guidelines will allow to minmize

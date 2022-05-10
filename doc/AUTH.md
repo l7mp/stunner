@@ -1,4 +1,4 @@
-# The STUNner authentication guide
+# Authentication
 
 <TODO>
 
