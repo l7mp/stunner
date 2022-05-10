@@ -194,9 +194,13 @@ kubectl rollout restart deployment/stunner
 
 ## Configuring WebRTC clients to reach STUNner
 
-The last step is to configure your WebRTC clients to use STUNner as the TURN server.  The below
-JavaScript snippet will then direct your WebRTC clients to use STUNner; make sure to substitute the
-placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the above.
+The last step is to configure your WebRTC clients to use STUNner as the TURN server. STUNner is
+compatible with all client-side [TURN auto-discovery
+mechanisms](https://datatracker.ietf.org/doc/html/rfc8155). When no auto-discovery mechanism is
+available, clients will need to be manually configured to stream audio/video media over STUNner.
+
+The below JavaScript snippet will direct a WebRTC client to use STUNner; make sure to substitute
+the placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the above.
 
 ```js
 var ICE_config = {
@@ -212,7 +216,7 @@ var pc = new RTCPeerConnection(ICE_config);
 ```
 
 Note that STUNner comes with a [small Node.js
-library]https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
+library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
 ICE configurations and STUNner credentials in the application server.
 
 ## Examples
@@ -247,8 +251,8 @@ Kubernetes.
   [Node.js](https://nodejs.org) application server for creating a browser-based two-party WebRTC
   video-call, plus the Kurento media server deployed behind STUNner for media exchange and,
   potentially, automatic audio/video transcoding.
-* [Magic mirror via STUNner](examples/kurento-magic-mirror/README.md): This example has been
-  adopted from the [Kurento](https://www.kurento.org) [magic
+* [Media-plane mode: Magic mirror via STUNner](examples/kurento-magic-mirror/README.md): This
+  example has been adopted from the [Kurento](https://www.kurento.org) [magic
   mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
   demo. The demo shows a basic WebRTC loopback server with some media processing added: the
   application uses computer vision and augmented reality techniques to add a funny hat on top of

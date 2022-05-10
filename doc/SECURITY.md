@@ -129,25 +129,10 @@ password is available in plain text at the clients (`plaintext` authentication m
 access to the static STUNner credentials can open a UDP tunnel to any service inside the Kubernetes
 cluster, unless [blocked](#access-control) by a properly configured Kubernetes `NetworkPolicy`.
 
-In order to mitigate the risk, it is a good security practice to reset the username/password pair
-every once in a while.  Suppose you want to set the STUN/TURN username to `my_user` and the
-password to `my_pass`. To do this simply modify the STUNner `ConfigMap` and restart STUNner to
-enforce the new access tokens:
-
-```console
-$ kubectl patch configmap/stunner-config -n default --type merge \
-    -p "{\"data\":{\"STUNNER_USERNAME\":\"my_user\",\"STUNNER_PASSWORD\":\"my_pass\"}}"
-$ kubectl rollout restart deployment/stunner
-```
-
-You can even set up a [cron
-job](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) to automate this. Note
-that if the WebRTC application server uses [dynamic STUN/TURN credentials](#demo), then it may need
-to be restarted as well to learn the new credentials.
-
 For more security sensitive workloads, we recommend the time-limited [STUN/TURN long-term
 credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) authentication mode. See the
-[STUNner Authentication Guide](doc/AUTH.md) for configuring user STUNner authentication mode.
+[STUNner authentication guide](doc/AUTH.md) for configuring the more secure `longterm`
+authentication mode.
 
 ## Access control
 
