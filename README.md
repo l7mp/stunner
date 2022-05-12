@@ -126,6 +126,19 @@ deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner
 your media servers are readily reachable to WebRTC clients, despite running with a private IP
 address inside a Kubernetes pod.
 
+With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should not take more than
+5 minutes.
+
+* [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and expose it over
+  a public IP address and port.
+* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call) into Kubernetes as well.
+* [Set STUNner as the ICE server](#configuring-webrtc-clients-to-reach-stunner) in your WebRTC
+  clients.
+* ...
+* Profit!!
+
+### Installation
+
 The simplest way to deploy STUNner is through [Helm](https://helm.sh). In this case, all STUNner
 configuration parameters are available for customization as [Helm
 Values](https://helm.sh/docs/chart_template_guide/values_files).
@@ -137,7 +150,10 @@ $ helm install stunner stunner/stunner
 ```
 
 And that's all: a standalone deployment of STUNner is up and running, waiting for WebRTC clients to
-connect to it. The last step to do is to direct clients to indeed connect to STUNner.
+connect to it. See the [STUNner installation guide](/doc/INSTALL.md) on how to customize STUNner or
+deploy it without Helm, using a static [Kubernetes manifest](/kubernetes/stunner.yaml).
+
+### Configuration
 
 Wait until Kubernetes assigns a public IP address for STUNner; this should not take more than a minute.
 
@@ -145,14 +161,15 @@ Wait until Kubernetes assigns a public IP address for STUNner; this should not t
 $ until [ -n "$(kubectl get svc stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
 
-Query the actual STUNner configuration, in particular, the public IP address and port assigned by
+Query the actual STUNner configuration in order to learn the public IP address and port assigned by
 Kubernetes for the STUNner service.
 
 ```console
 $ kubectl get cm stunner-config -o yaml
 ```
 
-The result should be something like the below.
+The result should be something like the below. The public IP address allocated by Kubernetes for
+STUNner is marked with a placeholder `A.B.C.D` below.
 
 ```yaml
 apiVersion: v1
@@ -169,9 +186,21 @@ data:
   ...
 ```
 
-The below JavaScript snippet will then direct your WebRTC clients to use STUNner; make sure to
-substitute the placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the
-above.
+Note that any change to the STUNner `ConfigMap` will take effect only once STUNner is restarted.
+
+``` console
+kubectl rollout restart deployment stunner
+```
+
+## Configuring WebRTC clients to reach STUNner
+
+The last step is to configure your WebRTC clients to use STUNner as the TURN server. STUNner is
+compatible with all client-side [TURN auto-discovery
+mechanisms](https://datatracker.ietf.org/doc/html/rfc8155). When no auto-discovery mechanism is
+available, clients will need to be manually configured to stream audio/video media over STUNner.
+
+The below JavaScript snippet will direct a WebRTC client to use STUNner; make sure to substitute
+the placeholders (like `<STUNNER_PUBLIC_ADDR>`) with the correct configuration from the above.
 
 ```js
 var ICE_config = {
@@ -186,7 +215,9 @@ var ICE_config = {
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
-See the complete STUNner installation guide [here](/doc/INSTALL.md).
+Note that STUNner comes with a [small Node.js
+library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
+ICE configurations and STUNner credentials in the application server.
 
 ## Examples
 
@@ -220,8 +251,8 @@ Kubernetes.
   [Node.js](https://nodejs.org) application server for creating a browser-based two-party WebRTC
   video-call, plus the Kurento media server deployed behind STUNner for media exchange and,
   potentially, automatic audio/video transcoding.
-* [Magic mirror via STUNner](examples/kurento-magic-mirror/README.md): This example has been
-  adopted from the [Kurento](https://www.kurento.org) [magic
+* [Media-plane mode: Magic mirror via STUNner](examples/kurento-magic-mirror/README.md): This
+  example has been adopted from the [Kurento](https://www.kurento.org) [magic
   mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
   demo. The demo shows a basic WebRTC loopback server with some media processing added: the
   application uses computer vision and augmented reality techniques to add a funny hat on top of
@@ -244,7 +275,7 @@ notable limitations at this point are as follows.
   request to it (without special
   [hacks](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip)),
   and the TURN transport relay connection opened by a WebRTC client via STUNner is reachable only
-  to clients that likewise open a TURN transport via STUNner (again, without further
+  to clients configured to use the same STUNner service (again, without further
   [hacks](https://kubernetes.io/docs/concepts/security/pod-security-policy/#host-namespaces)). This
   is intended: STUNner is a Kubernetes ingress gateway which happens to expose a STUN/TURN
   compatible service to WebRTC clients, and not a public TURN service.

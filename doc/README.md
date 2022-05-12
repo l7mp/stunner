@@ -6,11 +6,11 @@ TODO
 
 ## User guides
 
-* The [Installation and Configuration Guide](/doc/INSTALL.md) helps getting started with STUnner
+* The [installation and configuration guide](/doc/INSTALL.md) helps getting started with STUnner
   and describes the most important configuration knobs.
-* The [Security Guide](/doc/SECURITY.md) discusses the best-practices to minmize the security risks
+* The [security guide](/doc/SECURITY.md) discusses the best-practices to minmize the security risks
 associated with a misconfigured STUNner gateway.
-* The [Authentication Guide](/doc/AUTH.md) describes the different user authentication modes
+* The [authentication guide](/doc/AUTH.md) describes the different user authentication modes
 supported by STUNner.
 
 ## Manuals

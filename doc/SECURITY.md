@@ -112,8 +112,8 @@ EOF
 
 Repeating the DNS query should again time out, as before.
 
-In summary, unless properly locked down, STUNner may be used hostilely to open a UDP tunnel to any
-UDP service running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the
+In summary, unless properly locked down, STUNner may be used maliciously to open a tunnel to any
+service running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the
 pods and services inside a cluster exposed via STUNner, using a properly configured Kubernetes ACL
 (`NetworkPolicy`).
 
@@ -129,25 +129,9 @@ password is available in plain text at the clients (`plaintext` authentication m
 access to the static STUNner credentials can open a UDP tunnel to any service inside the Kubernetes
 cluster, unless [blocked](#access-control) by a properly configured Kubernetes `NetworkPolicy`.
 
-In order to mitigate the risk, it is a good security practice to reset the username/password pair
-every once in a while.  Suppose you want to set the STUN/TURN username to `my_user` and the
-password to `my_pass`. To do this simply modify the STUNner `ConfigMap` and restart STUNner to
-enforce the new access tokens:
-
-```console
-$ kubectl patch configmap/stunner-config -n default --type merge \
-    -p "{\"data\":{\"STUNNER_USERNAME\":\"my_user\",\"STUNNER_PASSWORD\":\"my_pass\"}}"
-$ kubectl rollout restart deployment/stunner
-```
-
-You can even set up a [cron
-job](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) to automate this. Note
-that if the WebRTC application server uses [dynamic STUN/TURN credentials](#demo), then it may need
-to be restarted as well to learn the new credentials.
-
-For more security sensitive workloads, we recommend the time-limited [STUN/TURN long-term
-credential](https://www.rfc-editor.org/rfc/rfc8489.html#section-9.2) authentication mode. See the
-[STUNner Authentication Guide](doc/AUTH.md) for configuring user STUNner authentication mode.
+For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
+per-client fixed lifetime username/password pairs. See the [STUNner authentication
+guide](doc/AUTH.md) for configuring STUNner with the more secure `longterm` authentication mode.
 
 ## Access control
 
@@ -246,8 +230,8 @@ over the private internal pod network and still allow external clients to make c
 media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP
 addresses are now exposed to the WebRTC clients in ICE candidates.
 
-The threat model is that, if possessing the correct credentials, an attacker can scan the *private*
-IP address of all STUNner pods and all media server pods via STUNner. This should not pose a major
+The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP
+address of all STUNner pods and all media server pods via STUNner. This should not pose a major
 security risk though: remember, none of these private IP addresses can be reached
 externally. Nevertheless, if worried about information exposure then STUNner may not be the best
 option for you.

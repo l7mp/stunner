@@ -46,6 +46,10 @@ data:
   # * `STUNNER_SHARED_SECRET`: the shared secret used for longterm authentication.
   STUNNER_SHARED_SECRET: "my-shared-secret"
 
+  # * `STUNNER_DURATION` (default: `86400`, i.e., one day): the lifetime of STUNner credentials
+  # * over longterm authentication.
+  STUNNER_DURATION: 86400
+
   # * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
   STUNNER_LOGLEVEL: "all:INFO"
 
