@@ -77,12 +77,11 @@ jobs:
 
       - name: Compile stunnerd
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd .
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd ./utils/stunnerd/...
 
       - name: Compile turncat
         run: |
-          cd utils/turncat
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat .
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat ./utils/stunnerd/...
 
       - name: Get release
         id: get_release
@@ -101,4 +100,4 @@ jobs:
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
           asset_name: turncat
-          asset_path: "utils/turncat/turncat"
+          asset_path: turncat
