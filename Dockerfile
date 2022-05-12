@@ -13,7 +13,7 @@ COPY utils/stunnerd/main.go stunnerd/
 COPY utils/stunnerd/stunnerd.conf ./
 
 # RUN go build -o /stunnerd
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o stunnerd  ./... 
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd  ./...
 
 ###########
 # STUNNERD
