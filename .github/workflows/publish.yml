@@ -81,7 +81,7 @@ jobs:
 
       - name: Compile turncat
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat ./utils/stunnerd/...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat ./utils/turncat/...
 
       - name: Get release
         id: get_release
