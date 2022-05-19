@@ -189,7 +189,7 @@ data:
 Note that any change to the STUNner `ConfigMap` will take effect only once STUNner is restarted.
 
 ``` console
-kubectl rollout restart deployment stunner
+$ kubectl rollout restart deployment stunner
 ```
 
 ## Configuring WebRTC clients to reach STUNner
@@ -216,8 +216,8 @@ var pc = new RTCPeerConnection(ICE_config);
 ```
 
 Note that STUNner comes with a [small Node.js
-library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
-ICE configurations and STUNner credentials in the application server.
+library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that simplifies generating ICE
+configurations and STUNner credentials in the application server.
 
 ## Examples
 

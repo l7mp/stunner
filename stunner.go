@@ -31,7 +31,7 @@ func NewStunner(conf *StunnerConfig) (*Stunner, error) {
 	s.logLevel = conf.Admin.LogLevel
 	s.logger = NewLoggerFactory(conf.Admin.LogLevel)
 	s.log = s.logger.NewLogger("stunner")
-	
+
 	if conf.ApiVersion != ApiVersion {
 		return nil, fmt.Errorf("unsupported API version: %s", conf.ApiVersion)
 	}
