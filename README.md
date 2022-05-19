@@ -126,8 +126,8 @@ deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner
 your media servers are readily reachable to WebRTC clients, despite running with a private IP
 address inside a Kubernetes pod.
 
-With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should not take more than
-5 minutes.
+With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should take less than 5
+minutes.
 
 * [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and expose it over
   a public IP address and port.

@@ -37,19 +37,7 @@ In this demo you will learn how to:
 
 ### Prerequisites
 
-You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be
-configured to communicate with your cluster. If you do not already have a cluster, you can create
-one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
-STUNner is deployed into the cluster (see the [STUNner configuration
-guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
-follow the steps in the [STUNner testing guide](/examples/simple-tunnel/README.md) to make sure
-that STUNner is fully operational. The below examples assume that STUNner has been installed into
-the default namespace with simple plain text authentication. The demo requires a solid
-understanding of the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
-[WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
-original [Kurento One to one video
-call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
-locally, in order to understand how the Kubernetes based demo differs (very little).
+Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner.
 
 ### Quick installation
 
@@ -108,35 +96,26 @@ server can be found
 2. Deploy the Kurento media server into a `Deployment` (called `kms`). Observe that Kurento has
    been configured with *no STUN and TURN servers* and *no external IP addresses*, and it runs in
    an ordinary Kubernetes pod at an ephemeral private IP address which is not available from
-   browsers directly. Here is where the *magic* happens: STUNner makes sure that WebRTC media just
+   browsers directly. Here is where the magic happens: STUNner makes sure that WebRTC media just
    keeps flowing between clients and the media server, without *any* of the two being directly
    accessible via a public IP.
 3. Expose the media server pool, i.e., the Kurento media server deployment, over the Kubernetes
    service `kms-control` over the TCP port 8888. This assigns a virtual IP address (a `ClusterIP`)
    that the application server can use to configure the WebRTC endpoints and media pipelines in
    Kurento. Note that this address is private and it is not reachable from outside the cluster.
-4. [Modify](https://github.com/l7mp/kurento-tutorial-node/commit/54289c2c6592d9237f3b465a0e10fa425b8ade8b#diff-70406ec94adfebba544257cb82e2aed222a8941c8b8db766aee488272446f1acR26)
-   the WebRTC application server to (1)
-   [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L26)
-   the STUNner configuration parameters available in the environment variables
-   `STUNNER_PUBLIC_ADDR`, `STUNNER_PUBLIC_PORT`, `STUNNER_USERNAME`, and `STUNNER_PASSWORD` (see
-   below) in an appropriate WebRTC [ICE server
-   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) and (2)
-   [return](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/server.js#L442)
-   the ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
+4. Modify the WebRTC [application server
+   logic](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/server.js)
+   to (1) use the STUNner [Node.js authentication
+   library]https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to generate a WebRTC [ICE server
+   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) and (2) return the
+   ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
    successful user registration.
-5. [Modify](https://github.com/l7mp/kurento-tutorial-node/commit/54289c2c6592d9237f3b465a0e10fa425b8ade8b#diff-70406ec94adfebba544257cb82e2aed222a8941c8b8db766aee488272446f1acR26)
-   the [JavaScript
+5. Modify the [JavaScript
    code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
-   served to clients to (1)
-   [store](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L134)
-   the ICE server configuration returned from the application server, and (2) set up the WebRTC
-   PeerConnection at both the
-   [caller](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L255)
-   and the
-   [callee](https://github.com/l7mp/kurento-tutorial-node/blob/54289c2c6592d9237f3b465a0e10fa425b8ade8b/kurento-one2one-call/static/js/index.js#L186)
-   so that the ICE handshake will use STUNner's public address and port with the correct STUN/TURN
-   credentials for establishing the media connection.
+   served to clients to (1) store the ICE server configuration returned from the application
+   server, and (2) set up the WebRTC `PeerConnection` at both the caller and the callee so that the
+   ICE handshake will use STUNner's public address and port with the correct STUN/TURN credentials
+   for establishing the media connection.
 6. Use the
    [Dockerfile](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/Dockerfile)
    packaged to build the modified WebRTC application server container image or deploy the [prebuilt
@@ -195,7 +174,7 @@ $ kubectl scale deployment kms --replicas=20
 
 ## Security
 
-As described in the [STUNner Security Guide](doc/SECURITY.md), it is critical to lock down
+As described in the [STUNner security guide](/doc/SECURITY.md), it is critical to lock down
 (potentially hostile) access to sensitive services running inside the cluster via STUNner. The
 necessary ACLs are automatically configured by the installation manifests above; below we describe
 what's happening in the background.
