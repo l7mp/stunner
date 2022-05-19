@@ -1,6 +1,6 @@
 # STUNner demo: Magic mirror with Kurento
 
-This is the Kurento [Node.js - Magic
+This is the Kurento [Magic
 mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
 demo, adopted for STUNner and Kubernetes. The demo shows a basic WebRTC loopback server with some
 media processing added: the application uses computer vision and augmented reality techniques to
