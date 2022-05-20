@@ -12,7 +12,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
 
-	"github.com/l7mp/stunner/v1"
+	"github.com/l7mp/stunner"
 )
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp

@@ -13,7 +13,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/pion/turn/v2"
 
-	"github.com/l7mp/stunner/v1"
+	"github.com/l7mp/stunner"
 )
 
 func main() {
