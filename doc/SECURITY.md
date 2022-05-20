@@ -16,7 +16,7 @@ the risks associated with a misconfigured STUNner.
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
-[`turncat`](/utils/turncat) utility to reach the Kubernetes DNS service through a misconfigured
+[`turncat`](/cmd/turncat) utility to reach the Kubernetes DNS service through a misconfigured
 STUNner gateway.
 
 Start with a fresh STUNner installation. As usual, we store the STUNner configuration for later
@@ -41,7 +41,7 @@ received packets to the cluster DNS service through STUNner.
 
 ```console
 $ cd stunner
-$ go run utils/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
+$ go run cmd/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
   --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${KUBE_DNS_IP}:53
 ```
 
@@ -217,7 +217,7 @@ EOF
 ```
 
 In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
-publicly; e.g., the [`turncat` utility](/utils/turncat) packaged with STUNner can be used
+publicly; e.g., the [`turncat` utility](/cmd/turncat) packaged with STUNner can be used
 conveniently for this [purpose](/examples/simple-tunnel/README.pm).
 
 ## Exposing internal IP addresses

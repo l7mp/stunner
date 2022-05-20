@@ -8,7 +8,7 @@ Installation is as easy as it gets:
 
 ```console
 $ cd stunner
-$ go build stunnerd utils/stunnerd/main.go
+$ go build stunnerd cmd/stunnerd/main.go
 ```
 
 ## Features
@@ -33,10 +33,10 @@ $ ./stunnerd --log=all:TRACE turn://user1:passwd1@127.0.0.1:5000
 ```
 
 Alternatively, run `stunnerd` in verbose mode with the configuration file taken from
-`utils/stunnerd/stunnerd.conf`.
+`cmd/stunnerd/stunnerd.conf`.
 
 ```console
-$ ./stunnerd -v -c utils/stunnerd/stunnerd.conf
+$ ./stunnerd -v -c cmd/stunnerd/stunnerd.conf
 ```
 
 Type `./stunnerd` to see a short description of the command line arguments supported by `stunnerd`.

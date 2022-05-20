@@ -151,7 +151,7 @@ $ helm install stunner stunner/stunner
 
 And that's all: a standalone deployment of STUNner is up and running, waiting for WebRTC clients to
 connect to it. See the [STUNner installation guide](/doc/INSTALL.md) on how to customize STUNner or
-deploy it without Helm, using a static [Kubernetes manifest](/kubernetes/stunner.yaml).
+deploy it without Helm, using a static [Kubernetes manifest](/deploy/manifests/stunner.yaml).
 
 ### Configuration
 
