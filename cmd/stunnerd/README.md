@@ -8,7 +8,7 @@ Installation is as easy as it gets:
 
 ```console
 $ cd stunner
-$ go build stunnerd cmd/stunnerd/main.go
+$ go build -o stunnerd cmd/stunnerd/main.go
 ```
 
 ## Features
