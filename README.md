@@ -126,8 +126,8 @@ deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner
 your media servers are readily reachable to WebRTC clients, despite running with a private IP
 address inside a Kubernetes pod.
 
-With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should not take more than
-5 minutes.
+With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should take less than 5
+minutes.
 
 * [Customize STUNner and deploy it](#installation) into your Kubernetes cluster and expose it over
   a public IP address and port.
@@ -189,7 +189,7 @@ data:
 Note that any change to the STUNner `ConfigMap` will take effect only once STUNner is restarted.
 
 ``` console
-kubectl rollout restart deployment stunner
+$ kubectl rollout restart deployment stunner
 ```
 
 ## Configuring WebRTC clients to reach STUNner
@@ -216,8 +216,8 @@ var pc = new RTCPeerConnection(ICE_config);
 ```
 
 Note that STUNner comes with a [small Node.js
-library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
-ICE configurations and STUNner credentials in the application server.
+library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that simplifies generating ICE
+configurations and STUNner credentials in the application server.
 
 ## Examples
 
@@ -293,12 +293,12 @@ notable limitations at this point are as follows.
 
 * v0.9.2: Day-2 operations: STUNner basic UDP/TURN connectivity + helm chart + simple use cases (Kurento
   demos).
-* v0.9.3: Onboarding: long-term STUN/TURN credentials and [STUN/TURN over
+* v0.10.1: Onboarding: long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
-* v0.9.4: Day-2 operations: STUNner Kubernetes operator.
-* v0.9.5: Performance: eBPF STUN/TURN acceleration.
-* v0.9.6: Observability: Prometheus + Grafana dashboard.
-* v0.9.7: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
+* v0.11.1: Day-2 operations: STUNner Kubernetes operator.
+* v0.12.1: Performance: eBPF STUN/TURN acceleration.
+* v0.13.1: Observability: Prometheus + Grafana dashboard.
+* v0.14.1: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
 * v1.0: GA
 * v2.0: Service mesh: adaptive scaling & resiliency
 

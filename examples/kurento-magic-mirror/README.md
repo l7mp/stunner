@@ -1,6 +1,6 @@
 # STUNner demo: Magic mirror with Kurento
 
-This is the Kurento [Node.js - Magic
+This is the Kurento [Magic
 mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
 demo, adopted for STUNner and Kubernetes. The demo shows a basic WebRTC loopback server with some
 media processing added: the application uses computer vision and augmented reality techniques to
@@ -23,18 +23,7 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be
-configured to communicate with your cluster. If you do not already have a cluster, you can create
-one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
-STUNner is deployed into the cluster (see the [STUNner configuration
-guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
-follow the steps in the [STUNner testing guide](/examples/simple-tunnel/README.md) to make sure
-that STUNner is fully operational. Finally, the demo requires a solid understanding of the basic
-concepts in [Kubernetes](https://kubernetes.io/docs/home) and
-[WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
-original [Kurento Magic
-mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html) demo
-locally, in order to understand how the Kubernetes based demo differs (very little).
+Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner.
 
 ### Quick installation
 

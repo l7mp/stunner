@@ -14,18 +14,7 @@ In this demo you will learn how to:
 
 ### Prerequisites
 
-You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be
-configured to communicate with your cluster. If you do not already have a cluster, you can create
-one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
-STUNner is deployed into the cluster (see the [STUNner configuration
-guide](/README.md#configuration) and the [STUNner installation
-guide](/README.md#installation)). The below examples assume that STUNner has been installed into a
-default namespace with simple plain text authentication. The demo requires a solid understanding of
-the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
-[WebRTC](https://webrtc.org/getting-started/overview). It is good idea to start with setting up the
-original [Kurento One to one video
-call](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-one2one.html) demo
-locally, in order to understand how the Kubernetes based demo differs (very little).
+Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner.
 
 ### Setup
 
@@ -89,9 +78,9 @@ TURN service.
 
 The default installation scripts install an ACL into Kubernetes that blocks *all* communication
 from STUNner to the rest of the workload. This is to minimize the risk of an improperly configured
-STUNner gateway to [expose sensitive services to the external world](doc/SECURITY.md). In order to
-allow STUNner to open transport relay connections to the `udp-echo` service, we have to explicitly
-open up this ACL first.
+STUNner gateway to [xpose sensitive services to the external world. In order to allow STUNner to
+open transport relay connections to the `udp-echo` service, we have to explicitly open up this ACL
+first. For more details, see the STUNner [security guide](/doc/SECURITY.md).
 
 ```console
 $ kubectl apply -f - <<EOF

@@ -22,16 +22,7 @@ In this demo you will learn how to:
 
 ### Prerequisites
 
-You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be
-configured to communicate with your cluster. If you do not already have a cluster, you can create
-one by using [minikube](https://minikube.sigs.k8s.io/docs/start). Furthermore, make sure that
-STUNner is deployed into the cluster (see the [STUNner configuration
-guide](/README.md#configuration) and the [STUNner installation guide](/README.md#installation)) and
-follow the steps in the [STUNner testing guide](/examples/simple-tunnel/README.md) to make sure
-that STUNner is fully operational. The below examples assume that STUNner has been installed into
-the default namespace with simple plain text authentication. The demo requires a solid
-understanding of the basic concepts in [Kubernetes](https://kubernetes.io/docs/home) and
-[WebRTC](https://webrtc.org/getting-started/overview).
+Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner.
 
 ### Quick installation
 
@@ -77,12 +68,11 @@ usable with STUNner and Kubernetes.  The full source code of the application ser
    pod. This allows easy and dynamic customization of the TLS certificates used with the demo.
 2. Modify the WebRTC [application server
    logic](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/server.js)
-   to (1) store the STUNner configuration parameters available in the environment variables
-   `STUNNER_PUBLIC_ADDR`, `STUNNER_PUBLIC_PORT`, `STUNNER_USERNAME`, and `STUNNER_PASSWORD` (see
-   below) in an appropriate WebRTC [ICE server
+   to (1) use the STUNner [Node.js authentication
+   library]https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to generate a WebRTC [ICE server
    configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer), (2) return the
-   ICE configuration to the WebRTC clients in the `registerResponse` messages indicating a
-   successful user registration, (3) pass on the caller's SDP Offer to the callee in the
+   generated ICE configuration to the WebRTC clients in the `registerResponse` messages indicating
+   a successful user registration, (3) pass on the caller's SDP Offer to the callee in the
    `incomingCall` message, and (4) return the callee's SDP Answer to the caller in the
    `callResponse` message.
 3. Modify the [JavaScript
@@ -106,7 +96,8 @@ usable with STUNner and Kubernetes.  The full source code of the application ser
 
 And that's all. Note that, unlike in the other demos there is no need to modify the "default-deny"
 ACL (i.e., the Kubernetes `NetworkPolicy`) in this case, since STUNner will never reach any
-internal service in Kubernetes (see the below [security notice](/#security) on access control).
+internal service in Kubernetes (see more in the STUNner [security guide](/doc/SECURITY.md) on
+access control).
 
 ## Scaling
 

@@ -18,8 +18,8 @@ to add user authentication to STUNner.
 STUNner relies on the STUN [long-term credential
 mechanism](https://www.rfc-editor.org/rfc/rfc8489.html#page-26) to provide user authentication.
 
-The long-term credential mechanism assumes that prior to the communication, the STUNner and the
-WebRTC clients agree on a username and password to be used for authentication.  The credential is
+The long-term credential mechanism assumes that prior to the communication, STUNner and the WebRTC
+clients agree on a username and password to be used for authentication.  The credential is
 considered long-term since it is assumed that it is provisioned for a user and remains in effect
 until the user is no longer a subscriber of the system (`plaintext` authentication), or until the
 predefined lifetime of the username/password pair passes and the credential expires (`longterm`
