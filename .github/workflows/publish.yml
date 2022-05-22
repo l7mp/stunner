@@ -78,11 +78,11 @@ jobs:
 
       - name: Compile stunnerd
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd ./utils/stunnerd/...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o stunnerd ./cmd/stunnerd/...
 
       - name: Compile turncat
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat ./utils/turncat/...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-w -s" -o turncat ./cmd/turncat/...
 
       - name: Get release
         id: get_release
@@ -100,5 +100,4 @@ jobs:
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_name: turncat
           asset_path: turncat
