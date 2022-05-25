@@ -1,3 +1,4 @@
+// Package stunner contains the public API for l7mp/stunner, a Kubernetes ingress gateway for WebRTC
 package stunner
 
 import (
