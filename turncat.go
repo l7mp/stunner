@@ -10,10 +10,13 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
+
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 const UDP_PACKET_SIZE = 1500
 
+// AuthGen is a function called by turncat to generate authentication tokens
 type AuthGen func() (string, string, error)
 
 // TurncatConfig is the main configuration for the turncat relay
@@ -95,7 +98,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 			peer.Protocol, peer.Address, peer.Port)
 	}
 
-	if config.Realm == "" { config.Realm = DefaultRealm }
+	if config.Realm == "" { config.Realm = v1alpha1.DefaultRealm }
 
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client

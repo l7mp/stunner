@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 	"math/big"
-	"crypto/tls"
+	// "crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"crypto/rsa"
@@ -16,7 +16,7 @@ import (
 	
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
-	"github.com/pion/dtls/v2"
+	// "github.com/pion/dtls/v2"
 	"github.com/pion/transport/test"
 	"github.com/pion/transport/vnet"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ import (
 var stunnerTestLoglevel string = "all:ERROR"
 //var stunnerTestLoglevel string = "all:TRACE"
 
-type stunnerEchoTestConfig struct {
+type echoTestConfig struct {
 	t *testing.T
 	// net
 	podnet, wan *vnet.Net
@@ -38,10 +38,11 @@ type stunnerEchoTestConfig struct {
 	natAddr net.IP
 	// echo
 	echoServerAddr string
+        expectedResult bool
 	loggerFactory *logging.DefaultLoggerFactory
 }
 
-func stunnerEchoTest(conf stunnerEchoTestConfig){
+func stunnerEchoTest(conf echoTestConfig){
 	t := conf.t
 	log := conf.loggerFactory.NewLogger("test")
 
@@ -102,27 +103,33 @@ func stunnerEchoTest(conf stunnerEchoTestConfig){
 		}
 	}()
 
-	buf := make([]byte, 1600)
-	for i := 0; i < 8; i++ {
-		log.Debug("sending \"Hello\"")
-		_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-		assert.NoError(t, err, err)
+        if conf.expectedResult == true {
+                buf := make([]byte, 1600)
+                for i := 0; i < 8; i++ {
+                        log.Debug("sending \"Hello\"")
+                        _, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+                        assert.NoError(t, err, err)
+                        
+                        _, from, err2 := conn.ReadFrom(buf)
+                        assert.NoError(t, err2, err2)
+                        
+                        // verify the message was received from the relay address
+                        assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
+                                "message should be received from the relay address")
+                        
+                        time.Sleep(100 * time.Millisecond)
+                }
+        } else {
+                // should fail 
+                _, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+                assert.Errorf(t, err, "got error message %s", err.Error())
+        }
 
-		_, from, err2 := conn.ReadFrom(buf)
-		assert.NoError(t, err2, err2)
-
-		// verify the message was received from the relay address
-		assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
-			"message should be received from the relay address")
-
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-	client.Close()
-
-	assert.NoError(t, conn.Close(), "cannot close relay connection")
-	assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
+        time.Sleep(100 * time.Millisecond)
+        client.Close()
+                
+        assert.NoError(t, conn.Close(), "cannot close relay connection")
+        assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 }
 
 func generateKey(crtFile, keyFile *os.File) error{
@@ -229,6 +236,7 @@ func buildVNet(logger *logging.DefaultLoggerFactory) (*VNet, error) {
 
 	// register host names
 	err = gw.AddHost("stunner.l7mp.io", "1.2.3.4")
+	err = gw.AddHost("echo-server.l7mp.io", "1.2.3.5")
 	if err != nil { return nil, err }
 
 	return &VNet{
@@ -273,9 +281,9 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
 			assert.NoError(t, err, "cannot create client listening socket")
 
-			testConfig := stunnerEchoTestConfig{t, v.podnet, v.wan, stunner,
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, "user1", "passwd1", net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", loggerFactory}
+				"1.2.3.5:5678", true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -285,45 +293,41 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 	}
 }
 
-var testVNetConfigs = []StunnerConfig{
+var testStunnerConfigsWithVnet = []StunnerConfig{
 	{
 		ApiVersion: "v1alpha1",
 		Admin: AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Static: StaticResourceConfig{
-			Auth: AuthConfig{
-				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			},
-			Listeners: []ListenerConfig{{
-				Protocol: "udp",
-				Addr: "1.2.3.4",
-				Port: 3478,
-			}},
-		},
+                Auth: AuthConfig{
+                        Type: "plaintext",
+                        Credentials: map[string]string{
+                                "username": "user1",
+                                "password": "passwd1",
+                        },
+                },
+                Listeners: []ListenerConfig{{
+                        Protocol: "udp",
+                        Addr: "1.2.3.4",
+                        Port: 3478,
+                }},
 	},
 	{
 		ApiVersion: "v1alpha1",
 		Admin: AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Static: StaticResourceConfig{
-			Auth: AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+                Auth: AuthConfig{
+                        Type: "longterm",
+                        Credentials: map[string]string{
+                                "secret": "my-secret",
 				},
-			},
-			Listeners: []ListenerConfig{{
-				Protocol: "udp",
-				Addr: "1.2.3.4",
-				Port: 3478,
-			}},
-		},
+                },
+                Listeners: []ListenerConfig{{
+                        Protocol: "udp",
+                        Addr: "1.2.3.4",
+                        Port: 3478,
+                }},
 	},
 }
 
@@ -337,8 +341,8 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	for _, c := range testVNetConfigs {
-		auth := c.Static.Auth.Type
+	for _, c := range testStunnerConfigsWithVnet {
+		auth := c.Auth.Type
 		testName := fmt.Sprintf("TestStunner_NewStunner_VNet_auth:%s", auth)
 		t.Run(testName, func(t *testing.T) {
 			// patch in the vnet
@@ -367,9 +371,9 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
 			assert.NoError(t, err, "cannot create client listening socket")
 
-			testConfig := stunnerEchoTestConfig{t, v.podnet, v.wan, stunner,
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", loggerFactory}
+				"1.2.3.5:5678", true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -411,29 +415,27 @@ func TestStunnerServerLocalhost(t *testing.T) {
 	defer func() { assert.NoError(t, os.Remove(keyFile.Name()), "cannot delete SSL key file")}()
 
 	err = generateKey(certFile, keyFile)
-	assert.NoError(t, err, "cannot generate SSL SSL cert/key")
+        assert.NoError(t, err, "cannot generate SSL SSL cert/key")
 
-	testLocalhostConfigs := []StunnerConfig{
+        testStunnerConfigsWithLocalhost := []StunnerConfig{
 		// udp, plaintext
 		{
 			ApiVersion: "v1alpha1",
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "plaintext",
-					Credentials: map[string]string{
-						"username": "user1",
-						"password": "passwd1",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "udp",
-					Addr: "127.0.0.1",
-					Port: 23478,
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                        }},
 		},
 		// udp, longterm
 		{
@@ -441,19 +443,17 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "longterm",
-					Credentials: map[string]string{
-						"secret": "my-secret",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "udp",
-					Addr: "127.0.0.1",
-					Port: 23478,
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "longterm",
+                                Credentials: map[string]string{
+                                        "secret": "my-secret",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                        }},
 		},
 		// tcp, plaintext
 		{
@@ -461,20 +461,18 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "plaintext",
-					Credentials: map[string]string{
-						"username": "user1",
-						"password": "passwd1",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "tcp",
-					Addr: "127.0.0.1",
-					Port: 23478,
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "tcp",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                        }},
 		},
 		// tcp, longterm
 		{
@@ -482,19 +480,17 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "longterm",
-					Credentials: map[string]string{
-						"secret": "my-secret",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "tcp",
-					Addr: "127.0.0.1",
-					Port: 23478,
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "longterm",
+                                Credentials: map[string]string{
+                                        "secret": "my-secret",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "tcp",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                        }},
 		},
 		// tls, plaintext
 		{
@@ -502,21 +498,19 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "plaintext",
-					Credentials: map[string]string{
-						"username": "user1",
-						"password": "passwd1",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "tls",
-					Addr: "127.0.0.1",
-					Port: 23478,
-					Cert: certFile.Name(),
-					Key: keyFile.Name(),
-				}},
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "tls",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                                Cert: certFile.Name(),
+                                Key: keyFile.Name(),
 			},
 		},
 		// tls, longterm
@@ -525,21 +519,19 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "longterm",
-					Credentials: map[string]string{
-						"secret": "my-secret",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "tls",
-					Addr: "127.0.0.1",
-					Port: 23478,
-					Cert: certFile.Name(),
-					Key: keyFile.Name(),
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "longterm",
+                                Credentials: map[string]string{
+                                        "secret": "my-secret",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "tls",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                                Cert: certFile.Name(),
+                                Key: keyFile.Name(),
+                        }},
 		},
 		// dtls, plaintext
 		{
@@ -547,22 +539,19 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "plaintext",
-					Credentials: map[string]string{
-						"username": "user1",
-						"password": "passwd1",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "dtls",
-					Addr: "127.0.0.1",
-					Port: 23478,
-					Cert: certFile.Name(),
-					Key: keyFile.Name(),
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "dtls",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                                Cert: certFilKey: keyFConfigsile.Name(),
+                        }},
 		},
 		// dtls, longterm
 		{
@@ -570,25 +559,23 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			Admin: AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Static: StaticResourceConfig{
-				Auth: AuthConfig{
-					Type: "longterm",
-					Credentials: map[string]string{
-						"secret": "my-secret",
-					},
-				},
-				Listeners: []ListenerConfig{{
-					Protocol: "dtls",
-					Addr: "127.0.0.1",
-					Port: 23478,
-					Cert: certFile.Name(),
-					Key: keyFile.Name(),
-				}},
-			},
+                        Auth: AuthConfig{
+                                Type: "longterm",
+                                Credentials: map[string]string{
+                                        "secret": "my-secret",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "dtls",
+                                Addr: "127.0.0.1",
+                                Port: 23478,
+                                Cert: certFile.Name(),
+                                Key: keyFile.Name(),
+                        }},
 		},
 	}
 
-	for _, c := range testLocalhostConfigs {
+	for _, c := range testStunnerConfigsWithLocalhost {
 		auth := c.Static.Auth.Type
 		proto := c.Static.Listeners[0].Protocol
 		testName := fmt.Sprintf("TestStunner_NewStunner_Localhost_auth:%s_client:%s", auth, proto)
@@ -647,9 +634,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				assert.NoError(t, fmt.Errorf("internal error: unknown client protocol in test"))
 			}
 
-			testConfig := stunnerEchoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
+			testConfig := echoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
 				stunnerAddr, lconn, u, p, net.IPv4(127, 0, 0, 1),
-				"127.0.0.1:25678", loggerFactory}
+				"127.0.0.1:25678", true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -657,3 +644,415 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		})
 	}
 }
+
+// *****************
+// Cluster tests with VNet
+// *****************
+type StunnerClusterConfig struct {
+        config StunnerConfig
+        echoServerAddr string
+        expectedResult bool
+}
+        
+var testClusterConfigsWithVNet = []StunnerClusterConfig{
+        // OPEN: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.5",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: true,
+        },
+        // default cluster type STATIC: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.5",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: true,
+        },
+        // STATIC endpoint: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.5",
+                                }}
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: true,
+        },
+        // STATIC endpoint with wrong peer addr: FAIL
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.6",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: false,
+        },
+        // STATIC endpoint with multiple routes: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                        Cluster: "dummy_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.5",
+                                }},
+                        },{
+                                Name: "dummy_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "9.8.7.6",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: true,
+        },
+        // STATIC endpoint with multiple routes and wrong peer addr: FAIL
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "dummy_cluster",
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.6",
+                                }},
+                        },{
+                                Name: "dummy_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "9.8.7.6",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: false,
+        },
+        // STATIC endpoint with multiple IPs: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.1",
+                                        Addr: "1.2.3.2",
+                                        Addr: "1.2.3.3",
+                                        Addr: "1.2.3.5",
+                                        Addr: "1.2.3.6",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: true,
+        },
+        // STATIC endpoint with multiple IPs with wrong peer addr: FAIL
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STATIC",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "1.2.3.1",
+                                        Addr: "1.2.3.2",
+                                        Addr: "1.2.3.3",
+                                        Addr: "1.2.3.6",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678"
+                result: false,
+        },
+        // STRICT_DNS: OK
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "echo-server.l7mp.io",
+                                }},
+                        }},
+                },
+                echoServerAddr: "echo-server.l7mp.io:5678"
+                result: true,
+        },
+        // STRICT_DNS cluster and wrong peer addr: FAIL
+        {
+                config: StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []ListenerConfig{{
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []RouteConfig{{
+                                        Cluster: "echo_server_cluster",
+                                }},
+                        }},
+                        Clusters: []ClusterConfig{{
+                                Name: "echo_server_cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []EndpointConfig{{
+                                        Addr: "echo-server.l7mp.io",
+                                }},
+                        }},
+                },
+                echoServerAddr: "1.2.3.10:5678"
+                result: false,
+        },
+}
+
+func TestStunnerClusterWithVNet(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	for _, c := range testClusterConfigsWithVNet {
+		auth := c.Auth.Type
+		testName := fmt.Sprintf("TestStunner_NewStunner_VNet_auth:%s", auth)
+		t.Run(testName, func(t *testing.T) {
+			// patch in the vnet
+			log.Debug("building virtual network")
+			v, err := buildVNet(loggerFactory)
+			assert.NoError(t, err, err)
+			c.Net = v.podnet
+
+			log.Debug("creating a stunnerd")
+			stunner, err := NewStunner(&c.config)
+			assert.NoError(t, err, err)
+
+			var u, p string
+			switch auth {
+			case "plaintext":
+				u = "user1"
+				p = "passwd1"
+			case "longterm":
+				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
+				assert.NoError(t, err, err)
+			default:
+				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
+			}
+
+			log.Debug("creating a client")
+			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+			assert.NoError(t, err, "cannot create client listening socket")
+
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
+				c.echoServerAddr, c.expectedResult, loggerFactory}
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
+		})
+	}
+}
+
