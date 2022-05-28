@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/l7mp/stunner"
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
@@ -29,7 +30,7 @@ func main() {
 		*level = "all:DEBUG"
 	}
 
-	var stunnerConfig *stunner.StunnerConfig
+	var stunnerConfig *v1alpha1.StunnerConfig
 	if *config == "" && flag.NArg() == 1 {
 		// no configfile and we have an url on the command line
 		c, err := stunner.NewDefaultStunnerConfig(flag.Arg(0), *level)
@@ -50,7 +51,7 @@ func main() {
 		re := regexp.MustCompile(`^[0-9]+$`)
 		port, ok := os.LookupEnv("STUNNER_PORT")
 		if !ok || (ok && port == "") || (ok && !re.Match([]byte(port))) {
-			publicPort := stunner.DefaultPort
+			publicPort := v1alpha1.DefaultPort
 			publicPortStr, ok := os.LookupEnv("STUNNER_PUBLIC_PORT")
 			if ok {
 				if p, err := strconv.Atoi(publicPortStr); err == nil {
@@ -62,7 +63,7 @@ func main() {
 
 		e := os.ExpandEnv(string(c))
 
-		s := stunner.StunnerConfig{}
+		s := v1alpha1.StunnerConfig{}
 		// try YAML first
 		if err = yaml.Unmarshal([]byte(e), &s); err != nil {
 			// if it fails, try to json
