@@ -20,28 +20,28 @@ type Auth struct {
 	log logging.LeveledLogger
 }
 
-// NewAuth creates a new authenticator. Requires a server restart (returns ErrRestartRequired)
+// NewAuth creates a new authenticator. Requires a server restart (returns v1alpha1.ErrRestartRequired)
 func NewAuth(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
         req, ok := conf.(*v1alpha1.AuthConfig)
         if !ok {
-                return nil, ErrInvalidConf
+                return nil, v1alpha1.ErrInvalidConf
         }
         
         auth := Auth { log: logger.NewLogger("stunner-auth") }
 	auth.log.Tracef("NewAuth: %#v", req)
 
-        if err := auth.Reconcile(req); err != nil && err != ErrRestartRequired {
+        if err := auth.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
                 return nil, err
         }
 
-        return &auth, ErrRestartRequired
+        return &auth, v1alpha1.ErrRestartRequired
 }        
 
 // Reconcile updates the authenticator for a new configuration. Does not requre a server restart but existing TURN connections may fail to refresh permissions
 func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
         req, ok := conf.(*v1alpha1.AuthConfig)
         if !ok {
-                return ErrInvalidConf
+                return v1alpha1.ErrInvalidConf
         }
         
 	auth.log.Tracef("Reconcile: %#v", req)
@@ -110,15 +110,20 @@ func (auth *Auth) GetConfig() v1alpha1.Config {
                 Realm:       auth.Realm,
 		Credentials: make(map[string]string),
 	}
-        r.Credentials["username"] = auth.Username
-        r.Credentials["password"] = auth.Password
-        r.Credentials["secret"]   = auth.Secret
+        switch auth.Type {
+        case v1alpha1.AuthTypePlainText:
+                r.Credentials["username"] = auth.Username
+                r.Credentials["password"] = auth.Password
+        case v1alpha1.AuthTypeLongTerm:
+                r.Credentials["secret"]   = auth.Secret
+        }
 
 	return &r
 }
 
 // Close closes the authenticator
-func (auth *Auth) Close()  {
+func (auth *Auth) Close() error {
 	auth.log.Tracef("Close")
+        return nil
 }
 

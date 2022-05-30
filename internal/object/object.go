@@ -8,11 +8,11 @@ import (
 type Object interface {
         // ObjectName returns the name of the object
         ObjectName() string
-        // Reconcile updates the object for a new configuration. May restart the server, always check returned error for ErrRestartRequired
+        // Reconcile updates the object for a new configuration, may return ErrRestartRequired
         Reconcile(conf v1alpha1.Config) error
         // GetConfig returns the configuration of the running authenticator
         GetConfig() v1alpha1.Config
-        // Close closes the object
-        Close()
+        // Close closes the object, may return ErrRestartRequired
+        Close() error
 }
 

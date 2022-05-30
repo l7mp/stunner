@@ -2,7 +2,7 @@ package object
 
 import (
 	"fmt"
-	"sort"
+	"net"
 
 	"github.com/pion/logging"
 
@@ -13,15 +13,15 @@ import (
 type Cluster struct {
 	Name string
 	Type v1alpha1.ClusterType
-	Endpoints []string
+	Endpoints []net.IPNet
 	log logging.LeveledLogger
 }
 
-// NewListener creates a new cluster. Requires a server restart (returns ErrRestartRequired)
+// NewListener creates a new cluster. Requires a server restart (returns v1alpha1.ErrRestartRequired)
 func NewCluster(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
         req, ok := conf.(*v1alpha1.ClusterConfig)
         if !ok {
-                return nil, ErrInvalidConf
+                return nil, v1alpha1.ErrInvalidConf
         }
         
         // make sure req.Name is correct
@@ -31,24 +31,24 @@ func NewCluster(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, err
 
 	c := Cluster{
                 Name:      req.Name,
-                Endpoints: []string{},
+                Endpoints: []net.IPNet{},
                 log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
         }
 
         c.log.Tracef("NewCluster: %#v", req)
 
-        if err := c.Reconcile(req); err != nil && err != ErrRestartRequired {
+        if err := c.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
                 return nil, err
         }
 
-        return &c, ErrRestartRequired
+        return &c, v1alpha1.ErrRestartRequired
 }
 
 // Reconcile updates a cluster. Does not require a server restart
 func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
         req, ok := conf.(*v1alpha1.ClusterConfig)
         if !ok {
-                return ErrInvalidConf
+                return v1alpha1.ErrInvalidConf
         }
         
         c.log.Tracef("Reconcile: %#v", req)
@@ -61,8 +61,39 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 
         switch c.Type {
         case v1alpha1.ClusterTypeStatic:
-                copy(c.Endpoints, req.Endpoints)
-                
+                // remove existing endpoints and start anew
+                c.Endpoints = c.Endpoints[:0]
+                for _, e := range req.Endpoints {
+                        // try to parse as a subnet
+                        _, n, err := net.ParseCIDR(e)
+                        if err == nil {
+                                c.Endpoints = append(c.Endpoints, *n)
+                                continue
+                        }
+
+                        // try to parse as an IP address
+                        a := net.ParseIP(e)
+                        if a == nil {
+                                c.log.Warnf("cluster %q: invalid endpoint IP: %q, ignoring", c.Name, e)
+                                continue
+                        }
+
+                        // add a prefix and reparse
+                        if a.To4() == nil {
+                                e = e + "/128"
+                        } else {
+                                e = e + "/32"
+                        }
+
+                        _, n2, err := net.ParseCIDR(e)
+                        if err != nil {
+                                c.log.Warnf("cluster %q: could not convert endpoint %q to CIDR subnet ",
+                                        "(ignoring): %s", c.Name, e, err.Error())
+                                continue
+                        }
+
+                        c.Endpoints = append(c.Endpoints, *n2)
+                }        
         case v1alpha1.ClusterTypeStrictDns:
                 panic("STRICT_DNS: unimplemented")
         }
@@ -83,14 +114,16 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 		Type:      c.Type.String(),
                 Endpoints: make([]string, len(c.Endpoints)),
 	}
-        // must be sorted!
-        sort.Strings(c.Endpoints)
-        copy(conf.Endpoints, c.Endpoints)
+
+        for i, e := range c.Endpoints {
+                conf.Endpoints[i] = e.String()
+        }
 
         return &conf
 }
 
 // Close closes the cluster
-func (l *Cluster) Close() {
+func (l *Cluster) Close() error {
         l.log.Trace("closing cluster")
+        return nil
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 var turncatTestLoglevel string = "all:ERROR"
@@ -100,29 +102,27 @@ func TestTurncatPlaintext(t *testing.T) {
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner, err := NewStunner(&StunnerConfig{
+	stunner, err := NewStunner(&v1alpha1.StunnerConfig{
 		ApiVersion: "v1alpha1",
-		Admin: AdminConfig{
+		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
 		},
-		Static: StaticResourceConfig{
-			Auth: AuthConfig{
-				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			},
-			Listeners: []ListenerConfig{{
-				Protocol: "udp",
-				Addr: "127.0.0.1",
-				Port: 23478,
-			},{
-				Protocol: "tcp",
-				Addr: "127.0.0.1",
-				Port: 23478,
-			}},
-		},
+                Auth: v1alpha1.AuthConfig{
+                        Type: "plaintext",
+                        Credentials: map[string]string{
+                                "username": "user1",
+                                "password": "passwd1",
+                        },
+                },
+                Listeners: []v1alpha1.ListenerConfig{{
+                        Protocol: "udp",
+                        Addr: "127.0.0.1",
+                        Port: 23478,
+                },{
+                        Protocol: "tcp",
+                        Addr: "127.0.0.1",
+                        Port: 23478,
+                }},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
@@ -206,28 +206,26 @@ func TestTurncatLongterm(t *testing.T) {
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner, err := NewStunner(&StunnerConfig{
+	stunner, err := NewStunner(&v1alpha1.StunnerConfig{
 		ApiVersion: "v1alpha1",
-		Admin: AdminConfig{
+		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
 		},
-		Static: StaticResourceConfig{
-			Auth: AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": sharedSecret,
-				},
-			},
-			Listeners: []ListenerConfig{{
-				Protocol: "udp",
-				Addr: "127.0.0.1",
-				Port: 23478,
-			},{
-				Protocol: "tcp",
-				Addr: "127.0.0.1",
-				Port: 23478,
-			}},
-		},
+                Auth: v1alpha1.AuthConfig{
+                        Type: "longterm",
+                        Credentials: map[string]string{
+                                "secret": sharedSecret,
+                        },
+                },
+                Listeners: []v1alpha1.ListenerConfig{{
+                        Protocol: "udp",
+                        Addr: "127.0.0.1",
+                        Port: 23478,
+                },{
+                        Protocol: "tcp",
+                        Addr: "127.0.0.1",
+                        Port: 23478,
+                }},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
