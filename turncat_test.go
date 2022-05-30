@@ -115,17 +115,28 @@ func TestTurncatPlaintext(t *testing.T) {
                         },
                 },
                 Listeners: []v1alpha1.ListenerConfig{{
+                        Name: "udp-listener-23478",
                         Protocol: "udp",
                         Addr: "127.0.0.1",
                         Port: 23478,
+                        Routes: []string{"allow-any"},
                 },{
+                        Name: "tcp-listener-23478",
                         Protocol: "tcp",
                         Addr: "127.0.0.1",
                         Port: 23478,
+                        Routes: []string{"allow-any"},
+                }},
+                Clusters: []v1alpha1.ClusterConfig{{
+                        Name: "allow-any",
+                        Endpoints: []string{"0.0.0.0/0"},
                 }},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
+
+        log.Debug("starting stunnerd")
+        assert.NoError(t, stunner.Start())
 
 	testTurncatConfigs := []TurncatConfig{
 		{
@@ -169,6 +180,7 @@ func TestTurncatPlaintext(t *testing.T) {
 			listener.Protocol, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
+                        log.Debugf("-------------- Running test: %s -------------", testName)
 			peer, err := ParseUri(c.PeerAddr)
 			assert.NoError(t, err, "cannot parse peer URI")
 
@@ -218,17 +230,28 @@ func TestTurncatLongterm(t *testing.T) {
                         },
                 },
                 Listeners: []v1alpha1.ListenerConfig{{
+                        Name: "udp-listener-23478",
                         Protocol: "udp",
                         Addr: "127.0.0.1",
                         Port: 23478,
+                        Routes: []string{"allow-any"},
                 },{
+                        Name: "tcp-listener-23478",
                         Protocol: "tcp",
                         Addr: "127.0.0.1",
                         Port: 23478,
+                        Routes: []string{"allow-any"},
+                }},
+                Clusters: []v1alpha1.ClusterConfig{{
+                        Name: "allow-any",
+                        Endpoints: []string{"0.0.0.0/0"},
                 }},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
+
+        log.Debug("starting stunnerd")
+        assert.NoError(t, stunner.Start())
 
 	testTurncatConfigs := []TurncatConfig{
 		{
@@ -272,6 +295,7 @@ func TestTurncatLongterm(t *testing.T) {
 			listener.Protocol, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
+                        log.Debugf("-------------- Running test: %s -------------", testName)
 			peer, err := ParseUri(c.PeerAddr)
 			assert.NoError(t, err, "cannot parse peer URI")
 
