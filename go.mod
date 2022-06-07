@@ -14,9 +14,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+require github.com/fsnotify/fsnotify v1.5.4
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/stun v0.3.5 // indirect
 	github.com/pion/udp v0.1.1 // indirect

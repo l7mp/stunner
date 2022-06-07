@@ -3,10 +3,13 @@ package object
 import (
 	"fmt"
 	"net"
+	"sort"
 
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/internal/util"
+	"github.com/l7mp/stunner/internal/resolver"
 )
 
 // Listener implements a STUNner cluster
@@ -14,11 +17,15 @@ type Cluster struct {
 	Name string
 	Type v1alpha1.ClusterType
 	Endpoints []net.IPNet
+	Domains []string
+        Resolver resolver.DnsResolver  // for strict DNS
+        logger logging.LoggerFactory        
 	log logging.LeveledLogger
 }
 
-// NewListener creates a new cluster. Requires a server restart (returns v1alpha1.ErrRestartRequired)
-func NewCluster(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
+// NewListener creates a new cluster. Does not require a server restart
+func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver,
+        logger logging.LoggerFactory) (Object, error) {
         req, ok := conf.(*v1alpha1.ClusterConfig)
         if !ok {
                 return nil, v1alpha1.ErrInvalidConf
@@ -32,16 +39,19 @@ func NewCluster(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, err
 	c := Cluster{
                 Name:      req.Name,
                 Endpoints: []net.IPNet{},
+                Domains:   []string{},
+                Resolver:  resolver,
+                logger:    logger,
                 log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
         }
 
         c.log.Tracef("NewCluster: %#v", req)
 
-        if err := c.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
+        if err := c.Reconcile(req); err != nil {
                 return nil, err
         }
 
-        return &c, v1alpha1.ErrRestartRequired
+        return &c, nil
 }
 
 // Reconcile updates a cluster. Does not require a server restart
@@ -95,7 +105,21 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
                         c.Endpoints = append(c.Endpoints, *n2)
                 }        
         case v1alpha1.ClusterTypeStrictDns:
-                panic("STRICT_DNS: unimplemented")
+                if c.Resolver == nil {
+                        return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
+                }
+
+                deleted, added := util.Diff(c.Domains, req.Endpoints)
+
+                for _, h := range deleted {
+                        c.Resolver.Unregister(h)
+                        c.Domains = util.Remove(c.Domains, h)
+                }
+
+                for _, h := range added {
+                        c.Resolver.Register(h)
+                        c.Domains = append(c.Domains, h)
+                }
         }
 
         return nil
@@ -112,18 +136,72 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
         conf := v1alpha1.ClusterConfig{
 		Name:      c.Name,
 		Type:      c.Type.String(),
-                Endpoints: make([]string, len(c.Endpoints)),
 	}
 
-        for i, e := range c.Endpoints {
-                conf.Endpoints[i] = e.String()
+        switch c.Type {
+        case v1alpha1.ClusterTypeStatic:
+                conf.Endpoints = make([]string, len(c.Endpoints))
+                for i, e := range c.Endpoints {
+                        conf.Endpoints[i] = e.String()
+                }
+        case v1alpha1.ClusterTypeStrictDns:
+                conf.Endpoints = make([]string, len(c.Domains))
+                for i, d := range c.Domains {
+                        conf.Endpoints[i] = d
+                }
+                conf.Endpoints = sort.StringSlice(conf.Endpoints)
         }
-
         return &conf
 }
 
 // Close closes the cluster
-func (l *Cluster) Close() error {
-        l.log.Trace("closing cluster")
+func (c *Cluster) Close() error {
+        c.log.Trace("closing cluster")
+
+        switch c.Type {
+        case v1alpha1.ClusterTypeStatic:
+                // do nothing
+        case v1alpha1.ClusterTypeStrictDns:
+                for _, d := range c.Domains {
+                        c.Resolver.Unregister(d)
+                }
+        }
+
         return nil
 }
+
+// Route decides whwther a peer IP appears among the permitted endpoints of a cluster
+func (c *Cluster) Route(peer net.IP) bool {
+        c.log.Tracef("Route: cluster %q of type %s: routing peer IP: %s",
+                c.Name, c.Type.String(), peer.String())
+        switch c.Type {
+        case v1alpha1.ClusterTypeStatic:
+                // endpoints are IPNets
+                for _, e := range c.Endpoints {
+                        c.log.Tracef("considering endpoint %q", e)
+                        if e.Contains(peer){
+                                return true
+                        }
+                }
+
+        case v1alpha1.ClusterTypeStrictDns:
+                // endpoints are obtained from the DNS
+                for _, d := range c.Domains {
+                        c.log.Tracef("considering domain %q", d)
+
+                        hs, err := c.Resolver.Lookup(d)
+                        if err != nil {
+                                c.log.Infof("could not resolve domain %q: %s", d, err.Error())
+                        }
+
+                        for _, n := range hs {
+                                if n.Equal(peer) {
+                                        return true
+                                }
+                        }
+                }
+        }
+
+        return false
+}
+

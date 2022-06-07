@@ -1,12 +1,12 @@
 package stunner
 
 import (
-	"strings"
-	"strconv"
-	"syscall"
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
+	"strconv"
+	"syscall"
 
 	"github.com/pion/logging"
 )
@@ -121,9 +121,4 @@ func reuseAddr(network, address string, conn syscall.RawConn) error {
 		syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
 	})
-}
-
-func contains(list []string, a string) bool {
-        for _, b := range list {if b == a { return true } }
-        return false
 }

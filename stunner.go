@@ -10,6 +10,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/manager"
+	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -17,6 +18,7 @@ import (
 type Stunner struct {
         version    string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
+        resolver   resolver.DnsResolver
 	logger     logging.LoggerFactory
 	log        logging.LeveledLogger
 	server     *turn.Server
@@ -38,6 +40,7 @@ func NewStunner(req *v1alpha1.StunnerConfig) (*Stunner, error) {
                 authManager:     manager.NewManager("auth-manager", logger),
                 listenerManager: manager.NewManager("listener-manager", logger),
                 clusterManager:  manager.NewManager("cluster-manager", logger),
+                resolver:        resolver.NewDnsResolver("dns-resolver", logger),
         }
 
 	if req.Net == nil {

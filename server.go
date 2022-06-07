@@ -12,6 +12,7 @@ import (
 	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -128,6 +129,17 @@ func (s *Stunner) Start() error {
                 }
         }
 
+        // start the DNS resolver threads
+        clusters := s.clusterManager.Keys()
+	for _, name := range clusters {
+		l := s.GetCluster(name)
+
+                if l.Resolver != nil {
+                        l.Resolver.Start()
+                }
+        }
+
+        
         // start the TURN server
 	t, err := turn.NewServer(turn.ServerConfig{
 		Realm:             auth.Realm,
@@ -169,9 +181,12 @@ func  (s *Stunner) Close(){
                 _ = c.Close()
 	}
         
+        s.resolver.Close()
+
         if s.server != nil {
                 s.server.Close()
         }
+        s.server = nil
 }
 
 // NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with the TURN server for authenticating clients
@@ -194,19 +209,15 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
                 clusters := s.clusterManager.Keys()
 
                 for _, r := range l.Routes {
-                        s.log.Tracef("considering route for cluster %q", r)
-                        if contains(clusters, r) {
-                                s.log.Tracef("considering endpoints for cluster %q", r)
+                        s.log.Tracef("considering route to cluster %q", r)
+                        if util.Member(clusters, r) {
+                                s.log.Tracef("considering cluster %q", r)
                                 c := s.GetCluster(r)
-                                for _, e := range c.Endpoints {
-                                        s.log.Tracef("considering endpoint %q", e)
-
-                                        if e.Contains(peer){
-                                                s.log.Debugf("permission granted on listener %q for client %q",
-                                                        "to peer %s based via cluster %q", l.Name, src.String(),
-                                                        peerIP, r)
-                                                return true
-                                        }
+                                if c.Route(peer) == true {
+                                        s.log.Debugf("permission granted on listener %q for client "+
+                                                "%q to peer %s via cluster %q", l.Name, src.String(),
+                                                peerIP, c.Name)
+                                        return true
                                 }
                         }
                 }
@@ -215,3 +226,4 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
                 return false
         }
 }
+

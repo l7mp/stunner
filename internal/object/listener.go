@@ -103,7 +103,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 
 // String returns a short stable string representation of the listener, safe for applying as a key in a map
 func (l *Listener) String() string {
-	uri := fmt.Sprintf("%s://%s:%d [%d:%d]", l.Proto, l.Addr, l.Port, l.MinPort, l.MaxPort)
+	uri := fmt.Sprintf("%s://%s:%d[%d:%d]", l.Proto, l.Addr, l.Port, l.MinPort, l.MaxPort)
 	if l.Cert != "" && l.Key != "" { uri += " (cert/key)" }
 	return uri
 }

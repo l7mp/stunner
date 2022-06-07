@@ -40,7 +40,7 @@ func main() {
 
         // no configfile but we have an url on the command line: start stunner with default config
         if *config == "" && flag.NArg() == 1 {
-                conf, err := stunner.NewDefaultStunnerConfig(flag.Arg(0))
+                conf, err := stunner.NewDefaultConfig(flag.Arg(0))
                 if err != nil {
                         log.Fatal("Could not load default STUNner config: %s", err.Error())
                 }
