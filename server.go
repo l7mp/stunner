@@ -41,7 +41,7 @@ func (s *Stunner) Start() error {
                 addr := fmt.Sprintf("%s:%d", l.Addr.String(), l.Port)
 
 		switch l.Proto {
-                case v1alpha1.ListenerProtocolUdp:
+                case v1alpha1.ListenerProtocolUDP:
                         s.log.Tracef("setting up UDP listener at %s", addr)
                         udpListener, err := l.Net.ListenPacket("udp", addr)
                         if err != nil {
@@ -58,7 +58,7 @@ func (s *Stunner) Start() error {
                         pconn = append(pconn, l.Conn.(turn.PacketConnConfig))
                         
                         // cannot test this on vnet, no Listen/ListenTCP in vnet.Net
-                case v1alpha1.ListenerProtocolTcp:
+                case v1alpha1.ListenerProtocolTCP:
                         s.log.Tracef("setting up TCP listener at %s", addr)
                         tcpListener, err := net.Listen("tcp", addr)
                         if err != nil {
@@ -73,7 +73,7 @@ func (s *Stunner) Start() error {
                         conn = append(conn, l.Conn.(turn.ListenerConfig))
 
                         // cannot test this on vnet, no TLS in vnet.Net
-                case v1alpha1.ListenerProtocolTls:
+                case v1alpha1.ListenerProtocolTLS:
                         s.log.Tracef("setting up TLS/TCP listener at %s", addr)
                         cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
                         if errTls != nil {
@@ -97,7 +97,7 @@ func (s *Stunner) Start() error {
                         conn = append(conn, l.Conn.(turn.ListenerConfig))
                         
                         // cannot test this on vnet, no DTLS in vnet.Net
-                case v1alpha1.ListenerProtocolDtls:
+                case v1alpha1.ListenerProtocolDTLS:
                         s.log.Tracef("setting up DTLS/UDP listener at %s", addr)
 
                         cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
@@ -130,33 +130,30 @@ func (s *Stunner) Start() error {
         }
 
         // start the DNS resolver threads
-        clusters := s.clusterManager.Keys()
-	for _, name := range clusters {
-		l := s.GetCluster(name)
-
-                if l.Resolver != nil {
-                        l.Resolver.Start()
-                }
-        }
-
+        s.resolver.Start()
         
-        // start the TURN server
-	t, err := turn.NewServer(turn.ServerConfig{
-		Realm:             auth.Realm,
-		AuthHandler:       s.NewAuthHandler(),
-		LoggerFactory:     s.logger,
-		PacketConnConfigs: pconn,
-		ListenerConfigs:   conn,
-	})
-	if err != nil {
-		return fmt.Errorf("cannot set up TURN server: %s", err)
-	}
-	s.server = t
+        // start the TURN server if there are actual listeners configured
+        if len(conn) == 0 && len(pconn) == 0 {
+                s.server = nil
+        } else {
+                t, err := turn.NewServer(turn.ServerConfig{
+                        Realm:             auth.Realm,
+                        AuthHandler:       s.NewAuthHandler(),
+                        LoggerFactory:     s.logger,
+                        PacketConnConfigs: pconn,
+                        ListenerConfigs:   conn,
+                })
+                if err != nil {
+                        return fmt.Errorf("cannot set up TURN server: %s", err)
+                }
+                s.server = t
+        }
 
 	ls := make([]string, len(listeners))
 	for i, l := range listeners { ls[i] = s.GetListener(l).String() }
-	s.log.Infof("TURN server running, realm: %s, listeners: %s", auth.Realm,
-		strings.Join(ls, ", "))
+        str := strings.Join(ls, ", ")
+        if len(ls) == 0 { str = "NONE" }
+	s.log.Infof("TURN server running, realm: %s, listeners: %s", auth.Realm, str)
 
 	return nil
 }

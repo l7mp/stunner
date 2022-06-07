@@ -11,7 +11,7 @@ import (
 )
 
 // Reconcile handles the updates to the STUNner configuration. Some updates are destructive so the server must be closed and restarted with the new configuration manually (see the documentation of the corresponding STUNner objects for when STUNner may restart after a reconciliation). Reconcile returns nil if no action is required by the caller, v1alpha1.ErrRestartRequired to indicate that the caller must issue a Close/Start cycle to install the reconciled configuration, and a general error if the reconciliation has failed
-func (s *Stunner) Reconcile(req *v1alpha1.StunnerConfig) error {
+func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	s.log.Debugf("reconciling STUNner for config: %#v ", req)
 
         // validate config

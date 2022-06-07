@@ -2,7 +2,7 @@ package stunner
 
 import (
 	"net"
-	// "reflect"
+	// "fmt"
         "strconv"
 	"testing"
 	"time"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/resolver"
 )
 
 // *****************
@@ -74,7 +75,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -303,7 +304,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -388,7 +389,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -473,7 +474,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -557,7 +558,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -648,7 +649,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -718,7 +719,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTcp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
                         assert.Equal(t, l.Port, 12345, "listener port ok")
                         assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -797,7 +798,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTcp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
                         assert.Equal(t, l.Port, 1, "listener port ok")
                         assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -869,7 +870,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         l := s.GetListener("default-listener")
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUdp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
                         assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
                         assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -904,7 +905,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
                         assert.NotNil(t, l, "listener found")
                         assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTcp, "listener proto ok")
+                        assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
                         assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
                         assert.Equal(t, l.Port, 1, "listener port ok")
                         assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -1270,7 +1271,7 @@ func TestStunnerReconcile(t *testing.T) {
 
                         conf.Admin.LogLevel = stunnerTestLoglevel
 
-			s, err := NewStunner(conf)
+			s, err := NewStunner(*conf)
 			assert.NoError(t, err, err)
 
                         runningConf := s.GetConfig()
@@ -1294,10 +1295,601 @@ func TestStunnerReconcile(t *testing.T) {
 
                         assert.True(t, conf.DeepEqual(runningConf),"default stunner config ok")
 
-                        err = s.Reconcile(&c.config)
+                        err = s.Reconcile(c.config)
                         c.tester(t, s, err)
 
 			s.Close()
 		})
 	}
+}
+
+
+// e2e reconcile test with a running server
+type StunnerTestReconcileE2EConfig struct {
+        testName string
+        config v1alpha1.StunnerConfig
+        echoServerAddr string
+        bindSuccess, echoResult, restart bool
+}
+
+var testReconcileE2E = []StunnerTestReconcileE2EConfig{
+        {
+                testName: "initial E2E reconcile test: empty server",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{},
+                        Clusters: []v1alpha1.ClusterConfig{},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: true,
+                bindSuccess: false,
+                echoResult: false,
+        },
+        {
+                testName: "adding a listener at the wrong port",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: true,
+                bindSuccess: false,
+                echoResult: false,
+        },
+        {
+                testName: "adding a cluster to a listener at the wrong port",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: false,
+                echoResult: false,
+        },
+        {
+                testName: "adding a listener at the right port",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        },{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: true,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "adding a cluster to the wrong IP",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        },{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        },{
+                                Name: "dummy-cluster",
+                                Endpoints: []string{},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "removing working cluster",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        },{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "dummy-cluster",
+                                Endpoints: []string{},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: false,
+        },
+        {
+                testName: "reintroducing good cluster to the wrong IP",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        },{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3479,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        },{
+                                Name: "dummy-cluster",
+                                Endpoints: []string{},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "removing wrong listener",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        },{
+                                Name: "dummy-cluster",
+                                Endpoints: []string{},
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: true,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "correct the wrong cluster and remove the good one",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.10",
+                                },
+                        },{
+                                Name: "dummy-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "removing wrong cluster and reverting the working one",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "removing dangling cluster ref",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Endpoints: []string{
+                                        "1.2.3.5",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "converting cluster to strict dns",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                        "dummy-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []string{
+                                        "echo-server.l7mp.io",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "rewiring to an open cluster",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "open-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "open-cluster",
+                                Endpoints: []string{
+                                        "0.0.0.0/0",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: true,
+        },
+        {
+                testName: "closing open cluster",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp-ok",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "open-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: false,
+                bindSuccess: true,
+                echoResult: false,
+        },
+        {
+                testName: "closing listener",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{},
+                        Auth: v1alpha1.AuthConfig{
+                                Credentials: map[string]string{
+                                        "username": "user",
+                                        "password": "pass",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{},
+                        Clusters: []v1alpha1.ClusterConfig{},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                restart: true,
+                bindSuccess: false,
+                echoResult: false,
+        },
+}
+
+func TestStunnerReconcileE2EWithVNet(t *testing.T) {
+	lim := test.TimeOut(time.Second * 60)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+        // patch in the vnet
+        log.Debug("building virtual network")
+        v, err := buildVNet(loggerFactory)
+        assert.NoError(t, err, err)
+
+        log.Debug("creating default stunner config")
+        conf, err := NewDefaultConfig("turn://user:pass@1.2.3.4:3478?transport=udp")
+        assert.NoError(t, err, err)
+
+        conf.Admin.LogLevel = stunnerTestLoglevel
+        
+        // patch in the vnet
+        conf.Net = v.podnet
+
+        s, err := NewStunner(*conf)
+        assert.NoError(t, err, err)
+
+        log.Debug("setting up the mock DNS")
+        mockDns := &resolver.MockResolver{
+                Zone: map[string]([]string){
+                        "stunner.l7mp.io":     []string{"1.2.3.4"},
+                        "echo-server.l7mp.io": []string{"1.2.3.5"},
+                        "dummy.l7mp.io":       []string{"1.2.3.10"},
+                }}
+        s.resolver.SetResolver(mockDns)
+
+        log.Debug("starting stunnerd")
+        assert.NoError(t, s.Start())
+
+	for _, c := range testReconcileE2E {
+                c.config.Net = v.podnet
+		t.Run(c.testName, func(t *testing.T) {
+                     log.Debugf("-------------- Running test: %s -------------", c.testName)
+
+                        log.Debug("reconciling server")
+                        err := s.Reconcile(c.config)
+
+                        if err == v1alpha1.ErrRestartRequired {
+                                log.Debug("restarting server")
+                                
+                                assert.True(t, c.restart, "restart required ok")
+                                s.Close()
+                                err := s.Start()
+                                assert.NoError(t, err, "restart STUNner ok")
+                        } else {
+                                assert.NoError(t, err, "cannot reconcile")
+                                assert.False(t, c.restart, "restart not required ok")
+                        }
+
+                        // make sure new clusters use the mockDns
+                        s.resolver.SetResolver(mockDns)
+
+                        log.Debug("creating a client")
+                        lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+                        assert.NoError(t, err, "cannot create client listening socket")
+
+                        testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
+                                lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
+                                c.bindSuccess, c.echoResult, loggerFactory}
+                        stunnerEchoTest(testConfig)
+
+                        time.Sleep(100 * time.Millisecond)
+                        lconn.Close()
+		})
+	}
+
+        s.Close()
+        assert.NoError(t, v.Close(), "cannot close VNet")
 }

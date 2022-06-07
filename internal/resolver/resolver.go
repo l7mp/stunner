@@ -83,7 +83,7 @@ func (r *dnsResolverImpl) Register(domain string) error {
         }
 
         resolverCtx, cancel := context.WithCancel(r.ctx)
-        r.register[domain] = &serviceEntry{
+        e = &serviceEntry{
 		lock: sync.RWMutex{},
                 ctx: resolverCtx,
                 cancel: cancel,
@@ -94,7 +94,11 @@ func (r *dnsResolverImpl) Register(domain string) error {
                 lastResolved: time.Time{},
                 mockResolver: r.mockResolver,
         }
+        r.register[domain] = e        
 
+        r.log.Debugf("Starting resolver thread for domain %q", domain)
+        go startResolver(e, r.log)
+        
         return nil
 }
 
@@ -209,9 +213,7 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 // Starts spawns the background resolver thread
 func (r *dnsResolverImpl) Start() {
         r.log.Debugf("Starting")
-        for _, e := range r.register {
-                go startResolver(e, r.log)
-        }
+        // Register already started the resolver threads
 }
 
 // Close closes the background resolver

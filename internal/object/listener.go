@@ -86,7 +86,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	l.Addr    = ipAddr
 	l.rawAddr = req.Addr
 	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
-        if proto == v1alpha1.ListenerProtocolTls || proto == v1alpha1.ListenerProtocolDtls {
+        if proto == v1alpha1.ListenerProtocolTLS || proto == v1alpha1.ListenerProtocolDTLS {
 		l.Cert = req.Cert
 		l.Key = req.Key
         }
@@ -141,12 +141,12 @@ func (l *Listener) Close() error {
         l.log.Tracef("closing %s listener at %s", l.Proto.String(), l.Addr)
 
 	switch l.Proto {
-	case v1alpha1.ListenerProtocolUdp:
+	case v1alpha1.ListenerProtocolUDP:
                 if l.Conn != nil {
                         l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
                         l.Conn.(turn.PacketConnConfig).PacketConn.Close()
                 }
-        case v1alpha1.ListenerProtocolTcp, v1alpha1.ListenerProtocolTls, v1alpha1.ListenerProtocolDtls:
+        case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
                 if l.Conn != nil {
                         l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
                         l.Conn.(turn.ListenerConfig).Listener.Close()

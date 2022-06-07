@@ -47,31 +47,31 @@ func (a AuthType) String() string {
 type ListenerProtocol int
 
 const (
-	ListenerProtocolUdp ListenerProtocol = iota + 1
-	ListenerProtocolTcp
-	ListenerProtocolTls
-	ListenerProtocolDtls
+	ListenerProtocolUDP ListenerProtocol = iota + 1
+	ListenerProtocolTCP
+	ListenerProtocolTLS
+	ListenerProtocolDTLS
 	ListenerProtocolUnknown
 )
 
 const (
-	listenerProtocolUdpStr  = "udp"
-	listenerProtocolTcpStr  = "tcp"
-	listenerProtocolTlsStr  = "tls"
-	listenerProtocolDtlsStr = "dtls"
+	listenerProtocolUDPStr  = "udp"
+	listenerProtocolTCPStr  = "tcp"
+	listenerProtocolTLSStr  = "tls"
+	listenerProtocolDTLSStr = "dtls"
 )
 
 // NewListenerProtocol parses the protocol specification
 func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 	switch strings.ToLower(raw) {
-	case listenerProtocolUdpStr:
-		return ListenerProtocolUdp, nil
-	case listenerProtocolTcpStr:
-		return ListenerProtocolTcp, nil
-	case listenerProtocolTlsStr:
-		return ListenerProtocolTls, nil
-	case listenerProtocolDtlsStr:
-		return ListenerProtocolDtls, nil
+	case listenerProtocolUDPStr:
+		return ListenerProtocolUDP, nil
+	case listenerProtocolTCPStr:
+		return ListenerProtocolTCP, nil
+	case listenerProtocolTLSStr:
+		return ListenerProtocolTLS, nil
+	case listenerProtocolDTLSStr:
+		return ListenerProtocolDTLS, nil
 	default:
 		return ListenerProtocol(ListenerProtocolUnknown),
                 fmt.Errorf("unknown listener protocol: \"%s\"", raw)
@@ -81,14 +81,14 @@ func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 // String returns a string representation of a listener protocol
 func (l ListenerProtocol) String() string {
 	switch l {
-	case ListenerProtocolUdp:
-		return listenerProtocolUdpStr
-	case ListenerProtocolTcp:
-		return listenerProtocolTcpStr
-	case ListenerProtocolTls:
-		return listenerProtocolTlsStr
-	case ListenerProtocolDtls:
-		return listenerProtocolDtlsStr
+	case ListenerProtocolUDP:
+		return listenerProtocolUDPStr
+	case ListenerProtocolTCP:
+		return listenerProtocolTCPStr
+	case ListenerProtocolTLS:
+		return listenerProtocolTLSStr
+	case ListenerProtocolDTLS:
+		return listenerProtocolDTLSStr
 	default:
 		return "<unknown>"
 	}
@@ -99,21 +99,21 @@ type ClusterType int
 
 const (
 	ClusterTypeStatic ClusterType = iota + 1
-	ClusterTypeStrictDns
+	ClusterTypeStrictDNS
 	ClusterTypeUnknown
 )
 
 const (
 	clusterTypeStaticStr    = "STATIC"
-	clusterTypeStrictDnsStr = "STRICT_DNS"
+	clusterTypeStrictDNSStr = "STRICT_DNS"
 )
 
 func NewClusterType(raw string) (ClusterType, error) {
 	switch strings.ToUpper(raw) {
 	case clusterTypeStaticStr:
 		return ClusterTypeStatic, nil
-	case clusterTypeStrictDnsStr:
-		return ClusterTypeStrictDns, nil
+	case clusterTypeStrictDNSStr:
+		return ClusterTypeStrictDNS, nil
 	default:
 		return ClusterType(ClusterTypeUnknown), fmt.Errorf("unknown cluster type: \"%s\"", raw)
 	}
@@ -123,8 +123,8 @@ func (l ClusterType) String() string {
 	switch l {
 	case ClusterTypeStatic:
 		return clusterTypeStaticStr
-	case ClusterTypeStrictDns:
-		return clusterTypeStrictDnsStr
+	case ClusterTypeStrictDNS:
+		return clusterTypeStrictDNSStr
 	default:
 		return "<unknown>"
 	}

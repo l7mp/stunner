@@ -120,7 +120,7 @@ func makeStunner(s *stunner.Stunner, conf *v1alpha1.StunnerConfig, level string)
         }
 
         if s == nil {
-                st, err := stunner.NewStunner(conf)
+                st, err := stunner.NewStunner(*conf)
                 if err != nil {
                         log.Fatalf("Could not create STUNner instance: %s",
                                 err.Error())
@@ -132,7 +132,7 @@ func makeStunner(s *stunner.Stunner, conf *v1alpha1.StunnerConfig, level string)
                                 err.Error())
                 }
         } else {
-                err := s.Reconcile(conf)
+                err := s.Reconcile(*conf)
                 if err != nil {
                         if err == v1alpha1.ErrRestartRequired {
                                 s.Close()

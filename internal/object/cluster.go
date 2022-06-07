@@ -104,7 +104,7 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 
                         c.Endpoints = append(c.Endpoints, *n2)
                 }        
-        case v1alpha1.ClusterTypeStrictDns:
+        case v1alpha1.ClusterTypeStrictDNS:
                 if c.Resolver == nil {
                         return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
                 }
@@ -144,7 +144,7 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
                 for i, e := range c.Endpoints {
                         conf.Endpoints[i] = e.String()
                 }
-        case v1alpha1.ClusterTypeStrictDns:
+        case v1alpha1.ClusterTypeStrictDNS:
                 conf.Endpoints = make([]string, len(c.Domains))
                 for i, d := range c.Domains {
                         conf.Endpoints[i] = d
@@ -161,7 +161,7 @@ func (c *Cluster) Close() error {
         switch c.Type {
         case v1alpha1.ClusterTypeStatic:
                 // do nothing
-        case v1alpha1.ClusterTypeStrictDns:
+        case v1alpha1.ClusterTypeStrictDNS:
                 for _, d := range c.Domains {
                         c.Resolver.Unregister(d)
                 }
@@ -184,7 +184,7 @@ func (c *Cluster) Route(peer net.IP) bool {
                         }
                 }
 
-        case v1alpha1.ClusterTypeStrictDns:
+        case v1alpha1.ClusterTypeStrictDNS:
                 // endpoints are obtained from the DNS
                 for _, d := range c.Domains {
                         c.log.Tracef("considering domain %q", d)

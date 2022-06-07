@@ -488,7 +488,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			c.config.Net = v.podnet
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunner(&c.config)
+			stunner, err := NewStunner(c.config)
 			assert.NoError(t, err, err)
 
 			log.Debug("setting up the mock DNS")
@@ -528,7 +528,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, c.result, loggerFactory}
+				c.echoServerAddr, true, c.result, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")

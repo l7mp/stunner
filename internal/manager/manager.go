@@ -89,7 +89,7 @@ func (m *managerImpl) Keys() []string {
 
 // Reconcile updates all objects handled by the manager and returns the config for the new objects to be created. Input config must be validated! Returns ErrRestartRequired if the server needs to be restarted
 func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, error) {
-        m.log.Debugf("reconciling manager for configs: %#v", confs)
+        m.log.Debugf("reconciling manager")
 
         restart         := false
         newJobQueue     := []v1alpha1.Config{}

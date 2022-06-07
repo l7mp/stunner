@@ -26,7 +26,7 @@ type Stunner struct {
 }
 
 // NewStunner creates the STUNner deamon from the specified configuration
-func NewStunner(req *v1alpha1.StunnerConfig) (*Stunner, error) {
+func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
         if err := req.Validate(); err != nil {
                 return nil, err
         }
