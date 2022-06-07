@@ -220,7 +220,7 @@ func buildVNet(logger *logging.DefaultLoggerFactory) (*VNet, error) {
 	if err != nil { return nil, err }
 
 	// client side
-	podnet := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4", "1.2.3.5"}})
+	podnet := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4", "1.2.3.5", "1.2.3.10" }})
 	err = gw.AddNet(podnet)
 	if err != nil { return nil, err }
 
@@ -245,6 +245,7 @@ func buildVNet(logger *logging.DefaultLoggerFactory) (*VNet, error) {
 	// register host names
 	err = gw.AddHost("stunner.l7mp.io", "1.2.3.4")
 	err = gw.AddHost("echo-server.l7mp.io", "1.2.3.5")
+	err = gw.AddHost("dummy.l7mp.io", "1.2.3.10")
 	if err != nil { return nil, err }
 
 	return &VNet{

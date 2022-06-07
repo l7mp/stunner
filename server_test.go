@@ -355,40 +355,116 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
                 echoServerAddr: "1.2.3.5:5678",
                 result: true,
         },
-        // {
-        //         name: "strict_dns cluster and wrong peer addr fail",
-        //         config: v1alpha1.StunnerConfig{
-        //                 ApiVersion: "v1alpha1",
-        //                 Admin: v1alpha1.AdminConfig{
-        //                         LogLevel: stunnerTestLoglevel,
-        //                 },
-        //                 Auth: v1alpha1.AuthConfig{
-        //                         Type: "plaintext",
-        //                         Credentials: map[string]string{
-        //                                 "username": "user1",
-        //                                 "password": "passwd1",
-        //                         },
-        //                 },
-        //                 Listeners: []v1alpha1.ListenerConfig{{
-        //                         Name: "udp",
-        //                         Protocol: "udp",
-        //                         Addr: "1.2.3.4",
-        //                         Port: 3478,
-        //                         Routes: []string{
-        //                                 "echo-server-cluster",
-        //                         },
-        //                 }},
-        //                 Clusters: []v1alpha1.ClusterConfig{{
-        //                         Name: "echo-server-cluster",
-        //                         Type: "STRICT_DNS",
-        //                         Endpoints: []string{
-        //                                 "echo-server.l7mp.io",
-        //                         },
-        //                 }},
-        //         },
-        //         echoServerAddr: "1.2.3.10:5678",
-        //         result: false,
-        // },
+        {
+                testName: "strict_dns cluster and wrong peer addr fail",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: v1alpha1.AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []string{
+                                        "echo-server.l7mp.io",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.10:5678",
+                result: false,
+        },
+        {
+                testName: "strict_dns cluster with multiple domains ok",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: v1alpha1.AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "echo-server-cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []string{
+                                        "stunner.l7mp.io",
+                                        "echo-server.l7mp.io",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                result: true,
+        },
+        {
+                testName: "multiple strict_dns clusters  ok",
+                config: v1alpha1.StunnerConfig{
+                        ApiVersion: "v1alpha1",
+                        Admin: v1alpha1.AdminConfig{
+                                LogLevel: stunnerTestLoglevel,
+                        },
+                        Auth: v1alpha1.AuthConfig{
+                                Type: "plaintext",
+                                Credentials: map[string]string{
+                                        "username": "user1",
+                                        "password": "passwd1",
+                                },
+                        },
+                        Listeners: []v1alpha1.ListenerConfig{{
+                                Name: "udp",
+                                Protocol: "udp",
+                                Addr: "1.2.3.4",
+                                Port: 3478,
+                                Routes: []string{
+                                        "stunner-cluster",
+                                        "echo-server-cluster",
+                                },
+                        }},
+                        Clusters: []v1alpha1.ClusterConfig{{
+                                Name: "stunner-cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []string{
+                                        "stunner.l7mp.io",
+                                },
+                        }, {
+                                Name: "echo-server-cluster",
+                                Type: "STRICT_DNS",
+                                Endpoints: []string{
+                                        "echo-server.l7mp.io",
+                                },
+                        }},
+                },
+                echoServerAddr: "1.2.3.5:5678",
+                result: true,
+        },
 }
 
 func TestStunnerClusterWithVNet(t *testing.T) {
@@ -420,6 +496,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
                                 Zone: map[string]([]string){
                                         "stunner.l7mp.io":     []string{"1.2.3.4"},
                                         "echo-server.l7mp.io": []string{"1.2.3.5"},
+                                        "dummy.l7mp.io":       []string{"1.2.3.10"},
                                 }}
 
                         cluster := stunner.GetCluster("echo-server-cluster")
