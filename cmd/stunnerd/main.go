@@ -32,7 +32,7 @@ func main() {
         log := stunner.NewLoggerFactory(*level).NewLogger("stunnerd")
         conf := make(chan *v1alpha1.StunnerConfig, 1)
         defer close(conf)
-        
+
         if *config == "" && flag.NArg() == 1 {
                 log.Infof("starting %s with default configuration at TURN URI: %s",
                         os.Args[0], flag.Arg(0))
@@ -94,7 +94,7 @@ func main() {
                                         if watcherEnabled == true {
                                                 continue
                                         }
-                                        
+
                                         log.Tracef("watcher inactive for config file %q: trying to activate it",
                                                 *config)
                                         if err := watcher.Add(*config); err != nil {
@@ -115,7 +115,7 @@ func main() {
 
                                 case e := <- watcher.Events:
                                         log.Debugf("received watcher event: %s", e.String())
-                                        
+
                                         if e.Op == fsnotify.Remove {
                                                 log.Warnf("config file deleted %q, disabling watcher",
                                                         e.Op.String())
@@ -223,7 +223,7 @@ func main() {
                                 }
                         }
                         log.Trace("reconciliation ready")
-                        
+
                 }
         }
 }
