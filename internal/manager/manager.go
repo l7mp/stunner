@@ -89,7 +89,7 @@ func (m *managerImpl) Keys() []string {
 
 // Reconcile updates all objects handled by the manager and returns the config for the new objects to be created. Input config must be validated! Returns ErrRestartRequired if the server needs to be restarted
 func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, error) {
-        m.log.Debugf("reconciling manager")
+        m.log.Tracef("reconciling manager")
 
         restart         := false
         newJobQueue     := []v1alpha1.Config{}
@@ -111,14 +111,14 @@ func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, err
                                         o.ObjectName(), runningConf)
                         }
                         if runningConf.DeepEqual(c) {
-                                m.log.Debugf("object %q unchanged", o.ObjectName())
+                                m.log.Tracef("object %q unchanged", o.ObjectName())
                         } else {
-                                m.log.Debugf("object %q changes, adding to job queue", o.ObjectName())
+                                m.log.Tracef("object %q changes, adding to job queue", o.ObjectName())
                                 changedJobQueue = append(changedJobQueue,
                                         job{object: o, config: c, oldConfig: runningConf})
                         }
                 } else {
-                        m.log.Debugf("new object %q: adding to job queue", c.ConfigName())
+                        m.log.Tracef("new object %q: adding to job queue", c.ConfigName())
                         newJobQueue = append(newJobQueue, c)
                 }
         }
@@ -126,7 +126,7 @@ func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, err
         // find what has to be deleted and delete it
         for _, o := range m.objects {
                 if !findConfByName(confs, o.ObjectName()) {
-                        m.log.Debugf("deleting object %q", o.ObjectName())
+                        m.log.Tracef("deleting object %q", o.ObjectName())
                         err := m.Delete(o)
                         if err == v1alpha1.ErrRestartRequired {
                                 restart = true
@@ -138,7 +138,7 @@ func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, err
         // do the reconciliation jobs
         m.log.Trace("running the reconciliation job queue")
         for _, j := range changedJobQueue {
-                m.log.Debugf("reconciling object %q: %#v -> %#v", j.object.ObjectName(), j.oldConfig, j.config)
+                m.log.Tracef("reconciling object %q: %#v -> %#v", j.object.ObjectName(), j.oldConfig, j.config)
                 err := j.object.Reconcile(j.config)
                 if err != nil {
                         if err == v1alpha1.ErrRestartRequired {
@@ -149,9 +149,8 @@ func (m *managerImpl) Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, err
                 }
         }
 
-        m.log.Debugf("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d, " +
-                "restart required for changed objects: %t", len(newJobQueue), len(changedJobQueue),
-                deleted, restart)
+        m.log.Debugf("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d",
+                len(newJobQueue), len(changedJobQueue), deleted)
         
         if restart {
                 return newJobQueue, v1alpha1.ErrRestartRequired

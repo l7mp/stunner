@@ -113,6 +113,8 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
                 s.log.Warn("running with no clusters: all traffic will be dropped")
         }
 
+        s.log.Infof("reconciliation ready, restart required: %t", restart)
+
         if restart {
                 return v1alpha1.ErrRestartRequired
         }
