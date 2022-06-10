@@ -3,10 +3,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=
 github.com/fsnotify/fsnotify v1.5.4/go.mod h1:OVB6XrOHzAwXMpEM7uPOzcehqUV2UqJxmVXmkdnm1bU=
-github.com/google/go-cmp v0.5.8 h1:e6P7q2lk1O+qJJb4BtCQXlK8vWEO8V1ZeuEdJNOqZyg=
-github.com/google/go-cmp v0.5.8/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/l7mp/turn/v2 v2.0.9 h1:d6jsA+qR58jUKuxLQCEZDjXpxMxiH9jgbhuJXbZCNoc=
-github.com/l7mp/turn/v2 v2.0.9/go.mod h1:69FCVYMkhQSXHfgklQBwsBDAK8/h62msFexdzJ9kfXg=
+github.com/l7mp/turn/v2 v2.0.10 h1:WNJiGXqVmVv5Ya7YZyHV+WoEZM6LI5wkn1aKww67ryk=
+github.com/l7mp/turn/v2 v2.0.10/go.mod h1:69FCVYMkhQSXHfgklQBwsBDAK8/h62msFexdzJ9kfXg=
 github.com/pion/dtls/v2 v2.1.5 h1:jlh2vtIyUBShchoTDqpCCqiYCyRFJ/lvf/gQ8TALs+c=
 github.com/pion/dtls/v2 v2.1.5/go.mod h1:BqCE7xPZbPSubGasRoDFJeTsyJtdD1FanJYL0JGheqY=
 github.com/pion/logging v0.2.2 h1:M9+AIj/+pxNsDfAT64+MAVgJO0rsyLnoJKCqf//DoeY=
