@@ -112,8 +112,9 @@ all packets to the `udp-echo` service in your Kubernetes cluster through STUNner
 
 ```console
 $ cd stunner
-$ go run cmd/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:9000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${UDP_ECHO_IP}:9001
+$ go run cmd/turncat/main.go --realm $STUNNER_REALM --log=all:DEBUG udp://127.0.0.1:9000 \
+    turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} \
+    udp://${UDP_ECHO_IP}:9001
 ```
 
 Now, in another terminal open a UDP connection through the tunnel opened by `turncat` and send
