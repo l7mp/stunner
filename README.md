@@ -295,10 +295,9 @@ notable limitations at this point are as follows.
   demos).
 * v0.10.1: Onboarding: long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
-* v0.11.1: Make STUNner dynamic: full dataplane reconciliation as per a config file watcher.
-* v0.12.1: Day-2 operations: STUNner Kubernetes operator.
-* v0.13.1: Observability: Prometheus + Grafana dashboard.
-* v0.14.1: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup, pion-SFU and livekit.
+* v0.11.1: Day-2 operations: STUNner Kubernetes operator.
+* v0.12.1: Observability: Prometheus + Grafana dashboard.
+* v0.13.1: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup, pion-SFU and livekit.
 * v1.0: GA
 * v1.1: Performance: eBPF STUN/TURN acceleration.
 * v2.0: Service mesh: adaptive scaling & resiliency
