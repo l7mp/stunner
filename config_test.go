@@ -1,8 +1,8 @@
 package stunner
 
 import (
-	"net"
 	"fmt"
+	"net"
 	// "reflect"
 	"testing"
 	"time"
@@ -24,19 +24,19 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 	for _, conf := range []string{
 		"turn://user1:passwd1@1.2.3.4:3478?transport=udp",
-		 "udp://user1:passwd1@1.2.3.4:3478?transport=udp",
-		 "udp://user1:passwd1@1.2.3.4:3478",
-	}{
-                testName := fmt.Sprintf("TestStunner_NewDefaultConfig_URI:%s", conf)
+		"udp://user1:passwd1@1.2.3.4:3478?transport=udp",
+		"udp://user1:passwd1@1.2.3.4:3478",
+	} {
+		testName := fmt.Sprintf("TestStunner_NewDefaultConfig_URI:%s", conf)
 		t.Run(testName, func(t *testing.T) {
-                        log.Debugf("-------------- Running test: %s -------------", testName)
+			log.Debugf("-------------- Running test: %s -------------", testName)
 
 			log.Debug("creating default stunner config")
 			c, err := NewDefaultConfig(conf)
 			assert.NoError(t, err, err)
 
-                        // patch in the loglevel
-                        c.Admin.LogLevel = stunnerTestLoglevel
+			// patch in the loglevel
+			c.Admin.LogLevel = stunnerTestLoglevel
 
 			// patch in the vnet
 			log.Debug("building virtual network")
@@ -66,4 +66,3 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 		})
 	}
 }
-

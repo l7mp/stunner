@@ -2,7 +2,7 @@ package stunner
 
 import (
 	"fmt"
-        
+
 	// "github.com/pion/logging"
 	// "github.com/pion/transport/vnet"
 
@@ -14,111 +14,110 @@ import (
 func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	s.log.Debugf("reconciling STUNner for config: %#v ", req)
 
-        // validate config
-        if err := req.Validate(); err != nil {
-                return err
-        }
+	// validate config
+	if err := req.Validate(); err != nil {
+		return err
+	}
 
-        restart := false
+	restart := false
 
-        // admin
-        newAdmin, err := s.adminManager.Reconcile([]v1alpha1.Config{&req.Admin})
-        if err != nil {
-                if err == v1alpha1.ErrRestartRequired {
-                        restart = true
-                } else {
-                        return fmt.Errorf("could not reconcile admin config: %s", err.Error())
-                }
-        }
+	// admin
+	newAdmin, err := s.adminManager.Reconcile([]v1alpha1.Config{&req.Admin})
+	if err != nil {
+		if err == v1alpha1.ErrRestartRequired {
+			restart = true
+		} else {
+			return fmt.Errorf("could not reconcile admin config: %s", err.Error())
+		}
+	}
 
-        for _, c := range newAdmin {
-                o, err := object.NewAdmin(c, s.logger)
-                if err != nil && err != v1alpha1.ErrRestartRequired {
-                        return err
-                }
-                s.adminManager.Upsert(o)
-        }
-        s.logger = NewLoggerFactory(s.GetAdmin().LogLevel)
-        s.log    = s.logger.NewLogger("stunner")
+	for _, c := range newAdmin {
+		o, err := object.NewAdmin(c, s.logger)
+		if err != nil && err != v1alpha1.ErrRestartRequired {
+			return err
+		}
+		s.adminManager.Upsert(o)
+	}
+	s.logger = NewLoggerFactory(s.GetAdmin().LogLevel)
+	s.log = s.logger.NewLogger("stunner")
 
-        // auth
-        newAuth, err := s.authManager.Reconcile([]v1alpha1.Config{&req.Auth})
-        if err != nil {
-                if err == v1alpha1.ErrRestartRequired {
-                        restart = true
-                } else {
-                        return fmt.Errorf("could not reconcile auth config: %s", err.Error())
-                }
-        }
+	// auth
+	newAuth, err := s.authManager.Reconcile([]v1alpha1.Config{&req.Auth})
+	if err != nil {
+		if err == v1alpha1.ErrRestartRequired {
+			restart = true
+		} else {
+			return fmt.Errorf("could not reconcile auth config: %s", err.Error())
+		}
+	}
 
-        for _, c := range newAuth {
-                o, err := object.NewAuth(c, s.logger)
-                if err != nil && err != v1alpha1.ErrRestartRequired {
-                        return err
-                }
-                s.authManager.Upsert(o)
-        }
+	for _, c := range newAuth {
+		o, err := object.NewAuth(c, s.logger)
+		if err != nil && err != v1alpha1.ErrRestartRequired {
+			return err
+		}
+		s.authManager.Upsert(o)
+	}
 
-        // listener
-        lconf := make([]v1alpha1.Config, len(req.Listeners))
-        for i, _ := range req.Listeners {
-                lconf[i] = &(req.Listeners[i])
-        }        
-        newListener, err := s.listenerManager.Reconcile(lconf)
-        if err != nil {
-                if err == v1alpha1.ErrRestartRequired {
-                        restart = true
-                } else {
-                        return fmt.Errorf("could not reconcile listener config: %s", err.Error())
-                }
-        }
+	// listener
+	lconf := make([]v1alpha1.Config, len(req.Listeners))
+	for i := range req.Listeners {
+		lconf[i] = &(req.Listeners[i])
+	}
+	newListener, err := s.listenerManager.Reconcile(lconf)
+	if err != nil {
+		if err == v1alpha1.ErrRestartRequired {
+			restart = true
+		} else {
+			return fmt.Errorf("could not reconcile listener config: %s", err.Error())
+		}
+	}
 
-        for _, c := range newListener {
-                o, err := object.NewListener(c, s.net, s.logger)
-                if err != nil && err != v1alpha1.ErrRestartRequired {
-                        return err
-                }
-                s.listenerManager.Upsert(o)
-                // new listeners require a restart
-                restart = true
-        }
+	for _, c := range newListener {
+		o, err := object.NewListener(c, s.net, s.logger)
+		if err != nil && err != v1alpha1.ErrRestartRequired {
+			return err
+		}
+		s.listenerManager.Upsert(o)
+		// new listeners require a restart
+		restart = true
+	}
 
-        if len(s.listenerManager.Keys()) == 0 {
-                s.log.Warn("running with no listeners")
-        }
+	if len(s.listenerManager.Keys()) == 0 {
+		s.log.Warn("running with no listeners")
+	}
 
-        // cluster
-        cconf := make([]v1alpha1.Config, len(req.Clusters))
-        for i, _ := range req.Clusters {
-                cconf[i] = &(req.Clusters[i])
-        }
-        newCluster, err := s.clusterManager.Reconcile(cconf)
-        if err != nil {
-                if err == v1alpha1.ErrRestartRequired {
-                        restart = true
-                } else {
-                        return fmt.Errorf("could not reconcile cluster config: %s", err.Error())
-                }
-        }
+	// cluster
+	cconf := make([]v1alpha1.Config, len(req.Clusters))
+	for i := range req.Clusters {
+		cconf[i] = &(req.Clusters[i])
+	}
+	newCluster, err := s.clusterManager.Reconcile(cconf)
+	if err != nil {
+		if err == v1alpha1.ErrRestartRequired {
+			restart = true
+		} else {
+			return fmt.Errorf("could not reconcile cluster config: %s", err.Error())
+		}
+	}
 
-        for _, c := range newCluster {
-                o, err := object.NewCluster(c, s.resolver, s.logger)
-                if err != nil && err != v1alpha1.ErrRestartRequired {
-                        return err
-                }
-                s.clusterManager.Upsert(o)
-        }
+	for _, c := range newCluster {
+		o, err := object.NewCluster(c, s.resolver, s.logger)
+		if err != nil && err != v1alpha1.ErrRestartRequired {
+			return err
+		}
+		s.clusterManager.Upsert(o)
+	}
 
-        if len(s.clusterManager.Keys()) == 0 {
-                s.log.Warn("running with no clusters: all traffic will be dropped")
-        }
+	if len(s.clusterManager.Keys()) == 0 {
+		s.log.Warn("running with no clusters: all traffic will be dropped")
+	}
 
-        s.log.Infof("reconciliation ready, restart required: %t", restart)
+	s.log.Infof("reconciliation ready, restart required: %t", restart)
 
-        if restart {
-                return v1alpha1.ErrRestartRequired
-        }
+	if restart {
+		return v1alpha1.ErrRestartRequired
+	}
 
-        return nil
+	return nil
 }
-

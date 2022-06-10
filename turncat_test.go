@@ -1,21 +1,22 @@
 package stunner
 
 import (
-	"net"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 	"time"
-	
+
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2"
 	"github.com/pion/transport/test"
+	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 var turncatTestLoglevel string = "all:ERROR"
+
 //var turncatTestLoglevel string = "all:TRACE"
 
 var sharedSecret = "my-secret"
@@ -25,7 +26,7 @@ var longtermAuthGen = func() (string, string, error) {
 	return turn.GenerateLongTermCredentials(sharedSecret, d)
 }
 var plaintextAuthGen = func() (string, string, error) {
-	return "user1", "passwd1",  nil
+	return "user1", "passwd1", nil
 }
 
 type turncatEchoTestConfig struct {
@@ -35,11 +36,11 @@ type turncatEchoTestConfig struct {
 	// client
 	lconn net.Conn
 	// peer
-	peer *StunnerUri
+	peer          *StunnerUri
 	loggerFactory *logging.DefaultLoggerFactory
 }
 
-func turncatEchoTest(conf turncatEchoTestConfig){
+func turncatEchoTest(conf turncatEchoTestConfig) {
 	t := conf.t
 	log := conf.loggerFactory.NewLogger("test")
 
@@ -107,36 +108,36 @@ func TestTurncatPlaintext(t *testing.T) {
 		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
 		},
-                Auth: v1alpha1.AuthConfig{
-                        Type: "plaintext",
-                        Credentials: map[string]string{
-                                "username": "user1",
-                                "password": "passwd1",
-                        },
-                },
-                Listeners: []v1alpha1.ListenerConfig{{
-                        Name: "udp-listener-23478",
-                        Protocol: "udp",
-                        Addr: "127.0.0.1",
-                        Port: 23478,
-                        Routes: []string{"allow-any"},
-                },{
-                        Name: "tcp-listener-23478",
-                        Protocol: "tcp",
-                        Addr: "127.0.0.1",
-                        Port: 23478,
-                        Routes: []string{"allow-any"},
-                }},
-                Clusters: []v1alpha1.ClusterConfig{{
-                        Name: "allow-any",
-                        Endpoints: []string{"0.0.0.0/0"},
-                }},
+		Auth: v1alpha1.AuthConfig{
+			Type: "plaintext",
+			Credentials: map[string]string{
+				"username": "user1",
+				"password": "passwd1",
+			},
+		},
+		Listeners: []v1alpha1.ListenerConfig{{
+			Name:     "udp-listener-23478",
+			Protocol: "udp",
+			Addr:     "127.0.0.1",
+			Port:     23478,
+			Routes:   []string{"allow-any"},
+		}, {
+			Name:     "tcp-listener-23478",
+			Protocol: "tcp",
+			Addr:     "127.0.0.1",
+			Port:     23478,
+			Routes:   []string{"allow-any"},
+		}},
+		Clusters: []v1alpha1.ClusterConfig{{
+			Name:      "allow-any",
+			Endpoints: []string{"0.0.0.0/0"},
+		}},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
 
-        log.Debug("starting stunnerd")
-        assert.NoError(t, stunner.Start())
+	log.Debug("starting stunnerd")
+	assert.NoError(t, stunner.Start())
 
 	testTurncatConfigs := []TurncatConfig{
 		{
@@ -168,7 +169,7 @@ func TestTurncatPlaintext(t *testing.T) {
 			LoggerFactory: logger,
 		},
 	}
-	
+
 	for _, c := range testTurncatConfigs {
 		listener, err := ParseUri(c.ListenerAddr)
 		assert.NoError(t, err, "cannot parse turncat listener URI")
@@ -180,7 +181,7 @@ func TestTurncatPlaintext(t *testing.T) {
 			listener.Protocol, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
-                        log.Debugf("-------------- Running test: %s -------------", testName)
+			log.Debugf("-------------- Running test: %s -------------", testName)
 			peer, err := ParseUri(c.PeerAddr)
 			assert.NoError(t, err, "cannot parse peer URI")
 
@@ -223,35 +224,35 @@ func TestTurncatLongterm(t *testing.T) {
 		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
 		},
-                Auth: v1alpha1.AuthConfig{
-                        Type: "longterm",
-                        Credentials: map[string]string{
-                                "secret": sharedSecret,
-                        },
-                },
-                Listeners: []v1alpha1.ListenerConfig{{
-                        Name: "udp-listener-23478",
-                        Protocol: "udp",
-                        Addr: "127.0.0.1",
-                        Port: 23478,
-                        Routes: []string{"allow-any"},
-                },{
-                        Name: "tcp-listener-23478",
-                        Protocol: "tcp",
-                        Addr: "127.0.0.1",
-                        Port: 23478,
-                        Routes: []string{"allow-any"},
-                }},
-                Clusters: []v1alpha1.ClusterConfig{{
-                        Name: "allow-any",
-                        Endpoints: []string{"0.0.0.0/0"},
-                }},
+		Auth: v1alpha1.AuthConfig{
+			Type: "longterm",
+			Credentials: map[string]string{
+				"secret": sharedSecret,
+			},
+		},
+		Listeners: []v1alpha1.ListenerConfig{{
+			Name:     "udp-listener-23478",
+			Protocol: "udp",
+			Addr:     "127.0.0.1",
+			Port:     23478,
+			Routes:   []string{"allow-any"},
+		}, {
+			Name:     "tcp-listener-23478",
+			Protocol: "tcp",
+			Addr:     "127.0.0.1",
+			Port:     23478,
+			Routes:   []string{"allow-any"},
+		}},
+		Clusters: []v1alpha1.ClusterConfig{{
+			Name:      "allow-any",
+			Endpoints: []string{"0.0.0.0/0"},
+		}},
 	})
 	assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
 
-        log.Debug("starting stunnerd")
-        assert.NoError(t, stunner.Start())
+	log.Debug("starting stunnerd")
+	assert.NoError(t, stunner.Start())
 
 	testTurncatConfigs := []TurncatConfig{
 		{
@@ -283,7 +284,7 @@ func TestTurncatLongterm(t *testing.T) {
 			LoggerFactory: logger,
 		},
 	}
-	
+
 	for _, c := range testTurncatConfigs {
 		listener, err := ParseUri(c.ListenerAddr)
 		assert.NoError(t, err, "cannot parse turncat listener URI")
@@ -295,7 +296,7 @@ func TestTurncatLongterm(t *testing.T) {
 			listener.Protocol, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
-                        log.Debugf("-------------- Running test: %s -------------", testName)
+			log.Debugf("-------------- Running test: %s -------------", testName)
 			peer, err := ParseUri(c.PeerAddr)
 			assert.NoError(t, err, "cannot parse peer URI")
 

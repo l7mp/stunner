@@ -16,7 +16,7 @@ const (
 
 const (
 	authTypePlainTextStr = "plaintext"
-	authTypeLongTermStr = "longterm"
+	authTypeLongTermStr  = "longterm"
 )
 
 // NewAuthType parses the authentication mechanism specification
@@ -74,7 +74,7 @@ func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 		return ListenerProtocolDTLS, nil
 	default:
 		return ListenerProtocol(ListenerProtocolUnknown),
-                fmt.Errorf("unknown listener protocol: \"%s\"", raw)
+			fmt.Errorf("unknown listener protocol: \"%s\"", raw)
 	}
 }
 
