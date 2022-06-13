@@ -8,6 +8,8 @@ import (
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
@@ -56,6 +58,8 @@ func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
 		return nil, err
 	}
 
+	s.InitMonitoring()
+
 	return &s, nil
 }
 
@@ -103,4 +107,18 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 		return nil
 	}
 	return l.(*object.Cluster)
+}
+
+func (s *Stunner) InitMonitoring() {
+	if err := prometheus.Register(prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Name: "allocation_count",
+			Help: "Number of active allocations.",
+		},
+		func() float64 { return float64(s.server.AllocationCount()) },
+	)); err == nil {
+		s.log.Debug("GaugeFunc 'allocation' registered.")
+	} else {
+		s.log.Warn("GaugeFunc 'allocation' cannot be registered.")
+	}
 }
