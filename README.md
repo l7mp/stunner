@@ -151,7 +151,7 @@ $ helm install stunner stunner/stunner
 
 And that's all: a standalone deployment of STUNner is up and running, waiting for WebRTC clients to
 connect to it. See the [STUNner installation guide](/doc/INSTALL.md) on how to customize STUNner or
-deploy it without Helm, using a static [Kubernetes manifest](/kubernetes/stunner.yaml).
+deploy it without Helm, using a static [Kubernetes manifest](/deploy/manifests/stunner.yaml).
 
 ### Configuration
 
@@ -296,10 +296,10 @@ notable limitations at this point are as follows.
 * v0.10.1: Onboarding: long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
 * v0.11.1: Day-2 operations: STUNner Kubernetes operator.
-* v0.12.1: Performance: eBPF STUN/TURN acceleration.
-* v0.13.1: Observability: Prometheus + Grafana dashboard.
-* v0.14.1: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup and pion-SFU.
+* v0.12.1: Observability: Prometheus + Grafana dashboard.
+* v0.13.1: Ubiquity: make STUNner work with Jitsi, Janus, mediasoup, pion-SFU and livekit.
 * v1.0: GA
+* v1.1: Performance: eBPF STUN/TURN acceleration.
 * v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help

@@ -1,34 +1,37 @@
 package stunner
 
 import (
-	"net"
-	"fmt"
 	"context"
+	"errors"
+	"fmt"
+	"net"
 	"strings"
 	"sync"
-	"errors"
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
+
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 const UDP_PACKET_SIZE = 1500
 
+// AuthGen is a function called by turncat to generate authentication tokens
 type AuthGen func() (string, string, error)
 
 // TurncatConfig is the main configuration for the turncat relay
 type TurncatConfig struct {
 	// ListenAddr is the listeninging socket address (local tunnel endpoint)
-	ListenerAddr   string
+	ListenerAddr string
 	// ServerAddr is the TURN server addrees (e.g. "turn:turn.abc.com:3478")
-	ServerAddr     string
+	ServerAddr string
 	// PeerAddr specifies the remote peer to connect to
-	PeerAddr       string
+	PeerAddr string
 	// Realm is the STUN/TURN realm
-	Realm          string
+	Realm string
 	// AuthGet specifies the function to generate auth tokens
-	AuthGen        AuthGen
-	LoggerFactory  logging.LoggerFactory	
+	AuthGen       AuthGen
+	LoggerFactory logging.LoggerFactory
 }
 
 // Turncat is the internal structure for representing a turncat relay
@@ -36,21 +39,21 @@ type Turncat struct {
 	listenerAddr  net.Addr
 	serverAddr    net.Addr
 	peerAddr      net.Addr
-	listenerConn  interface{}		// net.Conn or net.PacketConn
-	connTrack     map[string]*connection	// Conntrack table.
-	lock          *sync.Mutex		// Sync access to the conntrack state.
+	listenerConn  interface{}            // net.Conn or net.PacketConn
+	connTrack     map[string]*connection // Conntrack table.
+	lock          *sync.Mutex            // Sync access to the conntrack state.
 	realm         string
-	authGen       AuthGen			// Generate auth tokens.
+	authGen       AuthGen // Generate auth tokens.
 	loggerFactory logging.LoggerFactory
 	log           logging.LeveledLogger
 }
 
 type connection struct {
-	clientAddr net.Addr			// Address of the client
-	turnClient *turn.Client			// TURN client associated with the connection
-	clientConn net.Conn			// Socket connected back to the client
-	turnConn net.PacketConn			// Socket for the TURN client
-	serverConn net.PacketConn		// Relayed UDP connection to server
+	clientAddr net.Addr       // Address of the client
+	turnClient *turn.Client   // TURN client associated with the connection
+	clientConn net.Conn       // Socket connected back to the client
+	turnConn   net.PacketConn // Socket for the TURN client
+	serverConn net.PacketConn // Relayed UDP connection to server
 }
 
 // NewTurncat creates a new turncat relay from the specified config, creating a listener socket for clients to connect and relaying client connections through the speficied STUN/TURN server to the peer.
@@ -90,12 +93,14 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 			config.PeerAddr, pErr.Error())
 	}
 	if peer.Address == "" || peer.Port == 0 || !strings.HasPrefix(peer.Protocol, "udp") {
-		return nil, fmt.Errorf("error resolving peer address %s: invalid protocol (\"%s\"), " +
+		return nil, fmt.Errorf("error resolving peer address %s: invalid protocol (\"%s\"), "+
 			"empty address (\"%s\") or invalid port (%d)", config.PeerAddr,
 			peer.Protocol, peer.Address, peer.Port)
 	}
 
-	if config.Realm == "" { config.Realm = DefaultRealm }
+	if config.Realm == "" {
+		config.Realm = v1alpha1.DefaultRealm
+	}
 
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client
@@ -137,7 +142,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		log:           log,
 	}
 
-	switch t.listenerAddr.Network(){
+	switch t.listenerAddr.Network() {
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		// client connection is a packet conn, write our own Listen/Accept loop for UDP
 		// main loop: for every new packet we create a new connection and connect it back to the client
@@ -149,7 +154,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		t.log.Errorf("internal error: unknown client protocol %s for client %s:%s",
 			t.listenerAddr.Network(), t.listenerAddr.Network(), t.listenerAddr.String())
 	}
-	
+
 	log.Infof("Turncat client listening on %s, TURN server: %s, peer: %s",
 		config.ListenerAddr, config.ServerAddr, config.PeerAddr)
 
@@ -179,7 +184,7 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
-	default: 
+	default:
 		t.log.Error("internal error: unknown listener socket type")
 	}
 }
@@ -204,7 +209,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	// connection for the TURN client
 	var turnConn net.PacketConn
-	switch t.serverAddr.Network(){
+	switch t.serverAddr.Network() {
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		t, err := net.ListenPacket(t.serverAddr.Network(), "0.0.0.0:0")
 		if err != nil {
@@ -284,7 +289,7 @@ func (t *Turncat) deleteConnection(conn *connection) {
 	if err := conn.clientConn.Close(); err != nil {
 		t.log.Warnf("error closing client connection for %s:%s: %s",
 			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
-		}
+	}
 	if err := conn.serverConn.Close(); err != nil {
 		t.log.Warnf("error closing relayed TURN server connection for %s:%s: %s",
 			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
@@ -307,7 +312,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				// ignore "use of closed network connection" errors on exit (DeleteConn already called)
 				// unfoftunately, the PacketConn forged by pion/turn fails to check for net.ErrClosed...
 				if !errors.Is(readErr, net.ErrClosed) &&
-					!strings.Contains(readErr.Error(), "use of closed network connection"){
+					!strings.Contains(readErr.Error(), "use of closed network connection") {
 					t.log.Debugf("cannot read from TURN relay connection for client %s:%s (likely hamrless): %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
@@ -317,15 +322,15 @@ func (t *Turncat) runConnection(conn *connection) {
 
 			// TODO: not sure if this is the recommended way to compare net.Addrs
 			if peerAddr.Network() != t.peerAddr.Network() || peerAddr.String() != t.peerAddr.String() {
-				t.log.Debugf("received packet of %d bytes from unknown peer %s:%s (expected: " +
+				t.log.Debugf("received packet of %d bytes from unknown peer %s:%s (expected: "+
 					"%s:%s) on TURN relay connection for client %s:%s: ignoring",
 					n, peerAddr.Network(), peerAddr.String(),
-					t.peerAddr.Network(), t.peerAddr.String(), 
+					t.peerAddr.Network(), t.peerAddr.String(),
 					conn.clientAddr.Network(), conn.clientAddr.String())
 				continue
 			}
 
-			t.log.Tracef("forwarding packet of %d bytes from peer %s:%s on TURN relay connection " +
+			t.log.Tracef("forwarding packet of %d bytes from peer %s:%s on TURN relay connection "+
 				"for client %s:%s", n, peerAddr.Network(), peerAddr.String(),
 				conn.clientAddr.Network(), conn.clientAddr.String())
 
@@ -366,7 +371,6 @@ func (t *Turncat) runConnection(conn *connection) {
 	}()
 }
 
-
 func (t *Turncat) runListenPacket() {
 	listenerConn, ok := t.listenerConn.(net.PacketConn)
 	if !ok {
@@ -390,7 +394,7 @@ func (t *Turncat) runListenPacket() {
 		caddr := fmt.Sprintf("%s:%s", clientAddr.Network(), clientAddr.String())
 		trackConn, found := t.connTrack[caddr]
 		if !found {
-			t.log.Tracef("new client connection: read initial packet of %d bytes on listener" +
+			t.log.Tracef("new client connection: read initial packet of %d bytes on listener"+
 				"connnection from client %s", n, caddr)
 
 			// create per-client connection, connect back to client, then call runConnection

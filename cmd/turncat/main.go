@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
@@ -10,10 +10,11 @@ import (
 	// "bytes"
 	// "reflect"
 
-	flag "github.com/spf13/pflag"
 	"github.com/pion/turn/v2"
+	flag "github.com/spf13/pflag"
 
-	"github.com/l7mp/stunner/v1"
+	"github.com/l7mp/stunner"
+	// "github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 func main() {
@@ -24,11 +25,11 @@ func main() {
 
 	os.Args[0] = "turncat"
 	defaultDuration, _ := time.ParseDuration("1h")
- 	var realm    = flag.StringP("realm",      "r", "stunner.l7mp.io", "Realm (default: stunner.l7mp.io).")
-	var level    = flag.StringP("log",        "l", "all:WARN",        "Log level (default: all:WARN).")
-	var verbose  = flag.BoolP("verbose",      "v", false,             "Verbose logging, identical to -l all:DEBUG.")
- 	var secret   = flag.StringP("secret",     "s", "",                "Long-term credential shared secret.")
-	var duration = flag.DurationP("duration", "d", defaultDuration,   "Long-term credential duration (default: 1h)")
+	var realm = flag.StringP("realm", "r", "stunner.l7mp.io", "Realm (default: stunner.l7mp.io).")
+	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
+	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
+	var secret = flag.StringP("secret", "s", "", "Long-term credential shared secret.")
+	var duration = flag.DurationP("duration", "d", defaultDuration, "Long-term credential duration (default: 1h)")
 	flag.Parse()
 
 	if flag.NArg() != 3 {
@@ -86,7 +87,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	<- ctx.Done()
+	<-ctx.Done()
 	t.Close()
 
 }

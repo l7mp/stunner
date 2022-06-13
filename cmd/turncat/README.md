@@ -13,7 +13,7 @@ As simple as it gets:
 
 ```console
 $ cd stunner
-$ go build -o turncat utils/turncat/main.go
+$ go build -o turncat cmd/turncat/main.go
 ```
 
 ### Usage

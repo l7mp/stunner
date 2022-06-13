@@ -15,9 +15,9 @@ supported by STUNner.
 
 ## Manuals
 
-* The [`stunnerd` manual](/utils/stunnerd/README.md) describes the installation and configuration
+* The [`stunnerd` manual](/cmd/stunnerd/README.md) describes the installation and configuration
   of `stunnerd`, the daemon that implements the STUNner gateway service.
-* The [`turncat` manual](/utils/turncat/README.md) describes the `turncat` utility, a simple
+* The [`turncat` manual](/cmd/turncat/README.md) describes the `turncat` utility, a simple
   STUN/TURN client to tunnel a local connection through a TURN server to an arbitrary remote
   address/port.
 

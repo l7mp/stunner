@@ -92,7 +92,7 @@ The most important STUNner configuration settings are as follows.
 * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner. 
 
 The default configuration can be overridden by setting custom command line arguments when
-[launching the STUNner pods](/utils/stunnerd/README.md). All examples below assume that STUNner is
+[launching the STUNner pods](/cmd/stunnerd/README.md). All examples below assume that STUNner is
 deployed into the `default` namespace; see the installation notes below on how to override this.
 
 ## Installation
@@ -142,11 +142,11 @@ $ git clone https://github.com/l7mp/stunner.git
 $ cd stunner
 ```
 
-Then, customize the default settings in the STUNner service [manifest](/kubernetes/stunner.yaml)
+Then, customize the default settings in the STUNner service [manifest](/deploy/manifests/stunner.yaml)
 and deploy it via `kubectl`.
 
 ```console
-$ kubectl apply -f kubernetes/stunner.yaml
+$ kubectl apply -f deploy/manifests/stunner.yaml
 ```
 By default, all resources are created in the `default` namespace.
 

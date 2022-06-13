@@ -78,7 +78,6 @@ spec:
       containers:
       - name: stunnerd
         image: l7mp/stunnerd:latest
-        # imagePullPolicy: Never
         imagePullPolicy: Always
         command: ["stunnerd"]
         args: ["-c", "/stunnerd.conf"]

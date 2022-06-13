@@ -5,10 +5,10 @@ deployed into Kubernetes. The demo can be used to quickly check a STUNner instal
 
 In this demo you will learn how to:
 * configure a UDP echo service in Kubernetes,
-* use the [`turncat`](/utils/turncat) utility to connect to STUNner,
+* use the [`turncat`](/cmd/turncat) utility to connect to STUNner,
 * secure the STUNner deployment,
 * connect a local UDP sender to the echo service running in Kubernetes via STUNner, and
-* test a STUNner installation with [`turncat`](/utils/turncat).
+* test a STUNner installation with [`turncat`](/cmd/turncat).
 
 ## Installation
 
@@ -18,13 +18,13 @@ Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to s
 
 ### Setup
 
-STUNner comes with a simple STUN/TURN client called [`turncat`](/utils/turncat) that can be used to
+STUNner comes with a simple STUN/TURN client called [`turncat`](/cmd/turncat) that can be used to
 test a STUNner installation. The `turncat` client will open a UDP tunnel through STUNner into the
 Kubernetes cluster, which can be used to access any UDP service running inside the cluster (unless
 blocked by a [properly configured](/README.md#security) `NetworkPolicy`). Note that your WebRTC
 clients will not need `turncat` to reach the cluster, since all Web browsers come with a STUN/TURN
 client included; `turncat` here is used only to simulate what a WebRTC client would do when trying
-to reach STUNner. For more info, see the `turncat` [documentation](/utils/turncat).
+to reach STUNner. For more info, see the `turncat` [documentation](/cmd/turncat).
 
 In this demo we test the STUNner installation by deploying a UDP echo server into the cluster and
 exposing it for external access via STUNner.
@@ -112,8 +112,9 @@ all packets to the `udp-echo` service in your Kubernetes cluster through STUNner
 
 ```console
 $ cd stunner
-$ go run utils/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:9000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${UDP_ECHO_IP}:9001
+$ go run cmd/turncat/main.go --realm $STUNNER_REALM --log=all:DEBUG udp://127.0.0.1:9000 \
+    turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} \
+    udp://${UDP_ECHO_IP}:9001
 ```
 
 Now, in another terminal open a UDP connection through the tunnel opened by `turncat` and send
