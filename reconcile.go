@@ -59,6 +59,24 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		s.authManager.Upsert(o)
 	}
 
+	// monitoring
+	newMonitoring, err := s.monitoringManager.Reconcile([]v1alpha1.Config{&req.Monitoring})
+	if err != nil {
+		if err == v1alpha1.ErrRestartRequired {
+			restart = true
+		} else {
+			return fmt.Errorf("could not reconcile monitoring config: %s", err.Error())
+		}
+	}
+
+	for _, c := range newMonitoring {
+		o, err := object.NewMonitoring(c, s.logger)
+		if err != nil && err != v1alpha1.ErrRestartRequired {
+			return err
+		}
+		s.monitoringManager.Upsert(o)
+	}
+
 	// listener
 	lconf := make([]v1alpha1.Config, len(req.Listeners))
 	for i := range req.Listeners {

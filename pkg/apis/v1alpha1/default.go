@@ -19,6 +19,7 @@ const DefaultClusterType = "STATIC"
 const DefaultAdminName = "default-admin-config"
 const DefaultAuthName = "default-auth-config"
 
-const DefaultPrometheusPort int = 8080
-const DefaultPrometheusUrl = "/metrics"
-const DefaultPrometheusGroup = "STUNner"
+const DefaultMonitoringName = "default-monitoring-config"
+const DefaultMonitoringPort int = 8080
+const DefaultMonitoringUrl = "/metrics"
+const DefaultMonitoringGroup = "STUNner"

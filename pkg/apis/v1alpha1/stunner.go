@@ -15,6 +15,8 @@ type StunnerConfig struct {
 	Admin AdminConfig `json:"admin,omitempty"`
 	// Auth defines the specification of the STUN/TURN authentication mechanism used by STUNner
 	Auth AuthConfig `json:"auth"`
+	// Monitoring holds the Prometheus configuration
+	Monitoring MonitoringConfig `json:"monitoring"`
 	// Listeners defines the listeners for STUNner
 	Listeners []ListenerConfig `json:"listeners,omitempty"`
 	// Clusters defines the upstream endpoints to which transport peer connections can be made
@@ -37,6 +39,11 @@ func (req *StunnerConfig) Validate() error {
 
 	// validate auth
 	if err := req.Auth.Validate(); err != nil {
+		return err
+	}
+
+	// validate monitoring
+	if err := req.Monitoring.Validate(); err != nil {
 		return err
 	}
 
@@ -87,6 +94,10 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 		return false
 	}
 	if !req.Auth.DeepEqual(&other.Auth) {
+		return false
+	}
+
+	if !req.Monitoring.DeepEqual(&other.Monitoring) {
 		return false
 	}
 
