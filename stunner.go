@@ -2,13 +2,15 @@
 package stunner
 
 import (
-	// "fmt"
+	"fmt"
+	"net/http"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
@@ -18,13 +20,13 @@ import (
 
 // Stunner is an instance of the STUNner deamon
 type Stunner struct {
-	version                                                    string
-	adminManager, authManager, listenerManager, clusterManager manager.Manager
-	resolver                                                   resolver.DnsResolver
-	logger                                                     logging.LoggerFactory
-	log                                                        logging.LeveledLogger
-	server                                                     *turn.Server
-	net                                                        *vnet.Net
+	version                                                                       string
+	adminManager, authManager, monitoringManager, listenerManager, clusterManager manager.Manager
+	resolver                                                                      resolver.DnsResolver
+	logger                                                                        logging.LoggerFactory
+	log                                                                           logging.LeveledLogger
+	server                                                                        *turn.Server
+	net                                                                           *vnet.Net
 }
 
 // NewStunner creates a new STUNner deamon from the specified configuration
@@ -45,14 +47,15 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 
 	logger := NewLoggerFactory(req.Admin.LogLevel)
 	s := Stunner{
-		version:         req.ApiVersion,
-		logger:          logger,
-		log:             logger.NewLogger("stunner"),
-		adminManager:    manager.NewManager("admin-manager", logger),
-		authManager:     manager.NewManager("auth-manager", logger),
-		listenerManager: manager.NewManager("listener-manager", logger),
-		clusterManager:  manager.NewManager("cluster-manager", logger),
-		resolver:        resolver.NewDnsResolver("dns-resolver", logger),
+		version:           req.ApiVersion,
+		logger:            logger,
+		log:               logger.NewLogger("stunner"),
+		adminManager:      manager.NewManager("admin-manager", logger),
+		authManager:       manager.NewManager("auth-manager", logger),
+		monitoringManager: manager.NewManager("monitoring-manager", logger),
+		listenerManager:   manager.NewManager("listener-manager", logger),
+		clusterManager:    manager.NewManager("cluster-manager", logger),
+		resolver:          resolver.NewDnsResolver("dns-resolver", logger),
 	}
 
 	if net == nil {
@@ -101,6 +104,15 @@ func (s *Stunner) GetAuth() *object.Auth {
 	return a.(*object.Auth)
 }
 
+// GetMonitoring returns the STUNner monitoring
+func (s *Stunner) GetMonitoring() *object.Monitoring {
+	a, found := s.monitoringManager.Get(v1alpha1.DefaultMonitoringName)
+	if !found {
+		panic("internal error: no Monitoring found")
+	}
+	return a.(*object.Monitoring)
+}
+
 // GetListener returns a STUNner listener or nil of no listener with the given name found
 func (s *Stunner) GetListener(name string) *object.Listener {
 	l, found := s.listenerManager.Get(name)
@@ -131,4 +143,16 @@ func (s *Stunner) InitMonitoring() {
 	} else {
 		s.log.Warn("GaugeFunc 'allocation' cannot be registered.")
 	}
+}
+
+func (s *Stunner) StartMonitoring() {
+	// serve Prometheus mertics over HTTP
+	go func() {
+		monitoring := s.GetMonitoring()
+		monitoringUrl := monitoring.Url
+		monitoringPort := monitoring.Port
+		http.Handle(monitoringUrl, promhttp.Handler())
+		http.ListenAndServe(fmt.Sprintf(":%d", monitoringPort), nil)
+	}()
+
 }

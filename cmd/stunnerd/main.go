@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 
 	"github.com/l7mp/stunner"
@@ -182,12 +181,6 @@ func main() {
 			s.Close()
 		}
 	})()
-
-	// serve Prometheus mertics over HTTP
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		http.ListenAndServe(":8080", nil) // FIXME: use config params
-	}()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)

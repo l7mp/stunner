@@ -129,6 +129,9 @@ func (s *Stunner) Start() error {
 		}
 	}
 
+	// start monitoring
+	s.StartMonitoring()
+
 	// start the DNS resolver threads
 	s.resolver.Start()
 
