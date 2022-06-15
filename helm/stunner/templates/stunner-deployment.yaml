@@ -18,7 +18,7 @@ spec:
       - name: {{ .Values.stunner.deployment.container.name }}
         image: "{{ .Values.stunner.deployment.container.image.repository }}{{ .Values.stunner.deployment.container.image.name }}:{{ .Values.stunner.deployment.container.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.stunner.deployment.container.image.pullPolicy }}
-        command: ["stunnerd"]
+        command: ["stunnerd", "-c", "/stunnerd.conf"]
         # override env: e.g., args: ["--user", "test=test", "-l all:INFO"]
         args: []
         envFrom:
