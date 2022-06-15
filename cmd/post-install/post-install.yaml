@@ -44,7 +44,7 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     crb: stunner-job
-  name: prometheus-operator
+  name: stunner-job
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
