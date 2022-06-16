@@ -1252,7 +1252,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 // start with default config and then reconcile with the given config
 func TestStunnerReconcile(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
+	lim := test.TimeOut(time.Second * 60)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
@@ -1814,7 +1814,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 }
 
 func TestStunnerReconcileE2EWithVNet(t *testing.T) {
-	lim := test.TimeOut(time.Second * 60)
+	lim := test.TimeOut(time.Second * 120)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)

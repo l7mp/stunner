@@ -468,7 +468,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 }
 
 func TestStunnerClusterWithVNet(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
+	lim := test.TimeOut(time.Second * 60)
 	defer lim.Stop()
 
 	report := test.CheckRoutines(t)
