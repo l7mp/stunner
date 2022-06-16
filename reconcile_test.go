@@ -1,8 +1,8 @@
 package stunner
 
 import (
-	"net"
 	// "fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -30,7 +30,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: default admin",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -114,7 +116,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty credentials errs: user",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"password": "pass",
@@ -138,7 +142,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty credentials errs: passwd",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -162,7 +168,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty listener is fine",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -184,7 +192,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty listener name errs",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -208,7 +218,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty cluster is fine",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -230,7 +242,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: empty cluster name errs",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -257,7 +271,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
-				Name: "new-name",
+				Name:     "new-name",
+				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
@@ -429,7 +444,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
-				LogLevel: "anything",
+				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
@@ -513,7 +528,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
-				LogLevel: "anything",
+				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
@@ -597,7 +612,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
-				LogLevel: "anything",
+				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
@@ -688,7 +703,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile existing listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -764,7 +781,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile new listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -836,7 +855,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile additional listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -934,7 +955,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile deleted listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -966,7 +989,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile existing cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1020,7 +1045,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile new cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1078,7 +1105,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile additional cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1145,7 +1174,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile additional cluster and reroute",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1212,7 +1243,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		name: "reconcile-test: reconcile deleted cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1316,7 +1349,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "initial E2E reconcile test: empty server",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1335,7 +1370,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "adding a listener at the wrong port",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1362,7 +1399,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "adding a cluster to a listener at the wrong port",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1394,7 +1433,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "adding a listener at the right port",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1434,7 +1475,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "adding a cluster to the wrong IP",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1479,7 +1522,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "removing working cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1519,7 +1564,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "reintroducing good cluster to the wrong IP",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1564,7 +1611,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "removing wrong listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1600,7 +1649,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "correct the wrong cluster and remove the good one",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1638,7 +1689,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "removing wrong cluster and reverting the working one",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1671,7 +1724,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "removing dangling cluster ref",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1703,7 +1758,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "converting cluster to strict dns",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1737,7 +1794,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "rewiring to an open cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1769,7 +1828,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "closing open cluster",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
@@ -1796,7 +1857,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		testName: "closing listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
-			Admin:      v1alpha1.AdminConfig{},
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
