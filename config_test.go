@@ -93,18 +93,12 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	// patch in the loglevel
 	c.Admin.LogLevel = stunnerTestLoglevel
 
-	fmt.Printf("%#v\n", c)
-
 	file, err2 := yaml.Marshal(c)
 	assert.NoError(t, err2, "marschal config fike")
-
-	fmt.Printf("%s\n", string(file))
 
 	newConf := &v1alpha1.StunnerConfig{}
 	err = yaml.Unmarshal(file, newConf)
 	assert.NoError(t, err, "unmarschal config from fike")
-
-	fmt.Printf("%#v\n", *newConf)
 
 	ok := newConf.DeepEqual(c)
 	assert.True(t, ok, "config file roundtrip")
