@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,21 +16,29 @@ import (
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
 
-const confUpdatePeriod = 1 * time.Second
+const (
+	defaultLoglevel  = "all:INFO"
+	confUpdatePeriod = 1 * time.Second
+)
 
 func main() {
 	os.Args[0] = "stunnerd"
 	var config = flag.StringP("config", "c", "", "Config file.")
-	var level = flag.StringP("log", "l", "all:INFO", "Log level (default: all:INFO).")
+	var level = flag.StringP("log", "l", "", "Log level (default: all:INFO).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>.")
 	flag.Parse()
 
+	logLevel := defaultLoglevel
 	if *verbose {
-		*level = "all:DEBUG"
+		// verbose mode on, override any loglevel
+		logLevel = "all:DEBUG"
+	} else if *level != "" {
+		// loglevel set on the comman line, use that one instead
+		logLevel = *level
 	}
 
-	log := stunner.NewLoggerFactory(*level).NewLogger("stunnerd")
+	log := stunner.NewLoggerFactory(logLevel).NewLogger("stunnerd")
 	conf := make(chan *v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
@@ -185,8 +194,8 @@ func main() {
 			log.Trace("new configuration file available")
 
 			// command line loglevel overrides config
-			if *level != "" {
-				c.Admin.LogLevel = *level
+			if *verbose || *level != "" {
+				c.Admin.LogLevel = logLevel
 			}
 
 			if s == nil {

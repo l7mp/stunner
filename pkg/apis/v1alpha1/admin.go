@@ -15,6 +15,7 @@ type AdminConfig struct {
 
 // Validate checks a configuration and injects defaults
 func (req *AdminConfig) Validate() error {
+	//FIXME: no validation for loglevel (we'd need to create a new logger and it's not worth)
 	if req.LogLevel == "" {
 		req.LogLevel = DefaultLogLevel
 	}
