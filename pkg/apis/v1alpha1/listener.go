@@ -13,6 +13,8 @@ type ListenerConfig struct {
 	Name string `json:"name,omitempty"`
 	// Protocol is the transport protocol used by the listener ("UDP", "TCP", "TLS", "DTLS")
 	Protocol string `json:"protocol,omitempty"`
+	// PublicAddr is the Internet-facing public IP address for the listener
+	PublicAddr string `json:"public_address,omitempty"`
 	// Addr is the IP address for the listener
 	Addr string `json:"address,omitempty"`
 	// Port is the port for the listener
