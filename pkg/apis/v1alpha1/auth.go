@@ -9,7 +9,7 @@ import (
 type AuthConfig struct {
 	// Type is the type of the STUN/TURN authentication mechanism ("plaintext" or "longterm")
 	Type string `json:"type,omitempty"`
-	// Realm is the STUN/TURN realm
+	// Realm defines the STUN/TURN realm to be used for STUNner
 	Realm string `json:"realm,omitempty"`
 	// Credentials specifies the authententication credentials: for "plaintext" at least the
 	// keys "username" and "password" must be set, for "longterm" the key "secret" will hold
