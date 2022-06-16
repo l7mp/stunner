@@ -21,4 +21,4 @@ jobs:
       - name: Go install
         run: go install
       - name: Test
-        run: go test
+        run: go test -v
