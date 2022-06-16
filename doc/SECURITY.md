@@ -6,7 +6,7 @@ the risks associated with a misconfigured STUNner.
 
 ## Table of Contents
 1. [Threat](#threat)
-2. [Locking down STUNner](#locking-downstunner)
+2. [Locking down STUNner](#locking-down-stunner)
 3. [Authentication](#authentication)
 4. [Access control](#access-control)
 5. [Exposing internal IP addresses](#exposing-internal-ip-addresses)
