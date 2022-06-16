@@ -12,7 +12,7 @@ Kubernetes pod.
 2. [Configuration](#configuration)
 3. [Installation](#installation)
 4. [Learning the external IP and port](#learning-the-external-ip-and-port)
-5. [Configuring WebRTC clients](configuring-webrtc-clients)
+5. [Configuring WebRTC clients](#configuring-webrtc-clients)
 6. [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp)
 
 ## Prerequisites
@@ -85,7 +85,7 @@ The most important STUNner configuration settings are as follows.
   customize!
 * `STUNNER_DURATION` (default: `86400` sec, i.e., one day): the lifetime of STUNner credentials in
   `longterm` authentication. Not used by STUNner directly, but the [long-term credential
-  generation](/doc/AUTH.mc) mechanism use this configuration parameter to customize
+  generation](/doc/AUTH.md) mechanism use this configuration parameter to customize
   username/password lifetime.
 * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
 * `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner. 
@@ -163,7 +163,7 @@ Kubernetes lets you use your own [fix IP address and domain
 name](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
 but the default installation scripts do not support this.) WebRTC clients will need to learn
 STUNner's external IP and port somehow; this is outside the scope of STUNner; but see the [One to
-one video call with Kurento via STUNner](examples/kurento-one2one-call) demo for a solution to
+one video call with Kurento via STUNner](/examples/kurento-one2one-call) demo for a solution to
 communicate the STUN/TURN URI and port back to WebRTC clients during user registration.
 
 In order to simplify the integration of STUNner into the WebRTC application server, STUNner stores
@@ -256,7 +256,7 @@ Note that STUNner comes with a [small Node.js
 library]https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that makes it simpler dealing with
 ICE configurations and STUNner credentials in the application server.
 
-## Enabling TCP TURN transport
+## Enabling TURN transport over TCP
 
 Some corporate firewalls block all UDP access from the private network, except DNS. To make sure
 that clients can still reach STUNner from locked-down private networks, you can expose STUNner over
@@ -292,7 +292,7 @@ Restart STUNner with the new configuration.
 $ kubectl rollout restart deployment/stunner
 ```
 
-If using a media-server, don't forget to open up the [STUNner ACL](/doc/SECURITY#access-control) so
+If using a media-server, don't forget to open up the [STUNner ACL](/doc/SECURITY.md#access-control) so
 that STUNner can reach the media server pool over TCP.
 
 Finally, direct your clients to the re-exposed STUNner TCP service with the below `PeerConnection` configuration; don't
