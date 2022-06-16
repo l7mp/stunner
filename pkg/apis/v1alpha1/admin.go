@@ -10,7 +10,7 @@ type AdminConfig struct {
 	// Name is the name of the server, optional
 	Name string `json:"name,omitempty"`
 	// LogLevel is the desired log verbosity, e.g.: "stunner:TRACE,all:INFO"
-	LogLevel string `json:"logLevel,omitempty"`
+	LogLevel string `json:"loglevel,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults
