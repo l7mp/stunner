@@ -39,7 +39,7 @@ $ kubectl get cm stunner-config -o jsonpath="{.data.STUNNER_AUTH_TYPE}"
 ```
 
 If the output is `plaintext` you're good to go. Otherwise, consult the [STUNner Authentication
-Guide](doc/AUTH.md) on how to restart STUNner with plain-text authentication.
+Guide](/doc/AUTH.md#plaintext-authentication) on how to restart STUNner with plain-text authentication.
 
 Create a `Deployment` called `udp-echo` containing only a single pod and make this pod available
 over the UDP port 9001 as a cluster-internal service with the same name. Use everyone's favorite
@@ -129,7 +129,7 @@ cluster.
 
 ### Cleaning up
 
-First, make sure to lock down the ACL to the [default-deny rule](locking-down-STUNner):
+First, make sure to lock down the ACL to the [default-deny rule](/doc/SECURITY.md#locking-down-stunner):
 
 ```console
 $ kubectl apply -f - <<EOF
