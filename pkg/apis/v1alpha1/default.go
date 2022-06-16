@@ -12,7 +12,7 @@ const DefaultAuthType = "plaintext"
 // const DefaultUsername = "user1"
 // const DefaultPassword = "passwd1"
 
-const DefaultMinRelayPort int = 1 << 10
+const DefaultMinRelayPort int = 1 << 15
 const DefaultMaxRelayPort int = 1<<16 - 1
 const DefaultClusterType = "STATIC"
 
