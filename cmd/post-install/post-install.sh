@@ -25,8 +25,8 @@ STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer
 sleep 1
 ((TIMERCNT++))
 
-#this is triggered if the external IP address didn't occure for 40 seconds
-if [[ "$TIMERCNT" -eq 40 ]]; then
+#this is triggered if the external IP address didn't occure for 120 seconds
+if [[ "$TIMERCNT" -eq 120 ]]; then
   STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/nodes / |
     jq '.items[0].status.addresses[] | select(.type=="ExternalIP").address')
   STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner / |
