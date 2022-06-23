@@ -2,17 +2,14 @@
 package stunner
 
 import (
-	"fmt"
-	"net/http"
+	// "fmt"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"github.com/l7mp/stunner/internal/manager"
+	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -26,6 +23,7 @@ type Stunner struct {
 	logger                                                                        logging.LoggerFactory
 	log                                                                           logging.LeveledLogger
 	server                                                                        *turn.Server
+	monitoringServer                                                              *monitoring.MonitoringServer
 	net                                                                           *vnet.Net
 }
 
@@ -61,7 +59,13 @@ func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
 		return nil, err
 	}
 
-	s.InitMonitoring()
+	if m, err := monitoring.NewMonitoringServer(s.GetMonitoring()); err == nil {
+		s.monitoringServer = m
+	} else {
+		s.log.Warn("monitoring disabled")
+	}
+
+	s.monitoringServer.Init(s.server.AllocationCount)
 
 	return &s, nil
 }
@@ -119,30 +123,4 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 		return nil
 	}
 	return l.(*object.Cluster)
-}
-
-func (s *Stunner) InitMonitoring() {
-	if err := prometheus.Register(prometheus.NewGaugeFunc(
-		prometheus.GaugeOpts{
-			Name: "allocation_count",
-			Help: "Number of active allocations.",
-		},
-		func() float64 { return float64(s.server.AllocationCount()) },
-	)); err == nil {
-		s.log.Debug("GaugeFunc 'allocation' registered.")
-	} else {
-		s.log.Warn("GaugeFunc 'allocation' cannot be registered.")
-	}
-}
-
-func (s *Stunner) StartMonitoring() {
-	// serve Prometheus mertics over HTTP
-	go func() {
-		monitoring := s.GetMonitoring()
-		monitoringUrl := monitoring.Url
-		monitoringPort := monitoring.Port
-		http.Handle(monitoringUrl, promhttp.Handler())
-		http.ListenAndServe(fmt.Sprintf(":%d", monitoringPort), nil)
-	}()
-
 }
