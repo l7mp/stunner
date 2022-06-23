@@ -45,10 +45,10 @@ func (monitoring *Monitoring) Reconcile(conf v1alpha1.Config) error {
 	}
 
 	monitoring.Port = req.Port
-	monitoring.log.Infof("using port: %d", monitoring.Port)
-
 	monitoring.Url = req.Url
 	monitoring.Group = req.Group
+	monitoring.log.Infof("using port: %d, and url: '%s', with group '%s'",
+		monitoring.Port, monitoring.Url, monitoring.Group)
 
 	return nil
 }

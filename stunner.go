@@ -75,7 +75,7 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 		s.log.Warn("monitoring disabled")
 	}
 
-	s.monitoringServer.Init(s.server.AllocationCount)
+	s.monitoringServer.Init(func() float64 { return float64(s.server.AllocationCount()) })
 
 	return &s, nil
 }
