@@ -40,13 +40,13 @@ func NewMonitoringServer(o *object.Monitoring) (*MonitoringServer, error) {
 	return m, nil
 }
 
-func (m *MonitoringServer) Init(fp func() int) {
+func (m *MonitoringServer) Init(fp func() float64) {
 	if err := prometheus.Register(prometheus.NewGaugeFunc(
 		prometheus.GaugeOpts{
 			Name: "allocation_count",
 			Help: "Number of active allocations.",
 		},
-		func() float64 { return float64(fp()) },
+		fp,
 	)); err == nil {
 		//FIXME m.log.Debug("GaugeFunc 'allocation' registered.")
 		fmt.Println("GaugeFunc 'allocation' registered.")
