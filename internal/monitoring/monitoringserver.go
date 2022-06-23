@@ -51,8 +51,8 @@ func (m *MonitoringServer) Init(fp func() int) {
 		//FIXME m.log.Debug("GaugeFunc 'allocation' registered.")
 		fmt.Println("GaugeFunc 'allocation' registered.")
 	} else {
-		//FIXME m.log.Warn("GaugeFunc 'allocation' cannot be registered.")
-		fmt.Println("GaugeFunc 'allocation' cannot be registered.")
+		//FIXME m.log.Warn("GaugeFunc 'allocation' cannot be registered (already registered?).")
+		fmt.Println("GaugeFunc 'allocation' cannot be registered (already registered?).")
 	}
 }
 
