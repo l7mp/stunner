@@ -130,7 +130,7 @@ func (s *Stunner) Start() error {
 	}
 
 	// start monitoring
-	s.StartMonitoring()
+	s.monitoringServer.Start()
 
 	// start the DNS resolver threads
 	s.resolver.Start()
@@ -191,6 +191,9 @@ func (s *Stunner) Close() {
 		s.server.Close()
 	}
 	s.server = nil
+
+	// shutdown monitoring
+	s.monitoringServer.Stop()
 }
 
 // NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with the TURN server for authenticating clients

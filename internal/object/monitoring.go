@@ -43,9 +43,9 @@ func (monitoring *Monitoring) Reconcile(conf v1alpha1.Config) error {
 	if err := req.Validate(); err != nil {
 		return err
 	}
-	// TODO from here
+
 	monitoring.Port = req.Port
-	monitoring.log.Infof("using port: %s", monitoring.Port)
+	monitoring.log.Infof("using port: %d", monitoring.Port)
 
 	monitoring.Url = req.Url
 	monitoring.Group = req.Group
