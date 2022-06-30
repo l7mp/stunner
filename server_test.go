@@ -485,10 +485,9 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			log.Debug("building virtual network")
 			v, err := buildVNet(loggerFactory)
 			assert.NoError(t, err, err)
-			c.config.Net = v.podnet
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunner(c.config)
+			stunner, err := NewStunnerWithVNet(c.config, v.podnet)
 			assert.NoError(t, err, err)
 
 			log.Debug("setting up the mock DNS")
