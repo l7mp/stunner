@@ -46,10 +46,9 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			log.Debug("building virtual network")
 			v, err := buildVNet(loggerFactory)
 			assert.NoError(t, err, err)
-			c.Net = v.podnet
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunner(*c)
+			stunner, err := NewStunnerWithVNet(*c, v.podnet)
 			assert.NoError(t, err)
 
 			log.Debug("starting stunnerd")

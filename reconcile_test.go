@@ -1896,11 +1896,7 @@ func TestStunnerReconcileE2EWithVNet(t *testing.T) {
 	assert.NoError(t, err, err)
 
 	conf.Admin.LogLevel = stunnerTestLoglevel
-
-	// patch in the vnet
-	conf.Net = v.podnet
-
-	s, err := NewStunner(*conf)
+	s, err := NewStunnerWithVNet(*conf, v.podnet)
 	assert.NoError(t, err, err)
 
 	log.Debug("setting up the mock DNS")
@@ -1916,7 +1912,6 @@ func TestStunnerReconcileE2EWithVNet(t *testing.T) {
 	assert.NoError(t, s.Start())
 
 	for _, c := range testReconcileE2E {
-		c.config.Net = v.podnet
 		t.Run(c.testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", c.testName)
 
