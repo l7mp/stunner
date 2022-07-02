@@ -68,7 +68,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
 	ipAddr := net.ParseIP(req.Addr)
 
-	// the only chance we don't need a restart of only the Routes change
+	// the only chance we don't need a restart if only the Routes change
 	restart := true
 	if l.Name == req.Name && // name unchanged (should always be true)
 		l.Proto == proto && // protocol unchanged
@@ -146,15 +146,25 @@ func (l *Listener) Close() error {
 	case v1alpha1.ListenerProtocolUDP:
 		if l.Conn != nil {
 			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
-			l.Conn.(turn.PacketConnConfig).PacketConn.Close()
+			conn, ok := l.Conn.(turn.PacketConnConfig)
+			if !ok {
+				return fmt.Errorf("internal error: invalid conversion to turn.PacketConnConfig")
+			}
+
+			return conn.PacketConn.Close()
 		}
 	case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
 		if l.Conn != nil {
 			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
-			l.Conn.(turn.ListenerConfig).Listener.Close()
+			conn, ok := l.Conn.(turn.ListenerConfig)
+			if !ok {
+				return fmt.Errorf("internal error: invalid conversion to turn.ListenerConfig")
+			}
+
+			return conn.Listener.Close()
 		}
 	default:
-		panic("internal error: unknown listener protocol " + l.Proto.String())
+		return fmt.Errorf("internal error: unknown listener protocol %q", l.Proto.String())
 	}
 
 	return v1alpha1.ErrRestartRequired

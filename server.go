@@ -162,7 +162,8 @@ func (s *Stunner) Start() error {
 	return nil
 }
 
-// Close stops the STUNner daemon. It cleans up any associated state and closes all connections it is managing
+// Close stops the STUNner daemon, cleans up any associated state and closes all connections it is
+// managing
 func (s *Stunner) Close() {
 	s.log.Info("Closing Stunner")
 
@@ -173,13 +174,19 @@ func (s *Stunner) Close() {
 	listeners := s.listenerManager.Keys()
 	for _, name := range listeners {
 		l := s.GetListener(name)
-		_ = l.Close()
+		if err := l.Close(); err != nil {
+			s.log.Errorf("Error closing listener %q at adddress %s: %s",
+				l.Proto.String(), l.Addr, err.Error())
+		}
 	}
 
 	clusters := s.clusterManager.Keys()
 	for _, name := range clusters {
 		c := s.GetCluster(name)
-		_ = c.Close()
+		if err := c.Close(); err != nil {
+			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
+				err.Error())
+		}
 	}
 
 	s.resolver.Close()
