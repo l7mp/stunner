@@ -1,8 +1,13 @@
 package object
 
 import (
+	"crypto/hmac"
+	"crypto/sha1" //nolint:gosec,gci
+	"encoding/base64"
 	"fmt"
 	"net"
+	"strconv"
+	"time"
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
@@ -79,7 +84,33 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 			return fmt.Errorf("cannot handle auth config for type %s: invalid secret",
 				auth.Type.String())
 		}
-		handler = turn.NewLongTermAuthHandler(secret, auth.log)
+		// handler = turn.NewLongTermAuthHandler(secret, auth.log)
+		handler = func(username, realm string, srcAddr net.Addr) (key []byte, ok bool) {
+			auth.log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
+				username, realm, srcAddr)
+
+			t, err := strconv.Atoi(username)
+			if err != nil {
+				auth.log.Errorf("invalid time-windowed username %q", username)
+				return nil, false
+			}
+
+			if int64(t) < time.Now().Unix() {
+				auth.log.Errorf("expired time-windowed username %q", username)
+				return nil, false
+			}
+
+			// password, err := longTermCredentials(username, secret)
+			mac := hmac.New(sha1.New, []byte(secret))
+			_, err = mac.Write([]byte(username))
+			if err != nil {
+				auth.log.Errorf("failed do hash username: %w", err.Error())
+				return nil, false
+			}
+			password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+			return turn.GenerateAuthKey(username, realm, password), true
+		}
 	}
 
 	// no error: update
