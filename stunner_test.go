@@ -46,7 +46,7 @@ type echoTestConfig struct {
 	// echo
 	echoServerAddr           string
 	bindSuccess, echoSuccess bool
-	loggerFactory            *logging.DefaultLoggerFactory
+	loggerFactory            logging.LoggerFactory
 }
 
 type bundle struct {
@@ -237,7 +237,7 @@ func (v *VNet) Close() error {
 	return v.gw.Stop()
 }
 
-func buildVNet(logger *logging.DefaultLoggerFactory) (*VNet, error) {
+func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	gw, err := vnet.NewRouter(&vnet.RouterConfig{
 		Name:          "gw",
 		CIDR:          "0.0.0.0/0",

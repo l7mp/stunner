@@ -37,7 +37,7 @@ type turncatEchoTestConfig struct {
 	lconn net.Conn
 	// peer
 	peer          *StunnerUri
-	loggerFactory *logging.DefaultLoggerFactory
+	loggerFactory logging.LoggerFactory
 }
 
 func turncatEchoTest(conf turncatEchoTestConfig) {
