@@ -64,10 +64,13 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 
 		key = turn.GenerateAuthKey(username, req.Realm, password)
 		handler = func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-			auth.log.Debugf("plain text auth: username=%q realm=%q srcAddr=%v\n", username, realm, srcAddr)
+			auth.log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
+				username, realm, srcAddr)
+
 			if username == auth.Username {
 				return auth.key, true
 			}
+
 			return nil, false
 		}
 	case v1alpha1.AuthTypeLongTerm:
