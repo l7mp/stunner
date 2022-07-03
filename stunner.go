@@ -2,7 +2,8 @@
 package stunner
 
 import (
-	// "fmt"
+	"fmt"
+	"strings"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
@@ -114,4 +115,21 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 		return nil
 	}
 	return l.(*object.Cluster)
+}
+
+// String returns a short description of the running STUNner instance
+func (s *Stunner) String() string {
+	listeners := s.listenerManager.Keys()
+	ls := make([]string, len(listeners))
+	for i, l := range listeners {
+		ls[i] = s.GetListener(l).String()
+	}
+	str := "NONE"
+	if len(ls) > 0 {
+		str = strings.Join(ls, ", ")
+	}
+
+	auth := s.GetAuth()
+	return fmt.Sprintf("authentication type: %s, realm: %s, listeners: %s",
+		auth.Type.String(), auth.Realm, str)
 }

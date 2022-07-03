@@ -147,15 +147,7 @@ func (s *Stunner) Start() error {
 		s.server = t
 	}
 
-	ls := make([]string, len(listeners))
-	for i, l := range listeners {
-		ls[i] = s.GetListener(l).String()
-	}
-	str := strings.Join(ls, ", ")
-	if len(ls) == 0 {
-		str = "NONE"
-	}
-	s.log.Infof("TURN server running, realm: %s, listeners: %s", auth.Realm, str)
+	s.log.Infof("TURN server running: %s", s.String())
 
 	return nil
 }
