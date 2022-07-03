@@ -151,7 +151,9 @@ func (l *Listener) Close() error {
 				return fmt.Errorf("internal error: invalid conversion to turn.PacketConnConfig")
 			}
 
-			return conn.PacketConn.Close()
+			if err := conn.PacketConn.Close(); err != nil {
+				return err
+			}
 		}
 	case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
 		if l.Conn != nil {
@@ -161,7 +163,9 @@ func (l *Listener) Close() error {
 				return fmt.Errorf("internal error: invalid conversion to turn.ListenerConfig")
 			}
 
-			return conn.Listener.Close()
+			if err := conn.Listener.Close(); err != nil {
+				return err
+			}
 		}
 	default:
 		return fmt.Errorf("internal error: unknown listener protocol %q", l.Proto.String())
