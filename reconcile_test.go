@@ -1321,8 +1321,6 @@ func TestStunnerReconcile(t *testing.T) {
 				"default stunner admin config ok")
 			assert.True(t, conf.Auth.DeepEqual(&runningConf.Auth),
 				"default stunner auth config ok")
-			assert.True(t, conf.Monitoring.DeepEqual(&runningConf.Monitoring),
-				"default stunner monitoring config ok")
 			assert.True(t, conf.Listeners[0].DeepEqual(
 				&runningConf.Listeners[0]), "default stunner listener config ok")
 			assert.True(t, conf.Clusters[0].DeepEqual(

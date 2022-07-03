@@ -3,6 +3,7 @@ package object
 import (
 	"github.com/pion/logging"
 
+	// "github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -10,8 +11,9 @@ const DefaultAdminObjectName = "DefaultAdmin"
 
 // Admin is the main object holding STUNner administration info
 type Admin struct {
-	Name, LogLevel string
-	log            logging.LeveledLogger
+	Name, LogLevel, MetricsEndpoint    string
+	log                                logging.LeveledLogger
+	//monitoringServer  monitoring.MonitoringServer
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns v1alpha1.ErrRestartRequired)
@@ -47,6 +49,10 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
 
+	// TODO: metrics endpoint: if there is a change: restart the web server,
+	//                        leave untouched otherwise
+	a.MetricsEndpoint = req.MetricsEndpoint
+
 	return nil
 }
 
@@ -62,6 +68,7 @@ func (a *Admin) GetConfig() v1alpha1.Config {
 	return &v1alpha1.AdminConfig{
 		Name:     a.Name,
 		LogLevel: a.LogLevel,
+		MetricsEndpoint: a.MetricsEndpoint,
 	}
 }
 

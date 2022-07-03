@@ -11,6 +11,8 @@ type AdminConfig struct {
 	Name string `json:"name,omitempty"`
 	// LogLevel is the desired log verbosity, e.g.: "stunner:TRACE,all:INFO"
 	LogLevel string `json:"loglevel,omitempty"`
+	// MetricEndpoint specifies the the url to metric server
+	MetricsEndpoint string `json:"metrics_endpoint,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults

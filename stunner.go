@@ -17,14 +17,14 @@ import (
 
 // Stunner is an instance of the STUNner deamon
 type Stunner struct {
-	version                                                                       string
-	adminManager, authManager, monitoringManager, listenerManager, clusterManager manager.Manager
-	resolver                                                                      resolver.DnsResolver
-	logger                                                                        logging.LoggerFactory
-	log                                                                           logging.LeveledLogger
-	server                                                                        *turn.Server
-	monitoringServer                                                              *monitoring.MonitoringServer
-	net                                                                           *vnet.Net
+	version                                                    string
+	adminManager, authManager, listenerManager, clusterManager manager.Manager
+	resolver                                                   resolver.DnsResolver
+	logger                                                     logging.LoggerFactory
+	log                                                        logging.LeveledLogger
+	server                                                     *turn.Server
+	monitoringServer                                           *monitoring.MonitoringServer
+	net                                                        *vnet.Net
 }
 
 // NewStunner creates a new STUNner deamon from the specified configuration
@@ -45,16 +45,19 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 
 	logger := NewLoggerFactory(req.Admin.LogLevel)
 	s := Stunner{
-		version:           req.ApiVersion,
-		logger:            logger,
-		log:               logger.NewLogger("stunner"),
-		adminManager:      manager.NewManager("admin-manager", logger),
-		authManager:       manager.NewManager("auth-manager", logger),
-		monitoringManager: manager.NewManager("monitoring-manager", logger),
-		listenerManager:   manager.NewManager("listener-manager", logger),
-		clusterManager:    manager.NewManager("cluster-manager", logger),
-		resolver:          resolver.NewDnsResolver("dns-resolver", logger),
+		version:         req.ApiVersion,
+		logger:          logger,
+		log:             logger.NewLogger("stunner"),
+		adminManager:    manager.NewManager("admin-manager", logger),
+		authManager:     manager.NewManager("auth-manager", logger),
+		listenerManager: manager.NewManager("listener-manager", logger),
+		clusterManager:  manager.NewManager("cluster-manager", logger),
+		resolver:        resolver.NewDnsResolver("dns-resolver", logger),
 	}
+
+	// TODO
+	// add metrics to admin
+	// add monitoringserver like resolver!
 
 	if net == nil {
 		s.net = vnet.NewNet(nil)
@@ -69,13 +72,16 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 		return nil, err
 	}
 
-	if m, err := monitoring.NewMonitoringServer(s.GetMonitoring()); err == nil {
-		s.monitoringServer = m
+	if me := s.GetAdmin().MetricsEndpoint; me != "" {
+		if m, err := monitoring.NewMonitoringServer(me, "STUNner"); err == nil {
+			s.monitoringServer = m
+			s.monitoringServer.Init(func() float64 { return float64(s.server.AllocationCount()) })
+		} else {
+			s.log.Warn("monitoring cannot start")
+		}
 	} else {
 		s.log.Warn("monitoring disabled")
 	}
-
-	s.monitoringServer.Init(func() float64 { return float64(s.server.AllocationCount()) })
 
 	return &s, nil
 }
@@ -106,15 +112,6 @@ func (s *Stunner) GetAuth() *object.Auth {
 		panic("internal error: no Auth found")
 	}
 	return a.(*object.Auth)
-}
-
-// GetMonitoring returns the STUNner monitoring
-func (s *Stunner) GetMonitoring() *object.Monitoring {
-	a, found := s.monitoringManager.Get(v1alpha1.DefaultMonitoringName)
-	if !found {
-		panic("internal error: no Monitoring found")
-	}
-	return a.(*object.Monitoring)
 }
 
 // GetListener returns a STUNner listener or nil of no listener with the given name found

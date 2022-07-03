@@ -45,11 +45,6 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 				"password": u.Password,
 			},
 		},
-		Monitoring: v1alpha1.MonitoringConfig{
-			Port:  v1alpha1.DefaultMonitoringPort,
-			Url:   v1alpha1.DefaultMonitoringUrl,
-			Group: v1alpha1.DefaultMonitoringGroup,
-		},
 		Listeners: []v1alpha1.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: u.Protocol,
@@ -121,7 +116,6 @@ func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
 		ApiVersion: s.version,
 		Admin:      *s.GetAdmin().GetConfig().(*v1alpha1.AdminConfig),
 		Auth:       *s.GetAuth().GetConfig().(*v1alpha1.AuthConfig),
-		Monitoring: *s.GetMonitoring().GetConfig().(*v1alpha1.MonitoringConfig),
 		Listeners:  make([]v1alpha1.ListenerConfig, len(listeners)),
 		Clusters:   make([]v1alpha1.ClusterConfig, len(clusters)),
 	}
