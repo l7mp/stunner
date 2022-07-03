@@ -22,6 +22,8 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -355,7 +357,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
 	for _, c := range testStunnerConfigsWithVnet {
@@ -419,8 +421,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
 	certFile, err := os.CreateTemp("", "stunner_test.*.cert")

@@ -38,8 +38,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		}
 		s.adminManager.Upsert(o)
 	}
-	s.logger = NewLoggerFactory(s.GetAdmin().LogLevel)
-	s.log = s.logger.NewLogger("stunner")
+	s.logger.SetLevel(s.GetAdmin().LogLevel)
 
 	// auth
 	newAuth, err := s.authManager.Reconcile([]v1alpha1.Config{&req.Auth})

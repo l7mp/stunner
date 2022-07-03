@@ -12,6 +12,8 @@ import (
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -22,8 +24,8 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
 	for _, conf := range []string{
@@ -77,8 +79,8 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test-roundtrip")
 
 	conf := "turn://user1:passwd1@1.2.3.4:3478?transport=udp"

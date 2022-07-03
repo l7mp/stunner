@@ -11,6 +11,7 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
@@ -474,7 +475,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
 	for _, c := range testClusterConfigsWithVNet {

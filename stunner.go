@@ -8,6 +8,7 @@ import (
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
+	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
@@ -19,7 +20,7 @@ type Stunner struct {
 	version                                                    string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
 	resolver                                                   resolver.DnsResolver
-	logger                                                     logging.LoggerFactory
+	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
 	net                                                        *vnet.Net
@@ -41,16 +42,16 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 		return nil, err
 	}
 
-	logger := NewLoggerFactory(req.Admin.LogLevel)
+	loggerFactory := logger.NewLoggerFactory(req.Admin.LogLevel)
 	s := Stunner{
 		version:         req.ApiVersion,
-		logger:          logger,
-		log:             logger.NewLogger("stunner"),
-		adminManager:    manager.NewManager("admin-manager", logger),
-		authManager:     manager.NewManager("auth-manager", logger),
-		listenerManager: manager.NewManager("listener-manager", logger),
-		clusterManager:  manager.NewManager("cluster-manager", logger),
-		resolver:        resolver.NewDnsResolver("dns-resolver", logger),
+		logger:          loggerFactory,
+		log:             loggerFactory.NewLogger("stunner"),
+		adminManager:    manager.NewManager("admin-manager", loggerFactory),
+		authManager:     manager.NewManager("auth-manager", loggerFactory),
+		listenerManager: manager.NewManager("listener-manager", loggerFactory),
+		clusterManager:  manager.NewManager("cluster-manager", loggerFactory),
+		resolver:        resolver.NewDnsResolver("dns-resolver", loggerFactory),
 	}
 
 	if net == nil {

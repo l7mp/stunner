@@ -11,6 +11,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/l7mp/stunner"
+	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -38,7 +39,7 @@ func main() {
 		logLevel = *level
 	}
 
-	log := stunner.NewLoggerFactory(logLevel).NewLogger("stunnerd")
+	log := logger.NewLoggerFactory(logLevel).NewLogger("stunnerd")
 	conf := make(chan *v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 

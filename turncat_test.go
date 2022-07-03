@@ -12,6 +12,8 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -99,7 +101,7 @@ func TestTurncatPlaintext(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := NewLoggerFactory(turncatTestLoglevel)
+	logger := logger.NewLoggerFactory(turncatTestLoglevel)
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
@@ -215,7 +217,7 @@ func TestTurncatLongterm(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := NewLoggerFactory(turncatTestLoglevel)
+	logger := logger.NewLoggerFactory(turncatTestLoglevel)
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
