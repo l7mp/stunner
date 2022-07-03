@@ -65,7 +65,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			key, ok := auth.Handler("user", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("user",
@@ -307,7 +308,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			key, ok := auth.Handler("user", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("user",
@@ -392,7 +394,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			key, ok := auth.Handler("user", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("user",
@@ -472,7 +475,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "newuser", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			key, ok := auth.Handler("newuser", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("newuser", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("newuser",
@@ -556,7 +560,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "newpass", "password ok")
 
-			key, ok := auth.Handler("user", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("user",
@@ -644,7 +649,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			d := time.Now().Add(duration).Unix()
 			username := strconv.FormatInt(d, 10)
 
-			key, ok := auth.Handler(username, v1alpha1.DefaultRealm,
+			key, ok := handler(username, v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 
@@ -1338,10 +1343,10 @@ func TestStunnerReconcile(t *testing.T) {
 
 // e2e reconcile test with a running server
 type StunnerTestReconcileE2EConfig struct {
-	testName                         string
-	config                           v1alpha1.StunnerConfig
-	echoServerAddr                   string
-	bindSuccess, echoResult, restart bool
+	testName                                          string
+	config                                            v1alpha1.StunnerConfig
+	echoServerAddr                                    string
+	bindSuccess, allocateSuccess, echoResult, restart bool
 }
 
 var testReconcileE2E = []StunnerTestReconcileE2EConfig{
@@ -1361,10 +1366,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Listeners: []v1alpha1.ListenerConfig{},
 			Clusters:  []v1alpha1.ClusterConfig{},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        true,
-		bindSuccess:    false,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     false,
+		allocateSuccess: true,
+		echoResult:      false,
 	},
 	{
 		testName: "adding a listener at the wrong port",
@@ -1390,10 +1396,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			}},
 			Clusters: []v1alpha1.ClusterConfig{},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        true,
-		bindSuccess:    false,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     false,
+		allocateSuccess: true,
+		echoResult:      false,
 	},
 	{
 		testName: "adding a cluster to a listener at the wrong port",
@@ -1424,10 +1431,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    false,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     false,
+		allocateSuccess: true,
+		echoResult:      false,
 	},
 	{
 		testName: "adding a listener at the right port",
@@ -1466,10 +1474,140 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        true,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
+		testName: "changing plaintext credentials to a wrong passwd",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "dummy",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: false,
+		echoResult:      false,
+	},
+	{
+		testName: "changing auth to longterm credentials errs",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": "dummy",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: false,
+		echoResult:      false,
+	},
+	{
+		testName: "reverting good plaintext credentials ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "adding a cluster to the wrong IP",
@@ -1513,10 +1651,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Endpoints: []string{},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "removing working cluster",
@@ -1555,10 +1694,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Endpoints: []string{},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      false,
 	},
 	{
 		testName: "reintroducing good cluster to the wrong IP",
@@ -1602,10 +1742,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Endpoints: []string{},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "removing wrong listener",
@@ -1640,10 +1781,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Endpoints: []string{},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        true,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "correct the wrong cluster and remove the good one",
@@ -1680,10 +1822,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "removing wrong cluster and reverting the working one",
@@ -1715,10 +1858,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "removing dangling cluster ref",
@@ -1749,10 +1893,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "converting cluster to strict dns",
@@ -1785,10 +1930,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "rewiring to an open cluster",
@@ -1819,10 +1965,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     true,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "closing open cluster",
@@ -1848,10 +1995,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			}},
 			Clusters: []v1alpha1.ClusterConfig{},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        false,
-		bindSuccess:    true,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		allocateSuccess: true,
+		bindSuccess:     true,
+		echoResult:      false,
 	},
 	{
 		testName: "closing listener",
@@ -1869,10 +2017,11 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Listeners: []v1alpha1.ListenerConfig{},
 			Clusters:  []v1alpha1.ClusterConfig{},
 		},
-		echoServerAddr: "1.2.3.5:5678",
-		restart:        true,
-		bindSuccess:    false,
-		echoResult:     false,
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     false,
+		allocateSuccess: true,
+		echoResult:      false,
 	},
 }
 
@@ -1939,7 +2088,7 @@ func TestStunnerReconcileE2EWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
 				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
-				c.bindSuccess, c.echoResult, loggerFactory}
+				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			time.Sleep(100 * time.Millisecond)

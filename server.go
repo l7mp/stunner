@@ -11,8 +11,6 @@ import (
 	"github.com/pion/turn/v2"
 	// "github.com/pion/transport/vnet"
 
-	"github.com/l7mp/stunner/internal/object"
-	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -174,7 +172,7 @@ func (s *Stunner) Close() {
 	listeners := s.listenerManager.Keys()
 	for _, name := range listeners {
 		l := s.GetListener(name)
-		if err := l.Close(); err != nil {
+		if err := l.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
 			s.log.Errorf("Error closing listener %q at adddress %s: %s",
 				l.Proto.String(), l.Addr, err.Error())
 		}
@@ -183,7 +181,7 @@ func (s *Stunner) Close() {
 	clusters := s.clusterManager.Keys()
 	for _, name := range clusters {
 		c := s.GetCluster(name)
-		if err := c.Close(); err != nil {
+		if err := c.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
 			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
 				err.Error())
 		}
@@ -195,42 +193,4 @@ func (s *Stunner) Close() {
 		s.server.Close()
 	}
 	s.server = nil
-}
-
-// NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with the TURN server for authenticating clients
-func (s *Stunner) NewAuthHandler() turn.AuthHandler {
-	return func(username, realm string, srcAddr net.Addr) (key []byte, ok bool) {
-		// dynamic: authHandler might have changed behind ur back
-		auth := s.GetAuth()
-		return auth.Handler(username, realm, srcAddr)
-	}
-}
-
-// NewPermissionHandler returns a callback for STUNner to handle client permsission requests to access peers
-func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandler {
-	s.log.Trace("NewPermissionHandler")
-
-	return func(src net.Addr, peer net.IP) bool {
-		peerIP := peer.String()
-		s.log.Debugf("permission handler for listener %q: client %q, peer %q",
-			l.Name, src.String(), peerIP)
-		clusters := s.clusterManager.Keys()
-
-		for _, r := range l.Routes {
-			s.log.Tracef("considering route to cluster %q", r)
-			if util.Member(clusters, r) {
-				s.log.Tracef("considering cluster %q", r)
-				c := s.GetCluster(r)
-				if c.Route(peer) == true {
-					s.log.Infof("permission granted on listener %q for client "+
-						"%q to peer %s via cluster %q", l.Name, src.String(),
-						peerIP, c.Name)
-					return true
-				}
-			}
-		}
-		s.log.Debugf("permission denied on listener %q for client %q to peer %s: no route to endpoint",
-			l.Name, src.String(), peerIP)
-		return false
-	}
 }

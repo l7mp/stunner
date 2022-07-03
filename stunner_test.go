@@ -44,9 +44,9 @@ type echoTestConfig struct {
 	user, pass string
 	natAddr    net.IP
 	// echo
-	echoServerAddr           string
-	bindSuccess, echoSuccess bool
-	loggerFactory            logging.LoggerFactory
+	echoServerAddr                            string
+	allocateSuccess, bindSuccess, echoSuccess bool
+	loggerFactory                             logging.LoggerFactory
 }
 
 type bundle struct {
@@ -101,66 +101,69 @@ func stunnerEchoTest(conf echoTestConfig) {
 
 		log.Debug("sending an allocate request")
 		conn, err := client.Allocate()
-		assert.NoError(t, err, err)
-
-		// log.Debugf("laddr: %s", conn.LocalAddr().String())
-
-		log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
-		echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
-		assert.NoError(t, err, "creating echo socket")
-
-		// assert.NotNil(t, err, "echo socket not nil")
-
-		log.Debug("obtaining TURN server")
-		server := conf.stunner.GetServer()
-
-		// ensure allocation is counted
-		assert.Equal(t, 1, server.AllocationCount())
-
-		go func() {
-			buf := make([]byte, 1600)
-			for {
-				n, from, err2 := echoConn.ReadFrom(buf)
-				if err2 != nil {
-					break
-				}
-
-				// verify the message was received from the relay address
-				assert.Equal(t, conn.LocalAddr().String(), from.String(),
-					"message should be received from the relay address")
-				assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
-
-				// echo the data
-				_, err2 = echoConn.WriteTo(buf[:n], from)
-				assert.NoError(t, err2, err2)
-			}
-		}()
-
-		if conf.echoSuccess == true {
-			buf := make([]byte, 1600)
-			for i := 0; i < 8; i++ {
-				log.Debug("sending \"Hello\"")
-				_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-				assert.NoError(t, err, err)
-
-				_, from, err2 := conn.ReadFrom(buf)
-				assert.NoError(t, err2, err2)
-
-				// verify the message was received from the relay address
-				assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
-					"message should be received from the relay address")
-
-				time.Sleep(100 * time.Millisecond)
-			}
+		if conf.allocateSuccess == false {
+			assert.Error(t, err, err)
 		} else {
-			// should fail
-			_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-			assert.Errorf(t, err, "got error message %s", err.Error())
-		}
-		assert.NoError(t, conn.Close(), "cannot close relay connection")
-		assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
-	}
+			assert.NoError(t, err, err)
 
+			// log.Debugf("laddr: %s", conn.LocalAddr().String())
+
+			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
+			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
+			assert.NoError(t, err, "creating echo socket")
+
+			// assert.NotNil(t, err, "echo socket not nil")
+
+			log.Debug("obtaining TURN server")
+			server := conf.stunner.GetServer()
+
+			// ensure allocation is counted
+			assert.Equal(t, 1, server.AllocationCount())
+
+			go func() {
+				buf := make([]byte, 1600)
+				for {
+					n, from, err2 := echoConn.ReadFrom(buf)
+					if err2 != nil {
+						break
+					}
+
+					// verify the message was received from the relay address
+					assert.Equal(t, conn.LocalAddr().String(), from.String(),
+						"message should be received from the relay address")
+					assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
+
+					// echo the data
+					_, err2 = echoConn.WriteTo(buf[:n], from)
+					assert.NoError(t, err2, err2)
+				}
+			}()
+
+			if conf.echoSuccess == true {
+				buf := make([]byte, 1600)
+				for i := 0; i < 8; i++ {
+					log.Debug("sending \"Hello\"")
+					_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+					assert.NoError(t, err, err)
+
+					_, from, err2 := conn.ReadFrom(buf)
+					assert.NoError(t, err2, err2)
+
+					// verify the message was received from the relay address
+					assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
+						"message should be received from the relay address")
+
+					time.Sleep(100 * time.Millisecond)
+				}
+			} else {
+				// should fail
+				_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+				assert.Errorf(t, err, "got error message %s", err.Error())
+			}
+			assert.NoError(t, conn.Close(), "cannot close relay connection")
+			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
+		}
+	}
 	time.Sleep(100 * time.Millisecond)
 	client.Close()
 
@@ -391,7 +394,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, loggerFactory}
+				"1.2.3.5:5678", true, true, true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -706,7 +709,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 
 			testConfig := echoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
 				stunnerAddr, lconn, u, p, net.IPv4(127, 0, 0, 1),
-				"127.0.0.1:25678", true, true, loggerFactory}
+				"127.0.0.1:25678", true, true, true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")

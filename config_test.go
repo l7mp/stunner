@@ -60,7 +60,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, "user1", "passwd1", net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, loggerFactory}
+				"1.2.3.5:5678", true, true, true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
