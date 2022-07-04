@@ -45,8 +45,9 @@ jobs:
       - name: Build helm charts
         run: |
           cd stunner/helm
-          sed -ri 's/^(\s*)(version\s*:\s*0.1.0\s*$)/\1version: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
-          sed -ri 's/^(\s*)(appVersion\s*:\s*0.1.0\s*$)/\1appVersion: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(version\s*:\s*.*\s*$)/\1version: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(appVersion\s*:\s*.*\s*$)/\1appVersion: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(        tag\s*:\s*.*\s*$)/\1        tag: ${{steps.vars.outputs.tag}}/' stunner/values.yaml
           helm package *
       - name: Update l7mp.io
         run: |
