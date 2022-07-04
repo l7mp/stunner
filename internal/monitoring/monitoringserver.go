@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 )
@@ -45,17 +44,7 @@ func NewMonitoringServer(endpoint string, group string, logger logging.LoggerFac
 }
 
 func (m *MonitoringServer) Init(fp func() float64) {
-	if err := prometheus.Register(prometheus.NewGaugeFunc(
-		prometheus.GaugeOpts{
-			Name: "allocation_count",
-			Help: "Number of active allocations.",
-		},
-		fp,
-	)); err == nil {
-		m.log.Debug("GaugeFunc 'allocation' registered.")
-	} else {
-		m.log.Warn("GaugeFunc 'allocation' cannot be registered (already registered?).")
-	}
+	RegisterMetrics(m.log, fp)
 }
 
 func (m *MonitoringServer) Start() {  // specify config, create new server; move init here?
