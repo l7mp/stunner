@@ -3,14 +3,15 @@
 num_of_processes=$1
 eval_time=$2
 packet_size=$3
-platfrom=$4
+bandwidth=$4
+platform=$5
 
 echo "Number of concurrent turncat processes: $num_of_processes"
 echo "Evaluation time: $eval_time s"
 echo "Packet size: $packet_size bytes"
-echo "Platfrom: $platfrom"
+echo "Platform: $platform"
 
-if [[ $platfrom == "local" ]];
+if [[ $platform == "local" ]];
 then
     STUNNER_PUBLIC_ADDR="127.0.0.1"
     STUNNER_PUBLIC_PORT="5000"
@@ -42,7 +43,7 @@ for i in $(seq $num_of_processes);
 do
     port=$((8999+$i))
     # port=8999
-    iperf -c 127.0.0.1 -u -p $port -t $eval_time -i 1 -b 117500000 -l $packet_size &> /dev/null &
+    iperf -c 127.0.0.1 -u -p $port -t $eval_time -i 1 -b $bandwidth -l $packet_size &> /dev/null &
     # echo "hello" | socat -d -d - udp:127.0.0.1:$port
 done
 
