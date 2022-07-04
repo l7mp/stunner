@@ -55,10 +55,6 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 		resolver:        resolver.NewDnsResolver("dns-resolver", logger),
 	}
 
-	// TODO
-	// add metrics to admin
-	// add monitoringserver like resolver!
-
 	if net == nil {
 		s.net = vnet.NewNet(nil)
 	} else {
@@ -73,7 +69,7 @@ func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 	}
 
 	if me := s.GetAdmin().MetricsEndpoint; me != "" {
-		if m, err := monitoring.NewMonitoringServer(me, "STUNner"); err == nil {
+		if m, err := monitoring.NewMonitoringServer(me, v1alpha1.DefaultMonitoringGroup, logger); err == nil {
 			s.monitoringServer = m
 			s.monitoringServer.Init(func() float64 { return float64(s.server.AllocationCount()) })
 		} else {

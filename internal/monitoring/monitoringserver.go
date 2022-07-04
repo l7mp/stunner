@@ -22,7 +22,7 @@ type MonitoringServer struct {
 }
 
 // NewMonitoring initiates the monitoring subsystem
-func NewMonitoringServer(endpoint string, group string) (*MonitoringServer, error) {
+func NewMonitoringServer(endpoint string, group string, logger logging.LoggerFactory) (*MonitoringServer, error) {
 	addr := strings.Split(strings.Replace(endpoint, "http://", "", 1), "/")[0]
 
 	if addr == "" {
@@ -38,7 +38,7 @@ func NewMonitoringServer(endpoint string, group string) (*MonitoringServer, erro
 		httpServer: server,
 		Endpoint:   endpoint,
 		Group:      group,
-		//log:        o.log,
+		log:        logger.NewLogger("stunner-monitoring"),
 	}
 
 	return m, nil
@@ -52,11 +52,9 @@ func (m *MonitoringServer) Init(fp func() float64) {
 		},
 		fp,
 	)); err == nil {
-		//FIXME m.log.Debug("GaugeFunc 'allocation' registered.")
-		fmt.Println("GaugeFunc 'allocation' registered.")
+		m.log.Debug("GaugeFunc 'allocation' registered.")
 	} else {
-		//FIXME m.log.Warn("GaugeFunc 'allocation' cannot be registered (already registered?).")
-		fmt.Println("GaugeFunc 'allocation' cannot be registered (already registered?).")
+		m.log.Warn("GaugeFunc 'allocation' cannot be registered (already registered?).")
 	}
 }
 
