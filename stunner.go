@@ -25,8 +25,18 @@ type Stunner struct {
 	net                                                        *vnet.Net
 }
 
-// NewStunner creates the STUNner deamon from the specified configuration
+// NewStunner creates a new STUNner deamon from the specified configuration
 func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
+	return newStunner(req, nil)
+}
+
+// NewStunnerWithVNet creates a new STUNner deamon from the specified configuration, using a
+// vnet.Net instance to test STUNner over an emulated data-plane
+func NewStunnerWithVNet(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
+	return newStunner(req, net)
+}
+
+func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
@@ -43,10 +53,10 @@ func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
 		resolver:        resolver.NewDnsResolver("dns-resolver", logger),
 	}
 
-	if req.Net == nil {
+	if net == nil {
 		s.net = vnet.NewNet(nil)
 	} else {
-		s.net = req.Net
+		s.net = net
 		s.log.Warn("vnet is enabled")
 	}
 

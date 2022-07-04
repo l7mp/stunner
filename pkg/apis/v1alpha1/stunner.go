@@ -3,8 +3,6 @@ package v1alpha1
 import (
 	"fmt"
 	"sort"
-
-	"github.com/pion/transport/vnet"
 )
 
 // StunnerConfig configures the STUnner daemon
@@ -20,7 +18,6 @@ type StunnerConfig struct {
 	// Clusters defines the upstream endpoints to which transport peer connections can be made
 	// through STUNner
 	Clusters []ClusterConfig `json:"clusters,omitempty"`
-	Net      *vnet.Net       `json:"-"`
 }
 
 // Validate checks if a listener configuration is correct
