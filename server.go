@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"strings"
+	// "strings"
 
 	// "github.com/pion/logging"
 	"github.com/pion/dtls/v2"
@@ -154,34 +154,9 @@ func (s *Stunner) Start() error {
 	return nil
 }
 
-// Close stops the STUNner daemon, cleans up any associated state and closes all connections it is
-// managing
-func (s *Stunner) Close() {
-	s.log.Info("Closing Stunner")
-
-	// ignore restart-required errors
-	_ = s.GetAdmin().Close()
-	_ = s.GetAuth().Close()
-
-	listeners := s.listenerManager.Keys()
-	for _, name := range listeners {
-		l := s.GetListener(name)
-		if err := l.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
-			s.log.Errorf("Error closing listener %q at adddress %s: %s",
-				l.Proto.String(), l.Addr, err.Error())
-		}
-	}
-
-	clusters := s.clusterManager.Keys()
-	for _, name := range clusters {
-		c := s.GetCluster(name)
-		if err := c.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
-			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
-				err.Error())
-		}
-	}
-
-	s.resolver.Close()
+// Close stops the TURN server underneath STUNner
+func (s *Stunner) Stop() {
+	s.log.Info("stopping the STUNner server")
 
 	if s.server != nil {
 		s.server.Close()

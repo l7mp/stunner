@@ -426,7 +426,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 		result:         true,
 	},
 	{
-		testName: "multiple strict_dns clusters  ok",
+		testName: "multiple strict_dns clusters ok",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
@@ -487,27 +487,23 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			v, err := buildVNet(loggerFactory)
 			assert.NoError(t, err, err)
 
-			log.Debug("creating a stunnerd")
-			stunner, err := NewStunnerWithVNet(c.config, v.podnet)
-			assert.NoError(t, err, err)
-
 			log.Debug("setting up the mock DNS")
-			mockDns := &resolver.MockResolver{
-				Zone: map[string]([]string){
-					"stunner.l7mp.io":     []string{"1.2.3.4"},
-					"echo-server.l7mp.io": []string{"1.2.3.5"},
-					"dummy.l7mp.io":       []string{"1.2.3.10"},
-				}}
+			mockDns := resolver.NewMockResolver(map[string]([]string){
+				"stunner.l7mp.io":     []string{"1.2.3.4"},
+				"echo-server.l7mp.io": []string{"1.2.3.5"},
+				"dummy.l7mp.io":       []string{"1.2.3.10"},
+			}, loggerFactory)
 
-			cluster := stunner.GetCluster("echo-server-cluster")
-			assert.NotNil(t, cluster, "echo-server-cluster found")
-
-			if cluster.Resolver != nil {
-				cluster.Resolver.SetResolver(mockDns)
-			}
+			log.Debug("creating a stunnerd")
+			stunner := NewStunner().WithOptions(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Resolver:         mockDns,
+				Net:              v.podnet,
+			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Start())
+			assert.ErrorContains(t, stunner.Reconcile(c.config), "restart", "starting server")
 
 			var u, p string
 			auth := c.config.Auth.Type

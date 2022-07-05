@@ -50,11 +50,14 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			assert.NoError(t, err, err)
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunnerWithVNet(*c, v.podnet)
-			assert.NoError(t, err)
+			stunner := NewStunner().WithOptions(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Net:              v.podnet,
+			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Start())
+			assert.ErrorContains(t, stunner.Reconcile(*c), "restart", "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
