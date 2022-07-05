@@ -29,6 +29,29 @@ func (req *AuthConfig) Validate() error {
 		req.Realm = DefaultRealm
 	}
 
+	atype, err := NewAuthType(req.Type)
+	if err != nil {
+		return err
+	}
+
+	switch atype {
+	case AuthTypePlainText:
+		_, userFound := req.Credentials["username"]
+		_, passFound := req.Credentials["password"]
+		if !userFound || !passFound {
+			return fmt.Errorf("%s: empty username or password", atype.String())
+		}
+
+	case AuthTypeLongTerm:
+		_, secretFound := req.Credentials["secret"]
+		if !secretFound {
+			return fmt.Errorf("cannot handle auth config for type %s: invalid secret",
+				atype.String())
+		}
+	default:
+		return fmt.Errorf("invalid authentication type %q", req.Type)
+	}
+
 	return nil
 }
 

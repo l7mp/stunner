@@ -19,8 +19,10 @@ type Manager interface {
 	Get(name string) (object.Object, bool)
 	// Delete deletes the object from the store, may return ErrReturnRequired
 	Delete(o object.Object) error
-	// Reconcile reconcliles the the object store
-	Reconcile(confs []v1alpha1.Config) ([]v1alpha1.Config, error)
+	// PrepareReconciliation prepares the reconciliation of the manager
+	PrepareReconciliation(confs []v1alpha1.Config) (*ReconciliationState, error)
+	// FinishReconciliation finishes the reconciliation from the specified state
+	FinishReconciliation(state *ReconciliationState) error
 	// Keys returns the names iof all objects in the store in alphabetical order, suitable for iteration
 	Keys() []string
 }
@@ -30,14 +32,16 @@ type managerImpl struct {
 	name    string
 	lock    sync.RWMutex
 	objects map[string]object.Object
+	factory object.Factory
 	log     logging.LeveledLogger
 }
 
 // NewManager creates a new Manager.
-func NewManager(name string, logger logging.LoggerFactory) Manager {
+func NewManager(name string, f object.Factory, logger logging.LoggerFactory) Manager {
 	return &managerImpl{
 		name:    name,
 		objects: make(map[string]object.Object),
+		factory: f,
 		log:     logger.NewLogger(name),
 	}
 }
@@ -55,7 +59,7 @@ func (m *managerImpl) Upsert(o object.Object) error {
 }
 
 func (m *managerImpl) Get(name string) (object.Object, bool) {
-	m.log.Tracef("get object %s", name)
+	// m.log.Tracef("get object %s", name)
 
 	m.lock.RLock()
 	o, found := m.objects[name]
@@ -82,7 +86,7 @@ func (m *managerImpl) Delete(o object.Object) error {
 
 // safe for addition/deletion
 func (m *managerImpl) Keys() []string {
-	m.log.Tracef("object keys")
+	// m.log.Tracef("object keys")
 
 	names := make([]string, len(m.objects))
 	i := 0

@@ -52,7 +52,48 @@ func NewListener(conf v1alpha1.Config, net *vnet.Net, logger logging.LoggerFacto
 	return &l, v1alpha1.ErrRestartRequired
 }
 
-// Reconcile updates a listener. Requires a server restart (returns v1alpha1.ErrRestartRequired), unless only the Routes change
+// Inspect examines whether a configuration change on the object would require a restart. An empty
+// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
+// otherwise it will be reconciled from the old configuration to the new one
+func (l *Listener) Inspect(old, new v1alpha1.Config) bool {
+	// this is the only interesting Inspect function
+
+	// adding a new listener or deleting an existing one triggers a server restart
+	if old == nil || new == nil {
+		return true
+	}
+
+	// this is a reconciliaiton event!
+	req, ok := new.(*v1alpha1.ListenerConfig)
+	if !ok {
+		// should never happen
+		panic("Listener.Inspect called on an unknown configuration")
+	}
+
+	if err := req.Validate(); err != nil {
+		// should never happen
+		panic("Listener.Inspect called with an invalid ListenerConfig")
+	}
+
+	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
+
+	// the only chance we don't need a restart if only the Routes change
+	restart := true
+	if l.Name == req.Name && // name unchanged (should always be true)
+		l.Proto == proto && // protocol unchanged
+		l.rawAddr == req.Addr && // address unchanged
+		l.Port == req.Port && // ports unchanged
+		l.MinPort == req.MinRelayPort &&
+		l.MaxPort == req.MaxRelayPort &&
+		l.Cert == req.Cert && // TLS creds unchanged
+		l.Key == req.Key {
+		restart = false
+	}
+
+	return restart
+}
+
+// Reconcile updates a listener.
 func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	req, ok := conf.(*v1alpha1.ListenerConfig)
 	if !ok {
@@ -68,20 +109,6 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
 	ipAddr := net.ParseIP(req.Addr)
 
-	// the only chance we don't need a restart if only the Routes change
-	restart := true
-	if l.Name == req.Name && // name unchanged (should always be true)
-		l.Proto == proto && // protocol unchanged
-		l.rawAddr == req.Addr && // address unchanged
-		l.Port == req.Port && // ports unchanged
-		l.MinPort == req.MinRelayPort &&
-		l.MaxPort == req.MaxRelayPort &&
-		l.Cert == req.Cert && // TLS creds unchanged
-		l.Key == req.Key {
-		restart = false
-	}
-
-	// update!
 	l.Proto = proto
 	l.Addr = ipAddr
 	l.rawAddr = req.Addr
@@ -93,10 +120,6 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 
 	l.Routes = make([]string, len(req.Routes))
 	copy(l.Routes, req.Routes)
-
-	if restart {
-		return v1alpha1.ErrRestartRequired
-	}
 
 	return nil
 }
@@ -172,4 +195,25 @@ func (l *Listener) Close() error {
 	}
 
 	return v1alpha1.ErrRestartRequired
+}
+
+// ListenerFactory can create now Listener objects
+type ListenerFactory struct {
+	net    *vnet.Net
+	logger logging.LoggerFactory
+}
+
+// NewListenerFactory creates a new factory for Listener objects
+func NewListenerFactory(net *vnet.Net, logger logging.LoggerFactory) Factory {
+	return &ListenerFactory{net: net, logger: logger}
+}
+
+// New can produce a new Listener object from the given configuration. A nil config will create an
+// empty listener object (useful for creating throwaway objects for, e.g., calling Inpect)
+func (f *ListenerFactory) New(conf v1alpha1.Config) (Object, error) {
+	if conf == nil {
+		return &Listener{}, nil
+	}
+
+	return NewListener(conf, f.net, f.logger)
 }

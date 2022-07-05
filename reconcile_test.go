@@ -1310,8 +1310,15 @@ func TestStunnerReconcile(t *testing.T) {
 
 			conf.Admin.LogLevel = stunnerTestLoglevel
 
-			s, err := NewStunner(*conf)
-			assert.NoError(t, err, err)
+			log.Debug("creating a stunnerd")
+			s := NewStunner().WithOptions(Options{
+				DryRun:           true,
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+			})
+
+			log.Debug("starting stunnerd")
+			assert.ErrorContains(t, s.Reconcile(*conf), "restart", "starting server")
 
 			runningConf := s.GetConfig()
 			assert.NotNil(t, runningConf, "default stunner get config ok")
@@ -1342,12 +1349,86 @@ func TestStunnerReconcile(t *testing.T) {
 	}
 }
 
-// e2e reconcile test with a running server
+////////////////////
+// E2E reconcile test with a running server
+////////////////////
+
 type StunnerTestReconcileE2EConfig struct {
 	testName                                          string
 	config                                            v1alpha1.StunnerConfig
 	echoServerAddr                                    string
 	bindSuccess, allocateSuccess, echoResult, restart bool
+}
+
+func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcileE2EConfig, rollback bool) {
+	lim := test.TimeOut(time.Second * 120)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	// patch in the vnet
+	log.Debug("building virtual network")
+	v, err := buildVNet(loggerFactory)
+	assert.NoError(t, err, err)
+
+	log.Debug("creating default stunner config")
+	conf, err := NewDefaultConfig("turn://user:pass@1.2.3.4:3478?transport=udp")
+	assert.NoError(t, err, err)
+
+	conf.Admin.LogLevel = stunnerTestLoglevel
+	log.Debug("setting up the mock DNS")
+	mockDns := resolver.NewMockResolver(map[string]([]string){
+		"stunner.l7mp.io":     []string{"1.2.3.4"},
+		"echo-server.l7mp.io": []string{"1.2.3.5"},
+		"dummy.l7mp.io":       []string{"1.2.3.10"},
+	}, loggerFactory)
+
+	log.Debug("creating a stunnerd")
+	s := NewStunner().WithOptions(Options{
+		LogLevel:         stunnerTestLoglevel,
+		SuppressRollback: rollback,
+		Resolver:         mockDns,
+		Net:              v.podnet,
+	})
+
+	log.Debug("starting stunnerd")
+	assert.ErrorContains(t, s.Reconcile(*conf), "restart", "starting server")
+
+	for _, c := range testcases {
+		t.Run(c.testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.testName)
+
+			log.Debug("reconciling server")
+			err := s.Reconcile(c.config)
+			if c.restart {
+				assert.ErrorContains(t, err, "restart", "starting server")
+			} else {
+				assert.NoError(t, err, "cannot reconcile")
+			}
+
+			// // make sure new clusters use the mockDns
+			// s.resolver.SetResolver(mockDns)
+
+			log.Debug("creating a client")
+			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+			assert.NoError(t, err, "cannot create client listening socket")
+
+			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
+				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
+				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory}
+			stunnerEchoTest(testConfig)
+
+			time.Sleep(100 * time.Millisecond)
+			lconn.Close()
+		})
+	}
+
+	s.Close()
+	assert.NoError(t, v.Close(), "cannot close VNet")
 }
 
 var testReconcileE2E = []StunnerTestReconcileE2EConfig{
@@ -2026,77 +2107,96 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 }
 
-func TestStunnerReconcileE2EWithVNet(t *testing.T) {
-	lim := test.TimeOut(time.Second * 120)
-	defer lim.Stop()
+func TestStunnerReconcileWithVNetE2E(t *testing.T) {
+	testStunnerReconcileWithVNet(t, testReconcileE2E, true)
+}
 
-	report := test.CheckRoutines(t)
-	defer report()
+////////////////////
+// reconcile rollback tests: these always start from a base connfiguration and test through a series
+// of rollbacktests
+///////////////////
+var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
+	"reconcile protocol": {
+		{
+			testName: "base config",
+			config: v1alpha1.StunnerConfig{
+				ApiVersion: "v1alpha1",
+				Admin: v1alpha1.AdminConfig{
+					LogLevel: stunnerTestLoglevel,
+				},
+				Auth: v1alpha1.AuthConfig{
+					Credentials: map[string]string{
+						"username": "user",
+						"password": "pass",
+					},
+				},
+				Listeners: []v1alpha1.ListenerConfig{{
+					Name:     "udp",
+					Protocol: "udp",
+					Addr:     "1.2.3.4",
+					Port:     3478,
+					Routes: []string{
+						"echo-server-cluster",
+					},
+				}},
+				Clusters: []v1alpha1.ClusterConfig{{
+					Name: "echo-server-cluster",
+					Endpoints: []string{
+						"1.2.3.5",
+					},
+				}},
+			},
+			echoServerAddr:  "1.2.3.5:5678",
+			restart:         true,
+			bindSuccess:     true,
+			allocateSuccess: true,
+			echoResult:      true,
+		},
+		{
+			// tcp will fail on vnet: must rollback for the test to succeed
+			testName: "reconcile listener with a changed protocol",
+			config: v1alpha1.StunnerConfig{
+				ApiVersion: "v1alpha1",
+				Admin: v1alpha1.AdminConfig{
+					LogLevel: stunnerTestLoglevel,
+				},
+				Auth: v1alpha1.AuthConfig{
+					Credentials: map[string]string{
+						"username": "user",
+						"password": "pass",
+					},
+				},
+				Listeners: []v1alpha1.ListenerConfig{{
+					Name:     "udp",
+					Protocol: "tcp",
+					Addr:     "1.2.3.4",
+					Port:     3478,
+					Routes: []string{
+						"echo-server-cluster",
+					},
+				}},
+				Clusters: []v1alpha1.ClusterConfig{{
+					Name: "echo-server-cluster",
+					Endpoints: []string{
+						"1.2.3.5",
+					},
+				}},
+			},
+			echoServerAddr:  "1.2.3.5:5678",
+			restart:         true,
+			bindSuccess:     true,
+			allocateSuccess: true,
+			echoResult:      true,
+		},
+	},
+}
 
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
-	log := loggerFactory.NewLogger("test")
+func TestStunnerReconcileWithVNetRollback(t *testing.T) {
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("rollback-test")
 
-	// patch in the vnet
-	log.Debug("building virtual network")
-	v, err := buildVNet(loggerFactory)
-	assert.NoError(t, err, err)
-
-	log.Debug("creating default stunner config")
-	conf, err := NewDefaultConfig("turn://user:pass@1.2.3.4:3478?transport=udp")
-	assert.NoError(t, err, err)
-
-	conf.Admin.LogLevel = stunnerTestLoglevel
-	s, err := NewStunnerWithVNet(*conf, v.podnet)
-	assert.NoError(t, err, err)
-
-	log.Debug("setting up the mock DNS")
-	mockDns := &resolver.MockResolver{
-		Zone: map[string]([]string){
-			"stunner.l7mp.io":     []string{"1.2.3.4"},
-			"echo-server.l7mp.io": []string{"1.2.3.5"},
-			"dummy.l7mp.io":       []string{"1.2.3.10"},
-		}}
-	s.resolver.SetResolver(mockDns)
-
-	log.Debug("starting stunnerd")
-	assert.NoError(t, s.Start())
-
-	for _, c := range testReconcileE2E {
-		t.Run(c.testName, func(t *testing.T) {
-			log.Debugf("-------------- Running test: %s -------------", c.testName)
-
-			log.Debug("reconciling server")
-			err := s.Reconcile(c.config)
-
-			if err == v1alpha1.ErrRestartRequired {
-				log.Debug("restarting server")
-
-				assert.True(t, c.restart, "restart required ok")
-				s.Close()
-				err := s.Start()
-				assert.NoError(t, err, "restart STUNner ok")
-			} else {
-				assert.NoError(t, err, "cannot reconcile")
-				assert.False(t, c.restart, "restart not required ok")
-			}
-
-			// make sure new clusters use the mockDns
-			s.resolver.SetResolver(mockDns)
-
-			log.Debug("creating a client")
-			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
-			assert.NoError(t, err, "cannot create client listening socket")
-
-			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
-				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
-				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory}
-			stunnerEchoTest(testConfig)
-
-			time.Sleep(100 * time.Millisecond)
-			lconn.Close()
-		})
+	for name, testcase := range testReconcileRollback {
+		log.Debugf("-------------- Running new testtest: %s -------------", name)
+		testStunnerReconcileWithVNet(t, testcase, false)
 	}
-
-	s.Close()
-	assert.NoError(t, v.Close(), "cannot close VNet")
 }

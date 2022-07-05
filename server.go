@@ -40,7 +40,7 @@ func (s *Stunner) Start() error {
 
 		switch l.Proto {
 		case v1alpha1.ListenerProtocolUDP:
-			s.log.Tracef("setting up UDP listener at %s", addr)
+			s.log.Debugf("setting up UDP listener at %s", addr)
 			udpListener, err := l.Net.ListenPacket("udp", addr)
 			if err != nil {
 				return fmt.Errorf("failed to create UDP listener at %s: %s",
@@ -57,7 +57,7 @@ func (s *Stunner) Start() error {
 
 			// cannot test this on vnet, no Listen/ListenTCP in vnet.Net
 		case v1alpha1.ListenerProtocolTCP:
-			s.log.Tracef("setting up TCP listener at %s", addr)
+			s.log.Debugf("setting up TCP listener at %s", addr)
 			tcpListener, err := net.Listen("tcp", addr)
 			if err != nil {
 				return fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
@@ -72,7 +72,7 @@ func (s *Stunner) Start() error {
 
 			// cannot test this on vnet, no TLS in vnet.Net
 		case v1alpha1.ListenerProtocolTLS:
-			s.log.Tracef("setting up TLS/TCP listener at %s", addr)
+			s.log.Debugf("setting up TLS/TCP listener at %s", addr)
 			cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
 			if errTls != nil {
 				return fmt.Errorf("cannot load cert/key pair for creating TLS listener at %s: %s",
@@ -96,7 +96,7 @@ func (s *Stunner) Start() error {
 
 			// cannot test this on vnet, no DTLS in vnet.Net
 		case v1alpha1.ListenerProtocolDTLS:
-			s.log.Tracef("setting up DTLS/UDP listener at %s", addr)
+			s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
 
 			cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
 			if errTls != nil {
@@ -123,12 +123,14 @@ func (s *Stunner) Start() error {
 			conn = append(conn, l.Conn.(turn.ListenerConfig))
 
 		default:
-			panic("internal error: unknown listener protocol " + l.Proto.String())
+			return fmt.Errorf("internal error: unknown listener protocol " + l.Proto.String())
 		}
 	}
 
 	// start the DNS resolver threads
-	s.resolver.Start()
+	if s.resolver == nil {
+		s.resolver.Start()
+	}
 
 	// start the TURN server if there are actual listeners configured
 	if len(conn) == 0 && len(pconn) == 0 {

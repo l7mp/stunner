@@ -30,6 +30,8 @@ import (
 //var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
 var stunnerTestLoglevel string = "all:ERROR"
 
+//var stunnerTestLoglevel string = "all:INFO"
+
 //var stunnerTestLoglevel string = "all:TRACE"
 
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
@@ -372,11 +374,14 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			assert.NoError(t, err, err)
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunnerWithVNet(c, v.podnet)
-			assert.NoError(t, err, err)
+			stunner := NewStunner().WithOptions(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Net:              v.podnet,
+			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Start())
+			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
 
 			var u, p string
 			switch auth {
@@ -654,11 +659,13 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunner(c)
-			assert.NoError(t, err, err)
+			stunner := NewStunner().WithOptions(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Start())
+			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
 
 			var u, p string
 			switch auth {

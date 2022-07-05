@@ -6,56 +6,41 @@ import (
 	// "github.com/pion/logging"
 	// "github.com/pion/transport/vnet"
 
-	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// Reconcile handles the updates to the STUNner configuration. Some updates are destructive so the server must be closed and restarted with the new configuration manually (see the documentation of the corresponding STUNner objects for when STUNner may restart after a reconciliation). Reconcile returns nil if no action is required by the caller, v1alpha1.ErrRestartRequired to indicate that the caller must issue a Close/Start cycle to install the reconciled configuration, and a general error if the reconciliation has failed
+// Reconcile handles the updates to the STUNner configuration. Some updates are destructive so the
+// server must be closed and restarted with the new configuration manually (see the documentation
+// of the corresponding STUNner objects for when STUNner may restart after a
+// reconciliation). Reconcile returns nil if is server restart was not requred,
+// v1alpha1.ErrRestartRequired to indicate that it performed a full shutdown-restart cycle to
+// reconcile the new config (unless DryRun is on), and an error if an error happened during
+// reconciliation, in which case it will rollback the last working configuration (unless
+// SuppressRollback is on)
 func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	s.log.Debugf("reconciling STUNner for config: %#v ", req)
 
-	// validate config
-	if err := req.Validate(); err != nil {
-		return err
-	}
-
+	rollback := s.GetConfig()
 	restart := false
 
 	// admin
-	newAdmin, err := s.adminManager.Reconcile([]v1alpha1.Config{&req.Admin})
+	adminState, err := s.adminManager.PrepareReconciliation([]v1alpha1.Config{&req.Admin})
 	if err != nil {
 		if err == v1alpha1.ErrRestartRequired {
 			restart = true
 		} else {
-			return fmt.Errorf("could not reconcile admin config: %s", err.Error())
+			return fmt.Errorf("error preparing reconciliation for admin config: %s", err.Error())
 		}
 	}
-
-	for _, c := range newAdmin {
-		o, err := object.NewAdmin(c, s.logger)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
-			return err
-		}
-		s.adminManager.Upsert(o)
-	}
-	s.logger.SetLevel(s.GetAdmin().LogLevel)
 
 	// auth
-	newAuth, err := s.authManager.Reconcile([]v1alpha1.Config{&req.Auth})
+	authState, err := s.authManager.PrepareReconciliation([]v1alpha1.Config{&req.Auth})
 	if err != nil {
 		if err == v1alpha1.ErrRestartRequired {
 			restart = true
 		} else {
-			return fmt.Errorf("could not reconcile auth config: %s", err.Error())
+			return fmt.Errorf("error preparing reconciliation for auth config: %s", err.Error())
 		}
-	}
-
-	for _, c := range newAuth {
-		o, err := object.NewAuth(c, s.logger)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
-			return err
-		}
-		s.authManager.Upsert(o)
 	}
 
 	// listener
@@ -63,27 +48,13 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	for i := range req.Listeners {
 		lconf[i] = &(req.Listeners[i])
 	}
-	newListener, err := s.listenerManager.Reconcile(lconf)
+	listenerState, err := s.listenerManager.PrepareReconciliation(lconf)
 	if err != nil {
 		if err == v1alpha1.ErrRestartRequired {
 			restart = true
 		} else {
-			return fmt.Errorf("could not reconcile listener config: %s", err.Error())
+			return fmt.Errorf("error preparing reconciliation for listener config: %s", err.Error())
 		}
-	}
-
-	for _, c := range newListener {
-		o, err := object.NewListener(c, s.net, s.logger)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
-			return err
-		}
-		s.listenerManager.Upsert(o)
-		// new listeners require a restart
-		restart = true
-	}
-
-	if len(s.listenerManager.Keys()) == 0 {
-		s.log.Warn("running with no listeners")
 	}
 
 	// cluster
@@ -91,32 +62,120 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	for i := range req.Clusters {
 		cconf[i] = &(req.Clusters[i])
 	}
-	newCluster, err := s.clusterManager.Reconcile(cconf)
+	clusterState, err := s.clusterManager.PrepareReconciliation(cconf)
 	if err != nil {
 		if err == v1alpha1.ErrRestartRequired {
 			restart = true
 		} else {
-			return fmt.Errorf("could not reconcile cluster config: %s", err.Error())
+			return fmt.Errorf("error preparing reconciliation for cluster config: %s", err.Error())
 		}
 	}
 
-	for _, c := range newCluster {
-		o, err := object.NewCluster(c, s.resolver, s.logger)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
-			return err
-		}
-		s.clusterManager.Upsert(o)
+	s.log.Debugf("reconciliation preparation ready, restart required: %t", restart)
+
+	// a restart may be needed: close the running server while it still holds the actual
+	// configuration (i.e., before actually calling Reconcile on all objects)
+	if restart && s.options.DryRun != true {
+		s.log.Debug("closing running server")
+		s.Stop()
+	}
+
+	// finish reconciliation
+	// admin
+	new, deleted, changed := 0, 0, 0
+	var errFinal error
+
+	err = s.adminManager.FinishReconciliation(adminState)
+	if err != nil {
+		s.log.Errorf("could not reconcile admin config: %s", err.Error())
+		errFinal = err
+		goto rollback
+	}
+
+	s.logger.SetLevel(s.GetAdmin().LogLevel)
+
+	new += len(adminState.NewJobQueue)
+	changed += len(adminState.ChangedJobQueue)
+	deleted += len(adminState.DeletedJobQueue)
+
+	// auth
+	err = s.authManager.FinishReconciliation(authState)
+	if err != nil {
+		s.log.Errorf("could not reconcile auth config: %s", err.Error())
+		errFinal = err
+		goto rollback
+	}
+
+	new += len(authState.NewJobQueue)
+	changed += len(authState.ChangedJobQueue)
+	deleted += len(authState.DeletedJobQueue)
+
+	// listener
+	err = s.listenerManager.FinishReconciliation(listenerState)
+	if err != nil {
+		s.log.Errorf("could not reconcile listener config: %s", err.Error())
+		errFinal = err
+		goto rollback
+	}
+
+	if len(s.listenerManager.Keys()) == 0 {
+		s.log.Warn("running with no listeners")
+	}
+
+	new += len(listenerState.NewJobQueue)
+	changed += len(listenerState.ChangedJobQueue)
+	deleted += len(listenerState.DeletedJobQueue)
+
+	// cluster
+	err = s.clusterManager.FinishReconciliation(clusterState)
+	if err != nil {
+		s.log.Errorf("could not reconcile cluster config: %s", err.Error())
+		errFinal = err
+		goto rollback
 	}
 
 	if len(s.clusterManager.Keys()) == 0 {
 		s.log.Warn("running with no clusters: all traffic will be dropped")
 	}
 
-	s.log.Infof("reconciliation ready, restart required: %t", restart)
+	new += len(clusterState.NewJobQueue)
+	changed += len(clusterState.ChangedJobQueue)
+	deleted += len(clusterState.DeletedJobQueue)
 
+	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d",
+		new, changed, deleted)
+
+	if s.options.DryRun == true {
+		if restart {
+			return v1alpha1.ErrRestartRequired
+		}
+		return nil
+	}
+
+	// no dry-run
 	if restart {
+		s.log.Debugf("restarting for conf: %#v", req)
+
+		if err := s.Start(); err != nil {
+			s.log.Errorf("could not restart: %s", err.Error())
+			if s.options.SuppressRollback == true {
+				return err
+			}
+
+			errFinal = err
+			goto rollback
+		}
+
 		return v1alpha1.ErrRestartRequired
 	}
 
 	return nil
+
+rollback:
+	if s.options.SuppressRollback == false {
+		s.log.Infof("rolling back to previous configuration: %#v", rollback)
+		return s.Reconcile(*rollback)
+	}
+
+	return errFinal
 }

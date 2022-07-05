@@ -14,7 +14,8 @@ type Admin struct {
 	log            logging.LeveledLogger
 }
 
-// NewAdmin creates a new Admin object. Requires a server restart (returns v1alpha1.ErrRestartRequired)
+// NewAdmin creates a new Admin object. Requires a server restart (returns
+// v1alpha1.ErrRestartRequired)
 func NewAdmin(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
@@ -28,21 +29,29 @@ func NewAdmin(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error
 		return nil, err
 	}
 
-	return &admin, v1alpha1.ErrRestartRequired
+	return &admin, nil
 }
 
-// Reconcile updates the authenticator for a new configuration. Does require a server restart
+// Inspect examines whether a configuration change on the object would require a restart. An empty
+// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
+// otherwise it will be reconciled from the old configuration to the new one
+func (a *Admin) Inspect(old, new v1alpha1.Config) bool {
+	return false
+}
+
+// Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
+// request
 func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
 		return v1alpha1.ErrInvalidConf
 	}
 
-	a.log.Tracef("Reconcile: %#v", req)
-
 	if err := req.Validate(); err != nil {
 		return err
 	}
+
+	a.log.Tracef("Reconcile: %#v", req)
 
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
@@ -69,4 +78,24 @@ func (a *Admin) GetConfig() v1alpha1.Config {
 func (a *Admin) Close() error {
 	a.log.Tracef("Close")
 	return nil
+}
+
+// AdminFactory can create now Admin objects
+type AdminFactory struct {
+	logger logging.LoggerFactory
+}
+
+// NewAdminFactory creates a new factory for Admin objects
+func NewAdminFactory(logger logging.LoggerFactory) Factory {
+	return &AdminFactory{logger: logger}
+}
+
+// New can produce a new Admin object from the given configuration. A nil config will create an
+// empty admin object (useful for creating throwaway objects for, e.g., calling Inpect)
+func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
+	if conf == nil {
+		return &Admin{}, nil
+	}
+
+	return NewAdmin(conf, f.logger)
 }
