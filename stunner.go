@@ -16,6 +16,29 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
+const DefaultLogLevel = "all:WARN"
+
+// Options defines various options to define the way STUNner will run
+type Options struct {
+	// DryRun will suppress sideeffects: it will not initialize listener sockets and it will
+	// not bring up the TURN server. This is mostly for testing, default is false
+	DryRun bool
+	// SuppressRollback controls whether to rollback the last working configuration after a
+	// failed reconciliation request. Default is false, which means to always rollback
+	SuppressRollback bool
+	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
+	// "all:TRACE" will force maximal loglevel throughout the daemon will
+	// "all:ERROR,auth:TRACE,turn:DEBUG" will suppress all logs except in the authentication
+	// subsystem and the TURN protocol logic
+	LogLevel string
+	// Resolver swaps the internal DNS resolver with a custom implementation (used mostly for
+	// testing)
+	Resolver resolver.DnsResolver
+	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
+	// over an emulated data-plane
+	Net *vnet.Net
+}
+
 // Stunner is an instance of the STUNner deamon
 type Stunner struct {
 	version                                                    string
@@ -25,50 +48,57 @@ type Stunner struct {
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
 	net                                                        *vnet.Net
+	options                                                    Options
 }
 
-// NewStunner creates a new STUNner deamon from the specified configuration
-func NewStunner(req v1alpha1.StunnerConfig) (*Stunner, error) {
-	return newStunner(req, nil)
-}
+// NewStunner creates a new empty STUNner deamon. Call Reconcle to reconcile the daemon for the given configuration
+func NewStunner() *Stunner {
+	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
+	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
+	vnet := vnet.NewNet(nil)
 
-// NewStunnerWithVNet creates a new STUNner deamon from the specified configuration, using a
-// vnet.Net instance to test STUNner over an emulated data-plane
-func NewStunnerWithVNet(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
-	return newStunner(req, net)
-}
-
-func newStunner(req v1alpha1.StunnerConfig, net *vnet.Net) (*Stunner, error) {
-	if err := req.Validate(); err != nil {
-		return nil, err
-	}
-
-	loggerFactory := logger.NewLoggerFactory(req.Admin.LogLevel)
 	s := Stunner{
-		version:         req.ApiVersion,
-		logger:          loggerFactory,
-		log:             loggerFactory.NewLogger("stunner"),
-		adminManager:    manager.NewManager("admin-manager", loggerFactory),
-		authManager:     manager.NewManager("auth-manager", loggerFactory),
-		listenerManager: manager.NewManager("listener-manager", loggerFactory),
-		clusterManager:  manager.NewManager("cluster-manager", loggerFactory),
-		resolver:        resolver.NewDnsResolver("dns-resolver", loggerFactory),
+		version: v1alpha1.ApiVersion,
+		logger:  loggerFactory,
+		log:     loggerFactory.NewLogger("stunner"),
+		adminManager: manager.NewManager("admin-manager",
+			object.NewAdminFactory(loggerFactory), loggerFactory),
+		authManager: manager.NewManager("auth-manager",
+			object.NewAuthFactory(loggerFactory), loggerFactory),
+		listenerManager: manager.NewManager("listener-manager",
+			object.NewListenerFactory(vnet, loggerFactory), loggerFactory),
+		clusterManager: manager.NewManager("cluster-manager",
+			object.NewClusterFactory(r, loggerFactory), loggerFactory),
+		resolver: r,
+		net:      vnet,
+		options:  Options{},
 	}
 
-	if net == nil {
-		s.net = vnet.NewNet(nil)
-	} else {
-		s.net = net
+	return &s
+}
+
+// WithOptions will take into effect the options passed in
+func (s *Stunner) WithOptions(options Options) *Stunner {
+	s.options = options
+
+	if options.LogLevel != "" {
+		s.logger.SetLevel(options.LogLevel)
+	}
+
+	if options.Net != nil {
 		s.log.Warn("vnet is enabled")
+		s.net = options.Net
+		s.listenerManager = manager.NewManager("listener-manager",
+			object.NewListenerFactory(options.Net, s.logger), s.logger)
 	}
 
-	s.log.Tracef("NewStunner: %#v", req)
-
-	if err := s.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
-		return nil, err
+	if options.Resolver != nil {
+		s.resolver = options.Resolver
+		s.clusterManager = manager.NewManager("cluster-manager",
+			object.NewClusterFactory(options.Resolver, s.logger), s.logger)
 	}
 
-	return &s, nil
+	return s
 }
 
 // GetVersion returns the STUNner API version
@@ -117,6 +147,11 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 	return l.(*object.Cluster)
 }
 
+// GetLogger returns the logger factory of the running daemon, useful for creating a sub-logger
+func (s *Stunner) GetLogger() logging.LoggerFactory {
+	return s.logger
+}
+
 // String returns a short description of the running STUNner instance
 func (s *Stunner) String() string {
 	listeners := s.listenerManager.Keys()
@@ -132,4 +167,42 @@ func (s *Stunner) String() string {
 	auth := s.GetAuth()
 	return fmt.Sprintf("authentication type: %s, realm: %s, listeners: %s",
 		auth.Type.String(), auth.Realm, str)
+}
+
+// Close stops the STUNner daemon, cleans up any associated state and closes all connections it is
+// managing
+func (s *Stunner) Close() {
+	s.log.Info("closing STUNner")
+
+	// stop the server
+	s.Stop()
+
+	// ignore restart-required errors
+	if len(s.adminManager.Keys()) > 0 {
+		_ = s.GetAdmin().Close()
+	}
+
+	if len(s.authManager.Keys()) > 0 {
+		_ = s.GetAuth().Close()
+	}
+
+	listeners := s.listenerManager.Keys()
+	for _, name := range listeners {
+		l := s.GetListener(name)
+		if err := l.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
+			s.log.Errorf("Error closing listener %q at adddress %s: %s",
+				l.Proto.String(), l.Addr, err.Error())
+		}
+	}
+
+	clusters := s.clusterManager.Keys()
+	for _, name := range clusters {
+		c := s.GetCluster(name)
+		if err := c.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
+			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
+				err.Error())
+		}
+	}
+
+	s.resolver.Close()
 }
