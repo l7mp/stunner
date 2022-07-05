@@ -9,6 +9,7 @@ COPY go.sum ./
 RUN go mod download
 
 COPY *.go ./
+COPY internal/logger internal/logger
 COPY internal/manager/ internal/manager/
 COPY internal/object/ internal/object/
 COPY internal/resolver/ internal/resolver/
