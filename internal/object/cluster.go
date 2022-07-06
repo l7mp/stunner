@@ -23,9 +23,9 @@ type Cluster struct {
 	log       logging.LeveledLogger
 }
 
-// NewListener creates a new cluster. Does not require a server restart
-func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver,
-	logger logging.LoggerFactory) (Object, error) {
+// NewCluster creates a new cluster. Requires a server restart (returns
+// v1alpha1.ErrRestartRequired)
+func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.ClusterConfig)
 	if !ok {
 		return nil, v1alpha1.ErrInvalidConf
@@ -47,26 +47,32 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver,
 
 	c.log.Tracef("NewCluster: %#v", req)
 
-	if err := c.Reconcile(req); err != nil {
+	if err := c.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
 		return nil, err
 	}
 
 	return &c, nil
 }
 
-// Reconcile updates a cluster. Does not require a server restart
+// Inspect examines whether a configuration change on the object would require a restart. An empty
+// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
+// otherwise it will be reconciled from the old configuration to the new one
+func (c *Cluster) Inspect(old, new v1alpha1.Config) bool {
+	return false
+}
+
+// Reconcile updates the authenticator for a new configuration.
 func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 	req, ok := conf.(*v1alpha1.ClusterConfig)
 	if !ok {
 		return v1alpha1.ErrInvalidConf
 	}
 
-	c.log.Tracef("Reconcile: %#v", req)
-
 	if err := req.Validate(); err != nil {
 		return err
 	}
 
+	c.log.Tracef("Reconcile: %#v", req)
 	c.Type, _ = v1alpha1.NewClusterType(req.Type)
 
 	switch c.Type {
@@ -172,8 +178,9 @@ func (c *Cluster) Close() error {
 
 // Route decides whwther a peer IP appears among the permitted endpoints of a cluster
 func (c *Cluster) Route(peer net.IP) bool {
-	c.log.Tracef("Route: cluster %q of type %s: routing peer IP: %s",
-		c.Name, c.Type.String(), peer.String())
+	c.log.Tracef("Route: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
+		peer.String())
+
 	switch c.Type {
 	case v1alpha1.ClusterTypeStatic:
 		// endpoints are IPNets
@@ -203,4 +210,25 @@ func (c *Cluster) Route(peer net.IP) bool {
 	}
 
 	return false
+}
+
+// ClusterFactory can create now Cluster objects
+type ClusterFactory struct {
+	resolver resolver.DnsResolver
+	logger   logging.LoggerFactory
+}
+
+// NewClusterFactory creates a new factory for Cluster objects
+func NewClusterFactory(resolver resolver.DnsResolver, logger logging.LoggerFactory) Factory {
+	return &ClusterFactory{resolver: resolver, logger: logger}
+}
+
+// New can produce a new Cluster object from the given configuration. A nil config will create an
+// empty cluster object (useful for creating throwaway objects for, e.g., calling Inpect)
+func (f *ClusterFactory) New(conf v1alpha1.Config) (Object, error) {
+	if conf == nil {
+		return &Cluster{}, nil
+	}
+
+	return NewCluster(conf, f.resolver, f.logger)
 }

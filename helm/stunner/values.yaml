@@ -12,13 +12,13 @@ stunner:
         repository: ""
         name: l7mp/stunnerd
         pullPolicy: Always
-        tag: latest
+        tag: 0.10.6
         resources:
           limits:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 1000m
+            memory: 512Mi
           requests:
-            cpu: 100m
+            cpu: 250m
             memory: 128Mi
  
       netdebug: disable

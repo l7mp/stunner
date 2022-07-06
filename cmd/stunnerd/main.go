@@ -33,12 +33,17 @@ func main() {
 	if *verbose {
 		// verbose mode on, override any loglevel
 		logLevel = "all:DEBUG"
-	} else if *level != "" {
+	}
+	if *level != "" {
 		// loglevel set on the comman line, use that one instead
 		logLevel = *level
 	}
 
-	log := stunner.NewLoggerFactory(logLevel).NewLogger("stunnerd")
+	st := stunner.NewStunner().WithOptions(stunner.Options{LogLevel: logLevel})
+	defer st.Close()
+
+	log := st.GetLogger().NewLogger("stunnerd")
+
 	conf := make(chan *v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
@@ -48,8 +53,7 @@ func main() {
 
 		c, err := stunner.NewDefaultConfig(flag.Arg(0))
 		if err != nil {
-			log.Errorf("could not load default STUNner config: %s",
-				err.Error())
+			log.Errorf("could not load default STUNner config: %s", err.Error())
 			os.Exit(1)
 		}
 
@@ -156,7 +160,7 @@ func main() {
 					conf <- c
 
 				case err := <-watcher.Errors:
-					log.Debugf("watcher error, inactivating watcher: %s", err.Error())
+					log.Debugf("watcher error, deactivating watcher: %s", err.Error())
 
 					if watcherEnabled == true {
 						if err := watcher.Remove(*config); err != nil {
@@ -175,13 +179,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	var s *stunner.Stunner
-	defer (func() {
-		if s != nil {
-			s.Close()
-		}
-	})()
-
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -190,6 +187,7 @@ func main() {
 		case <-sigs:
 			log.Info("normal exit")
 			os.Exit(0)
+
 		case c := <-conf:
 			log.Trace("new configuration file available")
 
@@ -198,44 +196,18 @@ func main() {
 				c.Admin.LogLevel = logLevel
 			}
 
-			if s == nil {
-				log.Debugf("initializing new %s instance", os.Args[0])
-				st, err := stunner.NewStunner(*c)
-				if err != nil {
-					log.Errorf("could not create STUNner instance: %s", err.Error())
-					os.Exit(1)
-				}
-				s = st
-
-				log.Debugf("starting %s daemon", os.Args[0])
-				if err := s.Start(); err != nil {
-					log.Errorf("could not start STUNner daemon: %s", err.Error())
-					os.Exit(1)
-				}
-
-				continue
-			}
-
 			// we have working stunnerd: reconcile
 			log.Debug("initiating reconciliation")
-			err := s.Reconcile(*c)
+			err := st.Reconcile(*c)
+			log.Trace("reconciliation ready")
 			if err != nil {
-				log.Debugf("restarting %s", os.Args[0])
 				if err == v1alpha1.ErrRestartRequired {
-					s.Close()
-					if err := s.Start(); err != nil {
-						log.Errorf("could not restart %s: %s", os.Args[0],
-							err.Error())
-						os.Exit(1)
-					}
+					log.Debugf("reconciliation ready: server restarted")
 				} else {
-					log.Warnf("could not reconcile %s for new configuration (ignoring): %s",
-						os.Args[0], err.Error())
-					continue
+					log.Errorf("could not reconcile new configuration: %s, "+
+						"rolling back to last running config", err.Error())
 				}
 			}
-			log.Trace("reconciliation ready")
-
 		}
 	}
 }

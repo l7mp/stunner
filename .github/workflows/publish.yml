@@ -32,6 +32,8 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: stunner
+          ref: main
+          repository: l7mp/stunner
       - name: Get the version
         id: vars
         run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
@@ -41,20 +43,30 @@ jobs:
           token: ${{ secrets.WEB_PAT_TOKEN }}
           path: l7mp.io
           ref: master
-          repository: l7mp/l7mp.io
+          repository: l7mp/l7mp.io     
+      - name: Set git config
+        run: |
+          git config --global user.email "l7mp.info@gmail.com"
+          git config --global user.name "BotL7mp"
       - name: Build helm charts
         run: |
           cd stunner/helm
-          sed -ri 's/^(\s*)(version\s*:\s*0.1.0\s*$)/\1version: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
-          sed -ri 's/^(\s*)(appVersion\s*:\s*0.1.0\s*$)/\1appVersion: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(version\s*:\s*.*\s*$)/\1version: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(appVersion\s*:\s*.*\s*$)/\1appVersion: ${{steps.vars.outputs.tag}}/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(        tag\s*:\s*.*\s*$)/\1        tag: ${{steps.vars.outputs.tag}}/' stunner/values.yaml
           helm package *
       - name: Update l7mp.io
         run: |
           cp stunner/helm/*.tgz l7mp.io/stunner
           helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
+          rm stunner/helm/*.tgz
           cd l7mp.io
-          git config --global user.email "l7mp.info@gmail.com"
-          git config --global user.name "BotL7mp"
           git add .
           git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
           git push origin master
+      - name: Update stunner
+        run: |
+          cd stunner
+          git add .
+          git commit -m "Update helm chart" -m "(triggered by the 'Helm release' github action.)"
+          git push origin main
