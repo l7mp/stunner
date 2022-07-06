@@ -473,7 +473,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// check everyting
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, "new-name", "stunner name")
+			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, v1alpha1.DefaultLogLevel, "stunner loglevel")
 			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
