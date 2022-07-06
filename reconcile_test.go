@@ -470,11 +470,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// no restart!
 			assert.NoError(t, err, "no restart needed")
 
+			// check everyting
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
-			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics", "stunner metrics endpoint")
+			assert.Equal(t, admin.Name, "new-name", "stunner name")
+			// assert.Equal(t, admin.LogLevel, v1alpha1.DefaultLogLevel, "stunner loglevel")
+			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
+				"stunner metrics endpoint")
 
 			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
 			auth := s.GetAuth()
@@ -483,7 +485,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			key, ok := auth.Handler("user", v1alpha1.DefaultRealm,
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, key, turn.GenerateAuthKey("user",
