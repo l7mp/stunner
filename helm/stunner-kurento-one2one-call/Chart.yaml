@@ -1,5 +1,5 @@
 apiVersion: v2
-name: kurento_webrtc_demo
+name: stunner-kurento-one2one-call
 description: A Helm chart for Kubernetes
 
 # A chart can be either an 'application' or a 'library' chart.

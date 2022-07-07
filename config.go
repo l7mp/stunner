@@ -109,13 +109,25 @@ func LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
 	s.log.Tracef("GetConfig")
 
+	// singletons, but we want to avoid panics when GetConfig is called on an uninitialized
+	// STUNner object
+	adminConf := v1alpha1.AdminConfig{}
+	if len(s.adminManager.Keys()) > 0 {
+		adminConf = *s.GetAdmin().GetConfig().(*v1alpha1.AdminConfig)
+	}
+
+	authConf := v1alpha1.AuthConfig{}
+	if len(s.authManager.Keys()) > 0 {
+		authConf = *s.GetAuth().GetConfig().(*v1alpha1.AuthConfig)
+	}
+
 	listeners := s.listenerManager.Keys()
 	clusters := s.clusterManager.Keys()
 
 	c := v1alpha1.StunnerConfig{
 		ApiVersion: s.version,
-		Admin:      *s.GetAdmin().GetConfig().(*v1alpha1.AdminConfig),
-		Auth:       *s.GetAuth().GetConfig().(*v1alpha1.AuthConfig),
+		Admin:      adminConf,
+		Auth:       authConf,
 		Listeners:  make([]v1alpha1.ListenerConfig, len(listeners)),
 		Clusters:   make([]v1alpha1.ClusterConfig, len(clusters)),
 	}

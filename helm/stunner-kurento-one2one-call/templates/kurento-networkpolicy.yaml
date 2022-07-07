@@ -16,7 +16,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          {{- include "kurento_webrtc_demo.mediaServer.selectorLabels" . | nindent 10 }}
+          {{- include "stunner-kurento-one2one-call.mediaServer.selectorLabels" . | nindent 10 }}
     ports:
     - protocol: UDP
       port: 10000

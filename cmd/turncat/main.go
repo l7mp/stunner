@@ -14,6 +14,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/l7mp/stunner"
+	"github.com/l7mp/stunner/internal/logger"
 	// "github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -64,7 +65,7 @@ func main() {
 	if *verbose {
 		*level = "all:DEBUG"
 	}
-	logger := stunner.NewLoggerFactory(*level)
+	logger := logger.NewLoggerFactory(*level)
 
 	cfg := &stunner.TurncatConfig{
 		ListenerAddr:  flag.Arg(0),

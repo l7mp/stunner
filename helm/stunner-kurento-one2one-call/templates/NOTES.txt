@@ -1,0 +1,1 @@
+Install of the stunner-kurento-one2one-call chart was successful.

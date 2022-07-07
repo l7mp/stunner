@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/pion/logging"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -16,42 +14,6 @@ type StunnerUri struct {
 	Protocol, Address, Username, Password string
 	Port                                  int
 	Addr                                  net.Addr
-}
-
-// NewLoggerFactory sets up a scoped logger for STUNner
-func NewLoggerFactory(levelSpec string) *logging.DefaultLoggerFactory {
-	logger := logging.NewDefaultLoggerFactory()
-
-	logLevels := map[string]logging.LogLevel{
-		"DISABLE": logging.LogLevelDisabled,
-		"ERROR":   logging.LogLevelError,
-		"WARN":    logging.LogLevelWarn,
-		"INFO":    logging.LogLevelInfo,
-		"DEBUG":   logging.LogLevelDebug,
-		"TRACE":   logging.LogLevelTrace,
-	}
-
-	levels := strings.Split(levelSpec, ",")
-	for _, s := range levels {
-		scopedLevel := strings.SplitN(s, ":", 2)
-		if len(scopedLevel) != 2 {
-			continue
-		}
-		scope := scopedLevel[0]
-		level := scopedLevel[1]
-		l, found := logLevels[strings.ToUpper(level)]
-		if found == false {
-			continue
-		}
-
-		if strings.ToLower(scope) == "all" {
-			logger.DefaultLogLevel = l
-			continue
-		}
-
-		logger.ScopeLevels[scope] = l
-	}
-	return logger
 }
 
 // ParseUri parses a STUN/TURN server URI, e.g., "turn://user1:passwd1@127.0.0.1:3478?transport=udp"

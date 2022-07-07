@@ -12,6 +12,8 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -37,7 +39,7 @@ type turncatEchoTestConfig struct {
 	lconn net.Conn
 	// peer
 	peer          *StunnerUri
-	loggerFactory *logging.DefaultLoggerFactory
+	loggerFactory logging.LoggerFactory
 }
 
 func turncatEchoTest(conf turncatEchoTestConfig) {
@@ -99,11 +101,16 @@ func TestTurncatPlaintext(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := NewLoggerFactory(turncatTestLoglevel)
+	logger := logger.NewLoggerFactory(turncatTestLoglevel)
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner, err := NewStunner(v1alpha1.StunnerConfig{
+	stunner := NewStunner().WithOptions(Options{
+		LogLevel:         turncatTestLoglevel,
+		SuppressRollback: true,
+	})
+
+	err := stunner.Reconcile(v1alpha1.StunnerConfig{
 		ApiVersion: "v1alpha1",
 		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
@@ -133,11 +140,11 @@ func TestTurncatPlaintext(t *testing.T) {
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
 	})
-	assert.NoError(t, err, "cannot set up STUNner daemon")
-	defer stunner.Close()
 
-	log.Debug("starting stunnerd")
-	assert.NoError(t, stunner.Start())
+	// restart required
+	assert.ErrorContains(t, err, "restart", "starting server")
+	// assert.NoError(t, err, "cannot set up STUNner daemon")
+	defer stunner.Close()
 
 	testTurncatConfigs := []TurncatConfig{
 		{
@@ -215,11 +222,15 @@ func TestTurncatLongterm(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := NewLoggerFactory(turncatTestLoglevel)
+	logger := logger.NewLoggerFactory(turncatTestLoglevel)
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner, err := NewStunner(v1alpha1.StunnerConfig{
+	stunner := NewStunner().WithOptions(Options{
+		LogLevel:         turncatTestLoglevel,
+		SuppressRollback: true,
+	})
+	err := stunner.Reconcile(v1alpha1.StunnerConfig{
 		ApiVersion: "v1alpha1",
 		Admin: v1alpha1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
@@ -248,11 +259,9 @@ func TestTurncatLongterm(t *testing.T) {
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
 	})
-	assert.NoError(t, err, "cannot set up STUNner daemon")
+	assert.ErrorContains(t, err, "restart", "starting server")
+	// assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
-
-	log.Debug("starting stunnerd")
-	assert.NoError(t, stunner.Start())
 
 	testTurncatConfigs := []TurncatConfig{
 		{

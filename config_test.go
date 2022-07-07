@@ -12,6 +12,8 @@ import (
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/l7mp/stunner/internal/logger"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -22,8 +24,8 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
 	for _, conf := range []string{
@@ -48,11 +50,14 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			assert.NoError(t, err, err)
 
 			log.Debug("creating a stunnerd")
-			stunner, err := NewStunnerWithVNet(*c, v.podnet)
-			assert.NoError(t, err)
+			stunner := NewStunner().WithOptions(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Net:              v.podnet,
+			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Start())
+			assert.ErrorContains(t, stunner.Reconcile(*c), "restart", "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -60,7 +65,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, "user1", "passwd1", net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, loggerFactory}
+				"1.2.3.5:5678", true, true, true, loggerFactory}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -77,8 +82,8 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := NewLoggerFactory("all:TRACE")
-	loggerFactory := NewLoggerFactory(stunnerTestLoglevel)
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test-roundtrip")
 
 	conf := "turn://user1:passwd1@1.2.3.4:3478?transport=udp"

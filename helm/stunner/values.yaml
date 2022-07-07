@@ -12,7 +12,7 @@ stunner:
         repository: ""
         name: l7mp/stunnerd
         pullPolicy: Always
-        tag: 0.10.3-t
+        tag: 0.10.6
         resources:
           limits:
             cpu: 1000m

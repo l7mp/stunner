@@ -22,7 +22,6 @@ type DnsResolver interface {
 	Lookup(domain string) ([]net.IP, error)
 	Start()
 	Close()
-	SetResolver(mockDns *MockResolver)
 }
 
 type serviceEntry struct {
@@ -35,14 +34,12 @@ type serviceEntry struct {
 	hostNames    []net.IP
 	cname        string
 	lastResolved time.Time
-	mockResolver *MockResolver
 }
 
 type dnsResolverImpl struct {
-	ctx          context.Context
-	register     map[string]*serviceEntry
-	log          logging.LeveledLogger
-	mockResolver *MockResolver
+	ctx      context.Context
+	register map[string]*serviceEntry
+	log      logging.LeveledLogger
 }
 
 // NewDnsResolver creates a new DNS resolver
@@ -51,24 +48,9 @@ func NewDnsResolver(name string, logger logging.LoggerFactory) DnsResolver {
 	log.Tracef("NewDnsResolver")
 
 	return &dnsResolverImpl{
-		ctx:          context.Background(),
-		register:     make(map[string]*serviceEntry),
-		log:          log,
-		mockResolver: nil,
-	}
-}
-
-// SetResolver overrides the default DNS resolver with a mock resolver for testing
-func (r *dnsResolverImpl) SetResolver(mockDns *MockResolver) {
-	r.log.Debugf("SetResolver: using mock resolver: %#v", *mockDns)
-
-	r.mockResolver = mockDns
-
-	for h, e := range r.register {
-		e.lock.Lock()
-		e.mockResolver = mockDns
-		e.lock.Unlock()
-		r.register[h] = e
+		ctx:      context.Background(),
+		register: make(map[string]*serviceEntry),
+		log:      log,
 	}
 }
 
@@ -92,7 +74,6 @@ func (r *dnsResolverImpl) Register(domain string) error {
 		domain:       domain,
 		cname:        "",
 		lastResolved: time.Time{},
-		mockResolver: r.mockResolver,
 	}
 	r.register[domain] = e
 
@@ -136,8 +117,7 @@ func startResolver(e *serviceEntry, log logging.LeveledLogger) {
 // do the heavy lifting
 func doResolve(e *serviceEntry) error {
 	if e.cname == "" {
-		// lookupCNAME is a wrapper (see below) for testing with the MockResolver
-		cname, err := lookupCNAME(e, e.domain)
+		cname, err := e.resolver.LookupCNAME(e.ctx, e.domain)
 		if err != nil {
 			return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
 				e.domain, err.Error())
@@ -145,8 +125,7 @@ func doResolve(e *serviceEntry) error {
 		e.cname = cname
 	}
 
-	// lookupHost is a wrapper (see below) for testing with the MockResolver
-	hosts, err := lookupHost(e, e.domain)
+	hosts, err := e.resolver.LookupHost(e.ctx, e.domain)
 	if err != nil {
 		return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
 			e.domain, err.Error())
@@ -207,6 +186,8 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 		ret[i] = n
 	}
 
+	r.log.Tracef("Lookup ready: domain %q, endpoints: %d", domain, len(ret))
+
 	return ret, nil
 }
 
@@ -224,49 +205,9 @@ func (r *dnsResolverImpl) Close() {
 		r.log.Warnf("trying to close DNS resolver with %d active domains",
 			len(r.register))
 		for _, e := range r.register {
-			r.log.Debugf("domain %q is active, refCount: %d",
+			r.log.Debugf("unregistering active domain %q, refCount: %d",
 				e.domain, e.refCount)
+			r.Unregister(e.domain)
 		}
 	}
-}
-
-// for testing
-type MockResolver struct {
-	Zone map[string]([]string)
-}
-
-func (m *MockResolver) LookupCNAME(domain string) (string, error) {
-	for d := range m.Zone {
-		if d == domain {
-			return domain, nil
-		}
-	}
-
-	return "", fmt.Errorf("Host %q not found: 3(NXDOMAIN)", domain)
-}
-
-func (m *MockResolver) LookupHost(domain string) ([]string, error) {
-	if e, found := m.Zone[domain]; found != false {
-		return e, nil
-	}
-
-	return []string{}, fmt.Errorf("Host %q not found: 3(NXDOMAIN)", domain)
-}
-
-// lookupCNAME is a wrapper (see below) for testing with the MockResolver
-func lookupCNAME(e *serviceEntry, domain string) (string, error) {
-	if e.mockResolver != nil {
-		return e.mockResolver.LookupCNAME(domain)
-	}
-
-	return e.resolver.LookupCNAME(e.ctx, domain)
-}
-
-// lookupHost is a wrapper (see below) for testing with the MockResolver
-func lookupHost(e *serviceEntry, domain string) ([]string, error) {
-	if e.mockResolver != nil {
-		return e.mockResolver.LookupHost(domain)
-	}
-
-	return e.resolver.LookupHost(e.ctx, domain)
 }
