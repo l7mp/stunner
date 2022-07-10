@@ -3,7 +3,7 @@ package object
 import (
 	"github.com/pion/logging"
 
-	// "github.com/l7mp/stunner/internal/monitoring"
+	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -11,9 +11,9 @@ const DefaultAdminObjectName = "DefaultAdmin"
 
 // Admin is the main object holding STUNner administration info
 type Admin struct {
-	Name, LogLevel, MetricsEndpoint    string
-	log                                logging.LeveledLogger
-	//monitoringServer  monitoring.MonitoringServer
+	Name, LogLevel, MetricsEndpoint string
+	log                             logging.LeveledLogger
+	MonitoringServer                *monitoring.MonitoringServer
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
@@ -58,9 +58,25 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
 
-	// TODO: metrics endpoint: if there is a change: restart the web server,
-	//                        leave untouched otherwise
-	a.MetricsEndpoint = req.MetricsEndpoint
+	// monitoring
+	me := req.MetricsEndpoint
+	if me != "" {
+		if a.MetricsEndpoint != me {
+			if a.MonitoringServer != nil {
+				a.MonitoringServer.Stop()
+			}
+			if m, err := monitoring.NewMonitoringServer(me, v1alpha1.DefaultMonitoringGroup); err == nil {
+				a.MonitoringServer = m
+			} else {
+				a.log.Warn("failed to create monitoring server")
+			}
+		}
+	} else {
+		if a.MonitoringServer != nil {
+			a.MonitoringServer.Stop()
+		}
+	}
+	a.MetricsEndpoint = me
 
 	return nil
 }
@@ -75,8 +91,8 @@ func (a *Admin) ObjectName() string {
 func (a *Admin) GetConfig() v1alpha1.Config {
 	a.log.Tracef("GetConfig")
 	return &v1alpha1.AdminConfig{
-		Name:     a.Name,
-		LogLevel: a.LogLevel,
+		Name:            a.Name,
+		LogLevel:        a.LogLevel,
 		MetricsEndpoint: a.MetricsEndpoint,
 	}
 }

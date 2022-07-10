@@ -11,6 +11,7 @@ import (
 	"github.com/pion/turn/v2"
 	// "github.com/pion/transport/vnet"
 
+	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -127,7 +128,11 @@ func (s *Stunner) Start() error {
 		}
 	}
 
+	// register metrics
+	monitoring.RegisterMetrics(s.log, func() float64 { return float64(s.server.AllocationCount()) })
+
 	// start monitoring
+	s.monitoringServer = s.GetAdmin().MonitoringServer
 	if s.monitoringServer != nil {
 		s.monitoringServer.Start()
 	}
