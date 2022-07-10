@@ -62,6 +62,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	me := req.MetricsEndpoint
 	if me != "" {
 		if a.MetricsEndpoint != me {
+			// new endpoint, restart monitoring server
 			if a.MonitoringServer != nil {
 				a.MonitoringServer.Stop()
 			}
@@ -72,6 +73,8 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 			}
 		}
 	} else {
+		// metrics endpoint is set to empty string, time to
+		// shut down the monitoring server
 		if a.MonitoringServer != nil {
 			a.MonitoringServer.Stop()
 		}
