@@ -2,6 +2,8 @@
 
 stunner:
   namespace: default
+  stunnerGatewayOperator:
+    enabled: false
   deployment:
     name: stunner
     label: stunner
