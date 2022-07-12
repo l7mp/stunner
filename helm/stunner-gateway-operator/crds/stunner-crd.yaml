@@ -1,0 +1,101 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: gatewayconfigs.stunner.l7mp.io
+spec:
+  group: stunner.l7mp.io
+  names:
+    categories:
+    - stunner
+    kind: GatewayConfig
+    listKind: GatewayConfigList
+    plural: gatewayconfigs
+    shortNames:
+    - gtwconf
+    singular: gatewayconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.realm
+      name: Realm
+      type: string
+    - jsonPath: .spec.authType
+      name: Auth
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: GatewayConfig is the Schema for the gatewayconfigs API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: GatewayConfigSpec defines the desired state of GatewayConfig
+            properties:
+              authLifetime:
+                description: AuthLifetime defines the lifetime of "longterm" authentication credentials in seconds.
+                format: int32
+                type: integer
+              authType:
+                default: plaintext
+                description: AuthType is the type of the STUN/TURN authentication mechanism.
+                pattern: ^plaintext|longterm$
+                type: string
+              loglevel:
+                description: LogLevel specifies the default loglevel for the STUNner daemon
+                type: string
+              maxPort:
+                description: MaxRelayPort is the smallest relay port assigned for STUNner relay connections.
+                format: int32
+                type: integer
+              minPort:
+                description: MinRelayPort is the smallest relay port assigned for STUNner relay connections.
+                format: int32
+                type: integer
+              password:
+                description: Password defines the `password` credential for "plaintext" authentication.
+                pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
+                type: string
+              realm:
+                default: stunner.l7mp.io
+                description: "Realm defines the STUN/TURN authentication realm to be used for clients toauthenticate with STUNner. \n The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. No other punctuation is allowed."
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                type: string
+              sharedSecret:
+                description: SharedSecret defines the shared secret to be used for "longterm" authentication
+                type: string
+              stunnerConfig:
+                default: stunnerd-config
+                description: StunnerConfig specifies the name of the ConfigMap into which the operator renders the stunnerd configfile.
+                maxLength: 64
+                pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                type: string
+              userName:
+                description: Username defines the `username` credential for "plaintext" authentication.
+                pattern: ^[A-Za-z0-9!#$%&'*+\-.^_\x60|~]+$
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
