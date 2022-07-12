@@ -22,3 +22,9 @@ version: 0.10.6
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: 0.10.6
+
+dependencies:
+  - name: stunner-gateway-operator
+    version: ~0.10.6
+    condition: stunnerGatewayOperator.enabled
+    repository: file://../stunner-gateway-operator

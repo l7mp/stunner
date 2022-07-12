@@ -1,4 +1,5 @@
 # Post install job running a script to gather the external IP of the LB SVC for stunner
+{{- if eq .Values.stunner.stunnerGatewayOperator.enabled false}}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -60,3 +61,4 @@ subjects:
   name: {{ .Values.stunner.postInstall.serviceAccountName }}
   namespace: {{ .Values.stunner.namespace }}
 ---
+{{- end -}}

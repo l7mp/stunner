@@ -61,3 +61,16 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Generate the proper args for stunnerd
+*/}}
+{{- define "stunner.stunnerGatewayOperator.args" -}}
+{{- if .Values.stunner.stunnerGatewayOperator.enabled }}
+command: ["stunnerd"]
+args: ["-w", "-c", "/etc/stunnerd/stunnerd.conf"]
+{{- else }}
+command: ["stunnerd"]
+args: ["-c", "/stunnerd.conf"]
+{{- end }}
+{{- end }}
