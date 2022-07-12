@@ -1,4 +1,12 @@
 {{ .Chart.Name }} successfully installed
+{{- if .Values.global.stunnerGatewayOperator.enabled}}
+You installed stunner with the gateway operator.
+To checkout the installed resources:
+$ kubectl get pod,svc,cm,gatewayclasses,gatewayconfigs -n {{ .Values.global.stunner.namespace }}
+$ kubectl get pod,svc -n {{ .Values.global.stunnerGatewayOperator.namespace }}
+{{- else}}
+You installed stunner without the gateway operator
 !IMPORTANT!
 Customize the default values below stunner.config
 to your own specification!
+{{- end}}
