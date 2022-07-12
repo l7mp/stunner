@@ -2,7 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
-  namespace: stunner
+  namespace: {{ .Values.global.stunner.namespace }}
 spec:
   controllerName: "stunner.l7mp.io/gateway-operator"
   parametersRef:

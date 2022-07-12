@@ -3,32 +3,25 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "stunner.name" . }}
-  namespace: {{ .Values.stunner.namespace }}
+  namespace: {{ .Values.global.stunner.namespace }}
 spec:
   selector:
     matchLabels:
       {{- include "stunner.labels" . | nindent 6 }}
-  replicas: {{ .Values.stunner.deployment.replica }}
+  replicas: {{ .Values.global.stunner.deployment.replica }}
   template:
     metadata:
       labels:
         {{- include "stunner.labels" . | nindent 8 }}
     spec:
+      {{- include "stunner.stunnerGatewayOperator.volume" . | indent 6 }}
       containers:
-      - name: {{ .Values.stunner.deployment.container.name }}
-        image: "{{ .Values.stunner.deployment.container.image.repository }}{{ .Values.stunner.deployment.container.image.name }}:{{ .Values.stunner.deployment.container.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.stunner.deployment.container.image.pullPolicy }}
+      - name: {{ .Values.global.stunner.deployment.container.name }}
+        image: "{{ .Values.global.stunner.deployment.container.image.repository }}{{ .Values.global.stunner.deployment.container.image.name }}:{{ .Values.global.stunner.deployment.container.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.global.stunner.deployment.container.image.pullPolicy }}
         {{- include "stunner.stunnerGatewayOperator.args" . | indent 8 }}
-        envFrom:
-          - configMapRef:
-              name: stunner-config
-        env:
-        - name: STUNNER_ADDR  # we use the POD IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        resources: {{- toYaml .Values.stunner.deployment.container.image.resources | nindent 10 }}
-{{- if eq .Values.stunner.deployment.container.netdebug "enable"}}
+        resources: {{- toYaml .Values.global.stunner.deployment.container.image.resources | nindent 10 }}
+{{- if eq .Values.global.stunner.deployment.container.netdebug "enable"}}
       - name: net-debug
         image: retvari/net-debug:latest
         imagePullPolicy: IfNotPresent

@@ -1,5 +1,6 @@
+# Important! Job is installed in case the stunnerGatewayOperator.enabled is set to false.
 # Post install job running a script to gather the external IP of the LB SVC for stunner
-{{- if eq .Values.stunner.stunnerGatewayOperator.enabled false}}
+{{- if eq .Values.global.stunnerGatewayOperator.enabled false}}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -7,16 +8,16 @@ metadata:
   name: "{{- include "stunner.name" .}}-post-install"
   labels: 
     job: "{{- include "stunner.name" .}}-post-install-job"
-  namespace: {{ .Values.stunner.namespace }}
+  namespace: {{ .Values.global.stunner.namespace }}
 spec:
   template:
     spec:
-      serviceAccountName: {{ .Values.stunner.postInstall.serviceAccountName }}
+      serviceAccountName: {{ .Values.global.stunner.postInstall.serviceAccountName }}
       containers:
       - name: post-install
         # image: l7mp/stunner-job:latest
-        image: "{{ .Values.stunner.postInstall.image.repository }}{{ .Values.stunner.postInstall.image.name }}:{{ .Values.stunner.postInstall.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.stunner.postInstall.image.pullPolicy }}
+        image: "{{ .Values.global.stunner.postInstall.image.repository }}{{ .Values.global.stunner.postInstall.image.name }}:{{ .Values.global.stunner.postInstall.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.global.stunner.postInstall.image.pullPolicy }}
         command: ["/bin/bash"]
         args: ["./post-install.sh"]
       restartPolicy: Never
@@ -26,7 +27,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: post-install-cr
-  namespace: {{ .Values.stunner.namespace }}
+  namespace: {{ .Values.global.stunner.namespace }}
 rules:
 - apiGroups: [""]
   resources: ["services"]
@@ -41,8 +42,8 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Values.stunner.postInstall.serviceAccountName }}
-  namespace: {{ .Values.stunner.namespace }}
+  name: {{ .Values.global.stunner.postInstall.serviceAccountName }}
+  namespace: {{ .Values.global.stunner.namespace }}
   labels:
     job: "{{- include "stunner.name" .}}-post-install-job"
 ---
@@ -58,7 +59,7 @@ roleRef:
   name: post-install-cr
 subjects:
 - kind: ServiceAccount
-  name: {{ .Values.stunner.postInstall.serviceAccountName }}
-  namespace: {{ .Values.stunner.namespace }}
+  name: {{ .Values.global.stunner.postInstall.serviceAccountName }}
+  namespace: {{ .Values.global.stunner.namespace }}
 ---
 {{- end -}}

@@ -3,13 +3,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: stunner-gateway-operator-controller-manager
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: stunner-gateway-operator-leader-election-role
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 rules:
 - apiGroups:
   - ""
@@ -235,7 +235,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: stunner-gateway-operator-leader-election-rolebinding
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -243,7 +243,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: stunner-gateway-operator-controller-manager
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -256,7 +256,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: stunner-gateway-operator-controller-manager
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -269,9 +269,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: stunner-gateway-operator-controller-manager
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunner-gateway-operator-manager-config
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 data:
   controller_manager_config.yaml: |
     apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
@@ -285,10 +289,6 @@ data:
     leaderElection:
       leaderElect: true
       resourceName: 92062b70.l7mp.io
-kind: ConfigMap
-metadata:
-  name: stunner-gateway-operator-manager-config
-  namespace: stunner-gateway-operator-system
 ---
 apiVersion: v1
 kind: Service
@@ -296,7 +296,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: stunner-gateway-operator-controller-manager-metrics-service
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 spec:
   ports:
   - name: https
@@ -312,7 +312,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: stunner-gateway-operator-controller-manager
-  namespace: stunner-gateway-operator-system
+  namespace: {{ .Values.global.stunnerGatewayOperator.namespace }}
 spec:
   replicas: 1
   selector:
@@ -350,7 +350,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: l7mp/stunner-gateway-operator:latest
+        image: "{{ .Values.global.stunnerGatewayOperator.deployment.container.image.repository }}{{ .Values.global.stunnerGatewayOperator.deployment.container.image.name }}:{{ .Values.global.stunnerGatewayOperator.deployment.container.image.tag }}"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -364,13 +364,7 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 10m
-            memory: 64Mi
+        resources: {{- toYaml .Values.global.stunnerGatewayOperator.deployment.container.image.resources | nindent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
       securityContext:
