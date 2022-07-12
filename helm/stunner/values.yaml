@@ -2,8 +2,6 @@
 
 stunner:
   namespace: default
-  stunnerGatewayOperator:
-    enabled: false
   deployment:
     name: stunner
     label: stunner
@@ -47,9 +45,6 @@ stunner:
       pullPolicy: Always
       tag: latest
 
-# autoscaling:
-#   enabled: false
-#   minReplicas: 1
-#   maxReplicas: 100
-#   targetCPUUtilizationPercentage: 80
-#   # targetMemoryUtilizationPercentage: 80
+stunnerGatewayOperator:
+  enabled: true
+  namespace: stunner-gateway-operator-system
