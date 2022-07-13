@@ -8,7 +8,7 @@ import (
 func RegisterMetrics(log logging.LeveledLogger, GetAllocationCount func() float64) {
 	if err := prometheus.Register(prometheus.NewGaugeFunc(
 		prometheus.GaugeOpts{
-			Name: "allocation_count",
+			Name: "stunner_allocations",
 			Help: "Number of active allocations.",
 		},
 		GetAllocationCount,
