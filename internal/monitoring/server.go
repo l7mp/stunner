@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"net/http"
-	"strings"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -19,10 +19,15 @@ type MonitoringServer struct {
 
 // NewMonitoring initiates the monitoring subsystem
 func NewMonitoringServer(endpoint string, group string) (*MonitoringServer, error) {
-	addr := strings.Split(strings.Replace(endpoint, "http://", "", 1), "/")[0]
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
+	}
 
-	if addr == "" {
-		return nil, errors.New(fmt.Sprintf("no host:port info found in %s", endpoint))
+	addr := u.Hostname()
+	port := u.Port()
+	if port != "" {
+		addr = addr + ":" + port
 	}
 
 	server := &http.Server{
