@@ -18,5 +18,3 @@ const DefaultClusterType = "STATIC"
 
 const DefaultAdminName = "default-admin-config"
 const DefaultAuthName = "default-auth-config"
-
-const DefaultMonitoringGroup = "STUNner"

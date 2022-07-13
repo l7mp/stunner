@@ -66,7 +66,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 			if a.MonitoringServer != nil {
 				a.MonitoringServer.Stop()
 			}
-			if m, err := monitoring.NewMonitoringServer(me, v1alpha1.DefaultMonitoringGroup); err == nil {
+			if m, err := monitoring.NewMonitoringServer(me); err == nil {
 				a.MonitoringServer = m
 			} else {
 				a.log.Warn("failed to create monitoring server")

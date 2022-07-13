@@ -14,11 +14,10 @@ import (
 type MonitoringServer struct {
 	httpServer *http.Server
 	Endpoint   string
-	Group      string
 }
 
 // NewMonitoring initiates the monitoring subsystem
-func NewMonitoringServer(endpoint string, group string) (*MonitoringServer, error) {
+func NewMonitoringServer(endpoint string) (*MonitoringServer, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
@@ -38,7 +37,6 @@ func NewMonitoringServer(endpoint string, group string) (*MonitoringServer, erro
 	m := &MonitoringServer{
 		httpServer: server,
 		Endpoint:   endpoint,
-		Group:      group,
 	}
 
 	return m, nil
