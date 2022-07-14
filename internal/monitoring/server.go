@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"net/http"
+	"net/url"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -28,10 +28,17 @@ func NewMonitoringServer(endpoint string) (*MonitoringServer, error) {
 	if port != "" {
 		addr = addr + ":" + port
 	}
+	path := u.EscapedPath()
+	if path == "" {
+		path = "/metrics"
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle(path, promhttp.Handler())
 
 	server := &http.Server{
 		Addr:    addr,
-		Handler: promhttp.Handler(),
+		Handler: mux,
 	}
 
 	m := &MonitoringServer{
