@@ -36,7 +36,7 @@ type Options struct {
 	// testing)
 	Resolver resolver.DnsResolver
 	// MonitoringBackend serves Prometheus metrics data.
-	MonitoringBackend *monitoring.Backend
+	MonitoringBackend monitoring.Backend
 	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
 	// over an emulated data-plane
 	Net *vnet.Net
@@ -50,7 +50,7 @@ type Stunner struct {
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
-	monitoringBackend                                          *monitoring.Backend
+	monitoringBackend                                          monitoring.Backend
 	net                                                        *vnet.Net
 	options                                                    Options
 }

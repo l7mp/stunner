@@ -11,17 +11,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Monitoring is an instance of STUNner monitoring
-type Backend struct {
+type Backend interface {
+	// Reload backend based on the configuration change
+	Reload(endpoint string, log logging.LeveledLogger) Backend
+	// Start monitoring backend
+	Start()
+	// Stop the monitoring backend
+	Stop()
+}
+
+type backendImpl struct {
 	httpServer *http.Server
 	Endpoint   string
 }
 
-// NewMonitoring initiates the monitoring subsystem
-func NewBackend(endpoint string) (*Backend, error) {
+func NewBackend(endpoint string) (Backend, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		b := &Backend{
+		b := &backendImpl{
 			httpServer: nil,
 			Endpoint:   endpoint,
 		}
@@ -31,8 +38,8 @@ func NewBackend(endpoint string) (*Backend, error) {
 	addr := u.Hostname()
 	if addr == "" {
 		// omitted value means no monitoring, in this case we
-		// return a dummy Backend
-		b := &Backend{
+		// return a dummy backendImpl
+		b := &backendImpl{
 			httpServer: nil,
 			Endpoint:   endpoint,
 		}
@@ -55,15 +62,15 @@ func NewBackend(endpoint string) (*Backend, error) {
 		Handler: mux,
 	}
 
-	m := &Backend{
+	b := &backendImpl{
 		httpServer: server,
 		Endpoint:   endpoint,
 	}
 
-	return m, nil
+	return b, nil
 }
 
-func (b *Backend) Reload(endpoint string, log logging.LeveledLogger) *Backend {
+func (b *backendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend {
 	// stop if endpoint is unset
 	if endpoint == "" {
 		b.Stop()
@@ -74,7 +81,7 @@ func (b *Backend) Reload(endpoint string, log logging.LeveledLogger) *Backend {
 			// new endpoint, restart monitoring server
 			b.Stop()
 			if m, err := NewBackend(endpoint); err == nil {
-				b = m
+				b = m.(*backendImpl)
 				b.Start()
 			} else {
 				log.Warn("failed to create monitoring server")
@@ -84,7 +91,7 @@ func (b *Backend) Reload(endpoint string, log logging.LeveledLogger) *Backend {
 	return b
 }
 
-func (b *Backend) Start() {
+func (b *backendImpl) Start() {
 	if b.httpServer == nil {
 		return
 	}
@@ -94,7 +101,7 @@ func (b *Backend) Start() {
 	}()
 }
 
-func (b *Backend) Stop() {
+func (b *backendImpl) Stop() {
 	if b.httpServer == nil {
 		return
 	}

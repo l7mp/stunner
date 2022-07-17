@@ -13,12 +13,12 @@ const DefaultAdminObjectName = "DefaultAdmin"
 type Admin struct {
 	Name, LogLevel, MetricsEndpoint string
 	log                             logging.LeveledLogger
-	MonitoringBackend               *monitoring.Backend
+	MonitoringBackend               monitoring.Backend
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
 // v1alpha1.ErrRestartRequired)
-func NewAdmin(conf v1alpha1.Config, mb *monitoring.Backend, logger logging.LoggerFactory) (Object, error) {
+func NewAdmin(conf v1alpha1.Config, mb monitoring.Backend, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
 		return nil, v1alpha1.ErrInvalidConf
@@ -90,12 +90,12 @@ func (a *Admin) Close() error {
 
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
-	monitoringBackend *monitoring.Backend
+	monitoringBackend monitoring.Backend
 	logger            logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(mb *monitoring.Backend, logger logging.LoggerFactory) Factory {
+func NewAdminFactory(mb monitoring.Backend, logger logging.LoggerFactory) Factory {
 	return &AdminFactory{monitoringBackend: mb, logger: logger}
 }
 
