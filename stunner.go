@@ -59,6 +59,7 @@ type Stunner struct {
 func NewStunner() *Stunner {
 	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
 	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
+	mb, _ := monitoring.NewBackend("")
 	vnet := vnet.NewNet(nil)
 
 	s := Stunner{
@@ -66,7 +67,7 @@ func NewStunner() *Stunner {
 		logger:  loggerFactory,
 		log:     loggerFactory.NewLogger("stunner"),
 		adminManager: manager.NewManager("admin-manager",
-			object.NewAdminFactory(loggerFactory), loggerFactory),
+			object.NewAdminFactory(mb, loggerFactory), loggerFactory),
 		authManager: manager.NewManager("auth-manager",
 			object.NewAuthFactory(loggerFactory), loggerFactory),
 		listenerManager: manager.NewManager("listener-manager",
@@ -74,13 +75,14 @@ func NewStunner() *Stunner {
 		clusterManager: manager.NewManager("cluster-manager",
 			object.NewClusterFactory(r, loggerFactory), loggerFactory),
 		resolver:          r,
-		monitoringBackend: nil,
+		monitoringBackend: mb,
 		net:               vnet,
 		options:           Options{},
 	}
 
 	// register metrics
-	monitoring.RegisterMetrics(s.log, func() float64 { return float64(s.GetServer().AllocationCount()) })
+	monitoring.RegisterMetrics(s.log,
+		func() float64 { return float64(s.GetServer().AllocationCount()) })
 
 	return &s
 }
@@ -108,7 +110,8 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 
 	if options.MonitoringBackend != nil {
 		s.monitoringBackend = options.MonitoringBackend
-		// add monitoring server to AdminFactory and manage it
+		s.adminManager = manager.NewManager("admin-manager",
+			object.NewAdminFactory(options.MonitoringBackend, s.logger), s.logger)
 	}
 
 	return s

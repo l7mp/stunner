@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -20,10 +21,23 @@ type Backend struct {
 func NewBackend(endpoint string) (*Backend, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
+		b := &Backend{
+			httpServer: nil,
+			Endpoint:   endpoint,
+		}
+		return b, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
 	}
 
 	addr := u.Hostname()
+	if addr == "" {
+		// omitted value means no monitoring, in this case we
+		// return a dummy Backend
+		b := &Backend{
+			httpServer: nil,
+			Endpoint:   endpoint,
+		}
+		return b, nil
+	}
 	port := u.Port()
 	if port != "" {
 		addr = addr + ":" + port
@@ -49,19 +63,40 @@ func NewBackend(endpoint string) (*Backend, error) {
 	return m, nil
 }
 
-func (m *Backend) Start() { // specify config, create new server; move init here?
-	if m.Endpoint == "" {
+func (b *Backend) Reload(endpoint string, log logging.LeveledLogger) *Backend {
+	// stop if endpoint is unset
+	if endpoint == "" {
+		b.Stop()
+		return b
+	} else {
+		// otherwise reinit at new address
+		if b.Endpoint != endpoint {
+			// new endpoint, restart monitoring server
+			b.Stop()
+			if m, err := NewBackend(endpoint); err == nil {
+				b = m
+				b.Start()
+			} else {
+				log.Warn("failed to create monitoring server")
+			}
+		}
+	}
+	return b
+}
+
+func (b *Backend) Start() {
+	if b.httpServer == nil {
 		return
 	}
 	// serve Prometheus metrics over HTTP
 	go func() {
-		m.httpServer.ListenAndServe()
+		b.httpServer.ListenAndServe()
 	}()
 }
 
-func (m *Backend) Stop() {
-	if m.httpServer == nil {
+func (b *Backend) Stop() {
+	if b.httpServer == nil {
 		return
 	}
-	m.httpServer.Shutdown(context.Background())
+	b.httpServer.Shutdown(context.Background())
 }

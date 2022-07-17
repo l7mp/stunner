@@ -13,18 +13,18 @@ const DefaultAdminObjectName = "DefaultAdmin"
 type Admin struct {
 	Name, LogLevel, MetricsEndpoint string
 	log                             logging.LeveledLogger
-	MonitoringBackend                *monitoring.Backend
+	MonitoringBackend               *monitoring.Backend
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
 // v1alpha1.ErrRestartRequired)
-func NewAdmin(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
+func NewAdmin(conf v1alpha1.Config, mb *monitoring.Backend, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
 		return nil, v1alpha1.ErrInvalidConf
 	}
 
-	admin := Admin{log: logger.NewLogger("stunner-admin")}
+	admin := Admin{MonitoringBackend: mb, log: logger.NewLogger("stunner-admin")}
 	admin.log.Tracef("NewAdmin: %#v", req)
 
 	if err := admin.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
@@ -60,25 +60,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 	// monitoring
 	me := req.MetricsEndpoint
-	if me != "" {
-		if a.MetricsEndpoint != me {
-			// new endpoint, restart monitoring server
-			if a.MonitoringBackend != nil {
-				a.MonitoringBackend.Stop()
-			}
-			if m, err := monitoring.NewBackend(me); err == nil {
-				a.MonitoringBackend = m
-			} else {
-				a.log.Warn("failed to create monitoring server")
-			}
-		}
-	} else {
-		// metrics endpoint is set to empty string, time to
-		// shut down the monitoring server
-		if a.MonitoringBackend != nil {
-			a.MonitoringBackend.Stop()
-		}
-	}
+	a.MonitoringBackend = a.MonitoringBackend.Reload(me, a.log)
 	a.MetricsEndpoint = me
 
 	return nil
@@ -108,12 +90,13 @@ func (a *Admin) Close() error {
 
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
-	logger logging.LoggerFactory
+	monitoringBackend *monitoring.Backend
+	logger            logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(logger logging.LoggerFactory) Factory {
-	return &AdminFactory{logger: logger}
+func NewAdminFactory(mb *monitoring.Backend, logger logging.LoggerFactory) Factory {
+	return &AdminFactory{monitoringBackend: mb, logger: logger}
 }
 
 // New can produce a new Admin object from the given configuration. A nil config will create an
@@ -123,5 +106,5 @@ func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
 		return &Admin{}, nil
 	}
 
-	return NewAdmin(conf, f.logger)
+	return NewAdmin(conf, f.monitoringBackend, f.logger)
 }
