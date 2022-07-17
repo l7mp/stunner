@@ -477,6 +477,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// assert.Equal(t, admin.LogLevel, v1alpha1.DefaultLogLevel, "stunner loglevel")
 			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
+			admin.MonitoringBackend.Stop()  // FIXME: add a mock http server
 
 			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
 			auth := s.GetAuth()
