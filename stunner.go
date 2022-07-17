@@ -79,6 +79,9 @@ func NewStunner() *Stunner {
 		options:          Options{},
 	}
 
+	// register metrics
+	monitoring.RegisterMetrics(s.log, func() float64 { return float64(s.GetServer().AllocationCount()) })
+
 	return &s
 }
 
