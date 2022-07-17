@@ -11,13 +11,13 @@ import (
 )
 
 // Monitoring is an instance of STUNner monitoring
-type MonitoringServer struct {
+type Backend struct {
 	httpServer *http.Server
 	Endpoint   string
 }
 
 // NewMonitoring initiates the monitoring subsystem
-func NewMonitoringServer(endpoint string) (*MonitoringServer, error) {
+func NewBackend(endpoint string) (*Backend, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
@@ -41,7 +41,7 @@ func NewMonitoringServer(endpoint string) (*MonitoringServer, error) {
 		Handler: mux,
 	}
 
-	m := &MonitoringServer{
+	m := &Backend{
 		httpServer: server,
 		Endpoint:   endpoint,
 	}
@@ -49,7 +49,7 @@ func NewMonitoringServer(endpoint string) (*MonitoringServer, error) {
 	return m, nil
 }
 
-func (m *MonitoringServer) Start() { // specify config, create new server; move init here?
+func (m *Backend) Start() { // specify config, create new server; move init here?
 	if m.Endpoint == "" {
 		return
 	}
@@ -59,7 +59,7 @@ func (m *MonitoringServer) Start() { // specify config, create new server; move 
 	}()
 }
 
-func (m *MonitoringServer) Stop() {
+func (m *Backend) Stop() {
 	if m.httpServer == nil {
 		return
 	}

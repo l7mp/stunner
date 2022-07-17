@@ -35,8 +35,8 @@ type Options struct {
 	// Resolver swaps the internal DNS resolver with a custom implementation (used mostly for
 	// testing)
 	Resolver resolver.DnsResolver
-	// MonitoringServer is a HTTP server that serves Prometheus metrics data.
-	MonitoringServer *monitoring.MonitoringServer
+	// MonitoringBackend serves Prometheus metrics data.
+	MonitoringBackend *monitoring.Backend
 	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
 	// over an emulated data-plane
 	Net *vnet.Net
@@ -50,7 +50,7 @@ type Stunner struct {
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
-	monitoringServer                                           *monitoring.MonitoringServer
+	monitoringBackend                                          *monitoring.Backend
 	net                                                        *vnet.Net
 	options                                                    Options
 }
@@ -73,10 +73,10 @@ func NewStunner() *Stunner {
 			object.NewListenerFactory(vnet, loggerFactory), loggerFactory),
 		clusterManager: manager.NewManager("cluster-manager",
 			object.NewClusterFactory(r, loggerFactory), loggerFactory),
-		resolver:         r,
-		monitoringServer: nil,
-		net:              vnet,
-		options:          Options{},
+		resolver:          r,
+		monitoringBackend: nil,
+		net:               vnet,
+		options:           Options{},
 	}
 
 	// register metrics
@@ -106,8 +106,9 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 			object.NewClusterFactory(options.Resolver, s.logger), s.logger)
 	}
 
-	if options.MonitoringServer != nil {
-		s.monitoringServer = options.MonitoringServer
+	if options.MonitoringBackend != nil {
+		s.monitoringBackend = options.MonitoringBackend
+		// add monitoring server to AdminFactory and manage it
 	}
 
 	return s

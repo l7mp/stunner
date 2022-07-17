@@ -13,7 +13,7 @@ const DefaultAdminObjectName = "DefaultAdmin"
 type Admin struct {
 	Name, LogLevel, MetricsEndpoint string
 	log                             logging.LeveledLogger
-	MonitoringServer                *monitoring.MonitoringServer
+	MonitoringBackend                *monitoring.Backend
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
@@ -63,11 +63,11 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	if me != "" {
 		if a.MetricsEndpoint != me {
 			// new endpoint, restart monitoring server
-			if a.MonitoringServer != nil {
-				a.MonitoringServer.Stop()
+			if a.MonitoringBackend != nil {
+				a.MonitoringBackend.Stop()
 			}
-			if m, err := monitoring.NewMonitoringServer(me); err == nil {
-				a.MonitoringServer = m
+			if m, err := monitoring.NewBackend(me); err == nil {
+				a.MonitoringBackend = m
 			} else {
 				a.log.Warn("failed to create monitoring server")
 			}
@@ -75,8 +75,8 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	} else {
 		// metrics endpoint is set to empty string, time to
 		// shut down the monitoring server
-		if a.MonitoringServer != nil {
-			a.MonitoringServer.Stop()
+		if a.MonitoringBackend != nil {
+			a.MonitoringBackend.Stop()
 		}
 	}
 	a.MetricsEndpoint = me
