@@ -28,23 +28,23 @@ jobs:
     name: Push charts to the web
     runs-on: ubuntu-latest
     steps:
-      - name: first checkout
+      - name: stunner checkout
         uses: actions/checkout@v3
         with:
           path: stunner
           ref: main
-          repository: l7mp/stunner 
+          repository: l7mp/stunner
       - name: Get the version
         id: vars
         run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
-      - name: second checkout
+      - name: l7mp.io checkout
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.WEB_PAT_TOKEN }}
           path: l7mp.io
           ref: master
           repository: l7mp/l7mp.io
-      - name: third checkout
+      - name: stunner-helm checkout
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.WEB_PAT_TOKEN }}
@@ -66,7 +66,6 @@ jobs:
         run: |
           cp stunner-helm/helm/*.tgz l7mp.io/stunner
           helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
-          rm stunner-helm/helm/*.tgz
           cd l7mp.io
           git add .
           git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
@@ -74,6 +73,7 @@ jobs:
       - name: Update stunner
         run: |
           cd stunner-helm
+          rm helm/*.tgz
           git add .
           git commit -m "Update helm chart" -m "(triggered by the 'Helm release' github action.)"
           git push origin main
