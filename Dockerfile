@@ -9,16 +9,13 @@ COPY go.sum ./
 RUN go mod download
 
 COPY *.go ./
-COPY internal/manager/ internal/manager/
-COPY internal/object/ internal/object/
-COPY internal/resolver/ internal/resolver/
-COPY internal/util/ internal/util/
+COPY internal/ internal/
 COPY pkg/apis/v1alpha1/ pkg/apis/v1alpha1/
 
 COPY cmd/stunnerd/main.go cmd/stunnerd/
 COPY cmd/stunnerd/stunnerd.conf cmd/stunnerd/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go 
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
 
 ###########
 # STUNNERD
