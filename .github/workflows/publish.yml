@@ -73,7 +73,7 @@ jobs:
           git push origin master
       - name: Update stunner
         run: |
-          cd stunner
+          cd stunner-helm
           git add .
           git commit -m "Update helm chart" -m "(triggered by the 'Helm release' github action.)"
           git push origin main
