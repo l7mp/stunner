@@ -57,7 +57,7 @@ If everything is successful, Kubernetes should assign an external address to the
 Running to following command will result the assigned address in a decimal four-octet format:
 
 ```console
-# Cat is present because some terminals don't breakline  ^._.^
+# Cat is present because some terminals don't breakline  ^._.^ 
 cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
