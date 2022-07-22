@@ -7,3 +7,4 @@ sed 's/CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: NULL/CLOUD_GAME_WEBRTC_ICESERVERS_0_U
 sed 's/CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: NULL/CLOUD_GAME_WEBRTC_ICESERVERS_0_CREDENTIAL: '"$(kubectl get gatewayconfig -n stunner stunner-gatewayconfig -o jsonpath='{.spec.password}')"'/' | \
 kubectl apply -f -
 kubectl rollout restart deployment -n cloudretro coordinator-deployment
+#
