@@ -1,0 +1,78 @@
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coordinator-deployment
+  namespace: cloudretro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coordinator
+  template:
+    metadata:
+      labels:
+        app: coordinator
+    spec:
+      containers:
+      - name: coordinator
+        image: valniae/snekyrepo:cloudimage4
+        volumeMounts:
+        - name: cloudretro-confmap-vol
+          mountPath: "/usr/local/share/cloud-game/configs/"
+          readOnly: true
+        - name: cloudgame-assets
+          mountPath: "/usr/local/share/cloud-game/assets/"
+        command: ["coordinator"]
+        args: ["--v=5"]
+        ports:
+        - containerPort: 8000
+      volumes:
+      - name: cloudretro-confmap-vol
+        configMap:
+          name: cloudretro-config
+      - name: cloudgame-assets
+        persistentVolumeClaim:
+          claimName: shared-pvc
+EOF
+
+---------------------------------------------------------------
+
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-deployment
+  namespace: cloudretro
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: worker
+        image: valniae/snekyrepo:cloudimage4
+        volumeMounts:
+        - name: cloudretro-confmap-vol
+          mountPath: "/usr/local/share/cloud-game/configs/"
+          readOnly: true
+        - name: cloudgame-assets
+          mountPath: "/usr/local/share/cloud-game/assets/"
+        command: ["worker"]
+        args: ["--v=5"]
+        ports:
+        - containerPort: 9000
+          containerPort: 8443
+      volumes:
+      - name: cloudretro-confmap-vol
+        configMap:
+          name: cloudretro-config
+      - name: cloudgame-assets
+        persistentVolumeClaim:
+          claimName: shared-pvc
+EOF
