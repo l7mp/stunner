@@ -1,10 +1,8 @@
-# # WebRTC media server
----
 apiVersion: v1
 kind: Secret
 metadata:
   name: webrtc-server-secret
-  namespace: default
+  namespace: stunner
 type: kubernetes.io/tls
 data:
   tls.crt: |
@@ -69,6 +67,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kms-control
+  namespace: default
   labels:
     app: kms-control
 spec:
@@ -79,12 +78,30 @@ spec:
   selector:
     app: kms
 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kms-media-plane
+  namespace: default
+  labels:
+    app: kms-media-plane
+spec:
+  ports:
+    # port is ignored in the below
+    - port: 9999
+      protocol: UDP
+      name: kms-media-plane-port
+  selector:
+    app: kms
+
 # WebRTC application server
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webrtc-server
+  namespace: stunner
 spec:
   selector:
     matchLabels:
@@ -107,14 +124,21 @@ spec:
         ports:
         - containerPort: 8443
         # TURN server config to return to the user
-        envFrom:
-          - configMapRef:
-              name: stunner-config
+        env:
+          - name: STUNNER_CONFIG_FILENAME
+            value: "/etc/stunnerd/stunnerd.conf"
         volumeMounts:
           - name: webrtc-server-tls
             mountPath: "/app/keys"
             readOnly: true
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+            readOnly: true
       volumes:
+        - name: stunnerd-config-volume
+          configMap:
+            name: stunnerd-config
+            optional: true
         - name: webrtc-server-tls
           secret:
             secretName: webrtc-server-secret
@@ -129,6 +153,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: webrtc-server
+  namespace: stunner
   labels:
     app: webrtc-server
 spec:
@@ -139,26 +164,3 @@ spec:
     - port: 8443
       protocol: TCP
       name: webrtc-server-port
-
----
-# lock down access from the TURN server only to kms
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-  namespace: default
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: kms
-    ports:
-    - protocol: UDP
-      port: 10000
-      endPort: 20000
