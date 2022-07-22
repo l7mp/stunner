@@ -6,3 +6,4 @@ sed 's/CLOUD_GAME_WORKER_NETWORK_COORDINATORADDRESS: NULL/CLOUD_GAME_WORKER_NETW
 sed 's/CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: NULL/CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: '"$(kubectl get service -n cloudretro worker-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"'/' | \
 kubectl apply -f -
 kubectl rollout restart deployment -n cloudretro worker-deployment
+#

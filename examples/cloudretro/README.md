@@ -57,7 +57,7 @@ If everything is successful, Kubernetes should assign an external address to the
 Running to following command will result the assigned address in a decimal four-octet format:
 
 ```console
-# Cat is present because some terminals don't breakline  ^._.^ 
+# Cat is present because some terminals don not breakline  ^._.^ 
 cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
@@ -105,8 +105,8 @@ EOF
 
 With this, our Gateway Operator will create us a whole new LoadBalancer service for this Gateway, from which we can establish connection with STUNner. Although, this does not specify an endpoint for the UDP streams, so we are going to need an attached UDProute as well.
 
-Attaching an UDP route to the Gateway, so that clients will be able to connect via the public STUN/TURN listener UDP:3478 to the Worker LoadBalancer service we`ve created earlier (optionally with the cloudretro-setup.yaml).
-In our case, we named it worker-ci-udp-svc. Don`t forget to specify the namespace, even if its in the default one.
+Attaching an UDP route to the Gateway, so that clients will be able to connect via the public STUN/TURN listener UDP:3478 to the Worker LoadBalancer service we've created earlier (optionally with the cloudretro-setup.yaml).
+In our case, we named it worker-ci-udp-svc. Don't forget to specify the namespace, even if its in the default one.
 This is where we are connecting CloudRetro and STUNner.
 
 ```console
