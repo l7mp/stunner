@@ -28,7 +28,7 @@ This demo provides some helpful scripts for the setup, so this repository should
 
 ```console
 git clone https://github.com/l7mp/stunner
-cd stunner/examples/CloudRetro
+cd stunner/examples/cloudretro
 ```
 
 ### Quick-installing CLoudRetro
@@ -51,13 +51,13 @@ chmod +x apply-config-w.sh
 This will configure our Workers to successfully find their Coordinator.
 
 In the CloudRetro demo, we will be having multiple HTTPS web services, one linked to port 8000, and the other is to port 9000.
-From this, port 8000 is essential, while without port 9000 which is neccessary for CloudRetro to work as intended, the demo should still work.
+From this, port 8000 is essential, while without port 9000 which is necessary for CloudRetro to work as intended, the demo should still work.
 
 If everything is successful, Kubernetes should assign an external address to the exposed service of the Coordinator, which clients will connect to.
 Running to following command will result the assigned address in a decimal four-octet format:
 
 ```console
-# Cat is present because some terminals don not breakline  ^._.^ 
+# Cat is present because some terminals do not breakline  ^._.^ 
 cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
@@ -76,16 +76,16 @@ For more details about Gateway Operator and it's use, please visit [here](https:
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --set stunner-gateway-operator.namespace=stunner
 
-helm install stunner stunner/stunner
+helm install stunner stunner/stunner --set stunner.namespace=stunner
 ```
 
 By default, it will install STUNner with a Gateway Operator, which consists additionally a GatewayClass what we are going to instantiate, and a default GatewayConfig for it.
 This default config has the 'username' as 'user-1' and 'password' as 'pass-1'. Feel free to modify these values from the config.
 
 Now we are going to apply an instance of a Gateway, which will serve as a... yes, you got it right, a gateway for our WebRTC streams.
-The below Gateway specification will expose the STUNner gateway over the STUN/TURN listener service running on the UDP listener port 3478. STUnner will await clients to connect to this listener port and, once authenticated, let them connect to the services running inside the Kubernetes cluster; meanwhile, the NAT traversal functionality implemented by the STUN/TURN server embedded into STUNner will make sure that clients can connect from behind even the most over-zealous enterprise NAT or firewall.
+The below Gateway specification will expose the STUNner gateway over the STUN/TURN listener service running on the UDP listener port 3478. STUNner will await clients to connect to this listener port and, once authenticated, let them connect to the services running inside the Kubernetes cluster; meanwhile, the NAT traversal functionality implemented by the STUN/TURN server embedded into STUNner will make sure that clients can connect from behind even the most over-zealous enterprise NAT or firewall.
 
 ```console
 kubectl apply -f - <<EOF
@@ -168,7 +168,7 @@ MIT License - see [LICENSE](/LICENSE) for full text.
 Demo adopted from [CloudRetro](https://github.com/giongto35/cloud-game).
 
 Please note that this demo is only for showcasing STUNner in this enviroment.
-Many CloudRetro functions does not work; shared-save, shared-roms, areas, etc.
+Many CloudRetro functions do not work; shared-save, shared-roms, areas, etc.
 
 
 

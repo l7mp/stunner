@@ -7,7 +7,11 @@
 #
 # In short, no touching.
 #
-#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudretro
+---
 # Configmap for Worker
 apiVersion: v1
 kind: ConfigMap
@@ -17,9 +21,9 @@ metadata:
   labels:
     app: worker
 data:
-  CLOUD_GAME_WORKER_NETWORK_COORDINATORADDRESS: NULL
-  CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: NULL
---------------------------------------------------
+  CLOUD_GAME_WORKER_NETWORK_COORDINATORADDRESS: default
+  CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: default
+---
 # Configmap for Coordinator
 apiVersion: v1
 kind: ConfigMap
@@ -29,10 +33,10 @@ metadata:
   labels:
     app: coordinator
 data:
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: NULL
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_USERNAME: NULL
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_CREDENTIAL: NULL
---------------------------------------------------
+  CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: default
+  CLOUD_GAME_WEBRTC_ICESERVERS_0_USERNAME: default
+  CLOUD_GAME_WEBRTC_ICESERVERS_0_CREDENTIAL: default
+---
 # Coordinator deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -59,7 +63,7 @@ spec:
         args: ["--v=5"]
         ports:
         - containerPort: 8000
---------------------------------------------------
+---
 # Coordinator LoadBalancer for HTTP
 apiVersion: v1
 kind: Service
@@ -74,7 +78,7 @@ spec:
       targetPort: 8000
       #nodePort: 30001
   type: LoadBalancer
---------------------------------------------------
+---
 # Worker deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -102,7 +106,7 @@ spec:
         ports:
         - containerPort: 9000
           containerPort: 8443
---------------------------------------------------
+---
 # Worker LoadBalancer for HTTP
 apiVersion: v1
 kind: Service
@@ -117,7 +121,7 @@ spec:
       targetPort: 9000
       #nodePort: 30002
   type: LoadBalancer
---------------------------------------------------
+---
 # Worker ClusterIP for STUNner forwarding
 apiVersion: v1
 kind: Service
@@ -132,5 +136,3 @@ spec:
       port: 8443
       targetPort: 8443
   type: ClusterIP
---------------------------------------------------
-#
