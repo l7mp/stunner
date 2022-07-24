@@ -25,7 +25,7 @@
      showgrid="false"
      inkscape:zoom="1.0748023"
      inkscape:cx="474.50587"
-     inkscape:cy="103.27481"
+     inkscape:cy="104.20521"
      inkscape:window-width="1920"
      inkscape:window-height="1017"
      inkscape:window-x="-8"
@@ -128,7 +128,7 @@
      transform="matrix(1.7617495,0,0,1.9433853,-712.12779,-568.60004)"><tspan
        x="946.44263"
        y="614.34601"
-       id="tspan969">Workers</tspan></text>
+       id="tspan364">Workers</tspan></text>
   <text
      xml:space="preserve"
      x="760.94476"
@@ -222,7 +222,7 @@
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text44-4-5">HTTPS/WebSocket</text>
+         id="text44-4-5">HTTP/WebSocket</text>
       <text
          xml:space="preserve"
          x="1069.9994"
@@ -497,7 +497,7 @@
        x="481.8024"
        y="580.38446"
        id="tspan819"
-       style="stroke-width:1.21237">ICMP</tspan></text>
+       style="stroke-width:1.21237">HTTP</tspan></text>
   <text
      xml:space="preserve"
      x="800.95746"
