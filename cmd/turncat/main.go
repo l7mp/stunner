@@ -167,7 +167,9 @@ func getStunnerConfFromK8s(def string) (*stunnerv1alpha1.StunnerConfig, error) {
 		return nil, fmt.Errorf("cannot find listener %q in STUNner configmap", listener)
 	}
 
+	conf.Listeners = []stunnerv1alpha1.ListenerConfig{{}}
 	copy(conf.Listeners, ls)
+
 	return &conf, nil
 }
 
