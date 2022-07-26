@@ -22,10 +22,10 @@ get_config () {
     tmpfile=$(mktemp "./stunnerd-config.XXXXXX")
     kubectl get cm -n $namespace $name -o jsonpath="{.data.stunnerd\.conf}" > $tmpfile
    
-    AUTH_TYPE=$($jq ".auth.type" $tmpfile)
-    USERNAME=$($jq ".auth.credentials.username" $tmpfile)
-    PASSWORD=$($jq ".auth.credentials.password" $tmpfile)
-    SECRET=$($jq ".auth.credentials.secret" $tmpfile)
+    local AUTH_TYPE=$($jq ".auth.type" $tmpfile)
+    local USERNAME=$($jq ".auth.credentials.username" $tmpfile)
+    local PASSWORD=$($jq ".auth.credentials.password" $tmpfile)
+    local SECRET=$($jq ".auth.credentials.secret" $tmpfile)
 
     [ -n "$AUTH_TYPE" -a "$AUTH_TYPE" != "null" ] && echo -e "STUN/TURN authentication type:\t$AUTH_TYPE"
     [ -n "$USERNAME" -a "$USERNAME" != "null" ]   && echo -e "STUN/TURN username:\t\t$USERNAME"
@@ -34,20 +34,21 @@ get_config () {
     
     local n=0
     for NAME in $($jq '.listeners[] | .name' $tmpfile); do
-        PROTOCOL=$($jq ".listeners[${n}].protocol" $tmpfile)
-        PUBLIC_ADDR=$($jq ".listeners[${n}].public_address" $tmpfile)
-        PUBLIC_PORT=$($jq ".listeners[${n}].public_port" $tmpfile)
-
-        [ -n "$NAME" -a "$NAME" != "null" ]               && echo -e "Listener:\t$NAME"
-        [ -n "$PROTOCOL" -a "$PROTOCOL" != "null" ]       && echo -e "Protocol:\t$PROTOCOL"
-        [ -n "$PUBLIC_ADDR" -a "$PUBLIC_ADDR" != "null" ] && echo -e "Public address:\t$PUBLIC_ADDR"
-        [ -n "$PUBLIC_PORT" -a "$PUBLIC_PORT" != "null" ] && echo -e "Public port:\t$PUBLIC_PORT"
+        local PROTOCOL=$($jq ".listeners[${n}].protocol" $tmpfile)
+        local PUBLIC_ADDR=$($jq ".listeners[${n}].public_address" $tmpfile)
+        local PUBLIC_PORT=$($jq ".listeners[${n}].public_port" $tmpfile)
 
         n=$((n+1))
+
+        echo -e "Listener ${n}"
+        [ -n "$NAME" -a "$NAME" != "null" ]               && echo -e "\tName:\t$NAME"
+        [ -n "$NAME" -a "$NAME" != "null" ]               && echo -e "\tListener:\t$NAME"
+        [ -n "$PROTOCOL" -a "$PROTOCOL" != "null" ]       && echo -e "\tProtocol:\t$PROTOCOL"
+        [ -n "$PUBLIC_ADDR" -a "$PUBLIC_ADDR" != "null" ] && echo -e "\tPublic address:\t$PUBLIC_ADDR"
+        [ -n "$PUBLIC_PORT" -a "$PUBLIC_PORT" != "null" ] && echo -e "\tPublic port:\t$PUBLIC_PORT"
     done
         
     rm -f $tmpfile
-
 }
 
 case $COMMAND in
