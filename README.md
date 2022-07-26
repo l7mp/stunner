@@ -374,7 +374,70 @@ media servers via STUNner.
    STUNner ConfigMap and the name of the listener to connect to, and `turncat` will do the heavy
    lifting!
 
-## Configuring WebRTC clients
+### Reconcile
+
+Any time you see fit, you can update the STUNner configuration through the Gateway API: the STUNner
+gateway operator will make sure to reconcile the underlying dataplane for the new config. 
+
+For instance, you may want to expose STUNner on TCP as well; say, because an enterprise NAT went
+berserk and started to filter clients' UDP traffic. The below will do just that: open another
+listener on STUNner, this time on the TCP port 3478, and reattach the UDPRoute to both Gateways so
+that no matter which protocol a client connection was received on it will be routed to the
+`media-plane` service (i.e., the UDP greeter).
+
+1. Add the new TCP Gateway.
+   ```console
+   kubectl apply -f - <<EOF
+   apiVersion: gateway.networking.k8s.io/v1alpha2
+   kind: Gateway
+   metadata:
+     name: tcp-gateway
+     namespace: stunner
+   spec:
+     gatewayClassName: stunner-gatewayclass
+     listeners:
+       - name: tcp-listener
+         port: 3478
+         protocol: TCP
+   EOF
+   ```
+
+1. Update the UDPRoute so that it attaches to both Gateways.
+   ```console
+   kubectl apply -f - <<EOF
+   apiVersion: gateway.networking.k8s.io/v1alpha2
+   kind: UDPRoute
+   metadata:
+     name: media-plane
+     namespace: stunner
+   spec:
+     parentRefs:
+       - name: udp-gateway
+       - name: tcp-gateway
+     rules:
+       - backendRefs:
+           - name: media-plane
+             namespace: default
+   EOF
+   ```
+
+1. Fire up `turncat` again, but this time let it connect through the TCP Gateway. This is achieved
+   by specifying the name of the TCP listener (`tcp-listener`) in the STUNner URI.
+   ```console
+   export PEER_IP=$(kubectl get svc media-plane -o jsonpath='{.spec.clusterIP}')
+   ./turncat -l all:INFO - k8s://stunner/stunnerd-config:tcp-listener udp://${PEER_IP}:9001
+   [...] turncat INFO: Turncat client listening on -, TURN server: TCP://34.118.18.210:3478, peer: udp://10.120.0.127:9001
+   [...]
+   Hello STUNner
+   Greetings from STUNner!
+   ```
+   
+We have set the `turncat` loglevel to INFO so that we can learn that `turncat` has connected via
+the TURN server `TCP://34.118.18.210:3478` this time. And that's it: STUNner automatically routes
+the incoming TCP connection to the UDP greeter service, silently converting from TCP to UDP in the
+background and back again on return.
+
+### Configuring WebRTC clients
 
 Real WebRTC clients will need a valid ICE server configuration to use STUNner as the TURN
 server. STUNner is compatible with all client-side [TURN auto-discovery
