@@ -130,18 +130,18 @@ way.
 
 ## Getting Started
 
-STUNner comes with a helm chart to fire up a fully functional STUNner-based WebRTC media gateway in
-minutes. Note that the default installation does not contain an application server and a media
-server: STUNner in itself is not a WebRTC media server, it is just an *enabler* for you to deploy
-your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner makes sure that your
-media servers are readily reachable to WebRTC clients, despite running with a private IP address
-inside a Kubernetes pod.
+STUNner comes with a [Helm](https://helm.sh) chart to fire up a fully functional STUNner-based
+WebRTC media gateway in minutes. Note that the default installation does not contain an application
+server and a media server: STUNner in itself is not a WebRTC service, it is merely an *enabler* for
+you to deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner makes sure
+that your media servers are readily reachable to WebRTC clients, despite running with a private IP
+address inside a Kubernetes pod.
 
 With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should take less than 5
 minutes.
 
 * [Customize STUNner and deploy it](#installation) into your Kubernetes cluster.
-* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call) into Kubernetes.
+* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call).
 * [Set STUNner as the ICE server](#configuring-webrtc-clients) in your WebRTC clients.
 * ...
 * Profit!!
@@ -151,22 +151,24 @@ minutes.
 The simplest way to deploy STUNner is through [Helm](https://helm.sh). STUNner configuration
 parameters are available for customization as [Helm
 Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying STUNner
-into a separate `stunner` namespace to isolate it from the rest of the workload.
+into a separate namespace and we usually name this namespace as `stunner`, so as to isolate it from
+the rest of the workload.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator --set stunner.namespace=stunner
+helm install stunner stunner/stunner --set stunner.namespace=stunner
 helm install stunner-gateway-operator stunner/stunner-gateway-operator
 ```
 
 ### Configuration
 
-The standard way to interact with STUNner is via Kubernetes, using the [Kubernetes Gateway
-  API](https://gateway-api.sigs.k8s.io). This is much akin to the way you configure _all_
-  Kubernetes workloads: specify your intents in YAML files and issue a `kubectl apply`, and the
-  [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) will automatically
-  reconcile the STUNner dataplane for the new configuration.
+The standard way to interact with STUNner is via Kubernetes via the standard [Gateway
+  API](https://gateway-api.sigs.k8s.io) version
+  [v1alpha2](https://gateway-api.sigs.k8s.io/v1alpha2/references/spec). This is akin to the way you
+  configure _all_ Kubernetes workloads: specify your intents in YAML files and issue a `kubectl
+  apply`, and the [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) will
+  automatically reconcile the STUNner dataplane for the new configuration.
 
 1. Given a fresh STUNner install, the first step is to register STUNner with the Kubernetes Gateway
    API. This amounts to creating a
@@ -175,10 +177,9 @@ The standard way to interact with STUNner is via Kubernetes, using the [Kubernet
    
    Each GatewayClass must specify a controller that will manage the Gateway objects created under
    the class hierarchy. In our case this must be set to `stunner.l7mp.io/gateway-operator` for
-   STUNner to pick up the GatewayClass. In addition, a GatewayClass can refer to another object
-   using a `parametersRef`, which allows to add further implementation-specific configuration. The
-   below example refers to a GatewayConfig (see next), which will define some general configuration
-   for the STUNner dataplane.
+   STUNner to pick up the GatewayClass. In addition, a GatewayClass can refer to further
+   implementation-specific configuration via a `parametersRef`; in our case, this will be a
+   GatewayConfig object to be specified next.
    
    ``` console
    kubectl apply -f - <<EOF
@@ -197,16 +198,14 @@ The standard way to interact with STUNner is via Kubernetes, using the [Kubernet
    EOF
    ```
 
-1. The next step is to set some general configuration for STUNner, especially the STUN/TURN
-   authentication [credentials](https://github.com/l7mp/stunner/blob/main/doc/AUTH.md) clients can
-   use to reach STUNner. This requires loading a GatewayConfig custom resource into
-   Kubernetes. 
+1. The next step is to set some general configuration for STUNner, most importantly the STUN/TURN
+   authentication [credentials](https://github.com/l7mp/stunner/blob/main/doc/AUTH.md) for client
+   to reach STUNner. This requires loading a GatewayConfig custom resource into Kubernetes.
    
-   In the below GatewayConfig, we instruct STUNner to use the [`plaintext`
-   authentication](doc/AUTH.md) mechanism, using the username/password pair `user-1/pass-1`, and
-   the authentication realm `stunner.l7mp.io`; see the package
-   [docs](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator) on further configuration
-   options.
+   Below we set the [`plaintext` authentication](doc/AUTH.md) mechanism for STUNner, using the
+   username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`. See the
+   package [docs](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator) for further
+   configuration options available via GatewayConfigs.
 
    ```console
    kubectl apply -f - <<EOF
@@ -223,18 +222,21 @@ The standard way to interact with STUNner is via Kubernetes, using the [Kubernet
    EOF
    ```
 
-   Note that these two steps are required only once per STUNner deployment.
+   Note that these two steps are required only once per STUNner installation.
 
 1. At this point, we are ready to expose STUNner to clients! This occurs by loading a
    [Gateway](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway)
-   into Kubernetes.
+   resource into Kubernetes.
    
    In the below example, we open a STUN/TURN listener service on the UDP listener port 3478.
    STUnner will automatically expose this listener on a public IP address and port (by creating a
-   LoadBalancer Kubernetes service for each Gateway), await clients to connect to this listener
-   and, once authenticated, forward client connections to an arbitrary service backend *inside* the
-   cluster. Note that we set the `gatewayClassName` to the name of the above GatewayClass; this is
-   the way STUNner will know which STUN/TURN credentials to use with this listener.
+   [LoadBalancer
+   service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
+   Gateway), await clients to connect to this listener and, once authenticated, forward client
+   connections to an arbitrary service backend *inside* the cluster. Note that we set the
+   `gatewayClassName` to the name of the above GatewayClass; this is the way STUNner will know
+   which GatewayClass hierarchy the Gateway belongs and pick up the STUN/TURN credentials to use
+   with this listener.
 
    ```console
    kubectl apply -f - <<EOF
@@ -252,18 +254,19 @@ The standard way to interact with STUNner is via Kubernetes, using the [Kubernet
    EOF
    ```
 
-1. The finally step is to tell STUNner what to do with the client connections received on a Gateway
-   listener. In the [media-plane deployment model](#description) we will want to route client
+1. The final step is to tell STUNner what to do with the client connections received on the
+   Gateway. In the [media-plane deployment model](#description) we will want to route client
    connections to a [WebRTC media server](examples/kurento-one2one-call), but we may also let
-   connections to [loop back to STUNner itself](examples//direct-one2one-call), realizing STUNner's
-   [headless deployment model](#description). 
+   connections to [loop back to STUNner itself](examples//direct-one2one-call) in STUNner's
+   [headless deployment model](#description).
    
    Below we use the first model: we attach a
    [UDPRoute](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPROute)
-   to our Gateway (this is done by setting the `parentRef` to the name of the Gateway,
-   `udp-gateway`). This instructs STUNner to route client connections received on the Gateway to
-   the WebRTC server pool specified in the `backendRef`; in our case, the target is the Kubernetes
-   service `media-plane` that lives in the `default` namespace.
+   to our Gateway. You can attach a UDPRoute to any Gateway by setting the `parentRef` to the
+   Gateway's name, there is just one rule: the Gateway and the UDPRoute must both live in the same
+   Kubernetes namespace. Once a route is attached to a gateway, STUNner will route client
+   connections received on the Gateway to the WebRTC server pool specified in the `backendRef`; in
+   our case, the target is the Kubernetes service `media-plane` pods in the `default` namespace.
 
    ```console
    kubectl apply -f - <<EOF
