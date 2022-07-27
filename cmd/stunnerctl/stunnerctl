@@ -1,6 +1,6 @@
 #!/bin/bash
 
-USAGE="stunnercli get-config <namespace/name>"
+USAGE="stunnercli running-config <namespace/name>"
 
 [ -z "$1" -o -z "$2" ] && echo $USAGE && exit 0
 COMMAND="$1"
@@ -13,7 +13,7 @@ fi
 jq="$jq -r"
 
 # dumps only the first listener
-get_config () {
+running_config () {
     args=(${ARG//\// })
     namespace=${args[0]}
     name=${args[1]}
@@ -52,8 +52,8 @@ get_config () {
 }
 
 case $COMMAND in
-    "get-config")
-        get_config
+    "running-config")
+        running_config
         ;;
 
     *)
