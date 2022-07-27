@@ -24,7 +24,7 @@ import (
 	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-const usage = "turncat [-l|--log <level>] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>"
+const usage = "turncat [-l|--log <level>] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
 const defaultStunnerdConfigfileName = "stunnerd.conf"
 
 var log logging.LeveledLogger
