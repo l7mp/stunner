@@ -117,9 +117,6 @@ spec:
         image: l7mp/kurento-one2one-call-server
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
-        # imagePullPolicy: Never
-        # command: ["/bin/sh"]
-        # args: ["-c", "while true; do echo hello; sleep 10;done"]
         imagePullPolicy: Always
         ports:
         - containerPort: 8443

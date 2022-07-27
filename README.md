@@ -520,7 +520,7 @@ notable limitations at this point are as follows.
   [hacks](https://kubernetes.io/docs/concepts/security/pod-security-policy/#host-namespaces)). This
   is intended: STUNner is a Kubernetes ingress gateway which happens to expose a STUN/TURN
   compatible service to WebRTC clients, and not a public TURN service.
-* STUNner contains only a *partial implementation of the Kubernetes Gateway API.* In particular,
+* STUNner targets only a *partial implementation of the Kubernetes Gateway API.* In particular,
   only GatewayClass, Gateway and UDPRoute resources are supported. This is intended: STUNner
   deliberately ignores some unnecessary complexity in the [Gateway
   API](https://gateway-api.sigs.k8s.io) and deviates from the prescribed behavior in some case, all

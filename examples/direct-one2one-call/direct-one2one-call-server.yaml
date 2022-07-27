@@ -18,6 +18,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webrtc-server
+  namespace: stunner
 spec:
   selector:
     matchLabels:
@@ -33,21 +34,22 @@ spec:
         image: l7mp/direct-one2one-call-server
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
-        # imagePullPolicy: Never
-        # command: ["/bin/sh"]
-        # args: ["-c", "while true; do echo hello; sleep 10;done"]
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8443
         # TURN server config to return to the user
-        envFrom:
-          - configMapRef:
-              name: stunner-config
+        env:
+          - name: STUNNER_CONFIG_FILENAME
+            value: "/etc/stunnerd/stunnerd.conf"
         volumeMounts:
           - name: webrtc-server-tls
             mountPath: "/app/keys"
             readOnly: true
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+            # readOnly: true
       volumes:
+        - name: stunnerd-config-volume
+          configMap:
+            name: stunnerd-config
+            optional: true
         - name: webrtc-server-tls
           secret:
             secretName: webrtc-server-secret
@@ -62,6 +64,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: webrtc-server
+  namespace: stunner
   labels:
     app: webrtc-server
 spec:
@@ -72,17 +75,3 @@ spec:
     - port: 8443
       protocol: TCP
       name: webrtc-server-port
-
----
-# keep ACL locked down
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-  namespace: default
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress

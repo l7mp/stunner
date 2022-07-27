@@ -13,9 +13,9 @@ In this tutorial you will learn how to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner. The
-tutorial assumes a fresh STUNner installation. Create a namespace called `stunner` if there is
-none. You must have [`iperfv2`](https://iperf.fr) installed locally to run this tutorial.
+The tutorial assumes a fresh STUNner installation; consult the [STUNner installation and
+configuration guide](/doc/INSTALL.md) for to set up STUNner. Create a namespace called `stunner` if
+there is none. You must have [`iperfv2`](https://iperf.fr) installed locally to run this tutorial.
 
 ### Setup
 
@@ -28,29 +28,73 @@ a Kubernetes pod via STUNner acting as a STUN/TURN gateway.
 
 You can easily implement a makeshift VPN with STUNner using a similar setup.
 
-### Configuration
+### Server configuration
 
-First, set up an iperf server in the `default` Kubernetes namespace and wrap it in a Kubernetes 
+Set up an iperf server in the `default` Kubernetes namespace and wrap it in a Kubernetes 
 service called `iperf-server`.
 ```console
+cd stunner
 kubectl apply -f examples/simple-tunnel/iperf-server.yaml
 ```
 
-Then, expose the service via the STUNner. The pre-compiled manifest below will create the required
-GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on TCP:3478,
-and route client connections received on the gateways to the `iperf-server` backend service we
-created above.
+### STUNner configuration
+
+Expose the service via the STUNner. The pre-compiled manifest below will create the required
+GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on
+TCP:3478, and route client connections received on the gateways to the `iperf-server` backend
+service we created above.
 ```console
 kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
 ```
 
+For convenience, below is a dump of the Gateways and UDPRoute resources the manifests create.
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: udp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: tcp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: tcp-listener
+      port: 3478
+      protocol: TCP
+
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: iperf-server
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+    - name: tcp-gateway
+  rules:
+    - backendRefs:
+        - name: iperf-server
+          namespace: default
+```
+
 ### Check your configuration
 
-Check whether you have all the necessary objects installed into the `stunner` namespace.
-``` console
-kubectl get gatewayconfigs,gateways,udproutes -n stunner
-NAME                                                  REALM             AUTH        AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   15s
+Check whether you have all the necessary objects installed into the `stunner` namespace.  ```
+console kubectl get gatewayconfigs,gateways,udproutes -n stunner NAME REALM AUTH AGE
+gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig stunner.l7mp.io plaintext 15s
 
 NAME                                            CLASS                  ADDRESS   READY   AGE
 gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass             True    14s
