@@ -18,7 +18,9 @@ Worry no more! STUNner allows you to deploy *any* WebRTC service into Kubernetes
 integrating it into the [cloud-native ecosystem](https://landscape.cncf.io).  STUNner exposes a
 standards-compliant STUN/TURN gateway for clients to access your virtualized WebRTC infrastructure
 running in Kubernetes, maintaining full browser compatibility and requiring minimal or no
-modification to your existing WebRTC codebase.
+modification to your existing WebRTC codebase.  STUNner implements the standard [Kubernetes Gateway
+API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
+style via Kubernetes manifests.
 
 ## Table of Contents
 1. [Description](#description)
@@ -75,14 +77,6 @@ Don't worry about the performance implications of processing all your media thro
 STUNner is written in [Go](https://go.dev) so it is extremely fast, it is co-located with your
 media server pool so you don't pay the round-trip time to a far-away public STUN/TURN server, and
 STUNner can be easily scaled up if needed, just like any other "normal" Kubernetes service.
-
-The recommended way to configure STUNner is via the standard [Kubernetes Gateway
-API](https://gateway-api.sigs.k8s.io): you specify the way you want to expose your WebRTC services
-in the familiar YAML-engineering style and the [STUNner gateway
-operator](https://github.com/l7mp/stunner-gateway-operator) reconciles the dataplane, updates
-STUN/TURN credentials, and exposes your STUNner
-[Gateways](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway)
-in LoadBalancer services, and all this happens automatically.
 
 ## Features
 
