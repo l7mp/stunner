@@ -5,7 +5,7 @@
    viewBox="130.0 290.0 1180.0 280.0"
    version="1.1"
    id="svg76"
-   sodipodi:docname="stunner_echo.svg"
+   sodipodi:docname="stunner_benchmark.svg"
    inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -23,14 +23,14 @@
      inkscape:pagecheckerboard="0"
      showgrid="false"
      inkscape:zoom="1.2084746"
-     inkscape:cx="757.15286"
-     inkscape:cy="81.921457"
+     inkscape:cx="795.21738"
+     inkscape:cy="61.23422"
      inkscape:window-width="1800"
      inkscape:window-height="1037"
      inkscape:window-x="112"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:current-layer="t262107475" />
+     inkscape:current-layer="t112840114" />
   <rect
      x="130"
      y="290"
@@ -67,23 +67,24 @@
        rx="20.0"
        ry="20.0" />
     <g
-       id="t110001004">
+       id="t110001004"
+       transform="translate(0,8)">
       <text
          xml:space="preserve"
          x="218.49995"
          y="446.20602"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
-         id="text7">UDP client</text>
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text7">iperf client</text>
       <text
          xml:space="preserve"
          x="232.49995"
          y="464.7861"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
-         id="text9">socat</text>
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text9" />
     </g>
   </g>
   <g
@@ -129,12 +130,12 @@
          id="text21">127.0.0.1:</text>
       <text
          xml:space="preserve"
-         x="383.9999"
-         y="445.4961"
-         font-family="Sans,Helvetica"
-         fill="rgb(0,0,0)"
-         font-size="14"
-         id="text23">9000</text>
+         x="383.99991"
+         y="445.49609"
+         font-family="Sans, Helvetica"
+         fill="#000000"
+         font-size="14px"
+         id="text23">5000</text>
       <text
          xml:space="preserve"
          x="399.9999"
@@ -175,7 +176,7 @@
        ry="19.99998" />
     <g
        id="t87700413"
-       transform="translate(-4)">
+       transform="translate(0,8)">
       <text
          xml:space="preserve"
          x="1139.5009"
@@ -183,7 +184,7 @@
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text36">UDP echo server</text>
+         id="text36">iperf UDP server</text>
       <text
          xml:space="preserve"
          x="1172.5009"
@@ -191,7 +192,7 @@
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text38">socat</text>
+         id="text38" />
     </g>
   </g>
   <g
@@ -205,12 +206,12 @@
        id="t112840114">
       <text
          xml:space="preserve"
-         x="1023.9994"
+         x="1035.9994"
          y="426.91602"
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text44">UDP_ECHO_IP:</text>
+         id="text44">IPERF_ADDR</text>
       <text
          xml:space="preserve"
          x="1093.9994"
@@ -218,7 +219,7 @@
          font-family="Sans, Helvetica"
          fill="#000000"
          font-size="14px"
-         id="text46">9001</text>
+         id="text46">5001</text>
       <text
          xml:space="preserve"
          x="1069.9994"

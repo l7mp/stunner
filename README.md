@@ -336,7 +336,7 @@ a heartwarming welcome message.
    which  means that Kubernetes will not expose the service to the Internet: the only way for 
    clients to obtain a response is via STUNner.
    ```console
-   kubectl apply -f examples/simple-tunnel/udp-greeter.yaml
+   kubectl apply -f deploy/manifests/udp-greeter.yaml
    ```
 
 1. We also need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy
@@ -370,6 +370,11 @@ Kubernetes directly; just specify the special STUNner URI
 `k8s://stunner/stunnerd-config:udp-listener`, identifying the namespace and the name for the
 STUNner ConfigMap and the name of the listener to connect to, and `turncat` will do the heavy
 lifting.
+
+Note that your actual WebRTC clients will not need to use `turncat` to reach the cluster: all
+modern Web browsers and WebRTC clients come with a STUN/TURN client included. Here, `turncat` is
+used only to *simulate* what a real WebRTC client would do when trying to reach STUNner. For more
+info, see the `turncat` [documentation](/cmd/turncat).
 
 ### Reconcile
 
