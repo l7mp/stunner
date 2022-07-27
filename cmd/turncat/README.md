@@ -1,4 +1,4 @@
-# turncat: Tunnel a local connection through a TURN server
+# turncat: A simple STUN/TURN client
 
 The `turncat` tool implements a simple STUN/TURN client to open a connection through a TURN server
 to an arbitrary remote address/port. The main use is to open a connection to any service running
@@ -28,13 +28,14 @@ user/passwd `test/test`:
 ```
 
 Alternatively, specify the special STUNner URI `k8s://stunner/stunnerd-config:udp-listener` to let
-`turncat` parse the running STUNner configuration from the active Kubernetes cluster context,
-identifying the `stunner` namespace and the `stunnerd-config` ConfigMap to read the STUNner config
-from plus the listener called `udp-listener` to connect to. The CLI flag `-v` will enable verbose
-logging.
+`turncat` parse the running STUNner configuration from the active Kubernetes cluster, identifying
+the `stunner` namespace and the `stunnerd-config` ConfigMap to read the STUNner config from plus
+the listener called `udp-listener` to connect to. The CLI flag `-` instructs `turncat` to listen on
+the standard input: anything you type in the terminal will be sent via STUNner to the peer
+`udp://10.0.0.1:9001` (after you press Enter). The CLI flag `-v` will enable verbose logging.
 
 ```console
-./turncat -v - k8s://stunner/stunnerd-config:udp-listener udp://${PEER_IP}:9001
+./turncat -v - k8s://stunner/stunnerd-config:udp-listener udp://10.0.0.1:9001
 ```
 
 ## License

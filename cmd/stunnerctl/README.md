@@ -2,8 +2,6 @@
 
 The `stunnerctl` utility is a simplistic CLI tool to simplify the interaction with STUNner.
 
-## Getting Started
-
 ## Usage
 
 Dump the running config from a live STUNner deployment in human-readable format.
