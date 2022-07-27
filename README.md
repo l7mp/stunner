@@ -199,8 +199,8 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    ```
 
 1. The next step is to set some general configuration for STUNner, most importantly the STUN/TURN
-   authentication [credentials](https://github.com/l7mp/stunner/blob/main/doc/AUTH.md) for client
-   to reach STUNner. This requires loading a GatewayConfig custom resource into Kubernetes.
+   authentication [credentials](https://github.com/l7mp/stunner/blob/main/doc/AUTH.md). This
+   requires loading a GatewayConfig custom resource into Kubernetes.
    
    Below we set the [`plaintext` authentication](doc/AUTH.md) mechanism for STUNner, using the
    username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`. See the
@@ -235,8 +235,7 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    Gateway), await clients to connect to this listener and, once authenticated, forward client
    connections to an arbitrary service backend *inside* the cluster. Note that we set the
    `gatewayClassName` to the name of the above GatewayClass; this is the way STUNner will know
-   which GatewayClass hierarchy the Gateway belongs and pick up the STUN/TURN credentials to use
-   with this listener.
+   which class hierarchy the Gateway belongs so that it pick up the STUN/TURN credentials.
 
    ```console
    kubectl apply -f - <<EOF
@@ -257,16 +256,17 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
 1. The final step is to tell STUNner what to do with the client connections received on the
    Gateway. In the [media-plane deployment model](#description) we will want to route client
    connections to a [WebRTC media server](examples/kurento-one2one-call), but we may also let
-   connections to [loop back to STUNner itself](examples//direct-one2one-call) in STUNner's
-   [headless deployment model](#description).
+   connections to [loop back to STUNner itself](examples//direct-one2one-call) in the [headless
+   deployment model](#description). You can route connections received on a Gateway to any
+   Kubernetes service by attaching a
+   [UDPRoute](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute)
+   resource to it and specifying the target service in the `backendRef`. A UDPRoute can be attached
+   to any Gateway by setting the `parentRef` to the Gateway's name, there is just one rule: the
+   Gateway and the UDPRoute must both live in the same Kubernetes namespace.
    
-   Below we use the first model: we attach a
-   [UDPRoute](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPROute)
-   to our Gateway. You can attach a UDPRoute to any Gateway by setting the `parentRef` to the
-   Gateway's name, there is just one rule: the Gateway and the UDPRoute must both live in the same
-   Kubernetes namespace. Once a route is attached to a gateway, STUNner will route client
-   connections received on the Gateway to the WebRTC server pool specified in the `backendRef`; in
-   our case, the target is the Kubernetes service `media-plane` pods in the `default` namespace.
+   The below UDPRoute will configure STUNner to route client connections received on the Gateway
+   called `udp-gateway` to the WebRTC media server pool identified by the Kubernetes service
+   `media-plane` in the `default` namespace.
 
    ```console
    kubectl apply -f - <<EOF
@@ -288,24 +288,24 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
 And that's all: once configured, STUNner will make all this happen automatically, and you don't
 need to worry about client-side NAT traversal and request routing because STUNner has you covered!
 Even better, every time you change a Gateway API resource in Kubernetes, say, you update the
-GatewayConfig to reset your STUN/TURN credentials, the [STUNner gateway
-operator](https://github.com/l7mp/stunner-gateway-operator) automatically updates the underlying
-dataplane in a matter of milliseconds. Kubernetes is beautiful, isn't it?
+GatewayConfig to reset your STUN/TURN credentials or change the protocol or port in one of your
+Gateways, the [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) will
+automatically pick up your modifications and update the underlying dataplane in a matter of
+milliseconds. Kubernetes is beautiful, isn't it?
 
 ### Check your config
 
 The current STUNner dataplane configuration is always made available in a convenient ConfigMap
 called `stunnerd-config` (you can choose the name in the GatewayConfig). There is one rule: the
-ConfigMap always lives in the same namespace as the GatewayConfig that belongs to it. The STUNner
-dataplane pods themselves will also pick up the configuration from this ConfigMap, so you can
-consider the content as the ground truth: whatever is in the ConfigMap is exactly the configuration
-last reconciled by the STUNner dataplane.
+ConfigMap always lives in the same namespace as the GatewayConfig that belongs to the corresponding
+gatewayclass hierarchy. Actually, the STUNner dataplane pods themselves will use the same very
+ConfigMap to reconcile their internal state so you can consider its content to be the ground truth.
 
 STUNner comes with a small utility to dump the running configuration in human readable format (you must have
 [`jq`](https://stedolan.github.io/jq) installed in your PATH to be able to use it). Chdir into the
 main STUNner directory and issue:
-```console
-cmd/stunnerctl/stunnerctl get-config stunner/stunnerd-config
+```{r, engine='bash'}
+cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
 STUN/TURN authentication type:	plaintext
 STUN/TURN username:		user-1
 STUN/TURN password:		pass-1
