@@ -168,7 +168,7 @@ func stunnerEchoTest(conf echoTestConfig) {
 			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 	client.Close()
 
 }
