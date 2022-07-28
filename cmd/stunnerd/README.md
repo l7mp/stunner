@@ -2,16 +2,16 @@
 
 The `stunnerd` daemon implements the STUNner gateway dataplane.
 
-The `stunnerd` daemon supports two basic modes. For quick tests `stunnerd` can be configured as a
-simple TURN server by specifying a TURN network URI on the command line. For more complex
-scenarios, and especially for use in a Kubernetes cluster, `stunnerd` can take configuration from a
-config file. In addition, `stunnerd` implements a watch-mode, so that it can actively monitor the
-config file for updates and, once the config file has changed, automatically reconcile the internal
-state to the new configuration. This mode is intended for use with the [STUNner Kubernetes gateway
+The daemon supports two basic modes. For quick tests `stunnerd` can be configured as a TURN server
+by specifying a TURN network URI on the command line. For more complex scenarios, and especially
+for use in a Kubernetes cluster, `stunnerd` can take configuration from a config file. In addition,
+`stunnerd` implements a watch-mode, so that it can actively monitor the config file for updates
+and, once the config file has changed, automatically reconcile the TURN server to the new
+configuration. This mode is intended for use with the [STUNner Kubernetes gateway
 operator](https://github.com/l7mp/stunner-gateway-operator): the operator watches the Kubernetes
 [Gateway API](https://gateway-api.sigs.k8s.io) resources and renders the active control plane
-configuration into a ConfigMap, which is then mapped into the `stunnerd` pod as a config file so
-that the daemon can pick up the latest configuration using the watch mode.
+configuration into a ConfigMap, which is then mapped into the `stunnerd` pod's filesystem so that
+the daemon can pick up the latest configuration using the watch mode.
 
 ## Features
 

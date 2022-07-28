@@ -1,6 +1,6 @@
 # stunnerctl: Command line toolbox for STUNner
 
-The `stunnerctl` utility is a simplistic CLI tool to simplify the interaction with STUNner.
+A CLI tool to simplify the interaction with STUNner.
 
 ## Usage
 
