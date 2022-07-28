@@ -52,10 +52,12 @@ SDP Offer, and sends it along to the application server in a `call` message. The
 forwards the SDP Offer to the callee in an `incomingCall` message. If accepting the call, the
 callee sets up a WebRTC PeerConnection, generates an SDP Answer, and returns it in an
 `incomingCallResponse` message to the application server. The SDP Answer is then forwarded back to
-the caller in an `incomingCallResponse` message. Meanwhile, the caller and the callee exchange ICE
+the caller in an `callResponse` message. Meanwhile, the caller and the callee exchange ICE
 candidates in the background. Once the ICE process connects, the caller and the callee start to
 exchange audio/video frames via STUNner until one of the parties sends a `stop` message to the
 application server to terminate the call.
+
+![Call setup](/examples/direct-one2one-call/sequence.svg)
 
 In order start the ICE conversation using STUNner as the STUN/TURN server, the browsers will need
 to learn an ICE server configuration from the application server with STUNner's external IP
