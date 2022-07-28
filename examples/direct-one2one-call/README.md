@@ -202,8 +202,9 @@ spec:
           namespace: stunner
 ```
 
-Note that the `stunner/stunner` service should exist for this to work: create it as
-follows if it doesn't:
+Note that the `stunner/stunner` service should exist for this to work. The manifest conveniently
+creates it, but if you're doing things manually here is how to create the target service.
+
 ```console
 kubectl expose deployment -n stunner stunner --port 3478 --protocol UDP
 ```

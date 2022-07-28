@@ -36,7 +36,7 @@ style via Kubernetes manifests.
 Currently [WebRTC](https://stackoverflow.com/search?q=kubernetes+webrtc)
 [lacks](https://stackoverflow.com/questions/61140228/kubernetes-loadbalancer-open-a-wide-range-thousands-of-port)
 [a](https://stackoverflow.com/questions/64232853/how-to-use-webrtc-with-rtcpeerconnection-on-kubernetes)
-[vitualization](https://stackoverflow.com/questions/68339856/webrtc-on-kubernetes-cluster/68352515#68352515)
+[virtualization](https://stackoverflow.com/questions/68339856/webrtc-on-kubernetes-cluster/68352515#68352515)
 [story](https://stackoverflow.com/questions/52929955/akskubernetes-service-with-udp-and-tcp): there
 is no easy way to deploy a WebRTC media service into Kubernetes to benefit from the
 [resiliency](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce),
@@ -453,11 +453,11 @@ from the running STUNner config; don't forget that `stunnerctl` is always there 
 
 ```js
 var ICE_config = {
-  'iceServers': [
+  iceServers: [
     {
-      'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=udp',
-      'username': <STUNNER_USERNAME>,
-      'credential': <STUNNER_PASSWORD>,
+      url: 'turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=udp',
+      username: <STUNNER_USERNAME>,
+      credential: <STUNNER_PASSWORD>,
     },
   ],
 };
