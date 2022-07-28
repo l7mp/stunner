@@ -57,7 +57,7 @@ candidates in the background. Once the ICE process connects, the caller and the 
 exchange audio/video frames via STUNner until one of the parties sends a `stop` message to the
 application server to terminate the call.
 
-![Call setup](/examples/direct-one2one-call/sequence.svg)
+![Call setup](/examples/direct-one2one-call/sequence.png)
 
 In order start the ICE conversation using STUNner as the STUN/TURN server, the browsers will need
 to learn an ICE server configuration from the application server with STUNner's external IP
