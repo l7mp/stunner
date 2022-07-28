@@ -65,7 +65,7 @@ change the ICE configuration.
 
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
-`regiterResponse` message. We will use
+`registerResponse` message. We will use
 [`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small Node.js helper
 library that simplifies generating ICE configurations and STUNner credentials in the application
 server. The library will automatically parse the running STUNner configuration from the cluster and
