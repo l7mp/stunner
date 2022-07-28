@@ -66,34 +66,21 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kms-control
+  name: kms
   namespace: default
   labels:
-    app: kms-control
+    app: kms
 spec:
+  selector:
+    app: kms
   ports:
     - port: 8888
       protocol: TCP
       name: kms-port
-  selector:
-    app: kms
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: kms-media-plane
-  namespace: default
-  labels:
-    app: kms-media-plane
-spec:
-  ports:
-    # port is ignored in the below
     - port: 9999
       protocol: UDP
       name: kms-media-plane-port
-  selector:
-    app: kms
+
 
 # WebRTC application server
 ---

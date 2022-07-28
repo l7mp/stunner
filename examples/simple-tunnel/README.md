@@ -1,4 +1,6 @@
-# STUNner tutorial: Open a tunnel via STUNner
+# STUNner Tutorial
+
+# Open a tunnel via STUNner
 
 This tutorial shows how to tunnel an external connection via STUNner to a UDP service deployed into
 Kubernetes. The tutorial can also be used to quickly check a STUNner installation.
