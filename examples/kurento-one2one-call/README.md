@@ -39,7 +39,7 @@ clients.
 
 The application server implements a simple JSON/WebSocket API two browser clients can call to
 establish a two-party call.  The caller and the callee will connect to each other via STUNner as
-the TURN server, without the mediation of a media server.
+the TURN server, using the Kurento media server to mediate audio/video calls.
 
 As the first step, each client registers a unique username with the application server by sending a
 `register` message, which the server acknowledges in a `registerResponse` message. To start a call,
@@ -48,20 +48,31 @@ PeerConnection](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnecti
 SDP Offer, and sends it along to the application server in a `call` message. The application server
 rings the callee in an `incomingCall` message. If accepting the call, the callee sets up a WebRTC
 PeerConnection, generates an SDP Offer and sends it back the application server in an
-`incomingCallResponse` message. At this point the application server has both party's SDP Offer, so
-the next step is to set up the media pipeline in Kurento for the call and process the SDP Offers
-through the media server. The media server responds with an SDP Answer for both the callee and the
-caller, which the application server immediately sends back to the appropriate clients: the caller
-receives the SDP Answer in a `callResponse` message while the callee receives it in a
-`startCommunication` message. Meanwhile, the caller and the callee generate local ICE candidates
-and send them over to the application server, which forwards the candidates to Kurento. Kurento
-also generates a set of ICE candidates, these will be passed by the application server to the
-clients. Note that the media will flow between the clients and Kurento; the application server is
-there just to mediate the call setup. Once the ICE process connects, the caller and the callee
-start to exchange audio/video frames with Kurento via STUNner, until one of the parties sends a
-`stop` message to the application server to terminate the call. For more info on the application
-server protocol, consult the [original Kurento documentation]([one-to-one video call
-tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html).
+`incomingCallResponse` message. 
+
+At this point the application server has both party's SDP Offer, so the next step is to set up the
+media pipeline in Kurento and process the SDP Offers through the media server. This is done by
+opening a WebSocket connection to the URI `ws://kms.default.svc.cluster.local:8888/kurento`
+(this is set on the server's command line in the Deployment
+[manifest](/examples/kurento-one2one-call/kurento-one2one-call-server.yaml)): here,
+`kms.default.svc.cluster.local` is the DNS name assigned by Kubernetes to the `kms` service
+(recall, this is the service associated with the media server Deployment) and Kurento listens on
+the TCP port 8888 for control connections. Note that this call gets load-balanced through the 
+Kubernetes CNI's service load-balancer so it will hit one random media server replica (if there are
+more). This ensures that new calls are distributed evenly across media servers.
+
+The media server responds with an SDP Answer for both the callee and the caller, which the
+application server immediately sends back to the appropriate clients: the caller receives the SDP
+Answer in a `callResponse` message while the callee receives it in a `startCommunication`
+message. Meanwhile, the caller and the callee generate local ICE candidates and send them over to
+the application server, which forwards the candidates to Kurento. Kurento also generates a set of
+ICE candidates, these will be passed by the application server to the clients. Note that the media
+will flow between the clients and Kurento; the application server is there just to mediate the call
+setup. Once the ICE process connects, the caller and the callee start to exchange audio/video
+frames with Kurento via STUNner, until one of the parties sends a `stop` message to the application
+server to terminate the call. For more info on the application server protocol, consult the
+[Kurento
+documentation](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html).
 
 In order start the ICE conversation using STUNner as the STUN/TURN server, the browsers will need
 to learn an ICE server configuration from the application server with STUNner's external IP
@@ -72,16 +83,15 @@ change the ICE configuration.
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
 `regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
-authentication modes (i.e., the `longterm` mode), because the client's STUN/TURN credentials might
-expire by the time they decide to connect. It is up to the application server developer to make
-sure that clients' ICE server configuration is periodically updated.
+authentication modes (i.e., the `longterm` mode, see below), because the client's STUN/TURN
+credentials might expire by the time they decide to connect. It is up to the application server
+developer to make sure that clients' ICE server configuration is periodically updated.
 
 We will use [`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small
 Node.js helper library that simplifies generating ICE configurations and STUNner credentials in the
 application server. The library will automatically parse the running STUNner configuration from the
-cluster and generate STUN/TURN credentials and ICE server configuration. In addition, it includes a
-file watcher that will reread the configuration as it changes and the new settings will immediately
-take effect: client requests will always receive an up-to-date ICE configuration.
+cluster and generate STUN/TURN credentials and ICE server configuration from the most recent
+running config.
 
 The full application server code can be found
 [here](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call), below we
@@ -135,13 +145,12 @@ server.
    
    ```js
    function register(id, name, ws, callback) {
-    [...]
+     [...]
      try {
        let iceConfiguration = auth.getIceConfig();
        ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
-     } catch(exception) {
-       onError(exception);
      }
+     [...]
    }
    ```
 
@@ -185,7 +194,32 @@ service called `webrtc-server`.
 kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
 ```
 
-And that's all. We added roughly 30 lines of code to the Kurento demo to make it work with STUNner,
+Note that we disable STUN/TURN in Kurento: STUNner will make sure that your media servers will not
+need to use NAT traversal (despite running with a private IP) and everything should work just
+fine. Here is the corresponding snippet from the
+[manifest](examples/kurento-one2one-call/kurento-one2one-call-server.yaml), which sets Kurento's
+environment variables accordingly:
+
+```yaml
+spec:
+  containers:
+  - name: kms
+    image: kurento/kurento-media-server:latest
+    env:
+      - name: "KMS_ICE_TCP"
+        value: "0"
+      - name: "KMS_STUN_IP"
+        value: ""
+      - name: "KMS_STUN_PORT"
+        value: ""
+      - name: "KMS_TURN_URL"
+        value: ""
+      - name: "KMS_EXTERNAL_IPV4"
+        value: ""
+        [...]
+```
+
+And that's all. We added roughly 10 lines of code to the Kurento demo to make it work with STUNner,
 with most of the changes needed to return the public STUN/TURN URI and credentials to clients. If
 you allocate STUNner to a stable IP and domain name, you don't even need to modify *anything* in
 the demo and it will just work.
@@ -198,7 +232,7 @@ into the default namespace and you should be good to go.
 ### STUNner configuration
 
 Next, we deploy STUNner into the Kubernetes. The manifest below will set up a minimal STUNner
-gateway hierarchy to do just that: the setup includes a Gateway listener at UDP:3478 and and a
+gateway hierarchy to do just that: the setup includes a Gateway listener at UDP:3478 and a
 UDPRoute to forward incoming calls into the cluster.
 ```console
 kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
@@ -280,10 +314,9 @@ with STUNner.
 
 1. After registering with the application server, the console should show the content of the
    `registerResponse` message. If all goes well, the response should show the ICE configuration
-   returned by the application server. The configuration should contain a TURN URIs for the UDP
-   gateway we have created above. In addition, the authentication credentials and the public IP
-   addresses and ports should match those in the output of `stunnerctl`. This ICE configuration
-   will be passed in to the `PeerConnection` constructor during call setup.
+   returned by the application server. The configuration should contain a TURN URI for the UDP
+   Gateway we have created in STUNner. In addition, the authentication credentials and the public
+   IP addresses and ports should match those in the output of `stunnerctl`. 
    
    ```js
    {
@@ -321,20 +354,25 @@ with STUNner.
    ```console
    Received message: {[...] "candidate:1 1 UDP 2015363327 10.116.2.44 17325 typ host" [...]}
    ```
+   
+   Observe that the ICE candidate again contains a private IP: in fact, `10.116.2.44` is the pod IP
+   address belonging to the Kurento media server instance that received the call setup request from
+   the application server.
 
-1. Once ICE candidates are exchanged, both clients have a set of local ICE candidates obtained from
-   STUNner, these are all relay-candidates and contain a pod IP address as the transport relay
-   address, and a set of remote candidates generated by the media server, which are all of
-   host-type and likewise contain a pod IP address. Then, since in the Kubernetes networking model
-   ["pods can communicate with all other pods on any other node without
-   NAT"](https://kubernetes.io/docs/concepts/services-networking), we have direct connectivity
-   between any pair of local-remote candidates. Correspondingly, in STUNner's communication model,
-   ICE connectivity check usually succeeds on the first candidate pair. After connecting, video
-   starts to flow between the each client and the media server via the UDP/TURN connection opened
-   by STUNner, and the media server can perform all audio- and video-processing the tasks a media
-   server is expected to do. Note that browsers can be behind any type of NAT: STUNner makes sure
-   that whatever aggressive middlebox exists between itself and a client media traffic will still
-   flow seamlessly.
+1. Once ICE candidates are exchanged, both clients have a set of local and remote ICE candidates
+   they can start to probe for connectivity. Local candidates were obtained from STUNner, these are
+   all relay-candidates and contain a pod IP address as the transport relay address, and the remote
+   candidates were generated by the media server. These are of host-type and likewise contain a pod
+   IP address. Since in the Kubernetes networking model ["pods can communicate with all other pods
+   on any other node without NAT"](https://kubernetes.io/docs/concepts/services-networking), all
+   local-remote ICE candidate pairs will have direct connectivity and ICE connectivity check will
+   succeed on the first candidate pair! 
+   
+After connecting, video starts to flow between the each client and the media server via the
+UDP/TURN connection opened by STUNner, and the media server can perform all audio- and
+video-processing the tasks a media server is expected to perform. Note that browsers may be behind
+any type of NAT: STUNner makes sure that whatever aggressive middlebox exists between itself and a
+client, media traffic will still flow seamlessly.
 
 ### Troubleshooting
 
@@ -347,7 +385,8 @@ applications with STUNner.
 * No ICE candidate appears: Most probably this occurs because the browser's ICE configuration does
   not match the running STUNner config. Check that the ICE configuration returned by the
   application server in the `registerResponse` message matches the output of `stunnerctl
-  running-config`.
+  running-config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
+  typically indicate that STUN/TURN authentication was unsuccessful.
 * No video-connection: This is most probably due to a communication issue between your client and
   STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP. 
 * Still no connection: follow the excellent [TURN troubleshooting
@@ -355,11 +394,10 @@ applications with STUNner.
   issue. Remember: your ultimate friends `tcpdump` and `Wireshark` are always there for you to
   help!
 
-# Update STUN/TURN credentials
+## Update STUN/TURN credentials
 
-As exemplified by the `stunnerctl` output, STUNner currently runs with a fairly poor security:
-using `plaintext` authentication, sharing a single username/password pair between all active
-sessions. 
+As exemplified by `stunnerctl` output, STUNner currently runs with fairly poor security: using
+`plaintext` authentication, sharing a single username/password pair between all active sessions.
 
 ``` console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
@@ -371,11 +409,11 @@ STUN/TURN password:             pass-1
 
 Since plaintext credentials are just what they are, plaintext, it is easy to extract the STUN/TURN
 credentials on the client side for potentially nefarious purposes. Note that attackers should not
-be able to make too much harm, since the only Kubernetes service they can reach via STUNner is the
-Kurento media server pool. This is why we have installed the UDPRoute: STUNner will allow clients
-to connect *only* to the backend service(s) of the UDPRoute, and nothing else. Then, the attackers
-would need access to the application-server to open WebRTC endpoints on the media server for their
-own purposes, but application servers should be secure by default no? 
+be able to make too much harm with these credentials, since the only Kubernetes service they can
+reach via STUNner is the Kurento media server pool. This is why we have installed the UDPRoute:
+STUNner will allow clients to connect *only* to the backend service(s) of the UDPRoute, and nothing
+else. Then, the attackers would need access to the application-server to open WebRTC endpoints on
+the media server for their own purposes, but application servers should be secure by default no?
 
 In other words, *STUNner's default security model is exactly the same as if we put the application
 servers and media servers on public-facing physical servers*.
@@ -405,9 +443,9 @@ EOF
 Here is what happens: the [STUNner gateway
 operator](https://github.com/l7mp/stunner-gateway-operator) watches the Kubernetes API server for
 GateayConfig updates and re-renders STUNner's running config in response. STUNner pods in turn
-watch their own configuration file as well, and whenever there is a change they reconcile the TURN
-server for the new setup. In this case, STUNner will switch to `longterm` authentication, and all
-this goes without having to restart the server.
+watch their own configuration file, and whenever there is a change they reconcile the TURN server
+for the new setup. In this case, STUNner will switch to `longterm` authentication, and all this
+goes without having to restart the server.
 
 Check that the running config indeed is updated correctly.
 

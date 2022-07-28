@@ -65,17 +65,11 @@ change the ICE configuration.
 
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
-`regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
-authentication modes (i.e., the `longterm` mode), because the client's STUN/TURN credentials might
-expire by the time they decide to connect. It is up to the application server developer to make
-sure that clients' ICE server configuration is periodically updated.
-
-We will use [`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small
-Node.js helper library that simplifies generating ICE configurations and STUNner credentials in the
-application server. The library will automatically parse the running STUNner configuration from the
-cluster and generate STUN/TURN credentials and ICE server configuration. In addition, it includes a
-file watcher that will reread the configuration as it changes and the new settings will immediately
-take effect: client requests will always receive an up-to-date ICE configuration.
+`regiterResponse` message. We will use
+[`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small Node.js helper
+library that simplifies generating ICE configurations and STUNner credentials in the application
+server. The library will automatically parse the running STUNner configuration from the cluster and
+generate STUN/TURN credentials and ICE server configuration from the most recent running config.
 
 The full application server code can be found
 [here](https://github.com/l7mp/kurento-tutorial-node/tree/master/direct-one2one-call), below we
@@ -129,13 +123,12 @@ server.
    
    ```js
    function register(id, name, ws, callback) {
-    [...]
+     [...]
      try {
        let iceConfiguration = auth.getIceConfig();
        ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
-     } catch(exception) {
-       onError(exception);
      }
+     [...]
    }
    ```
 
@@ -284,10 +277,9 @@ with STUNner.
 1. After registering with the application server, the console should show the content of the
    `registerResponse` message. If all goes well, the response should show the ICE configuration
    returned by the application server. The configuration should contain two TURN URIs for the two
-   gateways we have created above: one with UDP transport and another one with TCP. In addition,
-   the authentication credentials and the public IP addresses and ports should match those in the
-   output of `stunnerctl`. This ICE configuration will be passed in to the `PeerConnection`
-   constructor during call setup.
+   gateways we have created in STUNner: one with UDP transport and another one with TCP. In
+   addition, the authentication credentials and the public IP addresses and ports should match
+   those in the output of `stunnerctl`.
    
    ```js
    {
@@ -316,8 +308,8 @@ with STUNner.
    ICE candidate for each relay connection it creates. Note that only TURN-relay candidates are
    generated: host and server-reflexive candidates would not work with STUNner anyway. (This is why
    we set the `iceTransportPolicy` to type `relay` in the ICE server configuration above.)  Locally
-   generated ICE candidates are sent by the browser over to the application server, which in turn
-   passes them over verbatim to the other client.
+   generated ICE candidates are sent by the browser to the application server, which in turn passes
+   them over verbatim to the other client.
 
    ```console
    Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
@@ -336,10 +328,11 @@ with STUNner.
    ```
    
 1. Once ICE candidates are exchanged, the browsers start to a connectivity check on potential
-   candidate pairs. With STUNner this usually succeeds with the first pair. After connecting, video
-   starts to flow between the two clients via the UDP/TURN connection opened on STUNner. Note that
-   browsers can be behind any type of NAT: STUNner makes sure that whatever aggressive middlebox
-   exists between itself and a client media traffic will still flow seamlessly.
+   candidate pairs. With STUNner this usually succeeds with the first pair. 
+   
+After connecting, video starts to flow between the two clients via the UDP/TURN connection opened
+on STUNner. Note that browsers can be behind any type of NAT: STUNner makes sure that whatever
+aggressive middlebox exists between itself and a client, media traffic will still flow seamlessly.
 
 ### Troubleshooting
 
@@ -351,7 +344,8 @@ WebRTC service and many things can go wrong. Below is a list of steps to help de
 * No ICE candidate appears: Most probably this occurs because the browser's ICE configuration does
   not match the running STUNner config. Check that the ICE configuration returned by the
   application server in the `registerResponse` message matches the output of `stunnerctl
-  running-config`.
+  running-config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
+  typically indicate that STUN/TURN authentication was unsuccessful.
 * No video-connection: This is most probably due to a communication issue between your client and
   STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP. 
 * Still no connection: follow the excellent [TURN troubleshooting
