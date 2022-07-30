@@ -63,7 +63,7 @@ cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status
 
 In cases Kubernetes won't assign an external IP to your service, You will need to use NodePort service instead.
 
-Clients connecting to this URL on a browser; `hhtp://<service-ip>:8000` (don't forget to swap <service-ip> with the one mentioned above) will be presented a console-looking website, with seemingly no active additional service. The CloudRetro is running and working, but the endpoints can not establish an ICE connection. You can take a look at it in the console as well, this is because ICE can not create acceptable candidates through Kubernetes NATs, and not even a STUN server would help. RTP is unfit to handle this issue.
+Clients connecting to this URL on a browser; `http://<service-ip>:8000` (don't forget to swap <service-ip> with the one mentioned above) will be presented a console-looking website, with seemingly no active additional service. The CloudRetro is running and working, but the endpoints can not establish an ICE connection. You can take a look at it in the console as well, this is because ICE can not create acceptable candidates through Kubernetes NATs, and not even a STUN server would help. RTP is unfit to handle this issue.
 That's why we need STUNner to make it work.
 
 
@@ -76,9 +76,9 @@ For more details about Gateway Operator and it's use, please visit [here](https:
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --set stunner-gateway-operator.namespace=stunner
+helm install stunner-gateway-operator stunner/stunner-gateway-operator
 
-helm install stunner stunner/stunner --set stunner.namespace=stunner
+helm install stunner stunner/stunner
 ```
 
 By default, it will install STUNner with a Gateway Operator, which consists additionally a GatewayClass what we are going to instantiate, and a default GatewayConfig for it.
@@ -93,7 +93,6 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: Gateway
 metadata:
   name: udp-gateway
-  namespace: stunner
 spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
@@ -115,7 +114,6 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
 metadata:
   name: worker-udp-route
-  namespace: stunner
 spec:
   parentRefs:
     - name: udp-gateway

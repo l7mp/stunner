@@ -20,7 +20,7 @@ CACERT=${SERVICEACCOUNT}/ca.crt
 
 while [[ "$STUNNER_PUBLIC_ADDR" == "null" ]]
 do
-STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner / | 
+STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner-standalone-lb / | 
   jq  '.status.loadBalancer.ingress[0].ip')
 sleep 1
 ((TIMERCNT++))
@@ -29,7 +29,7 @@ sleep 1
 if [[ "$TIMERCNT" -eq 120 ]]; then
   STUNNER_PUBLIC_ADDR=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/nodes / |
     jq '.items[0].status.addresses[] | select(.type=="ExternalIP").address')
-  STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner / |
+  STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner-standalone-lb / |
     jq  '.spec.ports[0].nodePort')
   JSON_STRING=$( jq -n \
                   --argjson addr $STUNNER_PUBLIC_ADDR \
@@ -46,14 +46,14 @@ if [[ "$TIMERCNT" -eq 120 ]]; then
   -H "Authorization: Bearer $TOKEN" \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json-patch+json' \
-  ${APISERVER}/api/v1/namespaces/${NAMESPACE}/configmaps/stunner-config
+  ${APISERVER}/api/v1/namespaces/${NAMESPACE}/configmaps/stunnerd-config
 
   exit $?
 fi
 
 done
 
-STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner / |
+STUNNER_PUBLIC_PORT=$(curl -s --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" -X GET ${APISERVER}/api/v1/namespaces/${NAMESPACE}/services/stunner-standalone-lb / |
   jq  '.spec.ports[0].port')
 
 JSON_STRING=$( jq -n \
@@ -69,4 +69,4 @@ curl -k \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json-patch+json' \
-  ${APISERVER}/api/v1/namespaces/${NAMESPACE}/configmaps/stunner-config
+  ${APISERVER}/api/v1/namespaces/${NAMESPACE}/configmaps/stunnerd-config
