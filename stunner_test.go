@@ -622,32 +622,32 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		// dtls, longterm
-		{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "dtls",
-				Protocol: "dtls",
-				Addr:     "127.0.0.1",
-				Port:     23478,
-				Cert:     certFile.Name(),
-				Key:      keyFile.Name(),
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
+		// // dtls, longterm
+		// {
+		// 	ApiVersion: "v1alpha1",
+		// 	Admin: v1alpha1.AdminConfig{
+		// 		LogLevel: stunnerTestLoglevel,
+		// 	},
+		// 	Auth: v1alpha1.AuthConfig{
+		// 		Type: "longterm",
+		// 		Credentials: map[string]string{
+		// 			"secret": "my-secret",
+		// 		},
+		// 	},
+		// 	Listeners: []v1alpha1.ListenerConfig{{
+		// 		Name:     "dtls",
+		// 		Protocol: "dtls",
+		// 		Addr:     "127.0.0.1",
+		// 		Port:     23478,
+		// 		Cert:     certFile.Name(),
+		// 		Key:      keyFile.Name(),
+		// 		Routes:   []string{"allow-any"},
+		// 	}},
+		// 	Clusters: []v1alpha1.ClusterConfig{{
+		// 		Name:      "allow-any",
+		// 		Endpoints: []string{"0.0.0.0/0"},
+		// 	}},
+		// },
 	}
 
 	for _, c := range testStunnerConfigsWithLocalhost {
