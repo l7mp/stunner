@@ -1,3 +1,30 @@
+<p align="center">
+  <a href="https://go.dev/doc/go1.17" alt="Go">
+    <img src="https://img.shields.io/github/go-mod/go-version/l7mp/stunner" /></a>
+  <a href="https://hub.docker.com/repository/docker/l7mp/stunnerd/tags?page=1&ordering=last_updated" alt="Docker version">
+    <img src="https://img.shields.io/docker/v/l7mp/stunnerd" /></a>
+  <a href="https://github.com/l7mp/stunner/stargazers" alt="Github stars">
+    <img src="https://img.shields.io/github/stars/l7mp/stunner?style=social" /></a>
+  <a href="https://github.com/l7mp/stunner/network/members" alt="Github Forks">
+    <img src="https://img.shields.io/github/forks/l7mp/stunner?style=social" /></a>
+  <a href="https://github.com/l7mp/stunner/blob/main/LICENSE" alt="MIT">
+    <img src="https://img.shields.io/github/license/l7mp/stunner" /></a>
+  <a href="https://github.com/l7mp/stunner/pulls?q=is%3Apr+is%3Aclosed" alt="PRs closed">
+    <img src="https://img.shields.io/github/issues-pr-closed/l7mp/stunner" /></a>
+  <a href="https://github.com/l7mp/stunner/pulls?q=is%3Aopen+is%3Apr" alt="PRs open">
+    <img src="https://img.shields.io/github/issues-pr/l7mp/stunner" /></a>
+  <a href="https://github.com/l7mp/stunner/issues?q=is%3Aissue+is%3Aclosed" alt="Issues closed">
+    <img src="https://img.shields.io/github/issues-closed/l7mp/stunner" /></a>
+  <a href="https://github.com/l7mp/stunner/issues?q=is%3Aopen+is%3Aissue" alt="Issues open">
+    <img src="https://img.shields.io/github/issues/l7mp/stunner" /></a>
+  <a href="https://hub.docker.com/repository/docker/l7mp/stunnerd" alt="Docker pulls">
+    <img src="https://img.shields.io/docker/pulls/l7mp/stunnerd" /></a>
+  <a href="https://github.com/l7mp/stunner/actions/workflows/test.yml" alt="Tests">
+    <img src="https://github.com/l7mp/stunner/actions/workflows/test.yml/badge.svg" /></a>
+  <a href="https://github.com/l7mp/stunner/actions/workflows/publish.yml" alt="Release">
+    <img src="https://github.com/l7mp/stunner/actions/workflows/publish.yml/badge.svg" /></a>
+</p>
+
 # STUNner: A Kubernetes ingress gateway for WebRTC
 
 Ever wondered how to [deploy your WebRTC infrastructure into the
