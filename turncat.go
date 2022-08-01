@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
@@ -56,7 +57,9 @@ type connection struct {
 	serverConn net.PacketConn // Relayed UDP connection to server
 }
 
-// NewTurncat creates a new turncat relay from the specified config, creating a listener socket for clients to connect and relaying client connections through the speficied STUN/TURN server to the peer.
+// NewTurncat creates a new turncat relay from the specified config, creating a listener socket for
+// clients to connect and relaying client connections through the speficied STUN/TURN server to the
+// peer.
 func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	loggerFactory := config.LoggerFactory
 	if loggerFactory == nil {
@@ -105,10 +108,12 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client
 	log.Tracef("Setting up listener connection on %s", config.ListenerAddr)
-	listenerConf := &net.ListenConfig{Control: reuseAddr}
 	var listenerConn interface{}
+	listenerConf := &net.ListenConfig{Control: reuseAddr}
 
 	switch listener.Protocol {
+	case "file":
+		listenerConn = NewFileConn(os.Stdin)
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		l, err := listenerConf.ListenPacket(context.Background(), listener.Addr.Network(),
 			listener.Addr.String())
@@ -150,6 +155,9 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
 		// client connection is bytestream, we are supposed to have a Listen/Accept loop available
 		go t.runListen()
+	case "file":
+		// client connection is file
+		go t.runListenFile()
 	default:
 		t.log.Errorf("internal error: unknown client protocol %s for client %s:%s",
 			t.listenerAddr.Network(), t.listenerAddr.Network(), t.listenerAddr.String())
@@ -184,6 +192,8 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
+	case *fileConn:
+		// do nothing
 	default:
 		t.log.Error("internal error: unknown listener socket type")
 	}
@@ -313,7 +323,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				// unfoftunately, the PacketConn forged by pion/turn fails to check for net.ErrClosed...
 				if !errors.Is(readErr, net.ErrClosed) &&
 					!strings.Contains(readErr.Error(), "use of closed network connection") {
-					t.log.Debugf("cannot read from TURN relay connection for client %s:%s (likely hamrless): %s",
+					t.log.Debugf("cannot read from TURN relay connection for client %s:%s: %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
 				}
@@ -335,7 +345,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				conn.clientAddr.Network(), conn.clientAddr.String())
 
 			if _, writeErr := conn.clientConn.Write(buffer[0:n]); writeErr != nil {
-				t.log.Debugf("cannot write to client connection for client %s:%s (likely harmless): %s",
+				t.log.Debugf("cannot write to client connection for client %s:%s: %s",
 					conn.clientAddr.Network(), conn.clientAddr.String(), writeErr.Error())
 				t.deleteConnection(conn)
 				return
@@ -500,4 +510,30 @@ func (t *Turncat) runListen() {
 				caddr)
 		}
 	}
+}
+
+func (t *Turncat) runListenFile() {
+	listenerConn, ok := t.listenerConn.(*fileConn)
+	if !ok {
+		t.log.Error("cannot listen on client connection: expected file")
+		// terminate go routine
+		return
+	}
+
+	// handle connection
+	caddr := listenerConn.LocalAddr().String()
+	t.log.Tracef("new client connection: %s", caddr)
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	conn, err := t.newConnection(listenerConn)
+	if err != nil {
+		t.log.Warnf("relay setup failed for client %s, dropping client connection",
+			caddr)
+		return
+	}
+
+	t.connTrack[caddr] = conn
+
+	t.runConnection(conn)
 }
