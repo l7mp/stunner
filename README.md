@@ -186,9 +186,13 @@ the rest of the workload.
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner stunner/stunner --set stunner.namespace=stunner
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
+
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=<your-namespace>
+
+helm install stunner stunner/stunner --create-namespace --namespace=<your-namespace>
 ```
+
+Find out more about the charts in the [STUNner-helm repository](https://github.com/l7mp/stunner-helm).
 
 ### Configuration
 
