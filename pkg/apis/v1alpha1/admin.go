@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 )
 
@@ -23,6 +24,12 @@ func (req *AdminConfig) Validate() error {
 	}
 	if req.Name == "" {
 		req.Name = DefaultStunnerName
+	}
+
+	//validate metrics endpoint
+	_, err := url.Parse(req.MetricsEndpoint)
+	if err != nil {
+		return fmt.Errorf("%s: not a valid metric endpoint URL", req.MetricsEndpoint)
 	}
 
 	return nil

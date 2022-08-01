@@ -2,8 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -25,14 +23,10 @@ type backendImpl struct {
 	Endpoint   string
 }
 
-func NewBackend(endpoint string) (Backend, error) {
+func NewBackend(endpoint string) Backend {
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		b := &backendImpl{
-			httpServer: nil,
-			Endpoint:   endpoint,
-		}
-		return b, errors.New(fmt.Sprintf("unable to parse: %s", endpoint))
+		return nil
 	}
 
 	addr := u.Hostname()
@@ -43,12 +37,14 @@ func NewBackend(endpoint string) (Backend, error) {
 			httpServer: nil,
 			Endpoint:   endpoint,
 		}
-		return b, nil
+		return b
 	}
+
 	port := u.Port()
 	if port != "" {
 		addr = addr + ":" + port
 	}
+
 	path := u.EscapedPath()
 	if path == "" {
 		path = "/metrics"
@@ -61,13 +57,11 @@ func NewBackend(endpoint string) (Backend, error) {
 		Addr:    addr,
 		Handler: mux,
 	}
-
 	b := &backendImpl{
 		httpServer: server,
 		Endpoint:   endpoint,
 	}
-
-	return b, nil
+	return b
 }
 
 func (b *backendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend {
@@ -80,12 +74,9 @@ func (b *backendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend
 		if b.Endpoint != endpoint {
 			// new endpoint, restart monitoring server
 			b.Stop()
-			if m, err := NewBackend(endpoint); err == nil {
-				b = m.(*backendImpl)
-				b.Start()
-			} else {
-				log.Warn("failed to create monitoring server")
-			}
+			m := NewBackend(endpoint)
+			b = m.(*backendImpl)
+			b.Start()
 		}
 	}
 	return b

@@ -59,7 +59,7 @@ type Stunner struct {
 func NewStunner() *Stunner {
 	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
 	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
-	mb, _ := monitoring.NewBackend("")
+	mb := monitoring.NewBackend("")
 	vnet := vnet.NewNet(nil)
 
 	s := Stunner{
