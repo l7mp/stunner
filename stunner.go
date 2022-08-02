@@ -108,6 +108,12 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 			object.NewClusterFactory(options.Resolver, s.logger), s.logger)
 	}
 
+	// monitoring
+	if options.DryRun == true {
+		s.monitoringBackend = monitoring.NewMockBackend()
+		s.adminManager = manager.NewManager("admin-manager",
+			object.NewAdminFactory(s.monitoringBackend, s.logger), s.logger)
+	}
 	if options.MonitoringBackend != nil {
 		s.monitoringBackend = options.MonitoringBackend
 		s.adminManager = manager.NewManager("admin-manager",
