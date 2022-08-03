@@ -76,13 +76,21 @@ For more details about Gateway Operator and it's use, please visit [here](https:
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace stunner
 
-helm install stunner stunner/stunner
+helm install stunner stunner/stunner --namespace stunner
 ```
 
-By default, it will install STUNner with a Gateway Operator, which consists additionally a GatewayClass what we are going to instantiate, and a default GatewayConfig for it.
-This default config has the 'username' as 'user-1' and 'password' as 'pass-1'. Feel free to modify these values from the config.
+By default, it will install STUNner with a Gateway Operator.
+
+Next step is to register STUNner with the Kubernetes Gateway API, with a GatewayClass what we are going to instantiate later on, and a default GatewayConfig for it.
+
+```console
+kubectl apply -f stunner-gwcc.yaml
+```
+
+This script will install these in no time.
+The default config has the 'username' as 'user-1' and 'password' as 'pass-1'. Feel free to modify these values.
 
 Now we are going to apply an instance of a Gateway, which will serve as a... yes, you got it right, a gateway for our WebRTC streams.
 The below Gateway specification will expose the STUNner gateway over the STUN/TURN listener service running on the UDP listener port 3478. STUNner will await clients to connect to this listener port and, once authenticated, let them connect to the services running inside the Kubernetes cluster; meanwhile, the NAT traversal functionality implemented by the STUN/TURN server embedded into STUNner will make sure that clients can connect from behind even the most over-zealous enterprise NAT or firewall.
@@ -93,6 +101,7 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: Gateway
 metadata:
   name: udp-gateway
+  namespace: stunner
 spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
@@ -114,6 +123,7 @@ apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
 metadata:
   name: worker-udp-route
+  namespace: stunner
 spec:
   parentRefs:
     - name: udp-gateway
@@ -145,10 +155,11 @@ Thanks STUNner.
 
 ## Clean up
 
-Delete the demo deployments and services created using the below command:
+Delete the demo deployments and services created, and also the gateway and UDPRoute we have made for STUNner using the below commands.
 
 ```console
 kubectl delete -f cloudretro-setup.yaml
+kubectl delete -f cloudretro-stunner-cleanup.yaml
 ```
 
 ## Help
@@ -167,11 +178,4 @@ Demo adopted from [CloudRetro](https://github.com/giongto35/cloud-game).
 
 Please note that this demo is only for showcasing STUNner in this enviroment.
 Many CloudRetro functions do not work; shared-save, shared-roms, areas, etc.
-
-
-
-
-
-
-
 

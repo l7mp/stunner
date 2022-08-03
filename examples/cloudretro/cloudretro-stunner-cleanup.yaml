@@ -1,0 +1,25 @@
+# Script for the required STUNner components for CloudRetro
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: udp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: worker-udp-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: worker-ci-udp-svc
+          namespace: cloudretro
