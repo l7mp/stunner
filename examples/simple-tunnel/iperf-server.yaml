@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf-server
+  namespace: default
+  labels:
+    app: iperf-server
+spec:
+  selector:
+    matchLabels:
+      app: iperf-server
+  template:
+    metadata:
+      labels:
+        app: iperf-server
+    spec:
+      containers:
+      - image: l7mp/net-debug:0.5.3
+        name: net-debug
+        command: ["/usr/bin/iperf"]
+        args: ["-s", "-p", "5001", "-u", "-e"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf-server
+  namespace: default
+  labels:
+    app: iperf-server
+spec:
+  ports:
+  - name: iperf-udp
+    port: 5001
+    protocol: UDP
+  - name: iperf-tcp
+    port: 5001
+    protocol: TCP
+  selector:
+    app: iperf-server
+  type: ClusterIP

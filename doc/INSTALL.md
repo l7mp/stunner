@@ -104,28 +104,33 @@ installation method using static Kubernetes manifests.
 
 The simplest way to deploy STUNner is through [Helm](https://helm.sh). In this case, all STUNner
 configuration parameters are available for customization as [Helm
-Values](https://helm.sh/docs/chart_template_guide/values_files).
+Values](https://helm.sh/docs/chart_template_guide/values_files). Find out more about the charts in the [STUNner-helm repository](https://github.com/l7mp/stunner-helm).
 
 ```console
-$ helm repo add stunner https://l7mp.io/stunner
-$ helm repo update
-$ helm install stunner stunner/stunner
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
+
+helm install stunner-gateway-operator stunner/stunner-gateway-operator
+
+helm install stunner stunner/stunner
 ```
+The above will install both charts into the default namespace. 
 To customize your chart overwrite the [default
-values](https://github.com/l7mp/stunner/blob/main/helm/stunner/values.yaml). The below will set
-custom namespace for installing STUNner; note that the namespace must exist when
-installing STUNner.
+values](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner/values.yaml). The below will set
+custom namespace for installing STUNner; note that the `--create-namespace --namespace=<your-namespace>`
+options will create the release namespace if not present which means there is no need for a pre-existing namespace.
 
 ```console
-$ kubectl create namespace <insert-namespace-name-here>
-$ helm install stunner stunner/stunner --set stunner.namespace=<insert-namespace-name-here>
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=<your-namespace>
+
+helm install stunner stunner/stunner --create-namespace --namespace=<your-namespace>
 ```
 
 The following will set a custom [STUN/TURN
-realm](https://datatracker.ietf.org/doc/html/rfc8656#section-2).
+realm](https://datatracker.ietf.org/doc/html/rfc8656#section-2). (This will apply only in the case of the [Standalone](https://github.com/l7mp/stunner-helm#without-the-operator-in-standalone-mode) mode.)
 
 ```console
-$ helm install stunner stunner/stunner --set stunner.config.STUNNER_REALM=<your-realm-here>
+helm install stunner stunner/stunner --set stunner.standalone.config.STUNNER_REALM=<your-realm-here>
 ```
 
 ### Manual installation
