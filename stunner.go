@@ -11,6 +11,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
+	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -34,6 +35,8 @@ type Options struct {
 	// Resolver swaps the internal DNS resolver with a custom implementation (used mostly for
 	// testing)
 	Resolver resolver.DnsResolver
+	// MonitoringBackend serves Prometheus metrics data.
+	MonitoringBackend monitoring.Backend
 	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
 	// over an emulated data-plane
 	Net *vnet.Net
@@ -47,14 +50,16 @@ type Stunner struct {
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
+	monitoringBackend                                          monitoring.Backend
 	net                                                        *vnet.Net
 	options                                                    Options
 }
 
-// NewStunner creates a new empty STUNner deamon. Call Reconcle to reconcile the daemon for the given configuration
+// NewStunner creates a new empty STUNner deamon. Call Reconcile to reconcile the daemon for the given configuration
 func NewStunner() *Stunner {
 	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
 	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
+	mb := monitoring.NewBackend("")
 	vnet := vnet.NewNet(nil)
 
 	s := Stunner{
@@ -62,17 +67,22 @@ func NewStunner() *Stunner {
 		logger:  loggerFactory,
 		log:     loggerFactory.NewLogger("stunner"),
 		adminManager: manager.NewManager("admin-manager",
-			object.NewAdminFactory(loggerFactory), loggerFactory),
+			object.NewAdminFactory(mb, loggerFactory), loggerFactory),
 		authManager: manager.NewManager("auth-manager",
 			object.NewAuthFactory(loggerFactory), loggerFactory),
 		listenerManager: manager.NewManager("listener-manager",
 			object.NewListenerFactory(vnet, loggerFactory), loggerFactory),
 		clusterManager: manager.NewManager("cluster-manager",
 			object.NewClusterFactory(r, loggerFactory), loggerFactory),
-		resolver: r,
-		net:      vnet,
-		options:  Options{},
+		resolver:          r,
+		monitoringBackend: mb,
+		net:               vnet,
+		options:           Options{},
 	}
+
+	// register metrics
+	monitoring.RegisterMetrics(s.log,
+		func() float64 { return float64(s.GetServer().AllocationCount()) })
 
 	return &s
 }
@@ -96,6 +106,18 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 		s.resolver = options.Resolver
 		s.clusterManager = manager.NewManager("cluster-manager",
 			object.NewClusterFactory(options.Resolver, s.logger), s.logger)
+	}
+
+	// monitoring
+	if options.DryRun == true {
+		s.monitoringBackend = monitoring.NewMockBackend()
+		s.adminManager = manager.NewManager("admin-manager",
+			object.NewAdminFactory(s.monitoringBackend, s.logger), s.logger)
+	}
+	if options.MonitoringBackend != nil {
+		s.monitoringBackend = options.MonitoringBackend
+		s.adminManager = manager.NewManager("admin-manager",
+			object.NewAdminFactory(options.MonitoringBackend, s.logger), s.logger)
 	}
 
 	return s

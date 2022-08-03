@@ -127,6 +127,9 @@ func (s *Stunner) Start() error {
 		}
 	}
 
+	// start monitoring
+	s.monitoringBackend.Start()
+
 	// start the DNS resolver threads
 	if s.resolver == nil {
 		s.resolver.Start()
@@ -162,4 +165,7 @@ func (s *Stunner) Stop() {
 		s.server.Close()
 	}
 	s.server = nil
+
+	// shutdown monitoring
+	s.monitoringBackend.Stop()
 }
