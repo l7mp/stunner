@@ -20,5 +20,6 @@
 # Go workspace file
 go.work
 
-# Turncat
+# Our binaries
 turncat
+stunnerd
