@@ -184,7 +184,7 @@ into the default namespace and you should be good to go.
 
 ### STUNner configuration
 
-Next, we deploy STUNner into the Kubernetes. The manifest below will set up a minimal STUNner
+Next, we deploy STUNner into Kubernetes. The manifest below will set up a minimal STUNner
 gateway hierarchy to do just that: the setup includes two Gateway listeners, one at UDP:3478 and
 another one at TCP:3478, plus and a UDPRoute.
 ```console
