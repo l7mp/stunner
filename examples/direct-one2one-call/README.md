@@ -3,7 +3,7 @@
 ## Headless deployment: Direct one to one video call via STUNner
 
 This tutorial showcases the *headless deployment model* of STUNner, that is, when WebRTC clients
-connect to each other directly via STUNner, without going through a media server. 
+connect to each other directly via STUNner, without going through a media server.
 
 In this demo you will learn how to:
 * integrate a typical WebRTC application server with STUNner,
@@ -79,7 +79,7 @@ server.
 1. Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
    `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
    library to pick up the most recent running config.
-   
+
    ```yaml
    apiVersion: apps/v1
    kind: Deployment
@@ -112,7 +112,7 @@ server.
 
 1. Include the library at the top of the [server-side JavaScript
    code](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/server.js).
-   
+
    ```js
    const auth = require('@l7mp/stunner-auth-lib');
    ```
@@ -120,7 +120,7 @@ server.
 1. Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
    our case, this happens before returning a `registerResponse` to the client, so that the
    generated ICE configuration can be piggy-backed on the response message.
-   
+
    ```js
    function register(id, name, ws, callback) {
      [...]
@@ -136,7 +136,7 @@ server.
    code](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/static/js/index.js)
    to parse the ICE configuration received from the application server from the `registerResponse`
    message.
-   
+
    ```js
    var iceConfiguration;
 
@@ -154,13 +154,13 @@ server.
    configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer).  Note that
    `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
    create PeerConnections with Kurento.
-   
+
    ```js
    var options = {
      [...]
      configuration: iceConfiguration,
    }
-                   
+
    webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
    ```
 
@@ -175,6 +175,7 @@ the application server into the `stunner` namespace and exposes it in the Kubern
 service called `webrtc-server`.
 ```console
 kubectl apply -f examples/direct-one2one-call/direct-one2one-call-server.yaml
+kubectl apply -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
 Note: due to a limitation of `stunner-auth-lib` currently the application server must run in the
@@ -197,7 +198,7 @@ cross-connecting the clients' media streams between each other, is just pure TUR
 
 Here is the corresponding UDPRoute.
 
-```yaml 
+```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
 metadata:
@@ -224,7 +225,7 @@ kubectl expose deployment -n stunner stunner --port 3478 --protocol UDP
 
 Check whether you have all the necessary objects installed into the `stunner` namespace.
 
-```console 
+```console
 kubectl get gatewayconfigs,gateways,udproutes -n stunner
 NAME                                                  REALM             AUTH        AGE
 gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   4s
@@ -284,7 +285,7 @@ with STUNner.
    gateways we have created in STUNner: one with UDP transport and another one with TCP. In
    addition, the authentication credentials and the public IP addresses and ports should match
    those in the output of `stunnerctl`.
-   
+
    ```js
    {
        "id": "registerResponse",
@@ -322,18 +323,18 @@ with STUNner.
    Observe that the ICE candidate contains a private IP address (`10.116.1.21` in this case) as the
    TURN relay connection address: this just happens to be the IP address of the STUNner pod that
    receives the TURN allocation request from the browser.
-   
+
 1. The ICE candidates generates by one of the clients are received by the other client as a remote
    ICE candidate. The process is executed in the other direction as well, so that at the end both
    parties will have a set of local and remote ICE candidates they can start to probe for connectivity.
-   
+
    ```console
     Received message: { [...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
    ```
-   
+
 1. Once ICE candidates are exchanged, the browsers start to a connectivity check on potential
-   candidate pairs. With STUNner this usually succeeds with the first pair. 
-   
+   candidate pairs. With STUNner this usually succeeds with the first pair.
+
 After connecting, video starts to flow between the two clients via the UDP/TURN connection opened
 on STUNner. Note that browsers can be behind any type of NAT: STUNner makes sure that whatever
 aggressive middlebox exists between itself and a client, media traffic will still flow seamlessly.
@@ -351,7 +352,7 @@ WebRTC service and many things can go wrong. Below is a list of steps to help de
   running-config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
   typically indicate that STUN/TURN authentication was unsuccessful.
 * No video-connection: This is most probably due to a communication issue between your client and
-  STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP. 
+  STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP.
 * Still no connection: follow the excellent [TURN troubleshooting
   guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html) to track down the
   issue. Remember: your ultimate friends `tcpdump` and `Wireshark` are always there for you to
@@ -363,7 +364,7 @@ Suppose that the single STUNner instance is no longer sufficient; e.g., due to c
 performance or availability.  In a "conventional" privately hosted setup, you would need to
 provision a new physical STUN/TURN server, allocate a public IP, add the new server to the
 STUN/TURN server pool, and monitor the liveliness of the new server continuously. This takes a lot
-of manual effort and considerable time. 
+of manual effort and considerable time.
 
 In Kubernetes, however, you can use a single command to *scale STUNner to an arbitrary number of
 replicas*. Kubernetes will potentially add new nodes to the cluster if needed, add the new replicas
