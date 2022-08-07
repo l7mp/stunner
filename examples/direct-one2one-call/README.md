@@ -175,7 +175,6 @@ the application server into the `stunner` namespace and exposes it in the Kubern
 service called `webrtc-server`.
 ```console
 kubectl apply -f examples/direct-one2one-call/direct-one2one-call-server.yaml
-kubectl apply -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
 Note: due to a limitation of `stunner-auth-lib` currently the application server must run in the
@@ -189,7 +188,7 @@ Next, we deploy STUNner into the Kubernetes. The manifest below will set up a mi
 gateway hierarchy to do just that: the setup includes two Gateway listeners, one at UDP:3478 and
 another one at TCP:3478, plus and a UDPRoute.
 ```console
-kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
+kubectl apply -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
 In order to realize the headless deployment model, we set STUNner's own service as the backend in
