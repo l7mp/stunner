@@ -61,7 +61,7 @@ spec:
       #   image: l7mp/net-debug:latest
       #   command: ["/bin/sh"]
       #   args: ["-c", "while true; do echo hello; sleep 10;done"]
-            
+
 ---
 apiVersion: v1
 kind: Service

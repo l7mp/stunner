@@ -35,7 +35,7 @@ browsers.
 
 Note that transcoding/transsizing and other media server goodies are not available in this setup:
 the clients must be fully compatible to be able to establish an audio/video session in this
-case. Consult the [one to one video call with Kurento](examples/kurento-one2one-call) tutorial to
+case. Consult the [one to one video call with Kurento](../kurento-one2one-call) tutorial to
 learn how to set up a fully-fledged media server behind STUNner.
 
 ### Application server
@@ -166,7 +166,7 @@ server.
 
 Eventually, the call setup process will look like this.
 
-![Call setup](/examples/direct-one2one-call/sequence.png)
+![Call setup](sequence.png)
 
 You can build the application server container locally from the tutorial
 [repo](https://github.com/l7mp/kurento-tutorial-node/tree/master/direct-one2one-call), or you can
@@ -394,13 +394,13 @@ kubectl delete -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../../LICENSE) for full text.
 
 ## Acknowledgments
 

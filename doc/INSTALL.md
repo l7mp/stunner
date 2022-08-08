@@ -8,12 +8,19 @@ servers are still reachable for WebRTC clients, despite running with a private I
 Kubernetes pod.
 
 ## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [Configuration](#configuration)
-3. [Installation](#installation)
-4. [Learning the external IP and port](#learning-the-external-ip-and-port)
-5. [Configuring WebRTC clients](#configuring-webrtc-clients)
-6. [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp)
+- [Installation](#installation)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Configuration](#configuration)
+  - [Installation](#installation-1)
+    - [Helm](#helm)
+    - [Manual installation](#manual-installation)
+  - [Learning the external IP and port](#learning-the-external-ip-and-port)
+  - [Configuring WebRTC clients](#configuring-webrtc-clients)
+  - [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp)
+  - [Help](#help)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## Prerequisites
 
@@ -46,7 +53,7 @@ be customized prior to deployment. In particular, make absolutely sure to custom
 tokens (`STUNNER_USERNAME` and `STUNNER_PASSWORD` for `plaintext` authentication, and
 `STUNNER_SHARED_SECRET` and possibly `STUNNER_DURATION` for the `longterm` authentication mode),
 otherwise STUNner will use hard-coded STUN/TURN credentials. This should not pose a major security
-risk (see the [STUNner security guide](/doc/SECURITY.md#access-control) for more info), but it is
+risk (see the [STUNner security guide](SECURITY.md#access-control) for more info), but it is
 still safer to customize the access tokens before exposing STUNner to the Internet.
 
 The most recent STUNner configuration is always available in the Kubernetes `ConfigMap` named
@@ -88,11 +95,11 @@ The most important STUNner configuration settings are as follows.
   generation](/doc/AUTH.md) mechanism use this configuration parameter to customize
   username/password lifetime.
 * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
-* `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner. 
-* `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner. 
+* `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner.
+* `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
 
 The default configuration can be overridden by setting custom command line arguments when
-[launching the STUNner pods](/cmd/stunnerd/README.md). All examples below assume that STUNner is
+[launching the STUNner pods](../cmd/stunnerd/README.md). All examples below assume that STUNner is
 deployed into the `default` namespace; see the installation notes below on how to override this.
 
 ## Installation
@@ -114,7 +121,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator
 
 helm install stunner stunner/stunner
 ```
-The above will install both charts into the default namespace. 
+The above will install both charts into the default namespace.
 To customize your chart overwrite the [default
 values](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner/values.yaml). The below will set
 custom namespace for installing STUNner; note that the `--create-namespace --namespace=<your-namespace>`
@@ -147,7 +154,7 @@ $ git clone https://github.com/l7mp/stunner.git
 $ cd stunner
 ```
 
-Then, customize the default settings in the STUNner service [manifest](/deploy/manifests/stunner.yaml)
+Then, customize the default settings in the STUNner service [manifest](../deploy/manifests/stunner.yaml)
 and deploy it via `kubectl`.
 
 ```console
@@ -175,7 +182,7 @@ In order to simplify the integration of STUNner into the WebRTC application serv
 the dynamic IP address/port assigned by Kubernetes into the `stunner-config` `ConfigMap` under the
 key `STUNNER_PUBLIC_IP` and `STUNNER_PUBLIC_PORT`. Then, WebRTC application pods can reach this
 `ConfigMap` as environment variables and communicate the IP address and port back to the clients
-(see an [example](configuring-webrtc-clients) below).
+(see an [example](#configuring-webrtc-clients) below).
 
 The [Helm installation](#helm) scripts take care of setting the IP address and port automatically
 in the `ConfigMap`. However, when using the [manual installation](#manual-installation) option the
@@ -265,7 +272,7 @@ ICE configurations and STUNner credentials in the application server.
 
 Some corporate firewalls block all UDP access from the private network, except DNS. To make sure
 that clients can still reach STUNner from locked-down private networks, you can expose STUNner over
-a [TCP-based TURN transport]([RFC 6062](https://tools.ietf.org/html/rfc6062)). 
+a [TCP-based TURN transport]([RFC 6062](https://www.rfc-editor.org/rfc/rfc6062)).
 
 To maximize the chances of getting through an over-zealous firewall, below we expose STUNner over
 the default HTTPS port 443.
@@ -297,7 +304,7 @@ Restart STUNner with the new configuration.
 $ kubectl rollout restart deployment/stunner
 ```
 
-If using a media-server, don't forget to open up the [STUNner ACL](/doc/SECURITY.md#access-control) so
+If using a media-server, don't forget to open up the [STUNner ACL](SECURITY.md#access-control) so
 that STUNner can reach the media server pool over TCP.
 
 Finally, direct your clients to the re-exposed STUNner TCP service with the below `PeerConnection` configuration; don't
@@ -307,7 +314,7 @@ STUNner URI.
 var ICE_config = {
   'iceServers': [
     {
-      'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=tcp',
+      'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=tcp",
       'username': <STUNNER_USERNAME>,
       'credential': <STUNNER_PASSWORD>,
     },
@@ -318,13 +325,13 @@ var pc = new RTCPeerConnection(ICE_config);
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../LICENSE) for full text.
 
 ## Acknowledgments
 

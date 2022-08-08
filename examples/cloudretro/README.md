@@ -57,7 +57,7 @@ If everything is successful, Kubernetes should assign an external address to the
 Running to following command will result the assigned address in a decimal four-octet format:
 
 ```console
-# Cat is present because some terminals do not breakline  ^._.^ 
+# Cat is present because some terminals do not breakline  ^._.^
 cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
@@ -164,13 +164,13 @@ kubectl delete -f cloudretro-stunner-cleanup.yaml
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to request invitation.
+STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to request invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../../LICENSE) for full text.
 
 ## Acknowledgments
 

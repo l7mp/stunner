@@ -8,10 +8,15 @@ DTLS/UDP listeners, complete confidentiality. To complete the CIA triad, the thi
 to add user authentication to STUNner.
 
 ## Table of Contents
-1. [The long-term credential mechanism](#the-long-term-credential-mechanism)
-2. [STUNner authentication workflow](#stunner-authentication-workflow)
-3. [Plaintext authentication](#plaintext-authentication)
-4. [Longterm authentication](#longterm-authentication)
+- [Authentication](#authentication)
+  - [Table of Contents](#table-of-contents)
+  - [The long-term credential mechanism](#the-long-term-credential-mechanism)
+  - [STUNner authentication workflow](#stunner-authentication-workflow)
+  - [Plaintext authentication](#plaintext-authentication)
+  - [Longterm authentication](#longterm-authentication)
+  - [Help](#help)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## The long-term credential mechanism
 
@@ -42,7 +47,7 @@ The intended authentication workflow in STUNner is as follows.
    username/password pair and a realm based on the current STUNner configuration.
    ```javascript
    const StunnerAuth = require('@l7mp/stunner-auth-lib');
-   
+
    var credentials = StunnerAuth.getStunnerCredentials();
    ```
 2. *The clients and STUNner gateway exchange a username/password pair over a secure channel.* The
@@ -76,8 +81,8 @@ The intended authentication workflow in STUNner is as follows.
      iceTransportPolicy: 'relay'
    }
    ```
-   
-   In the [Magic mirror via STUNner](examples/kurento-magic-mirror/README.md) demo the ICE server
+
+   In the [Magic mirror via STUNner](../examples/kurento-magic-mirror/README.md) demo the ICE server
    configuration is generated and patched into the static Javascript code served to users on
    startup (this is suitable for STUNner's `plaintext` authentication), while the [One to one video
    call with Kurento via STUNner](examples/kurento-one2one-call) demo generates the STUNner
@@ -85,7 +90,7 @@ The intended authentication workflow in STUNner is as follows.
    to the clients in the "register response" message (this workflow is usable for dynamic
    credential generation using the `longterm` authentication mode).
 3. *WebRTC clients are configured with the STUNner authentication credentials.* The below snippet
-   shows how to initialize a WebRTC 
+   shows how to initialize a WebRTC
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
    ```javascript
@@ -173,13 +178,13 @@ var cred = StunnerAuth.getStunnerCredentials({
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../LICENSE) for full text.
 
 ## Acknowledgments
 

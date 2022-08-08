@@ -5,18 +5,23 @@ exposing sensitive services to the Internet. The below security guidelines will 
 the risks associated with a misconfigured STUNner.
 
 ## Table of Contents
-1. [Threat](#threat)
-2. [Locking down STUNner](#locking-down-stunner)
-3. [Authentication](#authentication)
-4. [Access control](#access-control)
-5. [Exposing internal IP addresses](#exposing-internal-ip-addresses)
+- [Security](#security)
+  - [Table of Contents](#table-of-contents)
+  - [Threat](#threat)
+  - [Locking down STUNner](#locking-down-stunner)
+  - [Authentication](#authentication)
+  - [Access control](#access-control)
+  - [Exposing internal IP addresses](#exposing-internal-ip-addresses)
+  - [Help](#help)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## Threat
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
-[`turncat`](/cmd/turncat) utility to reach the Kubernetes DNS service through a misconfigured
+[`turncat`](../cmd/turncat) utility to reach the Kubernetes DNS service through a misconfigured
 STUNner gateway.
 
 Start with a fresh STUNner installation. As usual, we store the STUNner configuration for later
@@ -139,7 +144,7 @@ The ultimate condition for a secure STUNner deployment is a correctly configured
 regime that restricts external users to open transport relay connections inside the cluster. The
 ACL must make sure that only the media servers, and only on a limited set of UDP ports, can be
 reached externally.  This can be achieved using an Access Control List, essentially an "internal"
-firewall in the cluster, which in Kubernetes is called a `NetworkPolicy`. 
+firewall in the cluster, which in Kubernetes is called a `NetworkPolicy`.
 
 The STUNner installation comes with a default ACL (i.e., `NetworkPolicy`) that locks down *all*
 access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to enforce
@@ -150,7 +155,7 @@ Here is how to customize this ACL to secure the WebRTC media plane.  Suppose tha
 to be able to reach *any* media server replica labeled as `app=media-server` over the UDP port
 range `[10000:20000]`, but we don't want transport relay connections via STUNner to succeed to
 *any* other pod. This will be enough to support WebRTC media, but will not allow clients to, e.g.,
-[reach the Kubernetes DNS service](#threat). 
+[reach the Kubernetes DNS service](#threat).
 
 Assuming that the entire workload is deployed into the `default` namespace, the below
 `NetworkPolicy` ensures that all access from any STUNner pod to any media server pod is allowed
@@ -176,7 +181,7 @@ spec:
         matchLabels:
           app: media-server
     ports:
-    # Only UDP ports 10000-20000 are allowed between 
+    # Only UDP ports 10000-20000 are allowed between
     #   the source-destination pairs
     - protocol: UDP
       port: 10000
@@ -217,8 +222,8 @@ EOF
 ```
 
 In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
-publicly; e.g., the [`turncat` utility](/cmd/turncat) packaged with STUNner can be used
-conveniently for this [purpose](/examples/simple-tunnel/README.pm).
+publicly; e.g., the [`turncat` utility](../cmd/turncat) packaged with STUNner can be used
+conveniently for this [purpose](../examples/simple-tunnel/README.md).
 
 ## Exposing internal IP addresses
 
@@ -238,13 +243,13 @@ option for you.
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../LICENSE) for full text.
 
 ## Acknowledgments
 

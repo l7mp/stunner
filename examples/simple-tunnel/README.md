@@ -8,7 +8,7 @@ Kubernetes. The tutorial can also be used to quickly check a STUNner installatio
 In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
 * configure STUNner to expose the service to clients,
-* use [`turncat`](/cmd/turncat) to connect to the UDP service via STUNner,
+* use [`turncat`](../../cmd/turncat) to connect to the UDP service via STUNner,
 * benchmark your cloud-setup with [`iperfv2`](https://iperf.fr).
 
 ## Installation
@@ -23,16 +23,16 @@ guide](/doc/INSTALL.md). Create a namespace called `stunner` if there is none. Y
 
 In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside
 the cluster and perform a speed test from the local console. We will use the
-[`turncat`](/cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner
+[`turncat`](../../cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner
 acting as a STUN/TURN gateway.
 
-![STUNner benchmarks setup](/doc/stunner_benchmark.svg)
+![STUNner benchmarks setup](../../doc/stunner_benchmark.svg)
 
 You can easily implement a makeshift VPN with STUNner using a similar setup.
 
 ### Server configuration
 
-Set up an iperf server in the `default` Kubernetes namespace and wrap it in a Kubernetes 
+Set up an iperf server in the `default` Kubernetes namespace and wrap it in a Kubernetes
 service called `iperf-server`.
 ```console
 cd stunner
@@ -109,7 +109,7 @@ spec:
 ### Check your configuration
 
 Check whether you have all the necessary STUNner resources installed namespace.
-```console 
+```console
 kubectl get gatewayconfigs,gateways,udproutes -n stunner
 NAME                                                  REALM             AUTH        AGE
 gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   14s
@@ -181,7 +181,7 @@ export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"
 
 Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this
 listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat`
-is clever enough to [parse the running STUNner configuration](/cmd/turncat) from Kubernetes and set
+is clever enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set
 the STUN/TURN server public address/port and the authentication credentials
 accordingly.
 ``` console
@@ -235,16 +235,16 @@ communications.
 
 Stop `turncat` and wipe all Kubernetes configuration.
 ```console
-kubectl delete -f examples/simple-tunnel/iperf-server.yaml 
-kubectl delete -f examples/simple-tunnel/iperf-stunner.yaml 
+kubectl delete -f examples/simple-tunnel/iperf-server.yaml
+kubectl delete -f examples/simple-tunnel/iperf-stunner.yaml
 ```
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../../LICENSE) for full text.

@@ -23,13 +23,13 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](/doc/INSTALL.md) to set up STUNner.
+Consult the [STUNner installation and configuration guide](../../doc/INSTALL.md) to set up STUNner.
 
 ### Quick installation
 
 The simplest way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](/examples/kurento-magic-mirror.yaml) packaged with STUNner.
+[manifest](kurento-magic-mirror.yaml) packaged with STUNner.
 
 ```console
 $ git clone https://github.com/l7mp/stunner
@@ -64,13 +64,13 @@ $ kubectl scale deployment kms --replicas=4
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../../LICENSE) for full text.
 
 ## Acknowledgments
 

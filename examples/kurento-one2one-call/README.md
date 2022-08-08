@@ -21,7 +21,7 @@ guide](/doc/INSTALL.md). Create a namespace called `stunner` if there is none. Y
 WebRTC-compatible browser to run this tutorial. Basically any modern browser will do; we usually
 test our WebRTC applications with Firefox.
 
-### Setup 
+### Setup
 
 The tutorial has been adopted from the [Kurento](https://www.kurento.org/) [one-to-one video call
 tutorial](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html), with
@@ -48,16 +48,16 @@ PeerConnection](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnecti
 SDP Offer, and sends it along to the application server in a `call` message. The application server
 rings the callee in an `incomingCall` message. If accepting the call, the callee sets up a WebRTC
 PeerConnection, generates an SDP Offer and sends it back the application server in an
-`incomingCallResponse` message. 
+`incomingCallResponse` message.
 
 At this point the application server has both party's SDP Offer, so the next step is to set up the
 media pipeline in Kurento and process the SDP Offers through the media server. This is done by
 opening a WebSocket connection to the URI `ws://kms.default.svc.cluster.local:8888/kurento`
 (this is set on the server's command line in the Deployment
-[manifest](/examples/kurento-one2one-call/kurento-one2one-call-server.yaml)): here,
+[manifest](kurento-one2one-call-server.yaml)): here,
 `kms.default.svc.cluster.local` is the DNS name assigned by Kubernetes to the `kms` service
 (recall, this is the service associated with the media server Deployment) and Kurento listens on
-the TCP port 8888 for control connections. Note that this call gets load-balanced through the 
+the TCP port 8888 for control connections. Note that this call gets load-balanced through the
 Kubernetes CNI's service load-balancer so it will hit one random media server replica (if there are
 more). This ensures that new calls are distributed evenly across media servers.
 
@@ -101,7 +101,7 @@ server.
 1. Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
    `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
    library to pick up the most recent running config.
-   
+
    ```yaml
    apiVersion: apps/v1
    kind: Deployment
@@ -142,7 +142,7 @@ server.
 1. Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
    our case, this happens before returning a `registerResponse` to the client, so that the
    generated ICE configuration can be piggy-backed on the response message.
-   
+
    ```js
    function register(id, name, ws, callback) {
      [...]
@@ -181,7 +181,7 @@ server.
      [...]
      configuration: iceConfiguration,
    }
-                   
+
    webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
    ```
 
@@ -197,7 +197,7 @@ kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
 Note that we disable STUN/TURN in Kurento: STUNner will make sure that your media servers will not
 need to use NAT traversal (despite running with a private IP) and everything should work just
 fine. Here is the corresponding snippet from the
-[manifest](examples/kurento-one2one-call/kurento-one2one-call-server.yaml), which sets Kurento's
+[manifest](kurento-one2one-call-server.yaml), which sets Kurento's
 environment variables accordingly:
 
 ```yaml
@@ -235,7 +235,7 @@ Next, we deploy STUNner into the Kubernetes. The manifest below will set up a mi
 gateway hierarchy to do just that: the setup includes a Gateway listener at UDP:3478 and a
 UDPRoute to forward incoming calls into the cluster.
 ```console
-kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
+kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
 ```
 
 In order to realize the media-plane deployment model, we set the `kms` service, which wraps the
@@ -248,7 +248,7 @@ cross-connecting the clients' media streams with Kurento's WebRTC endpoints, is 
 magic.
 
 Here is the corresponding UDPRoute.
-```yaml 
+```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
 metadata:
@@ -266,7 +266,7 @@ spec:
 ### Check your configuration
 
 Check whether you have all the necessary objects installed into the `stunner` namespace.
-```console 
+```console
 kubectl get gatewayconfigs,gateways,udproutes -n stunner
 NAME                                                  REALM             AUTH        AGE
 gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   95m
@@ -316,8 +316,8 @@ with STUNner.
    `registerResponse` message. If all goes well, the response should show the ICE configuration
    returned by the application server. The configuration should contain a TURN URI for the UDP
    Gateway we have created in STUNner. In addition, the authentication credentials and the public
-   IP addresses and ports should match those in the output of `stunnerctl`. 
-   
+   IP addresses and ports should match those in the output of `stunnerctl`.
+
    ```js
    {
      "iceServers": [
@@ -330,7 +330,7 @@ with STUNner.
      "iceTransportPolicy": "relay"
    }
    ```
-   
+
 1. Once configured with the above ICE server configuration, the browser will ask STUNner to open a
    TURN transport relay connection for exchanging the video stream with Kurento and generates a
    local ICE candidate for each relay connection it creates. Note that only TURN-relay candidates
@@ -350,11 +350,11 @@ with STUNner.
 1. The media server generates ICE candidates as well. Since we disabled STUN/TURN in Kurento, only
    host-type ICE candidates are generated by the media server. These will be sent back to the
    clients as remote ICE candidates.
-   
+
    ```console
    Received message: {[...] "candidate:1 1 UDP 2015363327 10.116.2.44 17325 typ host" [...]}
    ```
-   
+
    Observe that the ICE candidate again contains a private IP: in fact, `10.116.2.44` is the pod IP
    address belonging to the Kurento media server instance that received the call setup request from
    the application server.
@@ -366,8 +366,8 @@ with STUNner.
    IP address. Since in the Kubernetes networking model ["pods can communicate with all other pods
    on any other node without NAT"](https://kubernetes.io/docs/concepts/services-networking), all
    local-remote ICE candidate pairs will have direct connectivity and ICE connectivity check will
-   succeed on the first candidate pair! 
-   
+   succeed on the first candidate pair!
+
 After connecting, video starts to flow between the each client and the media server via the
 UDP/TURN connection opened by STUNner, and the media server can perform all audio- and
 video-processing the tasks a media server is expected to perform. Note that browsers may be behind
@@ -388,7 +388,7 @@ applications with STUNner.
   running-config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
   typically indicate that STUN/TURN authentication was unsuccessful.
 * No video-connection: This is most probably due to a communication issue between your client and
-  STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP. 
+  STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP.
 * Still no connection: follow the excellent [TURN troubleshooting
   guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html) to track down the
   issue. Remember: your ultimate friends `tcpdump` and `Wireshark` are always there for you to
@@ -491,13 +491,13 @@ kubectl delete -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yam
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
 
 ## License
 
-Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](/AUTHORS).
+Copyright 2021-2022 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
 
-MIT License - see [LICENSE](/LICENSE) for full text.
+MIT License - see [LICENSE](../../LICENSE) for full text.
 
 ## Acknowledgments
 
