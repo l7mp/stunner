@@ -22,8 +22,6 @@ metadata:
   labels:
     app: worker
 data:
-  CLOUD_GAME_WORKER_NETWORK_COORDINATORADDRESS: default
-  CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: default
   CLOUD_GAME_EMULATOR_AUTOSAVESEC: "3"
 ---
 # Worker deployment

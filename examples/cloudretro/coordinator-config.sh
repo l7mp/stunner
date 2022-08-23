@@ -4,7 +4,7 @@
 #
 primary_context=$1
 secondary_context=$2
-if [ $# -eq 0]
+if [ $# -eq 0 ]
 then
   primary_context=$(kubectl config current-context)
   secondary_context=$(kubectl config current-context)
@@ -18,7 +18,6 @@ do
     if [ -z "$c" ]
     then
         contextnumber=$i
-        echo $contextnumber
         break
     fi
 done

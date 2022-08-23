@@ -141,7 +141,7 @@ Now that we've set up STUNner, it is ready for action. Although, for this to wor
 Running the following, minimalistic script will do it for You;
 
 ```console
-chmod +x apply-config-c.sh
+chmod +x coordinator-config.sh
 ./coordinator-config.sh
 ```
 
@@ -176,8 +176,8 @@ Next, to make these workers connect to the coordinator, we are going to need the
 The script below will configure the SECONDARY workers to connect to the remote-cluster coordinator;
 
 ```console
-chmod +x apply-config-w.sh
-./apply-config-w.sh $(kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --context primary)
+chmod +x worker-config.sh
+./worker-config.sh primary secondary1
 ```
 
 ### STUNner setup on SECONDARY clusters
@@ -186,7 +186,7 @@ This time we won't get into the details, for a detailed installation see the [In
 The following script will repeat the exact same steps on Your SECONDARY cluster;
 
 ```console
-chmod +x stunner-cloudretro-setup.sh
+chmod +x stunner-setup-for-cloudretro.sh
 ./stunner-setup-for-cloudretro.sh secondary1
 ```
 
@@ -199,7 +199,7 @@ Running the following script will do that for You; although, You need to specify
 The script supports up to 10 SECONDARY clusters, but You can always just change the limit.
 
 ```console
-chmod +x coordinator-multicluster-add.sh
+chmod +x coordinator-config.sh
 ./coordinator-config.sh primary secondary1
 ```
 

@@ -20,10 +20,6 @@ metadata:
   namespace: cloudretro
   labels:
     app: coordinator
-data:
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: default
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_USERNAME: default
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_CREDENTIAL: default
 ---
 # Coordinator deployment
 apiVersion: apps/v1
