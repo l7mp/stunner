@@ -3,7 +3,8 @@
 # The following yaml script will install a cloud-retro setup in your Kubernetes cluster
 # with the needed services. With an invalid configuration of course, for this to properly work
 # You need the apply-config.sh minimalistic shell script to update the config with the unclear addresses.
-# 
+#  
+# Please not that this will only install the workers. For them to work, you will need a coordinator deployment as well.
 #
 # In short, no touching.
 #
@@ -23,61 +24,7 @@ metadata:
 data:
   CLOUD_GAME_WORKER_NETWORK_COORDINATORADDRESS: default
   CLOUD_GAME_WORKER_NETWORK_PUBLICADDRESS: default
----
-# Configmap for Coordinator
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloudretro-config-c
-  namespace: cloudretro
-  labels:
-    app: coordinator
-data:
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_URL: default
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_USERNAME: default
-  CLOUD_GAME_WEBRTC_ICESERVERS_0_CREDENTIAL: default
----
-# Coordinator deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: coordinator-deployment
-  namespace: cloudretro
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: coordinator
-  template:
-    metadata:
-      labels:
-        app: coordinator
-    spec:
-      containers:
-      - name: coordinator
-        image: valniae/snekyrepo:cloudimage5
-        envFrom:
-          - configMapRef:
-              name: cloudretro-config-c
-        command: ["coordinator"]
-        args: ["--v=5"]
-        ports:
-        - containerPort: 8000
----
-# Coordinator LoadBalancer for HTTP
-apiVersion: v1
-kind: Service
-metadata:
-  name: coordinator-lb-svc
-  namespace: cloudretro
-spec:
-  selector:
-    app: coordinator
-  ports:
-    - port: 8000
-      targetPort: 8000
-      #nodePort: 30001
-  type: LoadBalancer
+  CLOUD_GAME_EMULATOR_AUTOSAVESEC: "3"
 ---
 # Worker deployment
 apiVersion: apps/v1
@@ -97,7 +44,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: valniae/snekyrepo:cloudimage5
+        image: valniae/snekyrepo:crdi
         envFrom:
           - configMapRef:
               name: cloudretro-config-w
