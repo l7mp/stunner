@@ -58,12 +58,18 @@ spec:
             value: ""
         ports:
         - containerPort: 8888
+        resources:
+          requests:
+            cpu: "100m"
+          limits:
+            cpu: "1000m"
+
       # Uncomment this if you want to deploy a sidecar container to sniff traffic
       # - name: net-debug
       #   image: l7mp/net-debug:latest
       #   command: ["/bin/sh"]
       #   args: ["-c", "while true; do echo hello; sleep 10;done"]
-            
+
 ---
 apiVersion: v1
 kind: Service
@@ -97,24 +103,38 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        image: l7mp/kurento-magic-mirror-server
+        # image: l7mp/kurento-magic-mirror-server TODO update
+        image: nmate/kurento-magic-mirror-server:latest
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
-        # imagePullPolicy: Never
+        imagePullPolicy: Always
         # command: ["/bin/sh"]
         # args: ["-c", "while true; do echo hello; sleep 10;done"]
-        imagePullPolicy: Always
+        # imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443
         # TURN server config to return to the user
-        envFrom:
-          - configMapRef:
-              name: stunner-config
+        env:
+          - name: STUNNER_CONFIG_FILENAME
+            value: "/etc/stunnerd/stunnerd.conf"
         volumeMounts:
           - name: webrtc-server-tls
             mountPath: "/app/keys"
             readOnly: true
+          - name: stunnerd-config-volume
+            mountPath: "/etc/stunnerd"
+            readOnly: true
+
+      # - name: net-debug
+      #   image: l7mp/net-debug:latest
+      #   command: ["/bin/sh"]
+      #   args: ["-c", "while true; do echo hello; sleep 10;done"]
+
       volumes:
+        - name: stunnerd-config-volume
+          configMap:
+            name: stunnerd-config
+            optional: true
         - name: webrtc-server-tls
           secret:
             secretName: webrtc-server-secret
@@ -141,6 +161,25 @@ spec:
       name: webrtc-server-port
 
 ---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kms-media-plane
+  namespace: default
+  labels:
+    app: kms-media-plane
+spec:
+  ports:
+    # port is ignored in the below
+    - port: 9999
+      protocol: UDP
+      name: kms-media-plane-port
+  selector:
+    app: kms
+
+---
+
 # for serving the overlay image to Kurento
 apiVersion: v1
 kind: Service
@@ -156,25 +195,3 @@ spec:
       protocol: TCP
       name: overlay-image-port
 
----
-# lock down access from the TURN server only to kms
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-  namespace: default
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: kms
-    ports:
-    - protocol: UDP
-      port: 10000
-      endPort: 20000
