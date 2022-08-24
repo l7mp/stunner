@@ -4,9 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 type Frontend interface {
@@ -41,13 +44,14 @@ func NewFrontend(endpoint string) Frontend {
 	}
 
 	port := u.Port()
-	if port != "" {
-		addr = addr + ":" + port
+	if port == "" {
+		port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
 	}
+	addr = addr + ":" + port
 
 	path := u.EscapedPath()
 	if path == "" {
-		path = "/metrics"
+		path = "/"
 	}
 
 	mux := http.NewServeMux()
