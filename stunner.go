@@ -35,8 +35,8 @@ type Options struct {
 	// Resolver swaps the internal DNS resolver with a custom implementation (used mostly for
 	// testing)
 	Resolver resolver.DnsResolver
-	// MonitoringBackend serves Prometheus metrics data.
-	MonitoringBackend monitoring.Backend
+	// MonitoringFrontend serves Prometheus metrics data.
+	MonitoringFrontend monitoring.Frontend
 	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
 	// over an emulated data-plane
 	Net *vnet.Net
@@ -50,7 +50,7 @@ type Stunner struct {
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
-	monitoringBackend                                          monitoring.Backend
+	monitoringFrontend                                          monitoring.Frontend
 	net                                                        *vnet.Net
 	options                                                    Options
 }
@@ -59,7 +59,7 @@ type Stunner struct {
 func NewStunner() *Stunner {
 	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
 	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
-	mb := monitoring.NewBackend("")
+	mf := monitoring.NewFrontend("")
 	vnet := vnet.NewNet(nil)
 
 	s := Stunner{
@@ -67,7 +67,7 @@ func NewStunner() *Stunner {
 		logger:  loggerFactory,
 		log:     loggerFactory.NewLogger("stunner"),
 		adminManager: manager.NewManager("admin-manager",
-			object.NewAdminFactory(mb, loggerFactory), loggerFactory),
+			object.NewAdminFactory(mf, loggerFactory), loggerFactory),
 		authManager: manager.NewManager("auth-manager",
 			object.NewAuthFactory(loggerFactory), loggerFactory),
 		listenerManager: manager.NewManager("listener-manager",
@@ -75,7 +75,7 @@ func NewStunner() *Stunner {
 		clusterManager: manager.NewManager("cluster-manager",
 			object.NewClusterFactory(r, loggerFactory), loggerFactory),
 		resolver:          r,
-		monitoringBackend: mb,
+		monitoringFrontend: mf,
 		net:               vnet,
 		options:           Options{},
 	}
@@ -110,14 +110,14 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 
 	// monitoring
 	if options.DryRun == true {
-		s.monitoringBackend = monitoring.NewMockBackend()
+		s.monitoringFrontend = monitoring.NewMockFrontend()
 		s.adminManager = manager.NewManager("admin-manager",
-			object.NewAdminFactory(s.monitoringBackend, s.logger), s.logger)
+			object.NewAdminFactory(s.monitoringFrontend, s.logger), s.logger)
 	}
-	if options.MonitoringBackend != nil {
-		s.monitoringBackend = options.MonitoringBackend
+	if options.MonitoringFrontend != nil {
+		s.monitoringFrontend = options.MonitoringFrontend
 		s.adminManager = manager.NewManager("admin-manager",
-			object.NewAdminFactory(options.MonitoringBackend, s.logger), s.logger)
+			object.NewAdminFactory(options.MonitoringFrontend, s.logger), s.logger)
 	}
 
 	return s

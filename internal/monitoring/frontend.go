@@ -9,21 +9,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type Backend interface {
-	// Reload backend based on the configuration change
-	Reload(endpoint string, log logging.LeveledLogger) Backend
-	// Start monitoring backend
+type Frontend interface {
+	// Reload frontend based on the configuration change
+	Reload(endpoint string, log logging.LeveledLogger) Frontend
+	// Start monitoring frontend
 	Start()
-	// Stop the monitoring backend
+	// Stop the monitoring frontend
 	Stop()
 }
 
-type backendImpl struct {
+type frontendImpl struct {
 	httpServer *http.Server
 	Endpoint   string
 }
 
-func NewBackend(endpoint string) Backend {
+func NewFrontend(endpoint string) Frontend {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil
@@ -32,8 +32,8 @@ func NewBackend(endpoint string) Backend {
 	addr := u.Hostname()
 	if addr == "" {
 		// omitted value means no monitoring, in this case we
-		// return a dummy backendImpl
-		b := &backendImpl{
+		// return a dummy frontendImpl
+		b := &frontendImpl{
 			httpServer: nil,
 			Endpoint:   endpoint,
 		}
@@ -57,14 +57,14 @@ func NewBackend(endpoint string) Backend {
 		Addr:    addr,
 		Handler: mux,
 	}
-	b := &backendImpl{
+	b := &frontendImpl{
 		httpServer: server,
 		Endpoint:   endpoint,
 	}
 	return b
 }
 
-func (b *backendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend {
+func (b *frontendImpl) Reload(endpoint string, log logging.LeveledLogger) Frontend {
 	// stop if endpoint is unset
 	if endpoint == "" {
 		b.Stop()
@@ -74,15 +74,15 @@ func (b *backendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend
 		if b.Endpoint != endpoint {
 			// new endpoint, restart monitoring server
 			b.Stop()
-			m := NewBackend(endpoint)
-			b = m.(*backendImpl)
+			m := NewFrontend(endpoint)
+			b = m.(*frontendImpl)
 			b.Start()
 		}
 	}
 	return b
 }
 
-func (b *backendImpl) Start() {
+func (b *frontendImpl) Start() {
 	if b.httpServer == nil {
 		return
 	}
@@ -92,7 +92,7 @@ func (b *backendImpl) Start() {
 	}()
 }
 
-func (b *backendImpl) Stop() {
+func (b *frontendImpl) Stop() {
 	if b.httpServer == nil {
 		return
 	}

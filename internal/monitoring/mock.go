@@ -4,17 +4,17 @@ import (
 	"github.com/pion/logging"
 )
 
-type MockBackendImpl struct {
+type MockFrontendImpl struct {
 	Endpoint string
 }
 
-func NewMockBackend() Backend {
-	b := &MockBackendImpl{Endpoint: "mock!"}
+func NewMockFrontend() Frontend {
+	b := &MockFrontendImpl{Endpoint: "mock!"}
 	return b
 }
 
-func (b *MockBackendImpl) Reload(endpoint string, log logging.LeveledLogger) Backend { return b }
+func (b *MockFrontendImpl) Reload(endpoint string, log logging.LeveledLogger) Frontend { return b }
 
-func (b *MockBackendImpl) Start() {}
+func (b *MockFrontendImpl) Start() {}
 
-func (b *MockBackendImpl) Stop() {}
+func (b *MockFrontendImpl) Stop() {}
