@@ -1,4 +1,6 @@
 <p align="center">
+  <a href="https://discord.gg/DyPgEsbwzc" alt="Discord">
+    <img alt="Discord" src="https://img.shields.io/discord/945255818494902282" /></a>
   <a href="https://go.dev/doc/go1.17" alt="Go">
     <img src="https://img.shields.io/github/go-mod/go-version/l7mp/stunner" /></a>
   <a href="https://hub.docker.com/repository/docker/l7mp/stunnerd/tags?page=1&ordering=last_updated" alt="Docker version">
