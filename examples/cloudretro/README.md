@@ -226,7 +226,7 @@ kubectl delete -f cloudretro-stunner-cleanup.yaml
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to request invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 
@@ -240,4 +240,3 @@ Demo adopted from [CloudRetro](https://github.com/giongto35/cloud-game).
 
 Please note that this demo is only for showcasing STUNner in this enviroment.
 Many CloudRetro functions do not work; shared-save, shared-roms, areas, etc.
-

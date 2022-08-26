@@ -592,7 +592,7 @@ notable limitations at this point are as follows.
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 
