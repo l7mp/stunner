@@ -215,7 +215,7 @@ It is obvious, that the one made with an US-region worker (48 frame ~200,00ms) h
 
 | US video | EU video |
 |---|---|
-![cloudretro_us.mp4](cloudretro_us.mp4) | ![cloudretro_eu.mp4](cloudretro_eu.mp4) |
+| ![cloudretro_us.mp4](https://github.com/l7mp/stunner/raw/main/examples/cloudretro/cloudretro_us.mp4) | ![cloudretro_eu.mp4](https://github.com/l7mp/stunner/raw/main/examples/cloudretro/cloudretro_eu.mp4) |
 
 
 ## Clean up
