@@ -213,6 +213,10 @@ Although, you can manually choose workers by clicking the little `w` button unde
 For example, two videos are included. Both were recorded from a client in the European region with 240 FPS.
 It is obvious, that the one made with an US-region worker (48 frame ~200,00ms) has latency between invoke and response much larger than in the European one (20 frame ~83,33ms).
 
+| US video | EU video |
+|---|---|
+![cloudretro_us.mp4](cloudretro_us.mp4) | ![cloudretro_eu.mp4](cloudretro_eu.mp4) |
+
 
 ## Clean up
 
