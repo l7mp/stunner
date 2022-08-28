@@ -54,7 +54,7 @@ iperf-server   ClusterIP   10.120.5.36   <none>        5001/UDP,5001/TCP   19s  
 
 Expose the service via the STUNner. The pre-compiled manifest below will create the required
 GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on
-TCP:3478, and route client connections received on the gateways to the `iperf-server` 
+TCP:3478, and route client connections received on the gateways to the `iperf-server`
 service.
 ```console
 kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
@@ -241,7 +241,7 @@ kubectl delete -f examples/simple-tunnel/iperf-stunner.yaml
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 

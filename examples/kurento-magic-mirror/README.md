@@ -15,7 +15,7 @@ installed into a standard Kubernetes cluster.
 In this demo you will learn the following steps to:
 * integrate a typical WebRTC application server to be used with STUNner,
 * deploy the modified application server into a Kubernetes,
-* deploy the Kurento media server into Kubernetes behind STUNner, 
+* deploy the Kurento media server into Kubernetes behind STUNner,
 * scale a standard WebRTC workload using Kubernetes and STUNner.
 
 ## Installation
@@ -47,7 +47,7 @@ $ cd stunner
 $ kubectl apply -f examples/kurento-magic-mirror/kurento-magic-mirror-server.yaml
 ```
 
-### Configuration 
+### Configuration
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
 ```console
@@ -81,7 +81,7 @@ $ kubectl scale deployment kms --replicas=4
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 

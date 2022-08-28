@@ -376,8 +376,8 @@ active STUNner replicas.
 The below command will fire up 15 STUNner replicas; this usually succeeds in a matter of seconds.
 
 ```console
-kubectl scale deployment stunner --replicas=15 
-``` 
+kubectl scale deployment stunner --replicas=15
+```
 
 You can even use Kubernetes
 [autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
@@ -394,7 +394,7 @@ kubectl delete -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](../../AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 
