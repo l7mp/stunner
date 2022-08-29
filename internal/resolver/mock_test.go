@@ -9,7 +9,8 @@ import (
 	"github.com/l7mp/stunner/internal/logger"
 )
 
-var resolverTestLoglevel string = "all:TRACE"
+//var resolverTestLoglevel string = "all:TRACE"
+var resolverTestLoglevel string = "all:ERROR"
 
 func TestMockResolver(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(resolverTestLoglevel)

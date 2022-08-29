@@ -1387,6 +1387,10 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 		"dummy.l7mp.io":       []string{"1.2.3.10"},
 	}, loggerFactory)
 
+	// should never err
+	mockDns.Start()
+	assert.NoError(t, nil, "start mock DNS")
+
 	log.Debug("creating a stunnerd")
 	s := NewStunner().WithOptions(Options{
 		LogLevel:         stunnerTestLoglevel,

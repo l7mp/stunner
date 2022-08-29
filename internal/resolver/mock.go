@@ -3,6 +3,7 @@ package resolver
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/pion/logging"
 )
@@ -23,7 +24,11 @@ func NewMockResolver(zone map[string]([]string), logger logging.LoggerFactory) D
 
 // Starts spawns the mock DNS resolver
 func (m *MockResolver) Start() {
-	m.log.Debugf("Starting mock DNS resolver")
+	ds := []string{}
+	for d, ips := range m.Zone {
+		ds = append(ds, fmt.Sprintf("%s:[%s]", d, strings.Join(ips, ",")))
+	}
+	m.log.Debugf("Starting mock DNS resolver with zone: %s", strings.Join(ds, ", "))
 }
 
 // Close closes the mock resolver
@@ -48,7 +53,7 @@ func (m *MockResolver) Lookup(domain string) ([]net.IP, error) {
 
 	for d := range m.Zone {
 		if d == domain {
-			if e, found := m.Zone[domain]; found != false {
+			if e, found := m.Zone[domain]; found {
 				ret := []net.IP{}
 				for _, i := range e {
 					ret = append(ret, net.ParseIP(i))

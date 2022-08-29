@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	"github.com/pion/logging"
 
@@ -123,8 +124,9 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 		}
 
 		for _, h := range added {
-			c.Resolver.Register(h)
-			c.Domains = append(c.Domains, h)
+			if c.Resolver.Register(h) == nil {
+				c.Domains = append(c.Domains, h)
+			}
 		}
 	}
 
@@ -193,6 +195,8 @@ func (c *Cluster) Route(peer net.IP) bool {
 
 	case v1alpha1.ClusterTypeStrictDNS:
 		// endpoints are obtained from the DNS
+		c.log.Tracef("running STRICT_DNS cluster with domains: [%s]", strings.Join(c.Domains, ", "))
+
 		for _, d := range c.Domains {
 			c.log.Tracef("considering domain %q", d)
 
@@ -202,6 +206,8 @@ func (c *Cluster) Route(peer net.IP) bool {
 			}
 
 			for _, n := range hs {
+				c.log.Tracef("considering IP address %q", n)
+
 				if n.Equal(peer) {
 					return true
 				}

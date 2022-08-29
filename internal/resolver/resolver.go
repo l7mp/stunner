@@ -182,9 +182,7 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 	defer e.lock.RUnlock()
 
 	ret := make([]net.IP, len(e.hostNames))
-	for i, n := range e.hostNames {
-		ret[i] = n
-	}
+	copy(ret, e.hostNames)
 
 	r.log.Tracef("Lookup ready: domain %q, endpoints: %d", domain, len(ret))
 
