@@ -107,14 +107,16 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 			m.log.Errorf("could not create new object: %s", err.Error())
 			return err
 		}
-		m.Upsert(o)
+		// ignore errors
+		_ = m.Upsert(o)
 	}
 
 	m.log.Trace("running the deletion job queue")
 	for _, j := range state.DeletedJobQueue {
 		o := j.Object
 		m.log.Tracef("deleting object %q: running conf: %#v", o.ObjectName(), j.OldConfig)
-		m.Delete(o)
+		// ignore error
+		_ = m.Delete(o)
 	}
 
 	m.log.Trace("running the reconciliation job queue")

@@ -93,7 +93,7 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
 			if util.Member(clusters, r) {
 				auth.Log.Tracef("considering cluster %q", r)
 				c := s.GetCluster(r)
-				if c.Route(peer) == true {
+				if c.Route(peer) {
 					auth.Log.Infof("permission granted on listener %q for client "+
 						"%q to peer %s via cluster %q", l.Name, src.String(),
 						peerIP, c.Name)

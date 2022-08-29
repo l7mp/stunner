@@ -86,7 +86,7 @@ func (f *LoggerFactory) SetLevel(levelSpec string) {
 
 		// set log-level
 		l, found := logLevels[strings.ToUpper(level)]
-		if found == false {
+		if !found {
 			continue
 		}
 

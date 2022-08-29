@@ -62,10 +62,10 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 	auth.Realm = req.Realm
 	switch atype {
 	case v1alpha1.AuthTypePlainText:
-		auth.Username, _ = req.Credentials["username"]
-		auth.Password, _ = req.Credentials["password"]
+		auth.Username = req.Credentials["username"]
+		auth.Password = req.Credentials["password"]
 	case v1alpha1.AuthTypeLongTerm:
-		auth.Secret, _ = req.Credentials["secret"]
+		auth.Secret = req.Credentials["secret"]
 	}
 
 	return nil

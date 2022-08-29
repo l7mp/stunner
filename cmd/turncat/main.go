@@ -32,7 +32,7 @@ var defaultDuration time.Duration
 
 func main() {
 	var Usage = func() {
-		fmt.Fprintf(os.Stderr, usage)
+		fmt.Fprint(os.Stderr, usage)
 		flag.PrintDefaults()
 	}
 
