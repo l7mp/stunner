@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 )
 
@@ -11,6 +12,8 @@ type AdminConfig struct {
 	Name string `json:"name,omitempty"`
 	// LogLevel is the desired log verbosity, e.g.: "stunner:TRACE,all:INFO"
 	LogLevel string `json:"loglevel,omitempty"`
+	// MetricsEndpoint is the url to the metric server (Prometheus)
+	MetricsEndpoint string `json:"metrics_endpoint,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults
@@ -21,6 +24,12 @@ func (req *AdminConfig) Validate() error {
 	}
 	if req.Name == "" {
 		req.Name = DefaultStunnerName
+	}
+
+	//validate metrics endpoint
+	_, err := url.Parse(req.MetricsEndpoint)
+	if err != nil {
+		return fmt.Errorf("%s: not a valid metric endpoint URL", req.MetricsEndpoint)
 	}
 
 	return nil

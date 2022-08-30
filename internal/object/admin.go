@@ -3,6 +3,7 @@ package object
 import (
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -10,19 +11,20 @@ const DefaultAdminObjectName = "DefaultAdmin"
 
 // Admin is the main object holding STUNner administration info
 type Admin struct {
-	Name, LogLevel string
-	log            logging.LeveledLogger
+	Name, LogLevel, MetricsEndpoint string
+	log                             logging.LeveledLogger
+	MonitoringFrontend               monitoring.Frontend
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
 // v1alpha1.ErrRestartRequired)
-func NewAdmin(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
+func NewAdmin(conf v1alpha1.Config, mf monitoring.Frontend, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
 		return nil, v1alpha1.ErrInvalidConf
 	}
 
-	admin := Admin{log: logger.NewLogger("stunner-admin")}
+	admin := Admin{MonitoringFrontend: mf, log: logger.NewLogger("stunner-admin")}
 	admin.log.Tracef("NewAdmin: %#v", req)
 
 	if err := admin.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
@@ -56,6 +58,11 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
 
+	// monitoring
+	me := req.MetricsEndpoint
+	a.MonitoringFrontend = a.MonitoringFrontend.Reload(me, a.log)
+	a.MetricsEndpoint = me
+
 	return nil
 }
 
@@ -69,8 +76,9 @@ func (a *Admin) ObjectName() string {
 func (a *Admin) GetConfig() v1alpha1.Config {
 	a.log.Tracef("GetConfig")
 	return &v1alpha1.AdminConfig{
-		Name:     a.Name,
-		LogLevel: a.LogLevel,
+		Name:            a.Name,
+		LogLevel:        a.LogLevel,
+		MetricsEndpoint: a.MetricsEndpoint,
 	}
 }
 
@@ -82,12 +90,13 @@ func (a *Admin) Close() error {
 
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
-	logger logging.LoggerFactory
+	monitoringFrontend monitoring.Frontend
+	logger            logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(logger logging.LoggerFactory) Factory {
-	return &AdminFactory{logger: logger}
+func NewAdminFactory(mf monitoring.Frontend, logger logging.LoggerFactory) Factory {
+	return &AdminFactory{monitoringFrontend: mf, logger: logger}
 }
 
 // New can produce a new Admin object from the given configuration. A nil config will create an
@@ -97,5 +106,5 @@ func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
 		return &Admin{}, nil
 	}
 
-	return NewAdmin(conf, f.logger)
+	return NewAdmin(conf, f.monitoringFrontend, f.logger)
 }
