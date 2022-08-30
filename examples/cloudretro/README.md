@@ -211,7 +211,14 @@ Keep in mind, that CloudRetro will connect to the relatively closest cluster if 
 Although, you can manually choose workers by clicking the little `w` button under `options`.
 
 For example, two videos are included. Both were recorded from a client in the European region with 240 FPS.
-It is obvious, that the one made with an US-region worker (48 frame ~200,00ms) has latency between invoke and response much larger than in the European one (20 frame ~83,33ms).
+It is obvious, that the one made with an [US-region worker](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_us.mp4) (48 frame ~200,00ms) has latency between invoke and response much larger than in the [European one](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_eu.mp4) (20 frame ~83,33ms).
+
+### Problems for the future
+
+Even with this setup, STUNner is working like an UDP Gateway for our services. In case of failure, all the control-info exchange must happen again, taking precious time, resulting in delay. If we want to provide our UDP service "seamlessly", basically a whole new connection must be built in case of worker-pod failure, with no "ture" load-balancing.
+
+This reconnection takes plenty of time, for example, a [demo video](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_reconnect_delay.mp4) included for this case.
+Even so, in this example much of the delay is the client realizing that the connection is no more.
 
 
 ## Clean up
