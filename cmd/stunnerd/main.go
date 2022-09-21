@@ -145,7 +145,7 @@ func main() {
 					}
 
 					if e.Op != fsnotify.Write {
-						log.Warnf("unhnadled notify op on config file %q (ignoring): %s",
+						log.Warnf("unhandled notify op on config file %q (ignoring): %s",
 							e.Name, e.Op.String())
 						continue
 					}
