@@ -13,9 +13,9 @@ func RegisterMetrics(log logging.LeveledLogger, GetAllocationCount func() float6
 		},
 		GetAllocationCount,
 	)); err == nil {
-		log.Debug("GaugeFunc 'allocation' registered.")
+		log.Debug("GaugeFunc 'stunner_allocations_active' registered.")
 	} else {
-		log.Warn("GaugeFunc 'allocation' cannot be registered (already registered?).")
+		log.Warn("GaugeFunc 'stunner_allocations_active' cannot be registered (already registered?).")
 	}
 
 	//TODO: add connection metrics
