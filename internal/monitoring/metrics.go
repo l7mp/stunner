@@ -26,7 +26,7 @@ func RegisterMetrics(log logging.LeveledLogger, GetAllocationCount func() float6
 
 func UnregisterMetrics(log logging.LeveledLogger) {
 	if AllocActiveGauge != nil {
-		if success := prometheus.Unregister(AllocActiveGauge); success == true {
+		if success := prometheus.Unregister(AllocActiveGauge); success {
 			log.Debug("GaugeFunc 'stunner_allocations_active' unregistered.")
 			return
 		}

@@ -88,7 +88,7 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 		m.log.Tracef("inspecting object %q for configuration change: %#v -> %#v",
 			j.Object.ObjectName(), j.OldConfig, j.NewConfig)
 
-		if re := j.Object.Inspect(j.OldConfig, j.NewConfig); re == true {
+		if re := j.Object.Inspect(j.OldConfig, j.NewConfig); re {
 			restart = v1alpha1.ErrRestartRequired
 		}
 	}

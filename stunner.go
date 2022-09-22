@@ -105,7 +105,7 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 	}
 
 	// monitoring
-	if options.DryRun == true {
+	if options.DryRun {
 		s.monitoringFrontend = monitoring.NewMockFrontend()
 		s.adminManager = manager.NewManager("admin-manager",
 			object.NewAdminFactory(s.monitoringFrontend, s.logger), s.logger)
