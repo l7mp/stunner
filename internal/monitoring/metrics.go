@@ -5,18 +5,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var AllocActiveGauge prometheus.GaugeFunc
+
+//TODO: add connection metrics
+
 func RegisterMetrics(log logging.LeveledLogger, GetAllocationCount func() float64) {
-	if err := prometheus.Register(prometheus.NewGaugeFunc(
+	AllocActiveGauge = prometheus.NewGaugeFunc(
 		prometheus.GaugeOpts{
 			Name: "stunner_allocations_active",
 			Help: "Number of active allocations.",
 		},
 		GetAllocationCount,
-	)); err == nil {
-		log.Debug("GaugeFunc 'stunner_allocations_active' registered.")
+	)
+	if err := prometheus.Register(AllocActiveGauge); err == nil {
+		log.Warn("GaugeFunc 'stunner_allocations_active' registered.")
 	} else {
-		log.Warn("GaugeFunc 'stunner_allocations_active' cannot be registered (already registered?).")
+		log.Warn("GaugeFunc 'stunner_allocations_active' cannot be registered.")
 	}
+}
 
-	//TODO: add connection metrics
+func UnregisterMetrics(log logging.LeveledLogger) {
+	if AllocActiveGauge != nil {
+		if success := prometheus.Unregister(AllocActiveGauge); success == true {
+			log.Warn("GaugeFunc 'stunner_allocations_active' unregistered.")
+			return
+		}
+	}
+	log.Warn("GaugeFunc 'stunner_allocations_active' cannot be unregistered.")
 }
