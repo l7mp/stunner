@@ -16,9 +16,9 @@ type Frontend interface {
 	// Reload frontend based on the configuration change
 	Reload(endpoint string, log logging.LeveledLogger) Frontend
 	// Start monitoring frontend
-	Start()
+	Start(log logging.LeveledLogger)
 	// Stop the monitoring frontend
-	Stop()
+	Stop(log logging.LeveledLogger)
 }
 
 type frontendImpl struct {
@@ -71,34 +71,40 @@ func NewFrontend(endpoint string) Frontend {
 func (b *frontendImpl) Reload(endpoint string, log logging.LeveledLogger) Frontend {
 	// stop if endpoint is unset
 	if endpoint == "" {
-		b.Stop()
+		b.Stop(log)
 		return b
 	} else {
 		// otherwise reinit at new address
 		if b.Endpoint != endpoint {
 			// new endpoint, restart monitoring server
-			b.Stop()
+			b.Stop(log)
 			m := NewFrontend(endpoint)
 			b = m.(*frontendImpl)
-			b.Start()
+			b.Start(log)
 		}
 	}
 	return b
 }
 
-func (b *frontendImpl) Start() {
+func (b *frontendImpl) Start(log logging.LeveledLogger) {
 	if b.httpServer == nil {
 		return
 	}
 	// serve Prometheus metrics over HTTP
 	go func() {
-		b.httpServer.ListenAndServe()
+		if err := b.httpServer.ListenAndServe(); err != nil {
+			log.Warn("Error in metrics HTTP endpoint operation.")
+		}
 	}()
+	log.Debug("Started metrics HTTP endpoint.")
 }
 
-func (b *frontendImpl) Stop() {
+func (b *frontendImpl) Stop(log logging.LeveledLogger) {
 	if b.httpServer == nil {
 		return
 	}
-	b.httpServer.Shutdown(context.Background())
+	if err := b.httpServer.Shutdown(context.Background()); err != nil {
+		log.Warn("Error in metrics HTTP endpoint shutdown.")
+	}
+	log.Debug("Succesful metrics HTTP endpoint shutdown.")
 }

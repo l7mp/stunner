@@ -157,7 +157,7 @@ func (s *Stunner) Start() error {
 	// start monitoring
 	monitoring.RegisterMetrics(s.log,
 		func() float64 { return float64(s.server.AllocationCount()) })
-	s.monitoringFrontend.Start()
+	s.monitoringFrontend.Start(s.log)
 
 	return nil
 }
@@ -172,6 +172,6 @@ func (s *Stunner) Stop() {
 	s.server = nil
 
 	// shutdown monitoring
-	s.monitoringFrontend.Stop()
+	s.monitoringFrontend.Stop(s.log)
 	monitoring.UnregisterMetrics(s.log)
 }

@@ -15,6 +15,6 @@ func NewMockFrontend() Frontend {
 
 func (b *MockFrontendImpl) Reload(endpoint string, log logging.LeveledLogger) Frontend { return b }
 
-func (b *MockFrontendImpl) Start() {}
+func (b *MockFrontendImpl) Start(log logging.LeveledLogger) {}
 
-func (b *MockFrontendImpl) Stop() {}
+func (b *MockFrontendImpl) Stop(log logging.LeveledLogger) {}
