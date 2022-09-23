@@ -1,8 +1,11 @@
 <p align="center">
+  <img alt="STUNner", src="doc/stunner.svg" width="50%" height="50%"></br>
   <a href="https://discord.gg/DyPgEsbwzc" alt="Discord">
     <img alt="Discord" src="https://img.shields.io/discord/945255818494902282" /></a>
   <a href="https://go.dev/doc/go1.17" alt="Go">
     <img src="https://img.shields.io/github/go-mod/go-version/l7mp/stunner" /></a>
+  <a href="https://pkg.go.dev/github.com/l7mp/stunner">
+    <img src="https://pkg.go.dev/badge/github.com/l7mp/stunner.svg" alt="Go Reference"></a>
   <a href="https://hub.docker.com/repository/docker/l7mp/stunnerd/tags?page=1&ordering=last_updated" alt="Docker version">
     <img src="https://img.shields.io/docker/v/l7mp/stunnerd" /></a>
   <a href="https://github.com/l7mp/stunner/stargazers" alt="Github stars">
