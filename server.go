@@ -13,7 +13,6 @@ import (
 
 	// "github.com/pion/transport/vnet"
 
-	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -154,11 +153,6 @@ func (s *Stunner) Start() error {
 
 	s.log.Infof("TURN server running: %s", s.String())
 
-	// start monitoring
-	monitoring.RegisterMetrics(s.log,
-		func() float64 { return float64(s.server.AllocationCount()) })
-	s.monitoringFrontend.Start(s.log)
-
 	return nil
 }
 
@@ -170,8 +164,4 @@ func (s *Stunner) Stop() {
 		s.server.Close()
 	}
 	s.server = nil
-
-	// shutdown monitoring
-	s.monitoringFrontend.Stop(s.log)
-	monitoring.UnregisterMetrics(s.log)
 }

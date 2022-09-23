@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,33 +15,54 @@ import (
 
 type Frontend interface {
 	// Reload frontend based on the configuration change
-	Reload(endpoint string, log logging.LeveledLogger) Frontend
-	// Start monitoring frontend
-	Start(log logging.LeveledLogger)
+	Reconcile(endpoint string) error
+	// Start the monitoring frontend
+	Start()
 	// Stop the monitoring frontend
-	Stop(log logging.LeveledLogger)
+	Stop()
+	// Get current endpoint
+	GetEndpoint() string
 }
 
 type frontendImpl struct {
 	httpServer *http.Server
 	Endpoint   string
+	dryRun     bool
+	log        logging.LeveledLogger
 }
 
-func NewFrontend(endpoint string) Frontend {
+func NewFrontend(endpoint string, dryRun bool, logger logging.LoggerFactory) Frontend {
+	log := logger.NewLogger("prometheus-frontend")
+	log.Tracef("NewFrontend")
+
+	return &frontendImpl{
+		httpServer: nil,
+		Endpoint:   endpoint,
+		dryRun:     dryRun,
+		log:        log,
+	}
+}
+
+// only configuration errors are critical, Prom client HTTP frontend start/stop errors are
+// suppredded: we don't want the stunner to rollback the old config when the HTTP server cannot
+// start for some reason (e.g., EBUSY)
+func (b *frontendImpl) Reconcile(endpoint string) error {
+	b.log.Tracef("Reconcile: %s", endpoint)
+
+	// stop if endpoint is unset
+	if endpoint == "" {
+		b.Stop()
+		return nil
+	}
+
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	addr := u.Hostname()
 	if addr == "" {
-		// omitted value means no monitoring, in this case we
-		// return a dummy frontendImpl
-		b := &frontendImpl{
-			httpServer: nil,
-			Endpoint:   endpoint,
-		}
-		return b
+		return nil
 	}
 
 	port := u.Port()
@@ -54,6 +76,17 @@ func NewFrontend(endpoint string) Frontend {
 		path = "/"
 	}
 
+	// Handle dry run
+	if b.dryRun {
+		b.Endpoint = endpoint
+		return nil
+	}
+
+	if b.Endpoint == endpoint {
+		// nothing to change
+		return nil
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle(path, promhttp.Handler())
 
@@ -61,50 +94,46 @@ func NewFrontend(endpoint string) Frontend {
 		Addr:    addr,
 		Handler: mux,
 	}
-	b := &frontendImpl{
-		httpServer: server,
-		Endpoint:   endpoint,
-	}
-	return b
+
+	b.Stop()
+	b.Endpoint = endpoint
+	b.httpServer = server
+	b.Start()
+
+	return nil
 }
 
-func (b *frontendImpl) Reload(endpoint string, log logging.LeveledLogger) Frontend {
-	// stop if endpoint is unset
-	if endpoint == "" {
-		b.Stop(log)
-		return b
-	} else {
-		// otherwise reinit at new address
-		if b.Endpoint != endpoint {
-			// new endpoint, restart monitoring server
-			b.Stop(log)
-			m := NewFrontend(endpoint)
-			b = m.(*frontendImpl)
-			b.Start(log)
-		}
-	}
-	return b
-}
-
-func (b *frontendImpl) Start(log logging.LeveledLogger) {
+func (b *frontendImpl) Start() {
+	b.log.Tracef("Starting prometheus client frontend at endpoint %s", b.Endpoint)
 	if b.httpServer == nil {
 		return
 	}
 	// serve Prometheus metrics over HTTP
 	go func() {
-		if err := b.httpServer.ListenAndServe(); err != nil {
-			log.Warn("Error in metrics HTTP endpoint operation.")
+		err := b.httpServer.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			b.log.Tracef("Prometheus client frontend: normal shutdown")
+		} else if err != nil {
+			b.log.Warnf("Cannot start Prometheus client frontend: %s", err.Error())
+			b.httpServer = nil
 		}
 	}()
-	log.Debug("Started metrics HTTP endpoint.")
 }
 
-func (b *frontendImpl) Stop(log logging.LeveledLogger) {
+func (b *frontendImpl) Stop() {
+	b.log.Tracef("Stopping prometheus client frontend %s", b.Endpoint)
 	if b.httpServer == nil {
 		return
 	}
+	// ignore errors
 	if err := b.httpServer.Shutdown(context.Background()); err != nil {
-		log.Warn("Error in metrics HTTP endpoint shutdown.")
+		b.log.Warnf("Error in stopping prometheus client frontend %s", b.Endpoint)
 	}
-	log.Debug("Succesful metrics HTTP endpoint shutdown.")
+}
+
+func (b *frontendImpl) GetEndpoint() string {
+	if b == nil {
+		return ""
+	}
+	return b.Endpoint
 }

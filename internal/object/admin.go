@@ -13,7 +13,7 @@ const DefaultAdminObjectName = "DefaultAdmin"
 type Admin struct {
 	Name, LogLevel, MetricsEndpoint string
 	log                             logging.LeveledLogger
-	MonitoringFrontend               monitoring.Frontend
+	MonitoringFrontend              monitoring.Frontend
 }
 
 // NewAdmin creates a new Admin object. Requires a server restart (returns
@@ -57,11 +57,10 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
+	a.MetricsEndpoint = req.MetricsEndpoint
 
 	// monitoring
-	me := req.MetricsEndpoint
-	a.MonitoringFrontend = a.MonitoringFrontend.Reload(me, a.log)
-	a.MetricsEndpoint = me
+	a.MonitoringFrontend.Reconcile(a.MetricsEndpoint)
 
 	return nil
 }
@@ -91,7 +90,7 @@ func (a *Admin) Close() error {
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
 	monitoringFrontend monitoring.Frontend
-	logger            logging.LoggerFactory
+	logger             logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
