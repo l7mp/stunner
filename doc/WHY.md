@@ -27,17 +27,21 @@ then the packet will again undergo another DNAT step, and so on.
 
 The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
 protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
-describes it, hence the HTTP client and the web server does not need to rely on the IP 5-tuple to
-identify a session. This is not the case with the prominent WebRTC media protocol encapsulation
-though, RTP over UDP. RTP does not have anything remotely similar to an HTTP header. To make things
-worse, the underlying UDP transport connections are usually *not* backed by a connection-tracking
-table in the NATs, so there is a good chance that subsequent packets will not even hit the same
-media server pod (e.g., if there is a parallel scale-out/scale-in event).  Consequently, the only
-"semi-stable" connection identifier WebRTC clients and servers can rely on is the IP 5-tuple, but
-when this is subject to change, e.g., due to a NAT in the datapath, then WebRTC media connections
-break. Due to reasons which are mostly historical at this point, *UDP/RTP connections cannot
-survive not even a single NAT step*, let along the 2-3 rounds of NATs a packet regularly undergoes
-in the Kubernetes dataplane.
+describes it and the underlying TCP transport connection is usually maintained in a connection
+tracking table in the NATs, hence the HTTP/TCP session once routed to a server will remain there
+and the server does not need to rely on the IP 5-tuple to re-identify the client per each packet
+(and vice versa). 
+
+This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
+UDP. RTP does not have anything remotely similar to an HTTP header. To make things worse, the
+underlying UDP transport connections are usually *not* backed by a connection-tracking table in the
+NATs, so there is a good chance that subsequent packets will not even hit the same media server pod
+(e.g., if there is a parallel scale-out/scale-in event).  Consequently, the only "semi-stable"
+connection identifier WebRTC clients and servers can rely on is the IP 5-tuple, but when this is
+subject to change, e.g., due to a NAT in the datapath, then WebRTC media connections break. Due to
+reasons which are mostly historical at this point, *UDP/RTP connections cannot survive not even a
+single NAT step*, let along the 2-3 rounds of NATs a packet regularly undergoes in the Kubernetes
+dataplane.
 
 ## The state-of-the-art
 
