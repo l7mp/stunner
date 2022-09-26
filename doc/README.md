@@ -1,23 +1,23 @@
 # STUNner documentation
 
-## Architecture
+<p align="center">
+  <img alt="STUNner", src="doc/stunner.svg" width="50%" height="50%"></br>
+</p>
 
-TODO
+## Introduction
 
-## Concepts
+* [Why STUNner](/doc/WHY.md)
 
-TODO
+## Deployment guides
+
+* [Concepts](/doc/CONCEPTS.md)
+* [Reference](/doc/GATEWAY.md)
 
 ## User guides
 
-<!-- * The [installation and configuration guide](/doc/INSTALL.md) helps getting started with STUnner -->
-<!--   and describes the most important configuration knobs. -->
-<!-- * The [security guide](/doc/SECURITY.md) discusses the best-practices to minmize the security risks -->
-<!-- associated with a misconfigured STUNner gateway. -->
-<!-- * The [authentication guide](/doc/AUTH.md) describes the different user authentication modes -->
-<!-- supported by STUNner. -->
-
-TODO
+* [Getting started](/doc/INSTALL.md)
+* [Security](/doc/SECURITY.md)
+* [Authentication](/doc/AUTH.md)
 
 ## Tutorials
 
