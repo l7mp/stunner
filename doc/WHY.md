@@ -53,14 +53,14 @@ container template). This way the media server shares the network namespace of t
 Kubernetes node) it is running on, inheriting the public address (if any) of the host and
 (hopefully) sidestepping the private pod network with the involved NATs.
 
-There are lots of reasons why this deployment model is less than ideal:
+There are *lots* of reasons why this deployment model is less than ideal:
 * **Each node can run a single pod only.** The basic idea in Kubernetes is that nodes should run
   lots of pods simultaneously, perhaps in the hundreds, in order to benefit from resource pooling
-  and statistical multiplexing, amortizing the costs of the per-node Kubernetes services needed to
-  run the cluster (the kubelet, kube-proxy, etc.), allow elastic scaling, etc. Using
-  host-networking breaks this promise: since there is no guarantee that two media server pods would
-  not both allocate the same UDP port to terminate a UDP/RTP stream, deploying both into the
-  host-network namespace of the same node would easily result in hard-to-debug port clashes.
+  and statistical multiplexing, amortizing the costs of running the per-node Kubernetes boilerplate
+  (the kubelet, kube-proxy, etc.), allow elastic scaling, etc. Using host-networking breaks this
+  promise: since there is no guarantee that two media server pods would not both allocate the same
+  UDP port to terminate a UDP/RTP stream, deploying both into the host-network namespace of the
+  same node would easily result in hard-to-debug port clashes.
   
 * **It inhibits elastic scaling.** Kubernetes scales workloads at the per-pod granularity. When
   each node occupies an entire Kubernetes node, scaling the media plane equals adding/removing
@@ -72,10 +72,10 @@ There are lots of reasons why this deployment model is less than ideal:
   time.
 
 * **It is a security nightmare.** Given today's operational reality, exposing an entire fleet of
-  media servers to the Internet over a public IP address, with all UDP ports open and readily
-  available to malicious actors, is an adventurous act, to say the least. Wouldn't it be nice to
-  hide your media servers behind a secure perimeter defense mechanism (say, a Gateway) and lock
-  down *all* uncontrolled access and nefarious business by running it over a private IP?
+  media servers to the Internet over a public IP address, and opening up all UDP ports for
+  malicious actors, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
+  your media servers behind a secure perimeter defense mechanism (say, a Gateway) and lock down
+  *all* uncontrolled access and nefarious business by running it over a private IP?
 
 * **It is a terrible waste of resources.** Think about this: when you use Kubernetes you pay a
   double virtualization price. Namely, the node itself is usually just regular VM on a physical
@@ -88,7 +88,7 @@ There are lots of reasons why this deployment model is less than ideal:
   over a public IP solves only half of the problem: the server side. For the client side you still
   need a costly NAT traversal service to let clients behind a NAT to connect to your media
   servers. But why not putting the NAT-traversal facilities right into your Kubernetes cluster and
-  use the same NAT traversal facility for both the client and the server?
+  share the same facility for the client and the server?
 
 * **Nodes might not even have a public IP address.** There are lots of locked-down hosted
   Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP address for
