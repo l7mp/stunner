@@ -1,12 +1,12 @@
 # Introduction
 
-STUNner is a *WebRTC ingress gateway for Kubernetes*. Indeed, STUNner is for *WebRTC*, so it is
-specifically designed to help dealing with WebRTC media plane network protocol encapsulations, it
-is an *ingress gateway* so its job is to help ingest WebRTC media traffic into a virtualized media
-plane, and it is highly *opinionated towards Kubernetes* so everything around STUNner is designed
-and built to play nice with Kubernetes and the cloud-native ecosystem. That being said, STUNner can
-easily be used outside of this context (e.g., as a regular STUN/TURN server), but these deployment
-options are not supported.
+STUNner is a *WebRTC ingress gateway for Kubernetes*. All the words matter here: indeed STUNner is
+for *WebRTC*, so it is specifically designed to help dealing with WebRTC media plane network
+protocol encapsulations, it is an *ingress gateway* so its job is to help ingest WebRTC media
+traffic into a virtualized media plane, and it is *opinionated towards Kubernetes* so everything
+around STUNner is designed and built to fit into the Kubernetes and the cloud-native
+ecosystem. That being said, STUNner can easily be used outside of this context (e.g., as a regular
+STUN/TURN server), but these deployment options are not the main focus.
 
 Below we discuss the main pain points STUNner is trying to solve.
 
@@ -28,9 +28,9 @@ then the packet will again undergo another DNAT step, and so on.
 The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
 protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
 describes it and the underlying TCP transport connection is usually maintained in a connection
-tracking table in the NATs, hence the HTTP/TCP session once routed to a server will remain there
-and the server does not need to rely on the IP 5-tuple to re-identify the client per each packet
-(and vice versa). 
+tracking table in the NATs. Hence, once a HTTP/TCP session is routed to a server it will remain
+there permanently, and the server does not need to rely on the IP 5-tuple to re-identify the client
+per each packet (and vice versa).
 
 This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
 UDP. RTP does not have anything remotely similar to an HTTP header. To make things worse, the
@@ -64,12 +64,11 @@ There are *lots* of reasons why this deployment model is less than ideal:
   
 * **It inhibits elastic scaling.** Kubernetes scales workloads at the per-pod granularity. When
   each node occupies an entire Kubernetes node, scaling the media plane equals adding/removing
-  Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly(!)  process. In
+  Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly process. In
   addition, it becomes very difficult to provision the resource requests and limits of each media
   server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a single video-conferencing
   room, while a `t2.xlarge` (8 vCPU/32 GB mem) is extremely costly for running, say, a single
-  2-party conference. Worse of all, you have to make the decision which one to use at installation
-  time.
+  2-party conference. Worse of all, you have to make the decision at installation time.
 
 * **It is a security nightmare.** Given today's operational reality, exposing an entire fleet of
   media servers to the Internet over a public IP address, and opening up all UDP ports for
@@ -88,31 +87,31 @@ There are *lots* of reasons why this deployment model is less than ideal:
   over a public IP solves only half of the problem: the server side. For the client side you still
   need a costly NAT traversal service to let clients behind a NAT to connect to your media
   servers. But why not putting the NAT-traversal facilities right into your Kubernetes cluster and
-  share the same facility for the client and the server?
+  share the same facility for the client and the server side?
 
 * **Nodes might not even have a public IP address.** There are lots of locked-down hosted
   Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP address for
-  security purposes. This then precludes even the host-networking trick. But even if nodes are
-  publicly available, many Kubernetes services simply disable host-networking all together (e.g.,
-  [GKE Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview))
-  exactly because it is such an intrusive hack.
+  security purposes. This then precludes the host-networking trick. But even if nodes are publicly
+  available, many Kubernetes services simply disable host-networking all together (e.g., [GKE
+  Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview)) exactly
+  because it is such an intrusive hack.
 
 ## Why STUNner
 
 Long story short, running your media servers with `hostNetwork=true` is just not THE WAY in
-Kubernetes! There is a reason why Kubernetes relies on a comprehensive collection of [Gateway
+Kubernetes! There is a reason why, instead of just installing the entire workload into the
+host-network namespace, Kubernetes relies on a comprehensive collection of [Gateway
 services](https://gateway-api.sigs.k8s.io) to ingest traffic into the cluster in a controlled
-manner, instead of just installing the entire workload into the host-network namespace. STUNner is
-exactly such a gateway service, carefully tailored to WebRTC media.
+manner. STUNner is exactly such a gateway service, carefully tailored to WebRTC media.
 
 Using STUNner allows you to specify a set of high-level declarative policies (UDP/TCP ports,
 authentication credentials, etc.) to define the way you want traffic to enter the cluster and to
 control the internal services client media can reach (i.e., UDP routes and backend services). This
 will then make it possible to leave behind the host-networking hack once and for all, and run,
 scale and monitor the media-plane workload in the usual private pod-network behind the secure
-perimeter defense provided by STUNner. From here, the rest is just PURE MAGIC!  (In fact, it is
-not: STUNner is just an everyday STUN/TURN server with some small tweaks to let it play nicely with
-Kubernetes. Sorry to spoil the fun, but there is absolutely nothing magical here...)
+perimeter defense provided by STUNner. From here, the rest is just PURE STUNner MAGIC!  (In fact,
+it is not: STUNner is just an everyday STUN/TURN server with some small tweaks to let it play
+nicely with Kubernetes. Sorry to spoil the fun, but there is absolutely nothing magical here...)
 
 ## Help
 
