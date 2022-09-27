@@ -4,19 +4,16 @@
   <img alt="STUNner", src="/doc/stunner.svg" width="50%" height="50%"></br>
 </p>
 
-## Introduction
+## Overview
 
 * [Why STUNner](/doc/WHY.md)
-
-## Deployment guides
-
 * [Deployment models](/doc/DEPLOYMENT.md)
 * [Concepts](/doc/CONCEPTS.md)
-* [Gateway API reference](/doc/GATEWAY.md)
 
 ## User guides
 
 * [Getting started](/doc/INSTALL.md)
+* [Gateway API reference](/doc/GATEWAY.md)
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
 
