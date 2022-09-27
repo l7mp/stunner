@@ -12,6 +12,7 @@
 
 * [Deployment models](/doc/DEPLOYMENT.md)
 * [Concepts](/doc/CONCEPTS.md)
+* [Gateway API reference](/doc/GATEWAY.md)
 
 ## User guides
 
@@ -36,9 +37,8 @@
 * [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md)
 * [Remote desktop access with Neko](/examples/neko/README.md)
 
-## Reference
+## Manuals
 
-* [Gateway API reference](/doc/GATEWAY.md)
 * [`stunnerd` manual](/cmd/stunnerd/README.md)
 * [`turncat` manual](/cmd/turncat/README.md)
 * [`stunnerctl` manual](/cmd/stunnerctl/README.md)
