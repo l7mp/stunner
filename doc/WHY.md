@@ -37,7 +37,7 @@ UDP. RTP does not have anything remotely similar to an HTTP header. Consequently
 client's packets to arrive from a negotiated IP source address and UDP source port. However, when
 the IP 5-tuple changes, for instance because there a NAT in the datapath, then WebRTC media
 connections break. Due to reasons which are mostly historical at this point, *UDP/RTP connections
-cannot survive not even a single NAT step*, let along the 2-3 rounds of NATs a packet regularly
+do not survive not even a single NAT step*, let along the 2-3 rounds of NATs a packet regularly
 undergoes in the Kubernetes dataplane.
 
 ## The state-of-the-art
@@ -53,8 +53,8 @@ Kubernetes node) it is running on, inheriting the public address (if any) of the
 There are *lots* of reasons why this deployment model is less than ideal:
 * **Each node can run a single pod only.** The basic idea in Kubernetes is that nodes should run
   lots of pods simultaneously, perhaps in the hundreds, in order to benefit from resource pooling
-  and statistical multiplexing, amortizing the costs of running the per-node Kubernetes boilerplate
-  (the kubelet, kube-proxy, etc.), allow elastic scaling, etc. Using host-networking breaks this
+  and statistical multiplexing, amortize the costs of running the per-node Kubernetes boilerplate
+  (the kubelet, kube-proxy, etc.), enable elastic scaling, etc. Using host-networking breaks this
   promise: since there is no guarantee that two media server pods would not both allocate the same
   UDP port to terminate a UDP/RTP stream, deploying both into the host-network namespace of the
   same node would easily result in hard-to-debug port clashes.
@@ -65,11 +65,11 @@ There are *lots* of reasons why this deployment model is less than ideal:
   addition, it becomes very difficult to provision the resource requests and limits of each media
   server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a single video-conferencing
   room, while a `t2.xlarge` (8 vCPU/32 GB mem) is extremely costly for running, say, a single
-  2-party conference. Worse of all, you have to make the decision at installation time.
+  2-party conference. Worse yet, you have to make the decision at installation time.
 
-* **It is a security nightmare.** Given today's operational reality, exposing an entire fleet of
-  media servers to the Internet over a public IP address, and opening up all UDP ports for
-  malicious actors, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
+* **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
+  servers to the Internet over a public IP address, and opening up all UDP ports for potentially
+  malicious access, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
   your media servers behind a secure perimeter defense mechanism (say, a Gateway) and lock down
   *all* uncontrolled access and nefarious business by running it over a private IP?
 

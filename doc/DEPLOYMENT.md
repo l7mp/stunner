@@ -1,5 +1,12 @@
 ## Deployment models
 
+STUNner supports various deployment models. In particular, it can be deployed in the headless model
+where there is no media server behind it, or it can work in the media-plane model to provide
+ingress services for an entire WebRTC workload. Orthogonally, there are two control-plane
+deployment models: in the standalone mode users manually supply the dataplane configuration, while
+in the full (default) deployment model there is a separate control plane responsible for exposing
+the dataplane configuration to the users in a [declarative API](https://gateway-api.sigs.k8s.io).
+
 ## Architectural models
 
 STUNner supports two architectural models, depending on whether it is used as a mere STUN/TURN
@@ -36,8 +43,8 @@ which theoretically means limitless scalability. By creating connection-tracking
 client session STUNner also supports the dynamic scale-in/scale-out of the media server pool
 without dropping client connections. Whether scaling STUNner itself causes client connection drops
 is depending on the cloud provider's load-balancer service: if the load-balancer creates conntrack
-state for clients' UDP transport streams then STUNner can be scaled freely scaled up and down,
-otherwise scaling STUNner may result the [disconnection of a small number of client
+state for clients' UDP transport streams then STUNner can be scaled freely, otherwise scaling
+STUNner may result the [disconnection of a small number of client
 connections](https://cilium.io/blog/2020/11/10/cilium-19/#maglev).
 
 ## Control plane models
@@ -47,9 +54,9 @@ STUNner can run in one of two modes: in the default mode STUNner configuration i
 resources](https://gateway-api.sigs.k8s.io), while in the *standalone model* the user configures
 STUNner manually. The standalone mode provides perfect control over the way STUNner ingests media,
 but at the same time it requires users to deal with the subtleties of internal STUNner APIs that
-are subject to change between subsequent releases. We are actively working towards feature parity
-between STUNner's control-plane models we consider the standalone model obsolete. If still
-interested, comprehensive documentation can be found [here](/doc/OBSOLETE.md).
+are subject to change between subsequent releases. We are actively working towards feature
+completeness for STUNner's operator-ful mode, and we consider the standalone model obsolete. If
+still interested, comprehensive documentation can be found [here](/doc/OBSOLETE.md).
 
 ## Help
 

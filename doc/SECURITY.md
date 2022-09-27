@@ -45,8 +45,8 @@ export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonp
 ```
 
 Build `turncat`, the Swiss-army-knife [testing tool](/cmd/turncat/README.md) for STUNner, fire up a
-UDP listener on port on `localhost:5000` and forward all received packets to the cluster DNS
-service through STUNner.
+UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service
+through STUNner.
 
 ```console
 ./turncat --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://${KUBE_DNS_IP}:53
@@ -60,14 +60,15 @@ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
 ```
 
 You should see the internal Cluster IP address allocated by Kubernetes for the STUNner dataplane
-service. Try experiment with other FQDNs, like `kubernetes.default.svc.cluster.local`, etc., the
-query should return the corresponding internal service IP.
+service. Try experiment with other FQDNs, like `kubernetes.default.svc.cluster.local`, etc.; the
+Kubernetes cluster DNS service will readily return the the corresponding internal service IP
+addresses.
 
 This little experiment demonstrates the threats associated with a poorly configured STUNner
-gateway. Note that reaching internal Kubernetes services via STUNner is contingent on two
-conditions: first, the target service must run over UDP (e.g., the `kube-dns`), since STUNner's
-transport relay connections are limited to UDP, and second, the user must specifically add a
-UDPRoute to the target service. 
+gateway: it can allows external access to *any* UDP service running inside your cluster. The
+prerequisites for this is that (1) the target service *must* run over UDP inside the cluster (e.g.,
+the `kube-dns`), since STUNner's transport relay connections are limited to UDP, and (2) the user
+*must* specifically add a UDPRoute to the target service, otherwise STUNner blocks access to it.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -93,7 +94,12 @@ outside of the backend services the user explicitly opens up via a UDPRoute.
 
 Unless properly locked down, STUNner may be used maliciously to open a tunnel to any UDP service
 running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the pods and
-services inside a cluster exposed via STUNner.
+services exposed via STUNner. The main security principle 
+
+> In a properly configured STUNner deployment, even possessing a valid TURN credential an malicious
+attacker can reach only the media servers via STUNner but no other services, which is essentially
+the same level of security as if you put the media servers to the Internet over an open public IP
+address, protected by a firewall that admits only UDP access.
 
 The below security considerations will greatly reduce the attack surface associated with
 STUNner. In any case, use STUNner at your own risk.
@@ -102,8 +108,10 @@ STUNner. In any case, use STUNner at your own risk.
 
 By default, STUNner uses a single statically set username/password pair for all clients and the
 password is available in plain text at the clients (`plaintext` authentication mode). Anyone with
-access to the static STUNner credentials can open a UDP tunnel to any service inside the Kubernetes
-cluster.
+access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know
+the private IP address of the target service or pod and provided that a UDPRoute exists that
+specifies the target service as a backend. This means, a service is exposed only if STUNner is
+explicitly configured so.
 
 For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
 per-client fixed lifetime username/password pairs. See the [authentication guide](/doc/AUTH.md) for
@@ -111,10 +119,9 @@ configuring STUNner with `longterm` authentication.
 
 ## Access control
 
-STUNner requires the user to explicitly open up external access to services internal to the cluster
-using a UDPRoute. For instance, the below UDPRoute allows access *only* to the media-server service
-in the media-plane namespace, and nothing else.
-
+STUNner requires the user to explicitly open up external access to internal services by specifying
+a proper UDPRoute. For instance, the below UDPRoute allows access *only* to the `media-server`
+service in the `media-plane` namespace, and nothing else.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -131,9 +138,9 @@ spec:
         - namespace: media-plane
 ```
 
-To avoid potential misuse, STUNner disables open access to the cluster (the user can explicitly
-open an open `stunnerd` cluster in the standalone mode though but this is discouraged for
-security).
+To avoid potential misuse, STUNner disables open wildcard access to the cluster. Note that in the
+standalone mode the user can still explicitly create an open `stunnerd` cluster, but this is
+discouraged for security).
 
 For hardened deployments, it is possible add a second level of isolation between STUNner and the
 rest of the Kubernetes cluster using the Kubernetes NetworkPolicy facility. Creating a
@@ -184,10 +191,12 @@ media servers via STUNner.  At the same time, this also has the bitter consequen
 addresses are now exposed to the WebRTC clients in ICE candidates.
 
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP
-address of all STUNner pods and all media server pods via STUNner. This should not pose a major
-security risk though: remember, none of these private IP addresses can be reached
-externally. Nevertheless, if worried about information exposure then STUNner may not be the best
-option at the moment. In later releases, we plan to remove this artifact.
+address of all STUNner pods and all media server pods. This should not pose a major security risk
+though: remember, none of these private IP addresses can be reached externally. Nevertheless, if
+worried about information exposure then STUNner may not be the best option at the moment. In later
+releases, we plan to obscure the transport relay connection addresses returned by STUNner, which
+would lock down external scanning attempts. (Feel free to open an issue if you think this
+limitation is a blocker for you.)
 
 ## Help
 

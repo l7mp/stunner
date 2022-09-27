@@ -30,8 +30,8 @@ integrity.  If they match, the request is authenticated, otherwise the server re
 The intended authentication workflow in STUNner is as follows.
 
 1. *A username/password pair is generated.* This is outside the scope of STUNner; however, STUNner
-   comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that
-   makes it simpler to generate STUNner credentials from the STUNner's [running configuration](/doc/CONCEPTS.md). For 
+   comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to
+   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For 
    instance, the below will automatically parse the running config and generate a username/password 
    pair and a realm based on the current configuration.
    ```javascript
@@ -39,8 +39,8 @@ The intended authentication workflow in STUNner is as follows.
    ...
    var credentials = StunnerAuth.getStunnerCredentials();
    ```
-2. *The clients and STUNner gateway exchange a username/password pair over a secure channel.* The
-   easiest way is to encode the username/password pair used for STUNner in the [ICE
+2. *The clients receive the username/password pair over a secure channel.* The
+   easiest way is to encode the username/password pair used for STUNner is in the [ICE
    server configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) returned to
    clients. E.g., using the above [Node.js
    library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib):
@@ -91,7 +91,7 @@ learns a `plaintext` STUNner credential they can use it without limits to reach 
 administrator rolls the credetials, see below).
 
 You can select the authentication mode from the GatewayConfig resource of STUNner. For instance,
-the below commands will configure STUNner to use `plaintext` authentication using the
+the below GatewayConfig will configure STUNner to use `plaintext` authentication using the
 username/password pair `my-user/my-password` over the realm `my-realm.example.com`. Note that
 `plaintext` authentication is the default in STUNner.
 
@@ -109,14 +109,14 @@ spec:
 ```
 
 The term `plaintext` may be deceptive: the password is never exchanged in plain text between the
-client and STUNner. However, since the WebRTC Javascript API uses the TURN credentials unencrypted,
-an attacker can easily extract the STUNner credentials from the client-side Javascript code. This
-does not pose a major security risk though: remember, possessing a working TURN credential will
-allow an attacked to reach only the backend services explicitly admitted by an appropriate
-UDPRoute. In other words, in a properly configured STUNner deployment the attacked will be able to
-reach only the media servers, which is essentially the same level of security as if you put the
-media servers to the Internet over an open public IP address. For [here](/doc/SECURITY.md) for
-further tips on hardened STUNner deployments.
+client and STUNner over the Internet. However, since the WebRTC Javascript API uses the TURN
+credentials unencrypted, an attacker can easily extract the STUNner credentials from the
+client-side Javascript code. This does not pose a major security risk though: remember, possessing
+a working TURN credential will allow an attacker to reach only the backend services explicitly
+admitted by an appropriate UDPRoute. In other words, in a properly configured STUNner deployment
+the attacker will be able to reach only the media servers, which is essentially the same level of
+security as if you put the media servers to the Internet over an open public IP address. For
+[here](/doc/SECURITY.md) for further tips on hardened STUNner deployments.
 
 In order to mitigate the risk, it is a good security practice to reset the username/password pair
 every once in a while.  Suppose you want to set the STUN/TURN username to `foo` and the password to
