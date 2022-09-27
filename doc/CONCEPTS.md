@@ -38,11 +38,12 @@ Gateways define a public IP address, port and transport protocol for STUNner to 
 and UDPRoutes point to the backend services client traffic should be forwarded to. See
 [here](/doc/REFERENCE.md) for a full reference.
 
-* **Gateway-operator service:** The main purpose of the gateway-operator is to watch Gateway
-hierarchies for change and, once a custom resource is added or modified by the user, render a new
-dataplane running configuration. This configuration is then mapped into the filesystem of the
-`stunnerd` pods running in the same namespace, so that each `stunnerd` instance will use the most
-recent configuration.
+* **Gateway-operator:** The main purpose of the gateway-operator is to watch Gateway hierarchies
+for change and, once a custom resource is added or modified by the user, render a new dataplane
+running configuration. This configuration is then mapped into the filesystem of the `stunnerd` pods
+running in the same namespace, so that each `stunnerd` instance will use the most recent
+configuration. The implementation and documentation of the STUNner's gateway-operator can be found
+[here](https://github.com/l7mp/stunner-gateway-operator).
 
 * **STUNner ConfigMap:** The STUNner ConfigMap contains the running dataplane configuration that
 will be implemented by the dataplane pods. Of course, we could let the `stunnerd` pods themselves
@@ -65,9 +66,20 @@ The `stunnerd` daemon itself is essentially a simple TURN server on top of
 *listener* for each Gateway in the Gateway hierarchy to terminate clients' TURN sessions, a
 *cluster* per each UDPRoute to forward packets to the backend services (e.g., to the media
 servers), plus implements some ancillary administrative and authentication mechanisms to check
-client credentials before admitting traffic into the cluster. You are free to scale the dataplane
-to as many `stunnerd` pods as you like: Kubernetes will make sure that client connections are
-conveniently distributed evenly over the pods.
+client credentials before admitting traffic into the cluster.  There is a one-to-one mapping
+between the control-plane Gateway resources and the `stunnerd` listeners, as well as between the
+UDPRoute resources and `stunnerd`'s clusters. Whenever you modify a Gateway (UDPRoute), the
+gateway-operator renders a new dataplane configuration with the modified listener (cluster,
+respectively) specs and the `stunnerd` pods immediately reconcile their state to the new
+configuration.  You are free to scale the dataplane to as many `stunnerd` pods as you like:
+Kubernetes will make sure that client connections are conveniently distributed evenly over the
+pods.
+
+Note that certain control-plane operations, and in particular the addition, removal or modification
+of Gateway resources induce a hard *TURN server restart* in `stunnerd`, which causes the dropping
+of all active connections. Until we manage to fix the [pion/turn](https://github.com/pion/turn)
+libraries underlying `stunnerd` to support the graceful addition and removal of listeners, it is
+best to avoid live modification of the STUNner Gateway resources.
 
 ## Help
 

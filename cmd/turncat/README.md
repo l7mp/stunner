@@ -1,4 +1,4 @@
-# turncat: A simple STUN/TURN client
+# turncat: Swiss-army-knife testing tool for STUNner
 
 `turncat` is a STUN/TURN client to open a connection through a TURN server to an arbitrary remote
 address/port. The main use is to open a local tunnel endpoint to any service running inside a

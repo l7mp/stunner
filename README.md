@@ -91,19 +91,13 @@ traffic into the Kubernetes cluster, exposing a public-facing STUN/TURN server t
 can connect to.
 
 In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that WebRTC
-clients can use as a NAT traversal facility for establishing a media connection. This is not that
-much different from a standard public STUN/TURN server setup, but in this case the STUN/TURN
-servers are deployed into Kubernetes, which makes lifecycle management, scaling and cost
-optimization infinitely simpler.
-
-![STUNner headless deployment architecture](./doc/stunner_standalone_arch.svg)
-
-In the fully fledged *media-plane deployment model* STUNner implements a STUN/TURN ingress gateway
-service that WebRTC clients can use to open a transport relay connection to the media servers
-running *inside* the Kubernetes cluster. This makes it possible to deploy WebRTC application
-servers and media servers into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent
-tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other
-cloud-bound workload.
+clients can use as a NAT traversal facility for establishing a media connection. In contrast, in
+the fully fledged *media-plane deployment model* STUNner implements a STUN/TURN ingress gateway
+that WebRTC clients can use to open a transport relay connection to the media servers running
+*inside* the Kubernetes cluster. This makes it possible to deploy WebRTC application servers and
+media servers into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to
+manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other cloud-bound
+workload.
 
 ![STUNner media-plane deployment architecture](./doc/stunner_arch.svg)
 

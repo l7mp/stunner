@@ -10,28 +10,39 @@
 
 ## Deployment guides
 
+* [Deployment models](/doc/DEPLOYMENT.md)
 * [Concepts](/doc/CONCEPTS.md)
-* [Reference](/doc/GATEWAY.md)
+<!-- * [How STUNner works](/doc/WORKING.md) -->
 
 ## User guides
 
 * [Getting started](/doc/INSTALL.md)
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
+* [Standalone mode (obsolete)](/doc/OBSOLETE.md)
 
 ## Tutorials
 
-* [Opening a UDP tunnel via STUNner](../examples/simple-tunnel)
-* [Headless deployment: Direct one to one video call via STUNner](../examples/direct-one2one-call)
-* [Media-plane mode: One to one video call with Kurento via STUNner](examples/kurento-one2one-call)
-* [Media-plane mode: Magic mirror via STUNner](../examples/kurento-magic-mirror/README.md)
-* [Media-plane mode: Cloud-gaming with STUNner](../examples/cloudretro/README.md)
+### Basics
 
-## Manuals
+* [Opening a UDP tunnel via STUNner](/examples/simple-tunnel)
 
-* [`stunnerd` manual](../cmd/stunnerd/README.md)
-* [`turncat` manual](../cmd/turncat/README.md)
-* [`stunnerctl` manual](../cmd/stunnerctl/README.md)
+### Headless deployment model
+
+* [Direct one to one video call via STUNner](/examples/direct-one2one-call)
+
+### Media-plane deployment model
+
+* [One to one video call with Kurento via STUNner](/examples/kurento-one2one-call)
+* [Magic mirror via STUNner](/examples/kurento-magic-mirror/README.md)
+* [Cloud-gaming with STUNner](/examples/cloudretro/README.md)
+
+## Reference
+
+* [Gateway API reference](/doc/GATEWAY.md)
+* [`stunnerd` manual](/cmd/stunnerd/README.md)
+* [`turncat` manual](/cmd/turncat/README.md)
+* [`stunnerctl` manual](/cmd/stunnerctl/README.md)
 
 ## Help
 
