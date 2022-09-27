@@ -21,8 +21,46 @@ and UDPRoutes point to the backend services client traffic should be forwarded t
 
 ![Gateway hierarchy](/doc/gateway_api.svg)
 
+In general the boundary of the Gateway hierarchy is the namespace of the Gateway API resources
+specified in the namespace, except the GatewayClass, which is
+[cluster-scoped](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions). You
+can run multiple Gateway hierarchies side-by-side, by creating multiple namespaces and installing a
+separate set of Gateway API resources into each, and installing a separate dataplane into each
+namespace.
+
 ## GatewayClass
 
+The GatewayClass resource provides the root of the Gateway hierarchy. GatewayClass resources are
+cluster-scoped, so they can be attached to from any namespace, but in STUNner we usually assume
+that each Gateway hierarchy will be restricted to a single namespace and specify a separate global
+GatewayClass as the anchor of the hierarchy.
+
+Below is a sample GatewayClass resource. Each GatewayClass must specify a controller that will
+manage the Gateway objects created under the hierarchy. In our case, this must be set to
+`stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In
+addition, a GatewayClass can refer to further implementation-specific configuration via a
+`parametersRef`; in our case, this will be a GatewayConfig object (see [below](#gatewayconfig)).
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is a WebRTC ingress gateway for Kubernetes"
+```
+
+Below is a quick reference of the most important GatewayClass fields.
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `controllerName` | `string` | STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc). lkjrlekkjkrje jkjkjrkej kjtkejtkje kjtke jtkje kejt kjek jtkejtkjtke jtkjek jkej kejt kjekj tkjetkjkejktjekj | Yes |
 
 ## Help
 
