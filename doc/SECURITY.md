@@ -94,15 +94,15 @@ outside of the backend services the user explicitly opens up via a UDPRoute.
 
 Unless properly locked down, STUNner may be used maliciously to open a tunnel to any UDP service
 running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the pods and
-services exposed via STUNner. The main security principle 
+services exposed via STUNner. STUNner's basic security promise is as follows:
 
-> In a properly configured STUNner deployment, even possessing a valid TURN credential an malicious
+> In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
 attacker can reach only the media servers via STUNner but no other services, which is essentially
-the same level of security as if you put the media servers to the Internet over an open public IP
+the same level of security as if you put the media servers to the Internet over a public IP
 address, protected by a firewall that admits only UDP access.
 
-The below security considerations will greatly reduce the attack surface associated with
-STUNner. In any case, use STUNner at your own risk.
+The below security considerations will greatly reduce this attack surface even further. In any
+case, use STUNner at your own risk.
 
 ## Authentication
 
@@ -114,7 +114,8 @@ specifies the target service as a backend. This means, a service is exposed only
 explicitly configured so.
 
 For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
-per-client fixed lifetime username/password pairs. See the [authentication guide](/doc/AUTH.md) for
+per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to
+steal and reuse STUNner's TURN credentials. See the [authentication guide](/doc/AUTH.md) for
 configuring STUNner with `longterm` authentication.
 
 ## Access control

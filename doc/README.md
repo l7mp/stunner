@@ -33,9 +33,10 @@
 
 ### Media-plane deployment model
 
-* [One to one video call with Kurento via STUNner](/examples/kurento-one2one-call)
-* [Magic mirror via STUNner](/examples/kurento-magic-mirror/README.md)
-* [Cloud-gaming with STUNner](/examples/cloudretro/README.md)
+* [One to one video call with Kurento](/examples/kurento-one2one-call)
+* [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md)
+* [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md)
+* [Remote desktop access with Neko](/examples/neko/README.md)
 
 ## Reference
 
