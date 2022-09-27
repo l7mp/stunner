@@ -231,10 +231,10 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    ```
 
 1. The next step is to set some general configuration for STUNner, most importantly the STUN/TURN
-   authentication [credentials](https://github.com/l7mp/stunner/blob/main/doc/AUTH.md). This
-   requires loading a GatewayConfig custom resource into Kubernetes.
+   authentication [credentials](/doc/AUTH.md). This requires loading a GatewayConfig custom
+   resource into Kubernetes.
 
-   Below we set the [`plaintext` authentication](doc/AUTH.md) mechanism for STUNner, using the
+   Below we set the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner, using the
    username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`. See the
    package [docs](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator) for further
    configuration options available via GatewayConfigs.
