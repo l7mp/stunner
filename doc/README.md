@@ -12,14 +12,12 @@
 
 * [Deployment models](/doc/DEPLOYMENT.md)
 * [Concepts](/doc/CONCEPTS.md)
-<!-- * [How STUNner works](/doc/WORKING.md) -->
 
 ## User guides
 
 * [Getting started](/doc/INSTALL.md)
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
-* [Standalone mode (obsolete)](/doc/OBSOLETE.md)
 
 ## Tutorials
 
@@ -44,6 +42,10 @@
 * [`stunnerd` manual](/cmd/stunnerd/README.md)
 * [`turncat` manual](/cmd/turncat/README.md)
 * [`stunnerctl` manual](/cmd/stunnerctl/README.md)
+
+## Obsolete features
+
+* [Standalone mode](/doc/OBSOLETE.md)
 
 ## Help
 
