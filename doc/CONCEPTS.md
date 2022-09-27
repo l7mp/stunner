@@ -36,7 +36,7 @@ anchor of the Gateway hierarchy is the GatewayClass object, and the rest of the 
 complete hierarchy underneath it: the GatewayConfig describes general STUNner configuration,
 Gateways define a public IP address, port and transport protocol for STUNner to open TURN servers,
 and UDPRoutes point to the backend services client traffic should be forwarded to. See
-[here](/doc/REFERENCE.md) for a full reference.
+[here](/doc/GATEWAY.md) for a full reference.
 
 * **Gateway operator:** The main purpose of the gateway operator is to watch Gateway hierarchies
 for change and, once a custom resource is added or modified by the user, render a new dataplane
