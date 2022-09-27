@@ -4,11 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+
 	// "strings"
 
 	// "github.com/pion/logging"
 	"github.com/pion/dtls/v2"
 	"github.com/pion/turn/v2"
+
 	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -127,9 +129,6 @@ func (s *Stunner) Start() error {
 		}
 	}
 
-	// start monitoring
-	s.monitoringFrontend.Start()
-
 	// start the DNS resolver threads
 	if s.resolver == nil {
 		s.resolver.Start()
@@ -165,7 +164,4 @@ func (s *Stunner) Stop() {
 		s.server.Close()
 	}
 	s.server = nil
-
-	// shutdown monitoring
-	s.monitoringFrontend.Stop()
 }

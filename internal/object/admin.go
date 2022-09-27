@@ -57,11 +57,10 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
+	a.MetricsEndpoint = req.MetricsEndpoint
 
 	// monitoring
-	me := req.MetricsEndpoint
-	a.MonitoringFrontend = a.MonitoringFrontend.Reload(me, a.log)
-	a.MetricsEndpoint = me
+	a.MonitoringFrontend.Reconcile(a.MetricsEndpoint)
 
 	return nil
 }

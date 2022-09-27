@@ -9,7 +9,7 @@ import (
 	"github.com/l7mp/stunner/internal/logger"
 )
 
-//var resolverTestLoglevel string = "all:TRACE"
+// var resolverTestLoglevel string = "all:TRACE"
 var resolverTestLoglevel string = "all:ERROR"
 
 func TestMockResolver(t *testing.T) {
@@ -28,7 +28,8 @@ func TestMockResolver(t *testing.T) {
 	assert.NoError(t, nil, "start mock DNS")
 
 	// should never err
-	mockDns.Register("dummy")
+	err := mockDns.Register("dummy")
+	assert.NoError(t, err, "register")
 	assert.NoError(t, nil, "register")
 
 	ip, err := mockDns.Lookup("stunner.l7mp.io")
