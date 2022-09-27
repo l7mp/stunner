@@ -261,7 +261,7 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    resource into Kubernetes.
 
    In the below example, we open a STUN/TURN listener service on the UDP listener port 3478.
-   STUnner will automatically expose this listener on a public IP address and port (by creating a
+   STUNner will automatically expose this listener on a public IP address and port (by creating a
    [LoadBalancer
    service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
    Gateway), await clients to connect to this listener and, once authenticated, forward client

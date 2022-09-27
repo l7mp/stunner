@@ -4,8 +4,8 @@ The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator)
 control plane configuration using the standard [Kubernetes Gateway
 API](https://gateway-api.sigs.k8s.io). This allows to configure STUNner in the familiar
 YAML-engineering style via Kubernetes manifests. The below reference gives a quick overview of the
-Gateway API resources, with some notes on the specifics of STUNner's gateway operator
-implementation.  See the [official docs](/doc/GATEWAY.md) for a full reference.
+Gateway API resources. Note that STUNner implements only a subset of the full
+[spec](/doc/GATEWAY.md), see [here](/README.md#caveats) for the most important simplifications.
 
 ## Overview
 
@@ -107,6 +107,101 @@ Below is a quick reference of the most important GatewayConfig fields.
 
 Note that at least a valid username/password pair *must* be supplied for `plaintext`
 authentication, or a `sharedSecret` for the `longterm` mode. Missing both is an error.
+
+GatewayConfig resources are safe under modification, that is, the `stunnerd` daemons know how to
+reconcile, e.g., a changed TURN credential or realm without restarting the TURN server.
+
+## Gateway
+
+The GatewayConfig resource provides general configuration for STUNner, most importantly the
+STUN/TURN authentication [credentials](/doc/AUTH.md) clients can use to authenticate with
+STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a
+particular GatewayConfig in the `parametersRef`.  GatewayConfig resources are namespaced, and every
+hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error
+because the authentication credentials cannot learned by the dataplane in such cases, and the
+STUNner gateway operator will refuse to generate a dataplane running config until the user attaches
+a valid GatewayConfig to the hierarchy.
+
+In the below example, we open a STUN/TURN listener on the UDP listener port 3478.  STUNner will
+automatically expose this listener on a public IP address and port by creating a [LoadBalancer
+service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
+Gateway. Then, it awaits clients to connect and, once authenticated, forward client connections to
+an arbitrary service backend.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: udp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+```
+
+Below is a quick reference of the most important Gateway fields.
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `spec. gatewayClassName` | `string` | The name of the GatewayClass that provides the root of the hierarchy the Gateway is attached to. | Yes |
+| `spec.listeners[0].name` | `string` | Name is the name of the TURN listener. | No |
+| `spec.listeners[0].port` | `int` | Network port for the TURN listener. | Yes |
+| `spec.listeners[0].protocol` | `string` | Transport protocol for the TURN listener. Either UDP or TCP, support for TLS and DTLS will be added in the next release. | Yes |
+
+Note that STUNner assumes that there is only a *single* listener specified in each
+Gateway. Multiple listeners are accepted and STUNner will install the corresponding TURN server
+listeners for each, but it will create only a *single* LoadBalancer service to expose the Gateway,
+which will allow public access only to the first listener in the list. You can always create the
+missing LoadBalancer services manually, but this is not encouraged. If you want multiple listeners
+(e.g., a separate UDP and TCP listener), attach two Gateways, each with a single listener only, to
+the Gateway hierarchy.
+
+Gateway resources are *not* safe for modification: for various reasons rooted in the limitations of
+the [pion/turn](https://github.com/pion/turn) library that provides the TURN services in STUNner,
+`stunnerd` daemons cannot add/remove TURN server listeners per Gateway without restarting the whole
+TURN server. This will then result in the termination of all active client sessions. We plan to
+address this restriction in a later release.
+
+## UDPRoute
+
+UDPRoute resources can be attached to Gateways to specify the backed services inside the cluster
+allowed to be reached via the Gateway. Multiple UDPRoutes can attach to a Gateway, and each
+UDPRoute can specify multiple backed services; in this case access to *each* if the backend
+services in *each* of the attached UDPRoutes is allowed. UDPRoutes can be attached to a Gateway *in
+the same namespace* by setting the `parentRef` to the Gateway's name. Attaching Gateways and
+UDPRoutes across a namespace boundary is prohibited.
+
+The below UDPRoute will configure STUNner to route client connections received on the Gateway
+called `udp-gateway` to the media server pool identified by the Kubernetes service
+`media-server-pool` in the `media-plane` namespace.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: media-plane-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: media-server-pool
+          namespace: media-plane
+```
+
+Below is a quick reference of the most important UDPRoute fields.
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `spec. parentRefs` | `[]string` | A list of Gateways in the same namepace to attach the route to. Attaching UDPRoutes across namespaces will fail. | Yes |
+| `spec.rules.backendRefs` | `list` | A list of `name`/`namespace` pairs specifying the backend services reachable through the UDPRoute. Specifying a service from a namespace other than the UDPRoute's own namespace is supported. | No |
+
+UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes
+without restarting the TURN server. 
 
 ## Help
 
