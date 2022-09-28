@@ -90,14 +90,12 @@ Kubernetes offering. This is achieved by STUNner acting as a gateway for ingesti
 traffic into the Kubernetes cluster, exposing a public-facing STUN/TURN server that WebRTC clients
 can connect to.
 
-In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that WebRTC
-clients can use as a NAT traversal facility for establishing a media connection. In contrast, in
-the fully fledged *media-plane deployment model* STUNner implements a STUN/TURN ingress gateway
-that WebRTC clients can use to open a transport relay connection to the media servers running
-*inside* the Kubernetes cluster. This makes it possible to deploy WebRTC application servers and
-media servers into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to
-manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other cloud-bound
-workload.
+STUNner can act as a STUN/TURN server that WebRTC clients can use as a scalable NAT traversal
+facility (headless model), or it can serve as a fully-fledged ingress gateway for clients to reach
+a media server deployed behind STUNner (media-plane model). This makes it possible to deploy WebRTC
+application servers and media servers into ordinary Kubernetes pods, taking advantage of
+Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure
+like any other cloud-bound workload.
 
 ![STUNner media-plane deployment architecture](./doc/stunner_arch.svg)
 
@@ -163,7 +161,8 @@ WebRTC media gateway in minutes. Note that the default installation does not con
 server and a media server: STUNner in itself is not a WebRTC service, it is merely an *enabler* for
 you to deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner makes sure
 that your media servers are readily reachable to WebRTC clients, despite running with a private IP
-address inside a Kubernetes pod.
+address inside a Kubernetes pod. See the [tutorials](#tutorials) for some ideas on how to deploy an
+actual WebRTC application behind STUNner.
 
 With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should take less than 5
 minutes.
@@ -185,9 +184,7 @@ the rest of the workload.
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=<your-namespace>
-
 helm install stunner stunner/stunner --create-namespace --namespace=<your-namespace>
 ```
 
@@ -287,15 +284,11 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    ```
 
 1. The final step is to tell STUNner what to do with the client connections received on the
-   Gateway. In the [media-plane deployment model](#description) we will want to route client
-   connections to a [WebRTC media server](examples/kurento-one2one-call), but we may also let
-   connections to [loop back to STUNner itself](examples//direct-one2one-call) in the [headless
-   deployment model](#description). You can route connections received on a Gateway to any
-   Kubernetes service by attaching a
+   Gateway. This occurs by attaching a
    [UDPRoute](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute)
-   resource to it and specifying the target service in the `backendRef`. A UDPRoute can be attached
-   to any Gateway by setting the `parentRef` to the Gateway's name, there is just one rule: the
-   Gateway and the UDPRoute must both live in the same Kubernetes namespace.
+   resource to the Gateway and specifying the target service in the `backendRef`. A UDPRoute can be
+   attached to any Gateway by setting the `parentRef` to the Gateway's name, there is just one
+   rule: the Gateway and the UDPRoute must both live in the same Kubernetes namespace.
 
    The below UDPRoute will configure STUNner to route client connections received on the Gateway
    called `udp-gateway` to the WebRTC media server pool identified by the Kubernetes service
@@ -329,14 +322,13 @@ milliseconds. Kubernetes is beautiful, isn't it?
 ### Check your config
 
 The current STUNner dataplane configuration is always made available in a convenient ConfigMap
-called `stunnerd-config` (you can choose the name in the GatewayConfig). There is one rule: the
-ConfigMap always lives in the same namespace as the GatewayConfig that belongs to the corresponding
-gateway-class hierarchy. Actually, the STUNner dataplane pods themselves will use the very same
-ConfigMap to reconcile their internal state so you can consider its content to be the ground truth.
+called `stunnerd-config` (you can choose the name in the GatewayConfig). The STUNner dataplane pods
+themselves will use the very same ConfigMap to reconcile their internal state, so you can consider
+its content to be the ground truth.
 
-STUNner comes with a small utility to dump the running configuration in human readable format (you must have
-[`jq`](https://stedolan.github.io/jq) installed in your PATH to be able to use it). Chdir into the
-main STUNner directory and issue.
+STUNner comes with a small utility to dump the running configuration in human readable format (you
+must have [`jq`](https://stedolan.github.io/jq) installed in your PATH to be able to use it). Chdir
+into the main STUNner directory and issue.
 
 ```console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
@@ -383,10 +375,10 @@ a heartwarming welcome message.
    ```
 
 1. We also need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy
-   STUN/TURN client called [`turncat`](cmd/turncat/README.md) for this purpose. Once
-   [built](cmd/turncat/README.md###installation), we can fire up `turncat` to listen on the standard
-   input and send everything it receives to STUNner. Type any input and press Enter, and you should
-   see a nice greeting from your cluster!
+   STUN/TURN client called [`turncat`](cmd/turncat/README.md) that we can use for this
+   purpose. Once [built](cmd/turncat/README.md#installation), we can fire up `turncat` to listen
+   on the standard input and send everything it receives to STUNner. Type any input and press
+   Enter, and you should see a nice greeting from your cluster!
 
    ```console
    ./turncat - k8s://stunner/stunnerd-config:udp-listener udp://${PEER_IP}:9001
@@ -412,8 +404,8 @@ will automatically reconcile the underlying dataplane for the new configuration.
 For instance, you may decide to open up your WebRTC infrastructure on TCP as well; say, because an
 enterprise NAT on the client network path has gone berserk and started to actively filter UDP/TURN
 traffic. The below steps will do just that: open another gateway on STUNner, this time on the TCP
-port 3478, and reattach the UDPRoute to both Gateways so that no matter which protocol a client
-chose the connection will be routed to the `media-plane` service (i.e., the UDP greeter) by
+port 3478, and reattach the UDPRoute to both Gateways so that no matter which protocol a client may
+choose the connection will be routed to the `media-plane` service (i.e., the UDP greeter) by
 STUNner.
 
 1. Add the new TCP Gateway.
@@ -506,7 +498,7 @@ applications into Kubernetes.
 
 * [Opening a UDP tunnel via STUNner](/examples/simple-tunnel/README.md): This introductory tutorial
   shows how to tunnel an external connection via STUNner to a UDP service deployed into
-  Kubernetes. The demo can be used to quickly check a STUNner installation.
+  Kubernetes. The demo can be used to quickly check and benchmark a STUNner installation.
   
 ### Headless deployment mode
 
@@ -517,27 +509,25 @@ applications into Kubernetes.
 ### Media-plane deployment model
 
 * [One to one video call with Kurento](/examples/kurento-one2one-call/README.md): This tutorial
-  shows how to use STUNner in the [media-plane deployment model](/doc/DEPLOYMENT.md), that is, when
-  WebRTC clients connect to each other via a media server deployed into Kubernetes behind
-  STUNner. STUNner will conveniently ingest WebRTC media into the cluster and route it to the
-  Kurento media server pods, and all this happens *without* modifying the media server code in any
-  way, just by adding 5-10 lines of straightforward JavaScript to configure clients to use STUNner
-  as the TURN server.
+  shows how to use STUNner to connect WebRTC clients to a media server deployed into Kubernetes
+  behind STUNner in the [media-plane deployment model](/doc/DEPLOYMENT.md). All this happens
+  *without* modifying the media server code in any way, just by adding 5-10 lines of
+  straightforward JavaScript to configure clients to use STUNner as the TURN server.
 * [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md): This tutorial has been
   adopted from the [Kurento](https://www.kurento.org) [magic
   mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
-  demo, implementing a basic WebRTC loopback server with some media processing added. In
-  particular, the application uses computer vision and augmented reality techniques to add a
-  funny hat on top of faces. 
-* [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md): If this was still not enough from
-  the fun, this tutorial lets you play Super Mario or Street Fighter in your browser, courtesy of
-  the amazing [CloudRetro](https://cloudretro.io) project and, of course, STUNner. The demo also
-  presents a simple multi-cluster setup, where clients can reach the game-servers in their
-  geographical locality, minimizing end-to-end latency.
+  demo, deploying a basic WebRTC loopback server behind STUNner with some media processing
+  added. In particular, the application uses computer vision and augmented reality techniques to
+  add a funny hat on top of faces.
+* [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md): This tutorial lets you play Super
+  Mario or Street Fighter in your browser, courtesy of the amazing
+  [CloudRetro](https://cloudretro.io) project and, of course, STUNner. The demo also presents a
+  simple multi-cluster setup, where clients can reach the game-servers in their geographical
+  locality to minimize latency.
 * [Remote desktop access with Neko](/examples/neko/README.md): This demo showcases STUNner
-  providing ingress gateway services to a remote desktop application. We use
+  providing an ingress gateway service to a remote desktop application. We use
   [neko.io](https://neko.m1k1o.net) to run a browser in a secure container inside the Kubernetes
-  cluster, and stream the desktop to the clients' browser via STUNner.
+  cluster, and stream the desktop to clients via STUNner.
 
 ## Documentation
 
@@ -549,15 +539,10 @@ STUNner is a work-in-progress. Some features are missing, others may not work as
 notable limitations at this point are as follows.
 
 * *STUNner is not intended to be used as a public STUN/TURN server.* The intended use of STUNner is
-  as a Kubernetes ingress gateway for WebRTC. Being deployed into a Kubernetes service, STUNner
-  will not be able to identify the public IP address of a client sending a STUN binding request to
-  it (without special
-  [hacks](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip)),
-  and the TURN transport relay connection opened by a WebRTC client via STUNner is reachable only
-  to clients configured to use the same STUNner service (again, without further
-  [hacks](https://kubernetes.io/docs/concepts/security/pod-security-policy/#host-namespaces)). This
-  is intended: STUNner is a Kubernetes ingress gateway which happens to expose a STUN/TURN
-  compatible service to WebRTC clients, and not a public TURN service.
+  as a Kubernetes ingress gateway for WebRTC. This still allows users to connect via STUNner
+  (without a TURN server), under the assumption that *all* users involved in a session use
+  STUNner. This is because the transport relay connections allocated by STUNner are on a private
+  IP, which may not be reachable to external clients and/or TURN servers.
 * STUNner targets only a *partial implementation of the Kubernetes Gateway API.* In particular,
   only GatewayClass, Gateway and UDPRoute resources are supported. This is intended: STUNner
   deliberately ignores some unnecessary complexity in the [Gateway
@@ -575,13 +560,10 @@ notable limitations at this point are as follows.
   from the load-balancing pool. Note that this problem is
   [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
   do something about it in a later STUNner release so stay tuned.
-* STUNner supports *multiple parallel GatewayClass hierarchies*, each with a specific GatewayConfig
-  with a specific target ConfigMap (so that the operator renders the different hierarchies into
-  different ConfigMaps) and different dataplanes (each taking the configuration from the
-  corresponding ConfigMap). This mode can be useful for testing new STUNner versions or
-  canary-upgrades and A/B testing of a new media server version. At the moment, however, this mode
-  is not supported: it should work but the Helm charts do not support this during installation and
-  we do not explicitly test multi-hierarchy deployments.
+* STUNner supports *multiple parallel GatewayClass hierarchies*, each deployed into a separate
+  namespace with a separate GatewayClass an a separate dataplane. This mode can be useful for
+  testing new STUNner versions or canary-upgrades and A/B testing of a new media server version. At
+  the moment, however, this mode is not supported: it should work but we don' test it.
 * SCTP DataChannels are not supported at the moment.
 
 ## Milestones
@@ -589,12 +571,12 @@ notable limitations at this point are as follows.
 * v0.9: First public release: STUNner basic UDP/TURN connectivity + helm chart + tutorials
 * v0.10: Long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
-* v0.11: Day-2 operations: STUNner Kubernetes gateway operator and dataplane reconciliation.
+* v0.11: STUNner Kubernetes gateway operator and dataplane reconciliation.
 * v0.12: Security: Hide plain text credentials in the Gateway API and expose TLS/DTLSS.
-* v0.13: Observability: Prometheus + Grafana dashboard.
-- v0.14: Performance: eBPF acceleration
-- v1.0: GA (this fall)
-- v2.0: Service mesh: adaptive scaling & resiliency
+* v1.0: GA
+* v1.1: Observability: Prometheus + Grafana dashboard.
+* v1.2: Performance: eBPF acceleration
+* v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help
 
