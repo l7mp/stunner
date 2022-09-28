@@ -2,15 +2,15 @@
 
 Like any conventional gateway service, an improperly configured STUNner service may easily end up
 exposing sensitive services to the Internet. The below security guidelines will allow to minimize
-the risks associated with a misconfigured STUNner.
+the risks associated with a misconfigured STUNner gateway service.
 
 ## Threat
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
-[`turncat`](/cmd/turncat) utility to reach the Kubernetes DNS service through a misconfigured
-STUNner gateway.
+[`turncat`](/cmd/turncat) utility and `dig` to query the Kubernetes DNS service through a
+misconfigured STUNner gateway.
 
 Start with a [fresh STUNner installation](/doc/INSTALL.md) into an empty namespace called `stunner`
 and apply the below configuration. 
@@ -52,8 +52,7 @@ through STUNner.
 ./turncat --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://${KUBE_DNS_IP}:53
 ```
 
-Now, in another terminal query the Kubernetes DNS service through the `turncat` tunnel to learn the
-internal service address allocated by Kubernetes for STUNner:
+Now, in another terminal query the Kubernetes DNS service through the `turncat` tunnel.
 
 ```console
 dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
@@ -66,9 +65,9 @@ addresses.
 
 This little experiment demonstrates the threats associated with a poorly configured STUNner
 gateway: it can allows external access to *any* UDP service running inside your cluster. The
-prerequisites for this is that (1) the target service *must* run over UDP inside the cluster (e.g.,
-the `kube-dns`), since STUNner's transport relay connections are limited to UDP, and (2) the user
-*must* specifically add a UDPRoute to the target service, otherwise STUNner blocks access to it.
+prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`), since
+STUNner's transport relay connections are limited to UDP, and (2) the user *must* specifically add
+a UDPRoute to the target service, otherwise STUNner blocks access to it.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -94,7 +93,9 @@ outside of the backend services the user explicitly opens up via a UDPRoute.
 
 Unless properly locked down, STUNner may be used maliciously to open a tunnel to any UDP service
 running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the pods and
-services exposed via STUNner. STUNner's basic security promise is as follows:
+services exposed via STUNner. 
+
+STUNner's basic security model is as follows:
 
 > In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
 attacker can reach only the media servers via STUNner but no other services, which is essentially
@@ -139,16 +140,16 @@ spec:
         - namespace: media-plane
 ```
 
-To avoid potential misuse, STUNner disables open wildcard access to the cluster. Note that in the
-standalone mode the user can still explicitly create an open `stunnerd` cluster, but this is
-discouraged for security).
+To avoid potential misuse, STUNner disables open wildcard access to the cluster. (Note that in the
+[standalone mode](/doc/OBSOLETE.md) the user can still explicitly create an open `stunnerd`
+cluster, but this is discouraged).
 
-For hardened deployments, it is possible add a second level of isolation between STUNner and the
-rest of the Kubernetes cluster using the Kubernetes NetworkPolicy facility. Creating a
-NetworkPolicy will essentially implement a firewall, blocking all access from the source to the
-target workload unless explicitly whitelisted in the NetworkPolicy. The below example allows access
-from STUNner to *any* media server pod labeled as `app=media-server` in the `default` namespace
-over the UDP port range `[10000:20000]`, but nothing else.
+For hardened deployments, it is possible to add a second level of isolation between STUNner and the
+rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will
+essentially implement a firewall, blocking all access from the source to the target workload except
+unless services explicitly whitelisted by the user. The below example allows access from STUNner to
+*any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port
+range `[10000:20000]`, but nothing else.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -196,8 +197,8 @@ address of all STUNner pods and all media server pods. This should not pose a ma
 though: remember, none of these private IP addresses can be reached externally. Nevertheless, if
 worried about information exposure then STUNner may not be the best option at the moment. In later
 releases, we plan to obscure the transport relay connection addresses returned by STUNner, which
-would lock down external scanning attempts. (Feel free to open an issue if you think this
-limitation is a blocker for you.)
+would lock down external scanning attempts. Feel free to open an issue if you think this limitation
+is a blocker for you.
 
 ## Help
 

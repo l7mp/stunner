@@ -3,8 +3,8 @@
 STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into the Kubernetes cluster,
 which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides
 comprehensive security. In particular, STUNner provides message integrity and, if configured with
-the TLS/TCP or DTLS/UDP listeners, complete confidentiality. To complete the CIA triad, the this
-guide shows how to add user authentication to STUNner.
+the TLS/TCP or DTLS/UDP listeners, complete confidentiality. To complete the CIA triad, this guide
+shows how to configure user authentication with STUNner.
 
 ## The long-term credential mechanism
 
@@ -76,7 +76,7 @@ The intended authentication workflow in STUNner is as follows.
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
    ```javascript
-   var ICE_config = <Read ICE configuration send by the application server>
+   var ICE_config = <Read ICE configuration sent by the application server>
    var pc = new RTCPeerConnection(ICE_config);
    ```
 
@@ -115,13 +115,14 @@ client-side Javascript code. This does not pose a major security risk though: re
 a working TURN credential will allow an attacker to reach only the backend services explicitly
 admitted by an appropriate UDPRoute. In other words, in a properly configured STUNner deployment
 the attacker will be able to reach only the media servers, which is essentially the same level of
-security as if you put the media servers to the Internet over an open public IP address. For
+security as if you put the media servers to the Internet over an open public IP address. See
 [here](/doc/SECURITY.md) for further tips on hardened STUNner deployments.
 
 In order to mitigate the risk, it is a good security practice to reset the username/password pair
 every once in a while.  Suppose you want to set the STUN/TURN username to `foo` and the password to
-`bar`. To do this simply modify the GatewayConfig: the [gateway-operator](/doc/CONCEPTS.md) will
-automatically reconcile the dataplane configuration to enforce the new access tokens.
+`bar`. To do this simply re-apply a modified GatewayConfig: the
+[gateway-operator](/doc/CONCEPTS.md) will automatically reconcile the dataplane configuration to
+enforce the new access tokens.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1alpha1
@@ -135,9 +136,8 @@ spec:
 ```
 
 Note that modifying TURN credentials goes *without* restarting the `stunnerd` pods: new connections
-will need to use the modified credentials but existing TURN connections should continue as
-normal. Depending on your use case, the WebRTC application server may need to be restarted to learn
-the new STUNner credentials.
+will need to use the modified credentials but existing TURN connections should continue as normal
+(the application server may need to be restarted to learn the new TURN credentials though).
 
 ## Longterm authentication
 
@@ -148,7 +148,7 @@ more. This authentication mode is more secure since credentials are not shared b
 come with a limited validity. Configuring `longterm` authentication may be more complex though,
 since credentials must be dynamically generated for each session and properly returned to clients.
 
-To implement this mode, STUNner adopts [auth
+To implement this mode, STUNner adopts the [auth
 handlers](https://pkg.go.dev/github.com/pion/turn/v2#GenerateLongTermCredentials) from [Pion
 TURN](https://pkg.go.dev/github.com/pion/turn/v2). In particular, the username is a UNIX timestamp
 specifying the time at with the credential expires, and the password is a base-64 encoded string

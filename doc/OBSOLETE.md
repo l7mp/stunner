@@ -2,10 +2,10 @@
 
 In order to gain full control over media ingestion, STUNner can be deployed without the gateway
 operator component. In this standalone mode, the user is fully in charge of creating and
-maintaining the configuration of the `stunnerd` pods. With the introduction and STUNner gateway
-operator, *the standalone mode is considered obsolete* as of STUNner v0.11. The below documentation
-is provided only for historical reference; before the introduction of the STUNner gateway operator
-this was *the* recommended way to interact with STUNner.
+maintaining the configuration of the `stunnerd` pods. With the introduction of the STUNner gateway
+operator *the standalone mode is considered obsolete* as of STUNner v0.11. The below documentation
+is provided only for historical reference; before the gateway operator existed this was *the*
+recommended way to interact with STUNner.
 
 ## Prerequisites
 
@@ -19,13 +19,14 @@ to block malicious access; make sure your Kubernetes installation supports these
 
 ## Installation
 
+### Installation with Helm
+
 Use the [Helm charts](https://github.com/l7mp/stunner-helm) for installing STUNner, setting the
 `standalone.enabled` feature gate to `true`:
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
 helm install stunner stunner/stunner --set stunner.standalone.enabled=true
 ```
 
@@ -38,6 +39,8 @@ helm install stunner stunner/stunner --set stunner.standalone.enabled=true --cre
 
 Note that we do not install the usual control plane: in this mode we ourselves need to manually
 provide the dataplane configuration for STUNner.
+
+### Manual installation
 
 If Helm is not an option, you can perform a manual installation using the static Kubernetes
 manifests packaged with STUNner.
@@ -66,7 +69,7 @@ The default STUNner installation will create the below Kubernetes resources:
 3. a LoadBalancer service to expose the STUNner deployment on a public IP address and UDP port
    (by default, the port is UDP 3478), and finally
 4. a NetworkPolicy, i.e., an ACL/firewall policy to control network communication from STUNner to
-   the rest of the cluster.
+   the rest of the Kubernetes workload.
 
 The installation scripts packaged with STUNner will use hard-coded configuration defaults that must
 be customized prior to deployment. In particular, make absolutely sure to customize the access
@@ -77,9 +80,9 @@ risk (see [here](/doc/SECURITY.md) for more info), but it is still safer to cust
 tokens before exposing STUNner to the Internet.
 
 The most recent STUNner configuration is always available in the Kubernetes ConfigMap named
-`stunnerd-config`. You can make all STUNner configuration parameters available to pods by
+`stunnerd-config`. This configuration is made available to the `stunnerd` pods by
 [mapping](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#define-container-environment-variables-using-configmap-data)
-the `stunnerd-config` ConfigMap into the pod as environment variables. Note that any change to this
+the `stunnerd-config` ConfigMap into the pods as environment variables. Note that changes to this
 ConfigMap will take effect only once STUNner is restarted.
 
 The most important STUNner configuration settings are as follows.
@@ -143,10 +146,11 @@ IP address/port assigned by Kubernetes into the `stunnerd-config` ConfigMap unde
 as environment variables and communicate the IP address and port back to the clients (see an
 [example](#configuring-webrtc-clients) below).
 
-The [Helm installation](#helm) scripts take care of setting the IP address and port automatically
-in the ConfigMap. However, when using the static Kubernetes manifests to deploy STUNner, the
-external IP address and port will need to be handled manually. The below instructions simplify this
-process.
+The [Helm installation](#helm) scripts should take care of setting the IP address and port
+automatically in the ConfigMap during installation. However, if later the LoadBalancer services
+change for some reason then the new external IP address and port will need to be configured
+manually in the ConfigMap. Similar is the case when using the static Kubernetes manifests to deploy
+STUNner. The below instructions simplify this process.
 
 After a successful installation, you should see something similar to the below:
 
@@ -154,7 +158,6 @@ After a successful installation, you should see something similar to the below:
 kubectl get all
 NAME                               READY   STATUS    RESTARTS   AGE
 pod/stunner-XXXXXXXXXX-YYYYY       1/1     Running   0          8s
-pod/stunner-post-install-vxpvg     0/1     Pending   0          8s
 
 NAME                            TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
 service/kubernetes              ClusterIP      10.72.128.1     <none>        443/TCP          6d4h
@@ -228,8 +231,8 @@ var pc = new RTCPeerConnection(ICE_config);
 ## Enabling TURN transport over TCP
 
 Some corporate firewalls block all UDP access from the private network, except DNS. To make sure
-that clients can still reach STUNner, you can expose STUNner over a [TCP-based TURN transport]([RFC
-6062](https://www.rfc-editor.org/rfc/rfc6062)). To maximize the chances of getting through a
+that clients can still reach STUNner, you can expose STUNner over a [TCP-based TURN
+transport](https://www.rfc-editor.org/rfc/rfc6062). To maximize the chances of getting through a
 zealous firewall, below we expose STUNner over the default HTTPS port 443.
 
 First, enable TURN transport over TCP in STUNner.
@@ -302,18 +305,19 @@ kubectl rollout restart deployment/stunner
 
 ## Access control
 
-Before deployment, it is worth evaluating the potential [security risks and best
-practices](/doc/SECURITY.md) for securing STUNner. Below, we summarize the only step that is
-specific to the standalone mode: configuring access control.
+The security risks and best practices associated with STUNner are described
+[here](/doc/SECURITY.md), below we summarize the only step that is specific to the standalone mode:
+configuring access control.
 
 By default, a standalone STUNner installation comes with an open route: this essentially means
 that, possessing a valid TURN credential, an attacker can reach *any* UDP service inside the
 Kubernetes cluster via STUNner. This is because, without an operator, there is no control plane to
 supply [endpoint-discovery
 service](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/service_discovery#endpoint-discovery-service-eds)
-foe the dataplane. In order to prevent open access through STUNner, the default standalone
-installation comes with a default-deny Kubernetes NetworkPolicy that locks down *all* access from
-the STUNner pods to the rest of the workload.
+for the dataplane and therefore `stunnerd` does not know whether the peer address a client wished
+to reach belongs to the legitimate backend service or not. In order to prevent open access through
+STUNner, the default standalone installation comes with a default-deny Kubernetes NetworkPolicy
+that locks down *all* access from the STUNner pods to the rest of the workload.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -328,11 +332,11 @@ spec:
   - Egress
 ```
 
-In order for STUNner to reach a media server pod inside the cluster is if the operator explicitly
-whitelists the target service in the above access control rule.  Suppose that we want STUNner to
-reach *any* media server pod labeled as `app=media-server` over the UDP port range `[10000:20000]`,
-but we don't want connections via STUNner to succeed to any other pod. This will be enough to
-support WebRTC media, but will not allow clients to, e.g., reach the Kubernetes DNS service.
+In order for clients to reach a media server pod via STUNner the user must explicitly whitelist the
+target service in this access control rule.  Suppose that we want STUNner to reach the media server
+pods labeled as `app=media-server` over the UDP port range `[10000:20000]`, but we don't want
+connections via STUNner to succeed to any other pod. This will be enough to support WebRTC media,
+but will not allow clients to, e.g., reach the Kubernetes DNS service.
 
 Assuming that the entire workload is deployed into the `default` namespace, the below
 `NetworkPolicy` ensures that all access from any STUNner pod to any media server pod is allowed
@@ -367,8 +371,9 @@ spec:
 
 If your Kubernetes CNIs does not support [network policies with port
 ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-range-of-ports),
-then the below will provide an identical access control rule to the above except that it opens up
-*all* UDP ports on the media server to be reached via STUNner.
+then the below will provide an access control rule similar to the above, except that it opens up
+*all* UDP ports on the media server instead of limiting access to the UDP port range
+`[10000:20000]`.
 
 ```yaml
 apiVersion: networking.k8s.io/v1

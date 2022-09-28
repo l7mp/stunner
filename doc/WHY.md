@@ -1,18 +1,18 @@
 # Introduction
 
-STUNner is a *WebRTC ingress gateway for Kubernetes*. All the words matter here: indeed STUNner is
-for *WebRTC*, so it is specifically designed to help dealing with WebRTC media plane network
-protocol encapsulations, it is an *ingress gateway* so its job is to help ingest WebRTC media
-traffic into a virtualized media plane, and it is *opinionated towards Kubernetes* so everything
-around STUNner is designed and built to fit into the Kubernetes and the cloud-native
-ecosystem. That being said, STUNner can easily be used outside of this context (e.g., as a regular
-STUN/TURN server), but these deployment options are not the main focus.
+STUNner is a *WebRTC ingress gateway for Kubernetes*. All words matter here: indeed STUNner is for
+*WebRTC*, so it is specifically designed to help dealing with WebRTC media plane network protocol
+encapsulations, it is an *ingress gateway* so its job is to help ingest WebRTC media traffic into a
+virtualized media plane, and it is *opinionated towards Kubernetes* so everything around STUNner is
+designed and built to fit into the Kubernetes and the cloud-native ecosystem. That being said,
+STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but these
+deployment options are not the main focus.
 
 Below we discuss the main pain points STUNner is trying to solve.
 
 ## The problem
 
-Kubernetes and WebRTC media are currently foes, not friends.
+Kubernetes and WebRTC are currently foes, not friends.
 
 Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
 streaming workloads, and especially UDP/RTP based WebRTC media, feel like a foreign citizen. Most
@@ -28,14 +28,14 @@ then the packet will again undergo another DNAT step, and so on.
 The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
 protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
 describes it. Once an HTTP/TCP session is routed to a server it will remain there permanently, and
-the server does not need to rely on the IP 5-tuple to re-identify the client per each packet
-because it has session context (and vice versa).
+the server does not need to re-identify the client per each packet because it has session context
+(and vice versa).
 
 This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
 UDP. RTP does not have anything remotely similar to an HTTP header. Consequently, the only
 "semi-stable" connection identifier WebRTC servers can use to identify a client is by expecting the
-client's packets to arrive from a negotiated IP source address and UDP source port. However, when
-the IP 5-tuple changes, for instance because there a NAT in the datapath, then WebRTC media
+client's packets to arrive from a negotiated IP source address and source port. However, when the
+IP 5-tuple changes, for instance because there is a NAT in the datapath, then WebRTC media
 connections break. Due to reasons which are mostly historical at this point, *UDP/RTP connections
 do not survive not even a single NAT step*, let along the 2-3 rounds of NATs a packet regularly
 undergoes in the Kubernetes dataplane.
@@ -63,15 +63,15 @@ There are *lots* of reasons why this deployment model is less than ideal:
   each node occupies an entire Kubernetes node, scaling the media plane equals adding/removing
   Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly process. In
   addition, it becomes very difficult to provision the resource requests and limits of each media
-  server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a single video-conferencing
-  room, while a `t2.xlarge` (8 vCPU/32 GB mem) is extremely costly for running, say, a single
-  2-party conference. Worse yet, you have to make the decision at installation time.
+  server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a large video-conferencing room,
+  while a `t2.xlarge` (8 vCPU/32 GB mem) is too costly for running, say, only a single 2-party
+  call. Worse yet, the decision has to be made at installation time.
 
 * **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
   servers to the Internet over a public IP address, and opening up all UDP ports for potentially
   malicious access, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
-  your media servers behind a secure perimeter defense mechanism (say, a Gateway) and lock down
-  *all* uncontrolled access and nefarious business by running it over a private IP?
+  your media servers behind a secure perimeter defense mechanism and lock down *all* uncontrolled
+  access and nefarious business by running it over a private IP?
 
 * **It is a terrible waste of resources.** Think about this: when you use Kubernetes you pay a
   double virtualization price. Namely, the node itself is usually just regular VM on a physical
@@ -86,10 +86,11 @@ There are *lots* of reasons why this deployment model is less than ideal:
   servers. But why not putting the NAT-traversal facilities right into your Kubernetes cluster and
   share the same facility for the client and the server side?
 
-* **Nodes might not even have a public IP address.** There are lots of locked-down hosted
-  Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP address for
-  security purposes. This then precludes the host-networking trick. But even if nodes are publicly
-  available, many Kubernetes services simply disable host-networking all together (e.g., [GKE
+* **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
+  hosted Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP
+  address for security purposes. This then precludes the host-networking trick. But even if nodes
+  are publicly available, many Kubernetes services simply disable host-networking all together
+  (e.g., [GKE
   Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview)) exactly
   because it is such an intrusive hack.
 
@@ -108,7 +109,7 @@ will then make it possible to leave behind the host-networking hack once and for
 scale and monitor the media-plane workload in the usual private pod-network behind the secure
 perimeter defense provided by STUNner. From here, the rest is just PURE STUNner MAGIC!  (In fact,
 it is not: STUNner is just an everyday STUN/TURN server with some small tweaks to let it play
-nicely with Kubernetes. Sorry to spoil the fun, but there is absolutely nothing magical here...)
+nicely with Kubernetes.)
 
 ## Help
 

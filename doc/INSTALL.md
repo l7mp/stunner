@@ -2,17 +2,17 @@
 
 ## Prerequisites
 
-You need to have a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be
-installed and configured to communicate with your cluster. STUNner should be compatible with *any*
-major hosted Kubernetes service or any on-prem Kubernetes cluster; if not, please file a bug.
+You need a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be installed and
+configured to communicate with your cluster. STUNner should be compatible with *any* major hosted
+Kubernetes service or any on-prem Kubernetes cluster; if not, please file a bug.
 
 The simplest way to expose STUNner to clients is through Kubernetes [LoadBalancer
-services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer),
+services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer);
 these are automatically managed by STUNner. This depends on a functional LoadBalancer integration
 in your cluster (if using Minikube, try `minikube tunnel` to get an idea of how this
 works). STUNner automatically detects if LoadBalancer service integration is functional and falls
-back to using NodePorts when they are not; however, this may require manual tweaking of the
-firewall rules to route the UDP NodePort range.
+back to using NodePorts when it is not; however, this may require manual tweaking of the firewall
+rules to route the UDP NodePort range.
 
 To recompile STUNner, at least Go v1.17 is required. Building the container images requires
 [Docker](https://docker.io) or [Podman](https://podman.io).
@@ -55,6 +55,9 @@ two dataplanes, one into the `pod` and another one into the `dev` namespace.
 helm install stunner stunner/stunner-prod --create-namespace --namespace=stunner-prod
 helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-dev
 ```
+
+Now, you can build a separate [gateway hierarchy](/doc/CONCEPTS.md) per each namespace to supply a
+distinct ingress gateway configuration per dataplane.
 
 For the list of available customizations, see the
 [STUNner-helm](https://github.com/l7mp/stunner-helm) repository. For installing STUNner in the
