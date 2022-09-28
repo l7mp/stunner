@@ -568,10 +568,10 @@ notable limitations at this point are as follows.
 
 ## Milestones
 
-* v0.9: First public release: STUNner basic UDP/TURN connectivity + helm chart + tutorials
-* v0.10: Long-term STUN/TURN credentials and [STUN/TURN over
+* v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials
+* v0.10: Dataplane: Long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
-* v0.11: STUNner Kubernetes gateway operator and dataplane reconciliation.
+* v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
 * v0.12: Security: Hide plain text credentials in the Gateway API and expose TLS/DTLSS.
 * v1.0: GA
 * v1.1: Observability: Prometheus + Grafana dashboard.
