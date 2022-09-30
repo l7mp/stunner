@@ -7,9 +7,10 @@ import (
 	"net"
 	"strconv"
 	"time"
+
 	// "fmt"
 	// "net"
-	// "strings"
+	"strings"
 
 	// "github.com/pion/logging"
 	"github.com/pion/turn/v2"
@@ -45,7 +46,8 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			t, err := strconv.Atoi(username)
+			u := strings.Split(username, ":")
+			t, err := strconv.Atoi(u[1])
 			if err != nil {
 				auth.Log.Errorf("invalid time-windowed username %q", username)
 				return nil, false

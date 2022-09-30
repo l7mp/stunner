@@ -31,8 +31,8 @@ The intended authentication workflow in STUNner is as follows.
 
 1. *A username/password pair is generated.* This is outside the scope of STUNner; however, STUNner
    comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to
-   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For 
-   instance, the below will automatically parse the running config and generate a username/password 
+   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For
+   instance, the below will automatically parse the running config and generate a username/password
    pair and a realm based on the current configuration.
    ```javascript
    const StunnerAuth = require('@l7mp/stunner-auth-lib');
@@ -168,7 +168,7 @@ metadata:
   namespace: stunner
 spec:
   realm: my-realm.example.com
-  authType: longerm
+  authType: longterm
   sharedSecret: "my-secret"
 ```
 
