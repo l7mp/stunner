@@ -1,0 +1,260 @@
+---
+# Redis
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels: 
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: redis-config
+            items:
+            - key: redis-config
+              path: redis.conf
+      containers:
+        - name: redis
+          image: redis
+          command:
+            - redis-server
+            - "/redis-master/redis.conf"
+          env:
+          - name: MASTER
+            value: "true"
+          ports:
+          - containerPort: 6379
+          volumeMounts:
+            - mountPath: /redis-master-data
+              name: data
+            - mountPath: /redis-master
+              name: config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: redis
+  name: redis
+spec:
+  ports:
+    - port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app: redis
+  clusterIP: None
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis-config: |
+    bind 0.0.0.0
+---
+# Livekit server
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: livekit-server
+data:
+  config.yaml: |
+    keys:
+      access_token: secret
+    log_level: debug
+    port: 7880
+    redis:
+      address: redis.default.svc:6379
+    rtc:
+      port_range_end: 60000
+      port_range_start: 50000
+      tcp_port: 7801
+      stun_servers:
+        - stunner_ip:3478
+      turn_servers:
+      - credential: pass-1
+        host: stunner_ip
+        port: 3478
+        protocol: udp
+        username: user-1
+      use_external_ip: false
+    turn:
+      enabled: false
+      loadBalancerAnnotations: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-server
+  labels:
+    app.kubernetes.io/name: livekit-server
+    app.kubernetes.io/instance: livekit
+    app.kubernetes.io/version: "v1.1.2"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 443
+      targetPort: 7880
+      protocol: TCP
+      name: http
+    - port: 7801
+      targetPort: 7801
+      protocol: TCP
+      name: rtc-tcp
+  selector:
+    app.kubernetes.io/name: livekit-server
+    app.kubernetes.io/instance: livekit
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-server
+  labels:
+    app.kubernetes.io/name: livekit-server
+    app.kubernetes.io/instance: livekit
+    app.kubernetes.io/version: "v1.1.2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: livekit-server
+      app.kubernetes.io/instance: livekit
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: disabled
+        sidecar.istio.io/inject: "false"
+      labels:
+        app.kubernetes.io/name: livekit-server
+        app.kubernetes.io/instance: livekit
+    spec:
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 18000 # 5 hours
+      containers:
+        - name: livekit-server
+          image: "livekit/livekit-server:v1.1.2"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LIVEKIT_CONFIG
+              valueFrom:
+                configMapKeyRef:
+                  name: livekit-server
+                  key: config.yaml
+          ports:
+            - name: http
+              containerPort: 7880
+              protocol: TCP
+            - name: rtc-tcp
+              containerPort: 7801
+              hostPort: 7801
+              protocol: TCP
+---
+# Livekit react example
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: lk-react
+  name: lk-react
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lk-react
+  template:
+    metadata:
+      labels:
+        app: lk-react
+    spec:
+      containers:
+      - name: lk-react
+        image: davidkornel/lk-react:latest
+        imagePullPolicy: IfNotPresent
+        command: ["yarn"]
+        args: ["start"]
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lk-react
+  labels:
+    app: lk-react
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 443
+      targetPort: 3000
+      protocol: TCP
+      name: https
+  selector:
+    app: lk-react
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-example-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class:  "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # ingressClassName: nginx
+  tls:
+  - hosts:
+      - clienta.ingressserviceip.nip.io
+      - mediaservera.ingressserviceip.nip.io
+    secretName: livekit-secret-tls
+  rules:
+  - host: clienta.ingressserviceip.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: lk-react
+            port:
+              number: 443
+  - host: mediaservera.ingressserviceip.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: livekit-server
+            port:
+              number: 443
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: info@l7mp.io
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-secret-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
