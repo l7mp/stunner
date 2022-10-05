@@ -564,7 +564,6 @@ notable limitations at this point are as follows.
   namespace with a separate GatewayClass an a separate dataplane. This mode can be useful for
   testing new STUNner versions or canary-upgrades and A/B testing of a new media server version. At
   the moment, however, this mode is not supported: it should work but we don' test it.
-* SCTP DataChannels are not supported at the moment.
 
 ## Milestones
 
