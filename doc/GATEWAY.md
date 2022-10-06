@@ -88,6 +88,7 @@ spec:
   authType: plaintext
   userName: "user-1"
   password: "pass-1"
+  metricsEndpoint: "http://0.0.0.0:8080/metrics"
 EOF
 ```
 
@@ -101,6 +102,7 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
 | `username` | `string` | The `username` credential for [`plaintext` authentication](/doc/AUTH.md) | No |
 | `password` | `string` | The `password` credential for [`plaintext` authentication](/doc/AUTH.md) | No |
+| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL | No |
 | `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
 | `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner per Gateway to provide a public IP addresses. See more details [here](https://github.com/l7mp/stunner/issues/32). | No |
