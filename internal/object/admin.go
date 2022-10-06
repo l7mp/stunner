@@ -61,7 +61,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 	// monitoring
 	if err := a.MonitoringFrontend.Reconcile(a.MetricsEndpoint); err != nil {
-		return err
+		a.log.Warnf("error in reconciling metrics endpoint: %s", err)
 	}
 
 	return nil
