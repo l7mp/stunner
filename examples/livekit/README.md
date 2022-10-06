@@ -97,6 +97,7 @@ But before we apply the listed resources we must set one more thing. As it was m
 ```
 kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 INGRESSIP=$(kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 sed -i "s/ingressserviceip/$INGRESSIP/g" livekit-server.yaml
 ```
 
@@ -110,13 +111,13 @@ kubectl get pods
 
 After installing everything successfully you should be able to open the following command's output URL in your browser:
 ```
-echo client.$INGRESSIP.nip.io
+echo client-$INGRESSIP.nip.io
 ```
 
 If it opened properly and you are greeted with the 'LiveKit Video' title you're doing great.
 As you can see you must set the LiveKit URL. It is the other subdomain we had to set earlier but to make sure you type the right URL in:
 ```
-echo wss://mediaserver.$INGRESSIP.nip.io:443
+echo wss://mediaserver-$INGRESSIP.nip.io:443
 ```
 
 As for the token you must install the [livekit-cli](https://github.com/livekit/livekit-cli#installation) on your computer.
