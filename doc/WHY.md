@@ -34,11 +34,11 @@ the server does not need to re-identify the client per each packet because it ha
 This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
 UDP. RTP does not have anything remotely similar to an HTTP header. Consequently, the only
 "semi-stable" connection identifier WebRTC servers can use to identify a client is by expecting the
-client's packets to arrive from a negotiated IP source address and source port. However, when the
-IP 5-tuple changes, for instance because there is a NAT in the datapath, then WebRTC media
-connections break. Due to reasons which are mostly historical at this point, *UDP/RTP connections
-do not survive not even a single NAT step*, let along the 2-3 rounds of NATs a packet regularly
-undergoes in the Kubernetes dataplane.
+client's packets to arrive from a negotiated IP source address and source port. When the IP 5-tuple
+changes, for instance because there is a NAT in the datapath, then WebRTC media connections
+break. Due to reasons which are mostly historical at this point, *UDP/RTP connections do not
+survive not even a single NAT step*, let alone the 2-3 rounds of NATs a packet regularly undergoes
+in the Kubernetes dataplane.
 
 ## The state-of-the-art
 
@@ -88,7 +88,7 @@ There are *lots* of reasons why this deployment model is less than ideal:
 
 * **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
   hosted Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP
-  address for security purposes. This then precludes the host-networking trick. But even if nodes
+  address for security purposes. This then precludes the host-networking hack. But even if nodes
   are publicly available, many Kubernetes services simply disable host-networking all together
   (e.g., [GKE
   Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview)) exactly

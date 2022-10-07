@@ -10,9 +10,12 @@
 * [Deployment models](/doc/DEPLOYMENT.md)
 * [Concepts](/doc/CONCEPTS.md)
 
+## Getting started
+
+* [Installation](/doc/INSTALL.md)
+
 ## User guides
 
-* [Getting started](/doc/INSTALL.md)
 * [Gateway API reference](/doc/GATEWAY.md)
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
