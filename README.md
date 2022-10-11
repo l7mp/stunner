@@ -56,14 +56,15 @@ modification to your existing WebRTC codebase.  STUNner implements the standard 
 API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
 style via Kubernetes manifests.
 
+See the full documentation [here](/doc/README.md).
+
 ## Table of Contents
 1. [Description](#description)
-2. [Features](#features)
-3. [Getting started](#getting-started)
-4. [Tutorials](#tutorials)
-5. [Documentation](#documentation)
-6. [Caveats](#caveats)
-7. [Milestones](#milestones)
+1. [Features](#features)
+1. [Getting started](#getting-started)
+1. [Tutorials](#tutorials)
+1. [Caveats](#caveats)
+1. [Milestones](#milestones)
 
 ## Description
 
@@ -531,7 +532,7 @@ applications into Kubernetes.
 
 ## Documentation
 
-See further documentation [here](doc/README.md).
+See the full documentation [here](/doc/README.md).
 
 ## Caveats
 
