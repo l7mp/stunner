@@ -24,8 +24,8 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="1.4142136"
-     inkscape:cx="410.82904"
-     inkscape:cy="220.97087"
+     inkscape:cx="407.2935"
+     inkscape:cy="151.6744"
      inkscape:window-width="1912"
      inkscape:window-height="1037"
      inkscape:window-x="0"
@@ -495,32 +495,6 @@
          x="145.32903"
          y="82.809853">STUNner Gateway Hierarchy</tspan></text>
     <g
-       id="g49004"
-       transform="translate(14.249746,42.55181)">
-      <text
-         xml:space="preserve"
-         style="font-style:normal;font-weight:normal;font-size:7.40831px;line-height:125%;font-family:Sans;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-         x="133.65752"
-         y="64.084625"
-         id="text12251-0"><tspan
-           sodipodi:role="line"
-           id="tspan12249-7"
-           style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.96333px;font-family:Sans;-inkscape-font-specification:'Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583px"
-           x="133.65752"
-           y="64.084625">Kubernetes</tspan></text>
-      <text
-         xml:space="preserve"
-         style="font-style:normal;font-weight:normal;font-size:7.40831px;line-height:125%;font-family:Sans;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
-         x="133.70187"
-         y="68.689636"
-         id="text12251-0-3"><tspan
-           sodipodi:role="line"
-           id="tspan12249-7-7"
-           style="font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.96333px;font-family:Sans;-inkscape-font-specification:'Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;stroke-width:0.264583px"
-           x="133.70187"
-           y="68.689636">namespace</tspan></text>
-    </g>
-    <g
        id="g44371"
        transform="matrix(0.7,0,0,0.7,79.364447,53.963403)"
        style="stroke-width:1.42857">
@@ -725,12 +699,5 @@
        inkscape:path-effect="#path-effect40916"
        d="m 154.24642,190.67619 65.76487,0 a 4.4979167,4.4979167 45 0 1 4.49792,4.49792 v 19.75365 a 4.4979167,4.4979167 135 0 1 -4.49792,4.49792 h -65.76487 a 4.4979167,4.4979167 45 0 1 -4.49792,-4.49792 v -19.75365 a 4.4979167,4.4979167 135 0 1 4.49792,-4.49792 z"
        sodipodi:type="rect" />
-    <rect
-       style="opacity:1;fill:none;fill-opacity:1;stroke:#000000;stroke-width:0.2;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:0.8, 0.8;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal"
-       id="rect45946"
-       width="105.7994"
-       height="120.45862"
-       x="139.92195"
-       y="103.47829" />
   </g>
 </svg>

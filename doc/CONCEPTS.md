@@ -8,11 +8,11 @@ operational STUNner installation.
 A STUNner installation consists of two parts, a *control plane* and a *dataplane*. The control
 plane consists of declarative policies specifying the way STUNner should route WebRTC media traffic
 to the media servers, plus a gateway operator that renders the high-level policies into an actual
-dataplane configuration. The dataplane in turn comprises one or more `stunnerd` pods which is
-actually ingesting media traffic into the cluster through a STUN/TURN server. Since the TURN
+dataplane configuration. The dataplane in turn comprises one or more `stunnerd` pods, responsible
+for actually ingesting media traffic into the cluster through a STUN/TURN server. Since the TURN
 service underlying STUNner is agnostic to NATs, STUNner can inject clients' media traffic into the
-private Kubernetes pod network where the media servers are deployed, addressing all NAT traversals
-(client-side and server-side) in a single go.
+private Kubernetes pod network, addressing all NAT traversals (client-side and server-side) in a
+single go.
 
 ![STUNner architecture](/doc/stunner_arch_big.svg)
 
@@ -39,9 +39,9 @@ and UDPRoutes point to the backend services client traffic should be forwarded t
 
 * **Gateway operator:** The main purpose of the gateway operator is to watch gateway hierarchies
 for change and, once a custom resource is added or modified by the user, render a new dataplane
-running configuration. This configuration is then mapped into the filesystem of the `stunnerd` pods
-running in the same namespace, so that each `stunnerd` instance will use the most recent
-configuration. The implementation and documentation of the STUNner's gateway operator can be found
+configuration. This configuration is then mapped into the filesystem of the `stunnerd` pods running
+in the same namespace, so that each `stunnerd` instance will use the most recent configuration. The
+implementation and documentation of the STUNner's gateway operator can be found
 [here](https://github.com/l7mp/stunner-gateway-operator).
 
 * **STUNner ConfigMap:** The STUNner ConfigMap contains the running dataplane configuration. Of

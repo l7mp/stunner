@@ -59,15 +59,15 @@ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
 ```
 
 You should see the internal Cluster IP address allocated by Kubernetes for the STUNner dataplane
-service. Try experiment with other FQDNs, like `kubernetes.default.svc.cluster.local`, etc.; the
+service. Experiment with other FQDNs, like `kubernetes.default.svc.cluster.local`, etc.; the
 Kubernetes cluster DNS service will readily return the the corresponding internal service IP
 addresses.
 
 This little experiment demonstrates the threats associated with a poorly configured STUNner
-gateway: it can allows external access to *any* UDP service running inside your cluster. The
-prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`), since
-STUNner's transport relay connections are limited to UDP, and (2) the user *must* specifically add
-a UDPRoute to the target service, otherwise STUNner blocks access to it.
+gateway: it may allow external access to *any* UDP service running inside your cluster. The
+prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`) and
+(2) the user *must* specifically add a UDPRoute to the target service, otherwise STUNner blocks
+access to it.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -87,7 +87,7 @@ spec:
 
 Repeat the above `dig` command to query the Kubernetes DNS service again and observe how the query
 times out. This demonstrates that a properly locked down STUNner installation blocks all accesses
-outside of the backend services the user explicitly opens up via a UDPRoute.
+outside of the backend services explicitly opened up via a UDPRoute.
 
 ## Locking down STUNner
 
@@ -98,7 +98,7 @@ services exposed via STUNner.
 STUNner's basic security model is as follows:
 
 > In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
-attacker can reach only the media servers via STUNner but no other services, which is essentially
+attacker can reach only the media servers via STUNner but no other services. This is essentially
 the same level of security as if you put the media servers to the Internet over a public IP
 address, protected by a firewall that admits only UDP access.
 
@@ -111,7 +111,7 @@ By default, STUNner uses a single statically set username/password pair for all 
 password is available in plain text at the clients (`plaintext` authentication mode). Anyone with
 access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know
 the private IP address of the target service or pod and provided that a UDPRoute exists that
-specifies the target service as a backend. This means, a service is exposed only if STUNner is
+specifies the target service as a backend. This means that a service is exposed only if STUNner is
 explicitly configured so.
 
 For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
@@ -140,14 +140,14 @@ spec:
         - namespace: media-plane
 ```
 
-To avoid potential misuse, STUNner disables open wildcard access to the cluster. (Note that in the
-[standalone mode](/doc/OBSOLETE.md) the user can still explicitly create an open `stunnerd`
+To avoid potential misuse, STUNner disables open wildcard access to the entire cluster. (Note that
+in the [standalone mode](/doc/OBSOLETE.md) the user can still explicitly create an open `stunnerd`
 cluster, but this is discouraged).
 
 For hardened deployments, it is possible to add a second level of isolation between STUNner and the
 rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will
 essentially implement a firewall, blocking all access from the source to the target workload except
-unless services explicitly whitelisted by the user. The below example allows access from STUNner to
+the services explicitly whitelisted by the user. The below example allows access from STUNner to
 *any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port
 range `[10000:20000]`, but nothing else.
 

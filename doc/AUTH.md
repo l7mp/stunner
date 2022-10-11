@@ -86,9 +86,9 @@ In STUNner, `plaintext` authentication is the simplest and least secure authenti
 basically corresponding to a traditional "log-in" username and password pair given to users. Note
 that only a single username/password pair is used for *all* clients. This makes configuration easy;
 e.g., the ICE server configuration can be written into the static Javascript code served to
-clients. At the same time, `plaintext` authentication is the least secure mode: once an attacker
-learns a `plaintext` STUNner credential they can use it without limits to reach STUNner (until the
-administrator rolls the credetials, see below).
+clients. At the same time, `plaintext` authentication is prone to leaking the credentials: once an
+attacker learns a `plaintext` STUNner credential they can use it without limits to reach STUNner
+(until the administrator rolls the credetials, see below).
 
 You can select the authentication mode from the GatewayConfig resource of STUNner. For instance,
 the below GatewayConfig will configure STUNner to use `plaintext` authentication using the
@@ -135,9 +135,10 @@ spec:
   password: "bar"
 ```
 
-Note that modifying TURN credentials goes *without* restarting the `stunnerd` pods: new connections
-will need to use the modified credentials but existing TURN connections should continue as normal
-(the application server may need to be restarted to learn the new TURN credentials though).
+Note that modifying STUNner's credentials goes *without* restarting the TURN server: new
+connections will need to use the modified credentials but existing TURN connections should continue
+as normal (the application server may need to be restarted to learn the new TURN credentials
+though).
 
 ## Longterm authentication
 

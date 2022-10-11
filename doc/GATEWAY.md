@@ -25,7 +25,7 @@ enforced: e.g., the GatewayClass is
 [cluster-scoped](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions)
 so it is outside the namespace, GatewayClasses can refer to GatewayConfigs across namespaces,
 etc. Still, it is a good practice to keep all control plane configuration, plus the actual
-dataplane pods in a single namespace as much as possible.
+dataplane pods, in a single namespace as much as possible.
 
 ## GatewayClass
 
@@ -34,7 +34,7 @@ cluster-scoped, so they can be attached to from any namespace, and we usually as
 namespaced gateway hierarchy will have a separate global GatewayClass as the anchor.
 
 Below is a sample GatewayClass resource. Each GatewayClass must specify a controller that will
-manage the Gateway objects created under the hierarchy. In our case, this must be set to
+manage the Gateway objects created under the hierarchy; this must be set to
 `stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In
 addition, a GatewayClass can refer to further implementation-specific configuration via a
 `parametersRef`; in our case, this will be a GatewayConfig object (see [below](#gatewayconfig)).
@@ -70,11 +70,11 @@ STUN/TURN authentication [credentials](/doc/AUTH.md) clients can use to connect 
 STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a
 particular GatewayConfig in the `parametersRef`.  GatewayConfig resources are namespaced, and every
 hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error
-because the authentication credentials cannot learned by the dataplane otherwise, and the STUNner
+because the authentication credentials cannot be learned by the dataplane otherwise. The STUNner
 gateway operator will refuse to generate a dataplane running config until the user attaches a valid
 GatewayConfig to the hierarchy.
 
-The following example sets the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner,
+The following example sets the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner
 using the username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`.
 
 ```yaml
@@ -100,23 +100,23 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `stunnerConfig` | `string` | The name of the ConfigMap into which the operator renders the `stunnerd` running configuration. Default: `stunnerd-config`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
-| `username` | `string` | The `username` credential for [`plaintext` authentication](/doc/AUTH.md) | No |
-| `password` | `string` | The `password` credential for [`plaintext` authentication](/doc/AUTH.md) | No |
-| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL | No |
+| `username` | `string` | The `username` for [`plaintext` authentication](/doc/AUTH.md). | No |
+| `password` | `string` | The credential for [`plaintext` authentication](/doc/AUTH.md). | No |
+| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stiunnerd` pods.| No |
 | `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
 | `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
-| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner per Gateway to provide a public IP addresses. See more details [here](https://github.com/l7mp/stunner/issues/32). | No |
+| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
 
 Note that at least a valid username/password pair *must* be supplied for `plaintext`
 authentication, or a `sharedSecret` for the `longterm` mode. Missing both is an error.
 
-GatewayConfig resources are safe under modification, that is, the `stunnerd` daemons know how to
-reconcile a change in any of the GatewayConfig fields without restarting the TURN server.
+Except the TURN authentication realm, all GatewayConfig resources are safe under modification. That
+is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting
+the TURN server. Changing the realm, however, induces a full TURN server restart.
 
 ## Gateway
 
-Gateways describe the STUN/TURN server listeners exposed to clients in order to ingest WebRTC media
-into the cluster.
+Gateways describe the STUN/TURN server listeners exposed to clients.
 
 In the below example, we open a STUN/TURN listener on the UDP port 3478.  STUNner will
 automatically expose this listener on a public IP address and port by creating a [LoadBalancer
@@ -148,32 +148,31 @@ Below is a quick reference of the most important fields of the Gateway
 | `listeners[0].port` | `int` | Network port for the TURN listener. | Yes |
 | `listeners[0].protocol` | `string` | Transport protocol for the TURN listener. Either UDP or TCP; support for TLS and DTLS will be added in the next release. | Yes |
 
-Note that STUNner assumes that there is only a *single* listener specified in each Gateway (that's
+Note that STUNner assumes that there is only a *single* listener specified in each Gateway (that is
 why we fixed the listener list index above at 0). Multiple listeners are accepted and STUNner will
 install the corresponding TURN server listeners for each, but it will create only a *single*
 LoadBalancer service to expose the entire Gateway with all the listeners. Thus, the resultant
-    public address/port provides access only to the first listener in the list. You can always create
-the missing LoadBalancer services manually, but this is not encouraged. If you want multiple
-listeners (e.g., a separate UDP and TCP listener), attach two Gateways, each with a single listener
-only, to the gateway hierarchy.
+public address/port provides access only to the first listener in the list. You can always create
+the missing LoadBalancer services manually, but this is not encouraged., Create *two* separately
+Gateways if you want multiple listeners, each with a single listener only.
 
-Gateway resources are *not* safe for modification: for various reasons rooted in the limitations of
-the [pion/turn](https://github.com/pion/turn) library that provides the TURN services in STUNner,
+Gateway resources are *not* safe for modification. For various reasons rooted in the limitations of
+the [pion/turn](https://github.com/pion/turn) library that provides the TURN services to STUNner,
 `stunnerd` daemons cannot add/remove TURN server listeners without restarting the whole TURN
-server, which will terminate all active client sessions. We plan to address this restriction in a
-later release; until then, it is best to not modify Gateways in production deployments. (A
-workaround would be to create *another* STUNner gateway hierarchy, make the necessary changes
-there, and then direct clients to the new STUNner gateway service by providing them a new ICE
-server configuration.
+server. This will then terminate all active client sessions. We plan to address this restriction in
+a later release; until then, it is best to refrain from modifying the Gateways in production
+deployments. The suggested workaround is to create *another* STUNner gateway hierarchy, make the
+necessary changes there, direct clients to the new STUNner gateway service by providing them a new
+ICE server configuration, and finally delete the old hierarchy.
 
 ## UDPRoute
 
 UDPRoute resources can be attached to Gateways to specify the backend services permitted to be
 reached via the Gateway. Multiple UDPRoutes can attach to a Gateway, and each UDPRoute can specify
-multiple backend services; in this case access to *each* of the backend services in *each* of the
-attached UDPRoutes is allowed. An UDPRoute can be attached only to a Gateway *in the same
-namespace*, by setting the `parentRef` to the Gateway's name. Attaching Gateways and UDPRoutes
-across a namespace boundary is prohibited.
+multiple backend services; in this case access to *all* backends in *each* of the attached
+UDPRoutes is allowed. An UDPRoute can be attached only to a Gateway *in the same namespace*, by
+setting the `parentRef` to the Gateway's name. Attaching Gateways and UDPRoutes across a namespace
+boundary is prohibited.
 
 The below UDPRoute will configure STUNner to route client connections received on the Gateway
 called `udp-gateway` to the media server pool identified by the Kubernetes service
@@ -207,10 +206,11 @@ without restarting the TURN server.
 
 ## Status
 
-Kubernetes has a very useful feature: most resources contains a `status` subresource that describes
+Kubernetes has a very useful feature: most resources contain a `status` subresource that describes
 the current state of the object, supplied and updated by the Kubernetes system and its
 components. The Kubernetes control plane continually and actively manages every object's actual
-state to match the desired state you supplied. 
+state to match the desired state you supplied and updates the status field to indicate whether any
+error was encountered during the reconciliation process.
 
 For instance, below is the status from a successfully reconciled Gateway, with one UDPRoute
 successfully attached to the Gateway:
@@ -224,38 +224,33 @@ spec:
 status:
   conditions:
   - lastTransitionTime: ...
-    message: gateway under processing by controller "stunner.l7mp.io/gateway-operator"
-    observedGeneration: 1
-    reason: Scheduled
-    status: "True"
     type: Scheduled
-  - lastTransitionTime: ...
-    message: gateway successfully processed by controller "stunner.l7mp.io/gateway-operator"
-    observedGeneration: 1
-    reason: Ready
     status: "True"
+    reason: Scheduled
+    message: gateway under processing by controller "stunner.l7mp.io/gateway-operator"
+  - lastTransitionTime: ...
     type: Ready
+    status: "True"
+    reason: Ready
+    message: gateway successfully processed by controller "stunner.l7mp.io/gateway-operator"
   listeners:
   - attachedRoutes: 1
     conditions:
     - lastTransitionTime: ...
-      message: listener accepted
-      observedGeneration: 1
-      reason: Attached
-      status: "False"
       type: Detached
+      status: "False"
+      reason: Attached
+      message: listener accepted
     - lastTransitionTime: ...
-      message: listener object references sucessfully resolved
-      observedGeneration: 1
-      reason: ResolvedRefs
-      status: "True"
       type: ResolvedRefs
-    - lastTransitionTime: ...
-      message: public address found for gateway
-      observedGeneration: 1
-      reason: Ready
       status: "True"
+      reason: ResolvedRefs
+      message: listener object references sucessfully resolved
+    - lastTransitionTime: ...
       type: Ready
+      status: "True"
+      reason: Ready
+      message: public address found for gateway
 ...
 ```
 

@@ -4,7 +4,7 @@
 
 You need a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be installed and
 configured to communicate with your cluster. STUNner should be compatible with *any* major hosted
-Kubernetes service or any on-prem Kubernetes cluster; if not, please file a bug.
+Kubernetes service or any on-prem Kubernetes cluster; if not, please file an issue.
 
 The simplest way to expose STUNner to clients is through Kubernetes [LoadBalancer
 services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer);
@@ -22,10 +22,10 @@ To recompile STUNner, at least Go v1.17 is required. Building the container imag
 The simplest way to deploy the full STUNner distro, with the dataplane and the controller
 automatically installed, is through [Helm](https://helm.sh). STUNner configuration parameters are
 available for customization as [Helm
-Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying STUNner
-into a separate namespace and we usually name this namespace as `stunner`, in order to isolate it
-from the rest of the workload.
-
+Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying the STUNner
+dataplane into a separate Kubernetes namespace and we usually name this namespace as `stunner`, in
+order to isolate it from the rest of the workload. The control plane operator can be deployed into
+any namespace.
 
 First, register the STUNner repository with Helm.
 
@@ -37,13 +37,13 @@ helm repo update
 Install the control plane:
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
+helm install stunner-gateway-operator stunner/stunner-gateway-operator
 ```
 
 Install the dataplane:
 
 ```console
-helm install stunner stunner/stunner --namespace=stunner
+helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
 You can install multiple STUNner dataplanes side-by-side, provided that the corresponding
