@@ -1,14 +1,14 @@
 ## Deployment models
 
-STUNner supports various deployment models. First, it supports multiple
-[architectures](#architectural-models) where it can act as a simple headless STUN/TURN server or it
-can implement a fully fledged ingress gateway in front of a Kubernetes-based media server
-pool. Second, STUNner can run in one of two[control plane models](control-plane-models), based on
-whether the user manually supplies the dataplane configuration or there is a separate control plane
-that automatically reconciles the dataplane state based on a high-level [declarative
+STUNner supports various deployment models. First, it supports multiple [architectural
+models](#architectural-models) where it can act either as a simple headless STUN/TURN server or a
+fully fledged ingress gateway in front of an entire Kubernetes-based media server pool. Second,
+STUNner can run in one of two [control plane models](control-plane-models), based on whether the
+user manually supplies STUNner configuration or there is a separate STUNner control plane that
+automatically reconciles the dataplane state based on a high-level [declarative
 API](https://gateway-api.sigs.k8s.io). Finally, there are multiple [ICE models](#ice-models), based
-on whether only the client connects via STUNner or both the client and the server are configured to
-use STUNner.
+on whether only the client connects via STUNner or both the client and the server use STUNner to
+set up the media-plane connection.
 
 ## Architectural models
 
@@ -28,7 +28,7 @@ this case the STUN/TURN servers are deployed into Kubernetes.
 Note that for STUNner to be able to connect two or more WebRTC clients in the headless model *all*
 the clients *must* use STUNner as the TURN server. This is because STUNner opens the transport
 relay connections *inside* the cluster, on a private IP address, and this address is reachable only
-to STUNner itself, but not for external clients or STUN/TURN servers.
+to STUNner itself, but not for external STUN/TURN servers.
 
 ### Media-plane model
 
@@ -43,8 +43,8 @@ cloud-bound workload.
 
 There is no limitation as to how many gateway and media server pods can be opened in this model,
 which theoretically means limitless scalability. Furthermore, by creating connection-tracking state
-for each client session STUNner supports the dynamic scale-in/scale-out of the media server pool
-without dropping client connections. Whether scaling STUNner itself causes client connection drops
+for each client session STUNner supports the dynamic scale-out of the media server pool without
+dropping active client connections. Whether scaling STUNner itself causes client connection drops
 is depending on the cloud provider's load-balancer service: if the load-balancer creates conntrack
 state for clients' UDP transport streams then STUNner can be scaled freely, otherwise scaling
 STUNner may result the [disconnection of a small number of client
@@ -79,12 +79,12 @@ In this model, the client is configured with STUNner as the TURN server so at a 
 the ICE conversation it opens a TURN transport relay connection via STUNner. The IP address of the
 resultant ICE [relay
 candidate](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) is a private pod
-IP address, in particular, the IP address of the `stunnerd` pod that happens to receive the client
-connection. In contrast, servers run without any STUN/TURN server so they generate [host ICE
-candidates](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) only. Due to
-servers being deployed into ordinary Kubernetes pods, the server's host candidate also contains a
-private pod IP address. Since in the Kubernetes networking model ["pods can communicate with all
-other pods on any other node without
+IP address, namely the IP address of the `stunnerd` pod that happens to receive the client
+connection. In contrast, servers run without any STUN/TURN server whatsoever, so they generate
+[host ICE candidates](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type)
+only. Due to servers being deployed into ordinary Kubernetes pods, the server's host candidate will
+likewise contain a private pod IP address. Then, since in the Kubernetes networking model ["pods
+can communicate with all other pods on any other node without
 NAT"](https://kubernetes.io/docs/concepts/services-networking), the clients relay candidate and the
 servers' host candidate will have direct connectivity in the Kubernetes private container network
 and the ICE connectivity check will succeed. See more explanation
@@ -115,24 +115,24 @@ the connection occurs directly via STUNner.
 
 In the symmetric mode the following rules apply for setting up the [ICE server
 configuration](/README.md#configuring-webrtc-clients):
-* set STUNner as the *only* TURN server and configure *no* STUN servers on both the clients and the
-  server, and
+* on both the clients and the server set STUNner as the *only* TURN server and configure *no* STUN
+  servers, and
 * set the `iceTransportPolicy` to `relay` on both sides.
 
 Note that the `iceTransportPolicy: relay` setting is mandatory in this case, otherwise the
-connection falls back to the asymmetric mode (this is a consequence of the way [ICE orders
+connection falls back to the asymmetric mode (this is a consequence of the way [ICE assigns
 priorities](https://www.ietf.org/rfc/rfc5245.txt) to different connection types).  Furthermore, it
-a good practice to configure the STUNner TURN URI in the server-side ICE server configuration with
-the *internal* IP address and port used by STUNner (i.e., the ClusterIP of the `stunner` Kubernetes
-service and the corresponding port), otherwise the server might connect via the external
-LoadBalancer IP causing an unnecessary roundtrip. 
+is a good practice to configure the STUNner TURN URI in the server-side ICE server configuration
+with the *internal* IP address and port used by STUNner (i.e., the ClusterIP of the `stunner`
+Kubernetes service and the corresponding port), otherwise the server might connect via the external
+LoadBalancer IP causing an unnecessary roundtrip.
 
-The symmetric mode means more overhead compared to the asymmetric mode, since STUNner now needs to
-perform the TURN encapsulation/decapsulation for both sides. However, the symmetric mode comes with
-certain operational advantages. Namely, this is the only ICE mode that would allow STUNner to
-obscure the internal IP addresses in the ICE candidates from attackers; note that this is not
-implemented yet, feel free to create an issue if [exposing internal IP addresses](/doc/SECURITY.md)
-is blocking you from adopting STUNner.
+The symmetric mode means more overhead compared to the asymmetric mode, since STUNner now performs
+TURN encapsulation/decapsulation for both sides. However, the symmetric mode comes with certain
+operational advantages. Namely, this is the only ICE mode that would allow STUNner to obscure the
+internal IP addresses in the ICE candidates from attackers; note that this is not implemented yet,
+but feel free to create an issue if [exposing internal IP addresses](/doc/SECURITY.md) is blocking
+you from adopting STUNner.
 
 ## Help
 
