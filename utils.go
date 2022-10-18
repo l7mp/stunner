@@ -106,13 +106,13 @@ func ParseUri(uri string) (*StunnerUri, error) {
 	s.Port = port
 
 	switch proto {
-	case "udp", "udp4", "udp6":
+	case "udp", "udp4", "udp6", "dtls":
 		a, err := net.ResolveUDPAddr("udp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
 		}
 		s.Addr = a
-	case "tcp", "tcp4", "tcp6":
+	case "tcp", "tcp4", "tcp6", "tls":
 		a, err := net.ResolveTCPAddr("tcp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err

@@ -539,11 +539,6 @@ See the full documentation [here](/doc/README.md).
 STUNner is a work-in-progress. Some features are missing, others may not work as expected. The
 notable limitations at this point are as follows.
 
-* *STUNner is not intended to be used as a public STUN/TURN server.* The intended use of STUNner is
-  as a Kubernetes ingress gateway for WebRTC. This still allows users to connect via STUNner
-  (without a TURN server), under the assumption that *all* users involved in a session use
-  STUNner. This is because the transport relay connections allocated by STUNner are on a private
-  IP, which may not be reachable to external clients and/or TURN servers.
 * STUNner targets only a *partial implementation of the Kubernetes Gateway API.* In particular,
   only GatewayClass, Gateway and UDPRoute resources are supported. This is intended: STUNner
   deliberately ignores some unnecessary complexity in the [Gateway
@@ -565,16 +560,18 @@ notable limitations at this point are as follows.
   namespace with a separate GatewayClass an a separate dataplane. This mode can be useful for
   testing new STUNner versions or canary-upgrades and A/B testing of a new media server version. At
   the moment, however, this mode is not supported: it should work but we don' test it.
+* Currently TURN over TLS/DTLS is supported only in the [standalone mode](/doc/OBSOLETE.md); we
+  will remove this restriction in the next release.
 
 ## Milestones
 
 * v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials
 * v0.10: Dataplane: Long-term STUN/TURN credentials and [STUN/TURN over
-  TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt).
+  TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt) in standalone mode.
 * v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
-* v0.12: Security: Hide plain text credentials in the Gateway API and expose TLS/DTLSS.
+* v0.12: Security: Hide plain text credentials in the Gateway API and expose TLS/DTLS.
+* v0.13: Observability: Prometheus + Grafana dashboard.
 * v1.0: GA
-* v1.1: Observability: Prometheus + Grafana dashboard.
 * v1.2: Performance: eBPF acceleration
 * v2.0: Service mesh: adaptive scaling & resiliency
 

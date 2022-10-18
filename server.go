@@ -102,7 +102,7 @@ func (s *Stunner) Start() error {
 
 			cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
 			if errTls != nil {
-				return fmt.Errorf("cannot load cert/ley pair for creating DTLS listener at %s: %s",
+				return fmt.Errorf("cannot load cert/key pair for creating DTLS listener at %s: %s",
 					addr, errTls)
 			}
 

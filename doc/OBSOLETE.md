@@ -7,6 +7,18 @@ operator *the standalone mode is considered obsolete* as of STUNner v0.11. The b
 is provided only for historical reference; before the gateway operator existed this was *the*
 recommended way to interact with STUNner.
 
+## Table of contents
+
+* [Prerequisites](#prerequisites)
+* [Installation](#installation)
+* [Configuration](#configuration)
+* [Learning the external IP and port](#learning-the-external-IP-and-port)
+* [Configuring WebRTC clients](#configuring-WebRTC-clients)
+* [Authentication](#authentication)
+* [Access control](#access-control)
+* [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp) 
+* [Enabling TURN transport over TLS and DTLS](#enabling-turn-transport-over-tls-and-dtls)
+
 ## Prerequisites
 
 The below installation instructions require an operational cluster running a supported version of
@@ -53,10 +65,10 @@ cd stunner
 ```
 
 Then, customize the default settings in the STUNner service
-[manifest](/deploy/manifests/stunner.yaml) and deploy it via `kubectl`.
+[manifest](/deploy/manifests/stunner-standalone.yaml) and deploy it via `kubectl`.
 
 ```console
-kubectl apply -f deploy/manifests/stunner.yaml
+kubectl apply -f deploy/manifests/stunner-standalone.yaml
 ```
 
 By default, all resources are created in the `default` namespace.
@@ -228,56 +240,6 @@ var ICE_config = {
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
-## Enabling TURN transport over TCP
-
-Some corporate firewalls block all UDP access from the private network, except DNS. To make sure
-that clients can still reach STUNner, you can expose STUNner over a [TCP-based TURN
-transport](https://www.rfc-editor.org/rfc/rfc6062). To maximize the chances of getting through a
-zealous firewall, below we expose STUNner over the default HTTPS port 443.
-
-First, enable TURN transport over TCP in STUNner.
-
-```console
-kubectl patch configmap/stunnerd-config --type merge -p "{\"data\":{\"STUNNER_TRANSPORT_TCP_ENABLE\":\"1\"}}"
-```
-
-Then, delete the default Kubernetes service that exposes STUNner over UDP and re-expose it over the
-TCP port 443.
-```console
-kubectl delete service stunner-standalone-lb
-kubectl expose deployment stunner-standalone-lb --protocol=TCP --port=443 --type=LoadBalancer
-```
-
-Wait until Kubernetes assigns a public IP address.
-```console
-until [ -n "$(kubectl get svc stunner-standalone-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-export STUNNER_PUBLIC_ADDR=$(kubectl get svc stunner-standalone-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-export STUNNER_PUBLIC_PORT=$(kubectl get svc stunner-standalone-lb -o jsonpath='{.spec.ports[0].port}')
-kubectl patch configmap/stunnerd-config --type merge \
-  -p "{\"data\":{\"STUNNER_PUBLIC_ADDR\":\"${STUNNER_PUBLIC_ADDR}\",\"STUNNER_PUBLIC_PORT\":\"${STUNNER_PUBLIC_PORT}\"}}"
-```
-
-Restart STUNner with the new configuration.
-```console
-kubectl rollout restart deployment/stunner
-```
-
-Finally, direct your clients to the re-exposed STUNner TCP service with the below `PeerConnection` configuration; don't
-forget to rewrite the  TURN transport to TCP by adding the query `transport=tcp` to the
-STUNner URI.
-```javascript
-var ICE_config = {
-  'iceServers': [
-    {
-      'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=tcp",
-      'username': <STUNNER_USERNAME>,
-      'credential': <STUNNER_PASSWORD>,
-    },
-  ],
-};
-var pc = new RTCPeerConnection(ICE_config);
-```
-
 ## Authentication
 
 STUNner relies on the STUN [long-term credential
@@ -394,6 +356,140 @@ spec:
     ports:
     - protocol: UDP
 ```
+
+## Enabling TURN transport over TCP
+
+Some corporate firewalls block all UDP access from the private network, except DNS. To make sure
+that clients can still reach STUNner, you can expose STUNner over a [TCP-based TURN
+transport](https://www.rfc-editor.org/rfc/rfc6062). To maximize the chances of getting through a
+zealous firewall, below we expose STUNner over the default HTTPS port 443.
+
+First, enable TURN transport over TCP in STUNner.
+
+```console
+kubectl patch configmap/stunnerd-config --type merge -p "{\"data\":{\"STUNNER_TRANSPORT_TCP_ENABLE\":\"1\"}}"
+```
+
+Then, delete the default Kubernetes service that exposes STUNner over UDP and re-expose it over the
+TCP port 443.
+```console
+kubectl delete service stunner-standalone-lb
+kubectl expose deployment stunner-standalone-lb --protocol=TCP --port=443 --type=LoadBalancer
+```
+
+Wait until Kubernetes assigns a public IP address.
+```console
+until [ -n "$(kubectl get svc stunner-standalone-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+export STUNNER_PUBLIC_ADDR=$(kubectl get svc stunner-standalone-lb -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export STUNNER_PUBLIC_PORT=$(kubectl get svc stunner-standalone-lb -o jsonpath='{.spec.ports[0].port}')
+kubectl patch configmap/stunnerd-config --type merge \
+  -p "{\"data\":{\"STUNNER_PUBLIC_ADDR\":\"${STUNNER_PUBLIC_ADDR}\",\"STUNNER_PUBLIC_PORT\":\"${STUNNER_PUBLIC_PORT}\"}}"
+```
+
+Restart STUNner with the new configuration.
+```console
+kubectl rollout restart deployment/stunner
+```
+
+Finally, direct your clients to the re-exposed STUNner TCP service with the below `PeerConnection` configuration; don't
+forget to rewrite the  TURN transport to TCP by adding the query `transport=tcp` to the
+STUNner URI.
+```javascript
+var ICE_config = {
+  'iceServers': [
+    {
+      'url': "turn:<STUNNER_PUBLIC_ADDR>:<STUNNER_PUBLIC_PORT>?transport=tcp",
+      'username': <STUNNER_USERNAME>,
+      'credential': <STUNNER_PASSWORD>,
+    },
+  ],
+};
+var pc = new RTCPeerConnection(ICE_config);
+```
+
+## Enabling TURN transport over TLS and DTLS
+
+The ultimate tool to work around aggressive firewalls and middleboxes is exposing STUNner via TLS
+and/or DTLS. Fixing the TLS listener port at 443 will make it impossible for the corporate firewall
+to block TURN/TLS connections without blocking all external HTTPS access, so most probably at least
+the TCP/443 port will be open to encrypted connections.
+
+Start with a fresh Kubernetes install. Below we create a self-signed certificate for testing; make
+sure to replace the cert/key pair below with your own trusted credentials.
+
+```console
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /tmp/tls.key -out /tmp/tls.crt -subj "/CN=example.domain.com"
+kubectl create secret tls stunner-tls --key /tmp/tls.key --cert /tmp/tls.crt
+```
+
+Deploy a STUNner gateway in standalone mode with the pre-configured static manifest.
+```console
+cd stunner/
+kubectl apply -f deploy/manifests/stunner-standalone-tls.yaml
+```
+
+This will fire up STUNner with two TURN listeners: a TLS/TCP and a DTLS/UDP listener, both at port
+443, and create two LoadBalancer services to expose these to clients.
+
+Wait until Kubernetes assigns a public IP address and learn the new public addresses.
+```console
+until [ -n "$(kubectl get svc stunner-tls -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+until [ -n "$(kubectl get svc stunner-dtls -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+export STUNNER_PUBLIC_ADDR_TLS=$(kubectl get svc stunner-tls -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export STUNNER_PUBLIC_ADDR_DTLS=$(kubectl get svc stunner-dtls -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+```
+
+Check your configuration with the handy [`turncat`](/cmd/turncat) utility and the [UDP
+greeter](/README.md#testing) service. First, query the UDP greeter service via TLS/TCP. Here, the
+`turncat` command line argument `-i` puts `turncat` into insecure mode in order to accept our
+self-signed TURN sever TLS certificate.
+
+```console
+cd stunner
+go build -o turncat cmd/turncat/main.go
+kubectl apply -f deploy/manifests/udp-greeter.yaml
+export PEER_IP=$(kubectl get svc media-plane -o jsonpath='{.spec.clusterIP}')
+export STUNNER_USERNAME=$(kubectl get cm stunner-config -o yaml -o jsonpath='{.data.STUNNER_USERNAME}')
+export STUNNER_PASSWORD=$(kubectl get cm stunner-config -o yaml -o jsonpath='{.data.STUNNER_PASSWORD}')
+./turncat -i - turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR_TLS}:443?transport=tls udp://${PEER_IP}:9001
+Hello STUNner via TLS
+Greetings from STUNner!
+```
+
+Type anything once `turncat` is running to receive a nice greeting from STUNner. DTLS/UDP should
+also work fine:
+
+```console
+./turncat -i - turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR_DTLS}:443?transport=dtls udp://${PEER_IP}:9001
+Another hello STUNner, now via DTLS!
+Greetings from STUNner!
+```
+
+Remember, you can always direct your clients to your TURN listeners by setting the TURN URIs in the
+ICE server configuration on your `PeerConnection`s.
+
+```javascript
+var ICE_config = {
+  'iceServers': [
+    {
+      'url': "turn:<STUNNER_PUBLIC_ADDR_TLS>:443?transport=tls",
+      'username': <STUNNER_USERNAME>,
+      'credential': <STUNNER_PASSWORD>,
+    },
+    {
+      'url': "turn:<STUNNER_PUBLIC_ADDR_DTLS>:443?transport=dtls",
+      'username': <STUNNER_USERNAME>,
+      'credential': <STUNNER_PASSWORD>,
+    },
+  ],
+};
+var pc = new RTCPeerConnection(ICE_config);
+```
+
+Note that the default Kubernetes manifest
+['stunner-standalone-tls.yaml'](/deploy/manifests/stunner-standalone-tls.yaml) opens up the
+NetworkPolicy for the `media-plane/default` service only, make sure to configure this to your own
+setup.
 
 ## Help
 

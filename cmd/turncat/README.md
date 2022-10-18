@@ -24,8 +24,15 @@ through the TURN server located at `192.0.2.1:3478` to the UDP server located at
 server and set the user/passwd to `test/test`:
 
 ```console
-./turncat --log=all:INFO,turncat:DEBUG udp://127.0.0.1:5000 \
-      turn://test:test@192.0.2.1:3478 udp://192.0.2.2:53
+./turncat --log=all:INFO,turncat:DEBUG udp://127.0.0.1:5000 turn://test:test@192.0.2.1:3478 udp://192.0.2.2:53
+```
+
+TLS/DTLS should also work fine; note that `--insecure` allows `turncat` to accept self-signed TLS
+certificates and `--verbose` is equivalent to setting all `turncat` loggers to DEBUG mode (`-l
+all:DEBUG`).
+
+```console
+./turncat --verbose --insecure udp://127.0.0.1:5000 turn://test:test@192.0.2.1:3478?transport=tls udp://192.0.2.2:53
 ```
 
 Alternatively, specify the special TURN server URI `k8s://stunner/stunnerd-config:udp-listener` to

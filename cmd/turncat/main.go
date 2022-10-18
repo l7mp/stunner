@@ -24,7 +24,7 @@ import (
 	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-const usage = "turncat [-l|--log <level>] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
+const usage = "turncat [-l|--log <level>] [-i|--insecure] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
 const defaultStunnerdConfigfileName = "stunnerd.conf"
 
 var log logging.LeveledLogger
@@ -39,6 +39,7 @@ func main() {
 	os.Args[0] = "turncat"
 	defaultDuration, _ = time.ParseDuration("1h")
 	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
+	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
 	flag.Parse()
 
@@ -83,6 +84,7 @@ func main() {
 		PeerAddr:      flag.Arg(2),
 		Realm:         config.Auth.Realm,
 		AuthGen:       authGen,
+		InsecureMode:  *insecure,
 		LoggerFactory: logger,
 	}
 	t, err := stunner.NewTurncat(cfg)
@@ -243,7 +245,7 @@ func getStunnerURI(config *stunnerv1alpha1.StunnerConfig) (string, error) {
 
 	l := config.Listeners[0]
 	if l.PublicAddr == "" {
-		return "", fmt.Errorf("no public addres for listener %q", l.Name)
+		return "", fmt.Errorf("no public address for listener %q", l.Name)
 	}
 	if l.PublicPort == 0 {
 		return "", fmt.Errorf("no public port for listener %q", l.Name)
