@@ -160,7 +160,6 @@ spec:
               protocol: TCP
             - name: rtc-tcp
               containerPort: 7801
-              hostPort: 7801
               protocol: TCP
 ---
 # Livekit react example
@@ -218,11 +217,11 @@ spec:
   # ingressClassName: nginx
   tls:
   - hosts:
-      - clienta.ingressserviceip.nip.io
-      - mediaservera.ingressserviceip.nip.io
+      - client-ingressserviceip.sslip.io
+      - mediaserver-ingressserviceip.sslip.io
     secretName: livekit-secret-tls
   rules:
-  - host: clienta.ingressserviceip.nip.io
+  - host: client-ingressserviceip.sslip.io
     http:
       paths:
       - path: /
@@ -232,7 +231,7 @@ spec:
             name: lk-react
             port:
               number: 443
-  - host: mediaservera.ingressserviceip.nip.io
+  - host: mediaserver-ingressserviceip.sslip.io
     http:
       paths:
       - path: /
