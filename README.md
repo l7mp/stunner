@@ -32,7 +32,7 @@
     <img src="https://img.shields.io/coveralls/github/l7mp/stunner" /></a>
 </p>
 
-# STUNner: A Kubernetes ingress gateway for WebRTC
+# STUNner: A Kubernetes media gateway for WebRTC
 
 Ever wondered how to [deploy your WebRTC infrastructure into the
 cloud](https://webrtchacks.com/webrtc-media-servers-in-the-cloud)? Frightened away by the
@@ -224,7 +224,7 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
        kind: GatewayConfig
        name: stunner-gatewayconfig
        namespace: stunner
-     description: "STUNner is a WebRTC ingress gateway for Kubernetes"
+     description: "STUNner is a WebRTC media gateway for Kubernetes"
    EOF
    ```
 

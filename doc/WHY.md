@@ -1,10 +1,10 @@
 # Introduction
 
-STUNner is a *WebRTC ingress gateway for Kubernetes*. All words matter here: indeed STUNner is for
-*WebRTC*, so it is specifically designed to help dealing with WebRTC media plane network protocol
-encapsulations, it is an *ingress gateway* so its job is to help ingest WebRTC media traffic into a
-virtualized media plane, and it is *opinionated towards Kubernetes* so everything around STUNner is
-designed and built to fit into the Kubernetes and the cloud-native ecosystem. That being said,
+STUNner is a *WebRTC media gateway for Kubernetes*. All words matter here: indeed STUNner is for
+*WebRTC*, so it is specifically designed to help dealing with the intricacies of WebRTC protocol
+encapsulations, it is a *media gateway* so its job is to ingest WebRTC audio/video streams into a
+virtualized media plane, and it is *opinionated towards Kubernetes*, so everything around STUNner
+is designed and built to fit into the Kubernetes and the cloud-native ecosystem. That being said,
 STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but these
 deployment options are not the main focus.
 
