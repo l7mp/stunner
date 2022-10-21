@@ -428,7 +428,7 @@ cd stunner/
 kubectl apply -f deploy/manifests/stunner-standalone-tls.yaml
 ```
 
-This will fire up STUNner with two TURN listeners: a TLS/TCP and a DTLS/UDP listener, both at port
+This will fire up STUNner with two TURN listeners, a TLS/TCP and a DTLS/UDP listener, both at port
 443, and create two LoadBalancer services to expose these to clients.
 
 Wait until Kubernetes assigns a public IP address and learn the new public addresses.
