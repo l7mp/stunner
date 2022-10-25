@@ -1,9 +1,8 @@
 # Using Livekit with STUNner
 
-This guide shows how you can use [LiveKit](https://livekit.io/)
-inside a Kubernetes cluster, using STUNner as a WebRTC gateway.
+This document guides you through the [LiveKit](https://livekit.io/) installation into Kubernetes, when it is used together with the STUNner WebRTC gateway.
 
-In this demo you will learn the following steps to:
+In this demo you will learn the following steps:
 - integrate a typical WebRTC application server with STUNner
 - deploy the LiveKit server into Kubernetes,
 - configure STUNner to expose LiveKit to clients
@@ -12,7 +11,7 @@ In this demo you will learn the following steps to:
 
 The below installation instructions require an operational cluster running a supported version of Kubernetes (>1.22). You can use any supported platform, any hosted or private Kubernetes cluster, but make sure that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes services should support this). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach your WebRTC infra.
 
-Minikube is not a supported platform unfortunately. It [cannot get a Let's Encrypt cerfiticate](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b) with nip.io using it which is essential for this demo. Later on you will learn more about this certificate.
+Unfortunately, Minikube is not supported for this demo. The reason is that [Let's Encrypt certificate is not available with nip.io] (https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b). Later on you will learn more about this certificate.
 
 ## Ingress
 
@@ -26,7 +25,7 @@ helm install ingress-nginx ingress-nginx/ingress-nginx
 ## Installation guide
 
 Let's start with a disclaimer. The liveKit client example(browser) must have secure HTTP connection in order to work because, [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This induces that the client-server(LiveKit-server) connection must be secure too. According to the [docs](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer) and our experiences, self-signed certs do not work.
-Due to these contstraints we must deploy some resources that can handle certificates. 
+Due to these constraints, we must deploy `cert-manager` that can properly handle certificates. 
 
 Install cert-manager's CRDs.
 ```
@@ -91,8 +90,8 @@ The LiveKit bundle includes a lot of resources:
 - a cluster issuer which is for the certificates
 - an Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster
 
-But before we apply the listed resources we must set one more thing. As it was mentioned earlier the LiveKit server must have a valid cert. It means you must have a domain that has CA signed certificate. If you have your own domain you can create two subdomains that points to the `ingress-nginx-controller` service's IP. If you don't have your own domain don't be upset there's a solution for you as well.  
-[nip.io](nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and have a CA signed certificate. 
+But before instantiating the listed resources, we have one more thing to set. As it was mentioned earlier the LiveKit server must have a valid cert. It means you must have a domain that has CA signed certificate. If you have your own domain, you can create two subdomains that points to the `ingress-nginx-controller` service's IP. If you don't have your own domain, don't be upset there's a solution for you as well.
+[nip.io](nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and have a CA signed certificate. It allows us to point `client-<ingress-IP>.nip.io` to our `Ingress` gateway under a valid CA signed domain.
 
 ```
 kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
@@ -109,13 +108,14 @@ kubectl get pods
 
 ## Test
 
-After installing everything successfully you should be able to open the following command's output URL in your browser:
+After installing everything, you shall execute the following command to retrieve the URL to open:
 ```
 echo client-$INGRESSIP.nip.io
 ```
+Copy the URL into your browser, and now you should be greeted with the 'LiveKit Video' title.
 
-If it opened properly and you are greeted with the 'LiveKit Video' title you're doing great.
-As you can see you must set the LiveKit URL. It is the other subdomain we had to set earlier but to make sure you type the right URL in:
+On the landing page you must set the LiveKit URL, which is the LiveKit server's address, or in our case the other subdomain we set earlier in the Ingress' manifest.
+Executing the following command shall get you the required URL:
 ```
 echo wss://mediaserver-$INGRESSIP.nip.io:443
 ```
@@ -128,7 +128,7 @@ livekit-cli create-token \
     --join --room room --identity user1 \
     --valid-for 24h
 ```
-Copy the access token into the token field and hit the Connect button. If everything is set up correctly you should be able to connect to a room. If you repeat the procedure in a seperate browser tab you can see yourself twice with the twist that the other client's media is flowing through STUNner and the LiveKit-server deployed in you cluster.
+Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a seperate browser tab you can see yourself twice with the twist that the other client's media is flowing through STUNner and the LiveKit-server deployed in you cluster.
 
 ## Help
 
