@@ -59,7 +59,7 @@ func main() {
 
 		conf <- c
 
-	} else if *config != "" && *watch == false {
+	} else if *config != "" && !*watch {
 		log.Infof("loading configuration from config file %q", *config)
 
 		c, err := stunner.LoadConfig(*config)
@@ -70,7 +70,7 @@ func main() {
 
 		conf <- c
 
-	} else if *config != "" && *watch == true {
+	} else if *config != "" && *watch {
 		log.Infof("watching configuration file at %q", *config)
 
 		watcherEnabled := false
@@ -104,7 +104,7 @@ func main() {
 				case <-ticker.C:
 					// log.Tracef("periodic watcher tick: watchlist: %s, watcher enabled: %t",
 					//         watcher.WatchList(), watcherEnabled)
-					if watcherEnabled == true {
+					if watcherEnabled {
 						continue
 					}
 
@@ -133,7 +133,7 @@ func main() {
 						log.Warnf("config file deleted %q, disabling watcher",
 							e.Op.String())
 
-						if watcherEnabled == true {
+						if watcherEnabled {
 							if err := watcher.Remove(*config); err != nil {
 								log.Warnf("could not remove config file %q "+
 									"from watcher: %s", *config, err.Error())
@@ -145,7 +145,7 @@ func main() {
 					}
 
 					if e.Op != fsnotify.Write {
-						log.Warnf("unhnadled notify op on config file %q (ignoring): %s",
+						log.Warnf("unhandled notify op on config file %q (ignoring): %s",
 							e.Name, e.Op.String())
 						continue
 					}
@@ -162,7 +162,7 @@ func main() {
 				case err := <-watcher.Errors:
 					log.Debugf("watcher error, deactivating watcher: %s", err.Error())
 
-					if watcherEnabled == true {
+					if watcherEnabled {
 						if err := watcher.Remove(*config); err != nil {
 							log.Warnf("could not remove config file %q from watcher: %s",
 								*config, err.Error())

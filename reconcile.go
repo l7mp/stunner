@@ -75,7 +75,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 
 	// a restart may be needed: close the running server while it still holds the actual
 	// configuration (i.e., before actually calling Reconcile on all objects)
-	if restart && s.options.DryRun != true {
+	if restart && !s.options.DryRun {
 		s.log.Debug("closing running server")
 		s.Stop()
 	}
@@ -92,6 +92,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		goto rollback
 	}
 
+	s.log.Infof("setting loglevel to %q", s.GetAdmin().LogLevel)
 	s.logger.SetLevel(s.GetAdmin().LogLevel)
 
 	new += len(adminState.NewJobQueue)
@@ -145,7 +146,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d",
 		new, changed, deleted)
 
-	if s.options.DryRun == true {
+	if s.options.DryRun {
 		if restart {
 			return v1alpha1.ErrRestartRequired
 		}
@@ -158,7 +159,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 
 		if err := s.Start(); err != nil {
 			s.log.Errorf("could not restart: %s", err.Error())
-			if s.options.SuppressRollback == true {
+			if s.options.SuppressRollback {
 				return err
 			}
 
@@ -172,7 +173,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	return nil
 
 rollback:
-	if s.options.SuppressRollback == false {
+	if !s.options.SuppressRollback {
 		s.log.Infof("rolling back to previous configuration: %#v", rollback)
 		return s.Reconcile(*rollback)
 	}

@@ -1,0 +1,64 @@
+#
+#
+# The following yaml script will install a cloud-retro setup in your Kubernetes cluster
+# with the needed services. With an invalid configuration of course, for this to properly work
+# You need the apply-config.sh minimalistic shell script to update the config with the unclear addresses.
+# 
+#
+# In short, no touching.
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudretro
+---
+# Configmap for Coordinator
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudretro-config-c
+  namespace: cloudretro
+  labels:
+    app: coordinator
+---
+# Coordinator deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coordinator-deployment
+  namespace: cloudretro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coordinator
+  template:
+    metadata:
+      labels:
+        app: coordinator
+    spec:
+      containers:
+      - name: coordinator
+        image: valniae/snekyrepo:crdi
+        envFrom:
+          - configMapRef:
+              name: cloudretro-config-c
+        command: ["coordinator"]
+        args: ["--v=5"]
+        ports:
+        - containerPort: 8000
+---
+# Coordinator LoadBalancer for HTTP
+apiVersion: v1
+kind: Service
+metadata:
+  name: coordinator-lb-svc
+  namespace: cloudretro
+spec:
+  selector:
+    app: coordinator
+  ports:
+    - port: 8000
+      targetPort: 8000
+      #nodePort: 30001
+  type: LoadBalancer

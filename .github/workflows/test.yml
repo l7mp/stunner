@@ -4,16 +4,18 @@ on:
   push:
     branches:
       - '*'
+    tags-ignore:
+      - '*'
   pull_request:
     branches: [ main ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: 1.18
       - name: Download modules
@@ -21,4 +23,24 @@ jobs:
       - name: Go install
         run: go install
       - name: Test
-        run: go test -v
+        run: go test -v -covermode=count
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        if: success()
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Calc coverage
+        run: |
+          go test -v -covermode=count -coverprofile=coverage.out
+      - name: Convert coverage.out to coverage.lcov
+        uses: jandelgado/gcov2lcov-action@v1
+      - name: Coveralls
+        uses: coverallsapp/github-action@v1.1.2
+        with:
+          github-token: ${{ secrets.github_token }}
+          path-to-lcov: coverage.lcov

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-plane
+  namespace: default
+  labels:
+    app: media-plane
+spec:
+  selector:
+    matchLabels:
+      app: media-plane
+  template:
+    metadata:
+      labels:
+        app: media-plane
+    spec:
+      containers:
+      - image: l7mp/net-debug:0.5.3
+        name: net-debug
+        command: ["/usr/bin/socat"]
+        args: ["-d", "-d", "udp-l:9001,fork", "EXEC:\"echo Greetings from STUNner!\""]
+        resources:
+          requests:
+            cpu: 250m
+            memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-plane
+  namespace: default
+  labels:
+    app: media-plane
+spec:
+  ports:
+  - port: 9001
+    protocol: UDP
+  selector:
+    app: media-plane
+  type: ClusterIP

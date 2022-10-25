@@ -2,12 +2,15 @@ package stunner
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
+	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
 
@@ -30,7 +33,9 @@ type TurncatConfig struct {
 	// Realm is the STUN/TURN realm
 	Realm string
 	// AuthGet specifies the function to generate auth tokens
-	AuthGen       AuthGen
+	AuthGen AuthGen
+	// InsecureMode controls whether self-signed TLS certificates are accepted by the TURN client
+	InsecureMode  bool
 	LoggerFactory logging.LoggerFactory
 }
 
@@ -38,12 +43,14 @@ type TurncatConfig struct {
 type Turncat struct {
 	listenerAddr  net.Addr
 	serverAddr    net.Addr
+	serverProto   string
 	peerAddr      net.Addr
+	realm         string
 	listenerConn  interface{}            // net.Conn or net.PacketConn
 	connTrack     map[string]*connection // Conntrack table.
 	lock          *sync.Mutex            // Sync access to the conntrack state.
-	realm         string
-	authGen       AuthGen // Generate auth tokens.
+	authGen       AuthGen                // Generate auth tokens.
+	insecure      bool
 	loggerFactory logging.LoggerFactory
 	log           logging.LeveledLogger
 }
@@ -56,7 +63,9 @@ type connection struct {
 	serverConn net.PacketConn // Relayed UDP connection to server
 }
 
-// NewTurncat creates a new turncat relay from the specified config, creating a listener socket for clients to connect and relaying client connections through the speficied STUN/TURN server to the peer.
+// NewTurncat creates a new turncat relay from the specified config, creating a listener socket for
+// clients to connect and relaying client connections through the speficied STUN/TURN server to the
+// peer.
 func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	loggerFactory := config.LoggerFactory
 	if loggerFactory == nil {
@@ -105,10 +114,12 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client
 	log.Tracef("Setting up listener connection on %s", config.ListenerAddr)
-	listenerConf := &net.ListenConfig{Control: reuseAddr}
 	var listenerConn interface{}
+	listenerConf := &net.ListenConfig{Control: reuseAddr}
 
 	switch listener.Protocol {
+	case "file":
+		listenerConn = NewFileConn(os.Stdin)
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		l, err := listenerConf.ListenPacket(context.Background(), listener.Addr.Network(),
 			listener.Addr.String())
@@ -132,12 +143,14 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	t := &Turncat{
 		listenerAddr:  listener.Addr,
 		serverAddr:    server.Addr,
+		serverProto:   server.Protocol,
 		peerAddr:      peer.Addr,
 		listenerConn:  listenerConn,
 		connTrack:     make(map[string]*connection),
 		lock:          new(sync.Mutex),
 		realm:         config.Realm,
 		authGen:       config.AuthGen,
+		insecure:      config.InsecureMode,
 		loggerFactory: loggerFactory,
 		log:           log,
 	}
@@ -150,6 +163,9 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
 		// client connection is bytestream, we are supposed to have a Listen/Accept loop available
 		go t.runListen()
+	case "file":
+		// client connection is file
+		go t.runListenFile()
 	default:
 		t.log.Errorf("internal error: unknown client protocol %s for client %s:%s",
 			t.listenerAddr.Network(), t.listenerAddr.Network(), t.listenerAddr.String())
@@ -184,6 +200,8 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
+	case *fileConn:
+		// do nothing
 	default:
 		t.log.Error("internal error: unknown listener socket type")
 	}
@@ -209,7 +227,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	// connection for the TURN client
 	var turnConn net.PacketConn
-	switch t.serverAddr.Network() {
+	switch t.serverProto {
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		t, err := net.ListenPacket(t.serverAddr.Network(), "0.0.0.0:0")
 		if err != nil {
@@ -224,6 +242,30 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(c)
+	case "tls":
+		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
+		// assert.NoError(t, err, "cannot create certificate for TLS client socket")
+		c, err := tls.Dial("tcp", t.serverAddr.String(), &tls.Config{
+			MinVersion:         tls.VersionTLS10,
+			InsecureSkipVerify: t.insecure,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot allocate TURN/TLS socket for client %s:%s: %s",
+				clientAddr.Network(), clientAddr.String(), err)
+		}
+		turnConn = turn.NewSTUNConn(c)
+	case "dtls":
+		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
+		// assert.NoError(t, err, "cannot create certificate for DTLS client socket")
+		udpAddr, _ := net.ResolveUDPAddr("udp", t.serverAddr.String())
+		conn, err := dtls.Dial("udp", udpAddr, &dtls.Config{
+			InsecureSkipVerify: t.insecure,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot allocate TURN/DTLS socket for client %s:%s: %s",
+				clientAddr.Network(), clientAddr.String(), err)
+		}
+		turnConn = turn.NewSTUNConn(conn)
 	default:
 		return nil, fmt.Errorf("unknown TURN server protocol %s for client %s:%s",
 			t.serverAddr.Network(), clientAddr.Network(), clientAddr.String())
@@ -313,7 +355,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				// unfoftunately, the PacketConn forged by pion/turn fails to check for net.ErrClosed...
 				if !errors.Is(readErr, net.ErrClosed) &&
 					!strings.Contains(readErr.Error(), "use of closed network connection") {
-					t.log.Debugf("cannot read from TURN relay connection for client %s:%s (likely hamrless): %s",
+					t.log.Debugf("cannot read from TURN relay connection for client %s:%s: %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
 				}
@@ -335,7 +377,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				conn.clientAddr.Network(), conn.clientAddr.String())
 
 			if _, writeErr := conn.clientConn.Write(buffer[0:n]); writeErr != nil {
-				t.log.Debugf("cannot write to client connection for client %s:%s (likely harmless): %s",
+				t.log.Debugf("cannot write to client connection for client %s:%s: %s",
 					conn.clientAddr.Network(), conn.clientAddr.String(), writeErr.Error())
 				t.deleteConnection(conn)
 				return
@@ -500,4 +542,29 @@ func (t *Turncat) runListen() {
 				caddr)
 		}
 	}
+}
+
+func (t *Turncat) runListenFile() {
+	listenerConn, ok := t.listenerConn.(*fileConn)
+	if !ok {
+		t.log.Error("cannot listen on client connection: expected file")
+		// terminate go routine
+		return
+	}
+
+	// handle connection
+	caddr := listenerConn.LocalAddr().String()
+	t.log.Tracef("new client connection: %s", caddr)
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	conn, err := t.newConnection(listenerConn)
+	if err != nil {
+		t.log.Warnf("relay setup failed for client %s: %s", caddr, err.Error())
+		return
+	}
+
+	t.connTrack[caddr] = conn
+
+	t.runConnection(conn)
 }

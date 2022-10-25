@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -16,9 +18,66 @@ type StunnerUri struct {
 	Addr                                  net.Addr
 }
 
+// wrap an os.File as a net.Conn
+type fileConnAddr struct {
+	file *os.File
+}
+
+func (s *fileConnAddr) Network() string { return "file" }
+func (s *fileConnAddr) String() string  { return s.file.Name() }
+
+type fileConn struct {
+	file *os.File
+}
+
+func (f *fileConn) Read(b []byte) (n int, err error) {
+	return f.file.Read(b)
+}
+
+func (f *fileConn) Write(b []byte) (n int, err error) {
+	return f.file.Write(b)
+}
+
+func (f *fileConn) Close() error {
+	return f.file.Close()
+}
+
+func (f *fileConn) LocalAddr() net.Addr {
+	return &fileConnAddr{file: f.file}
+}
+
+func (f *fileConn) RemoteAddr() net.Addr {
+	return &fileConnAddr{file: f.file}
+}
+
+func (f *fileConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (f *fileConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (f *fileConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func NewFileConn(file *os.File) net.Conn {
+	return &fileConn{file: file}
+}
+
 // ParseUri parses a STUN/TURN server URI, e.g., "turn://user1:passwd1@127.0.0.1:3478?transport=udp"
 func ParseUri(uri string) (*StunnerUri, error) {
 	s := StunnerUri{}
+
+	// handle stdin/out
+	if uri == "-" || uri == "file://-" {
+		s.Protocol = "file"
+		// make turncat conf happy
+		s.Port = 1
+		s.Addr = &fileConnAddr{file: os.Stdin}
+		return &s, nil
+	}
 
 	u, err := url.Parse(uri)
 	if err != nil {
@@ -47,13 +106,13 @@ func ParseUri(uri string) (*StunnerUri, error) {
 	s.Port = port
 
 	switch proto {
-	case "udp", "udp4", "udp6":
+	case "udp", "udp4", "udp6", "dtls":
 		a, err := net.ResolveUDPAddr("udp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
 		}
 		s.Addr = a
-	case "tcp", "tcp4", "tcp6":
+	case "tcp", "tcp4", "tcp6", "tls":
 		a, err := net.ResolveTCPAddr("tcp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
@@ -80,7 +139,7 @@ func ParseUri(uri string) (*StunnerUri, error) {
 
 func reuseAddr(network, address string, conn syscall.RawConn) error {
 	return conn.Control(func(descriptor uintptr) {
-		syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+		_ = syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
 	})
 }

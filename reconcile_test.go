@@ -442,6 +442,96 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
 		},
 	},
+	{
+		name: "reconcile-test: reconcile metrics_endpoint",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel:        "anything",
+				MetricsEndpoint: "http://0.0.0.0:8080/metrics",
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:   "default-listener",
+				Addr:   "127.0.0.1",
+				Routes: []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			// no restart!
+			assert.NoError(t, err, "no restart needed")
+
+			// check everyting
+			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			admin := s.GetAdmin()
+			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
+			// assert.Equal(t, admin.LogLevel, v1alpha1.DefaultLogLevel, "stunner loglevel")
+			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
+				"stunner metrics endpoint")
+
+			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
+			auth := s.GetAuth()
+			assert.Equal(t, auth.Type, v1alpha1.AuthTypePlainText, "auth type ok")
+
+			assert.Equal(t, auth.Username, "user", "username ok")
+			assert.Equal(t, auth.Password, "pass", "password ok")
+
+			handler := s.NewAuthHandler()
+			key, ok := handler("user", v1alpha1.DefaultRealm,
+				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, key, turn.GenerateAuthKey("user",
+				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
+
+			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+
+			l := s.GetListener("default-listener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
+			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
+			assert.Equal(t, l.MaxPort, v1alpha1.DefaultMaxRelayPort, "listener maxport ok")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+
+			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+
+			c := s.GetCluster("allow-any")
+			assert.NotNil(t, c, "cluster found")
+			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.Type, v1alpha1.ClusterTypeStatic, "cluster mode ok")
+			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			_, n, _ := net.ParseCIDR("0.0.0.0/0")
+			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
+			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+
+			// listener  uses the open cluster for routing
+			p := s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+		},
+	},
 	/// auth
 	{
 		name: "reconcile-test: reconcile plaintextauth name",
@@ -1387,6 +1477,10 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 		"dummy.l7mp.io":       []string{"1.2.3.10"},
 	}, loggerFactory)
 
+	// should never err
+	mockDns.Start()
+	assert.NoError(t, nil, "start mock DNS")
+
 	log.Debug("creating a stunnerd")
 	s := NewStunner().WithOptions(Options{
 		LogLevel:         stunnerTestLoglevel,
@@ -1687,6 +1781,93 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		},
 		echoServerAddr:  "1.2.3.5:5678",
 		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
+		testName: "changing the realm induces a server restart",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Realm: "dummy",
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
+		testName: "realm reset a server restart",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,

@@ -1,29 +1,55 @@
 # STUNner documentation
 
-## Concepts
+<p align="center">
+  <img alt="STUNner", src="/doc/stunner.svg" width="50%" height="50%"></br>
+</p>
 
-TODO
+## Overview
+
+* [Why STUNner](/doc/WHY.md)
+* [Deployment models](/doc/DEPLOYMENT.md)
+* [Concepts](/doc/CONCEPTS.md)
+
+## Getting started
+
+* [Installation](/doc/INSTALL.md)
 
 ## User guides
 
-* The [installation and configuration guide](/doc/INSTALL.md) helps getting started with STUnner
-  and describes the most important configuration knobs.
-* The [security guide](/doc/SECURITY.md) discusses the best-practices to minmize the security risks
-associated with a misconfigured STUNner gateway.
-* The [authentication guide](/doc/AUTH.md) describes the different user authentication modes
-supported by STUNner.
+* [Gateway API reference](/doc/GATEWAY.md)
+* [Security](/doc/SECURITY.md)
+* [Authentication](/doc/AUTH.md)
+
+## Tutorials
+
+### Basics
+
+* [Opening a UDP tunnel via STUNner](/examples/simple-tunnel)
+
+### Headless deployment model
+
+* [Direct one to one video call via STUNner](/examples/direct-one2one-call)
+
+### Media-plane deployment model
+
+* [One to one video call with Kurento](/examples/kurento-one2one-call)
+* [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md)
+* [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md)
+* [Remote desktop access with Neko](/examples/neko/README.md)
 
 ## Manuals
 
-* The [`stunnerd` manual](/cmd/stunnerd/README.md) describes the installation and configuration
-  of `stunnerd`, the daemon that implements the STUNner gateway service.
-* The [`turncat` manual](/cmd/turncat/README.md) describes the `turncat` utility, a simple
-  STUN/TURN client to tunnel a local connection through a TURN server to an arbitrary remote
-  address/port.
+* [`stunnerd` manual](/cmd/stunnerd/README.md)
+* [`turncat` manual](/cmd/turncat/README.md)
+* [`stunnerctl` manual](/cmd/stunnerctl/README.md)
+
+## Obsolete features
+
+* [Standalone mode](/doc/OBSOLETE.md)
 
 ## Help
 
-STUNner development is coordinated in Discord, send [us](/AUTHORS) an email to ask an invitation.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
 
 ## License
 

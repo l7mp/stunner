@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - '*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v3
+        with:
+          args: --timeout 3m --issues-exit-code=0

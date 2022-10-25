@@ -38,6 +38,28 @@ func NewAuth(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error)
 // new-config means it is about to be deleted, an empty old-config means it is to be deleted,
 // otherwise it will be reconciled from the old configuration to the new one
 func (auth *Auth) Inspect(old, new v1alpha1.Config) bool {
+
+	// auth is a singleton, so this should never happen
+	if old == nil || new == nil {
+		return false
+	}
+
+	req, ok := new.(*v1alpha1.AuthConfig)
+	if !ok {
+		// should never happen
+		panic("Auth.Inspect called on an unknown configuration")
+	}
+
+	if err := req.Validate(); err != nil {
+		// should never happen
+		panic("Auth.Inspect called with an invalid AuthConfig")
+	}
+
+	// the only case when restart is needed when the realm changes
+	if auth.Realm != req.Realm {
+		return true
+	}
+
 	return false
 }
 
@@ -62,10 +84,10 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 	auth.Realm = req.Realm
 	switch atype {
 	case v1alpha1.AuthTypePlainText:
-		auth.Username, _ = req.Credentials["username"]
-		auth.Password, _ = req.Credentials["password"]
+		auth.Username = req.Credentials["username"]
+		auth.Password = req.Credentials["password"]
 	case v1alpha1.AuthTypeLongTerm:
-		auth.Secret, _ = req.Credentials["secret"]
+		auth.Secret = req.Credentials["secret"]
 	}
 
 	return nil

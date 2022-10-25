@@ -53,10 +53,10 @@ type echoTestConfig struct {
 	loggerFactory                             logging.LoggerFactory
 }
 
-type bundle struct {
-	addr net.Addr
-	err  error
-}
+// type bundle struct {
+// 	addr net.Addr
+// 	err  error
+// }
 
 // func bindingRequestWithTimeout(client *turn.Client, timeout time.Duration) (net.Addr, error){
 //     res := make(chan bundle, 1)
@@ -168,7 +168,7 @@ func stunnerEchoTest(conf echoTestConfig) {
 			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 	client.Close()
 
 }
@@ -218,8 +218,8 @@ func generateKey(crtFile, keyFile *os.File) error {
 		},
 	)
 
-	crtFile.Write(certPem)
-	keyFile.Write(keyPEM)
+	_, _ = crtFile.Write(certPem)
+	_, _ = keyFile.Write(keyPEM)
 
 	return nil
 }
@@ -288,12 +288,9 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	}
 
 	// register host names
-	err = gw.AddHost("stunner.l7mp.io", "1.2.3.4")
-	err = gw.AddHost("echo-server.l7mp.io", "1.2.3.5")
-	err = gw.AddHost("dummy.l7mp.io", "1.2.3.10")
-	if err != nil {
-		return nil, err
-	}
+	_ = gw.AddHost("stunner.l7mp.io", "1.2.3.4")
+	_ = gw.AddHost("echo-server.l7mp.io", "1.2.3.5")
+	_ = gw.AddHost("dummy.l7mp.io", "1.2.3.10")
 
 	return &VNet{
 		gw:     gw,
@@ -622,32 +619,32 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		// dtls, longterm
-		{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "dtls",
-				Protocol: "dtls",
-				Addr:     "127.0.0.1",
-				Port:     23478,
-				Cert:     certFile.Name(),
-				Key:      keyFile.Name(),
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
+		// // dtls, longterm
+		// {
+		// 	ApiVersion: "v1alpha1",
+		// 	Admin: v1alpha1.AdminConfig{
+		// 		LogLevel: stunnerTestLoglevel,
+		// 	},
+		// 	Auth: v1alpha1.AuthConfig{
+		// 		Type: "longterm",
+		// 		Credentials: map[string]string{
+		// 			"secret": "my-secret",
+		// 		},
+		// 	},
+		// 	Listeners: []v1alpha1.ListenerConfig{{
+		// 		Name:     "dtls",
+		// 		Protocol: "dtls",
+		// 		Addr:     "127.0.0.1",
+		// 		Port:     23478,
+		// 		Cert:     certFile.Name(),
+		// 		Key:      keyFile.Name(),
+		// 		Routes:   []string{"allow-any"},
+		// 	}},
+		// 	Clusters: []v1alpha1.ClusterConfig{{
+		// 		Name:      "allow-any",
+		// 		Endpoints: []string{"0.0.0.0/0"},
+		// 	}},
+		// },
 	}
 
 	for _, c := range testStunnerConfigsWithLocalhost {
