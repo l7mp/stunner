@@ -82,7 +82,12 @@ func NewStunner() *Stunner {
 
 	// start monitoring
 	monitoring.RegisterMetrics(s.log,
-		func() float64 { return float64(s.server.AllocationCount()) })
+		func() float64 {
+			if s.server != nil {
+				return float64(s.server.AllocationCount())
+			}
+			return 0.0
+		})
 
 	return &s
 }
