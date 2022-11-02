@@ -9,6 +9,7 @@ import (
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
+	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -174,7 +175,7 @@ func (l *Listener) Close() error {
 				return fmt.Errorf("internal error: invalid conversion to turn.PacketConnConfig")
 			}
 
-			if err := conn.PacketConn.Close(); err != nil {
+			if err := conn.PacketConn.Close(); err != nil && !util.IsClosedErr(err) {
 				return err
 			}
 		}
@@ -186,7 +187,7 @@ func (l *Listener) Close() error {
 				return fmt.Errorf("internal error: invalid conversion to turn.ListenerConfig")
 			}
 
-			if err := conn.Listener.Close(); err != nil {
+			if err := conn.Listener.Close(); err != nil && !util.IsClosedErr(err) {
 				return err
 			}
 		}

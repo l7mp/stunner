@@ -3,7 +3,6 @@ package stunner
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
 
+	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -349,12 +349,7 @@ func (t *Turncat) runConnection(conn *connection) {
 		for {
 			n, peerAddr, readErr := conn.serverConn.ReadFrom(buffer[0:])
 			if readErr != nil {
-				// fmt.Println(PrettySprint(readErr.Error()))
-
-				// ignore "use of closed network connection" errors on exit (DeleteConn already called)
-				// unfoftunately, the PacketConn forged by pion/turn fails to check for net.ErrClosed...
-				if !errors.Is(readErr, net.ErrClosed) &&
-					!strings.Contains(readErr.Error(), "use of closed network connection") {
+				if !util.IsClosedErr(readErr) {
 					t.log.Debugf("cannot read from TURN relay connection for client %s:%s: %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
@@ -391,7 +386,7 @@ func (t *Turncat) runConnection(conn *connection) {
 		for {
 			n, readErr := conn.clientConn.Read(buffer[0:])
 			if readErr != nil {
-				if !errors.Is(readErr, net.ErrClosed) {
+				if !util.IsClosedErr(readErr) {
 					t.log.Debugf("cannot read from client connection for client %s:%s (likely hamrless): %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
@@ -425,7 +420,7 @@ func (t *Turncat) runListenPacket() {
 	for {
 		n, clientAddr, err := listenerConn.ReadFrom(buffer[0:])
 		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
+			if !util.IsClosedErr(err) {
 				t.log.Warnf("cannot read from listener connection: %s", err.Error())
 			}
 			return
@@ -502,7 +497,7 @@ func (t *Turncat) runListen() {
 	for {
 		clientConn, err := listenerConn.Accept()
 		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
+			if !util.IsClosedErr(err) {
 				t.log.Warnf("cannot accept() in listener connection: %s", err.Error())
 				continue
 			} else {
