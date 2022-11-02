@@ -15,7 +15,7 @@ spec:
         app: iperf-server
     spec:
       containers:
-      - image: l7mp/net-debug:0.5.4
+      - image: l7mp/net-debug:latest
         name: net-debug
         command: ["/usr/bin/iperf"]
         args: ["-s", "-p", "5000", "-u", "-e"]
