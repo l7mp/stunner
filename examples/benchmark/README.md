@@ -114,7 +114,7 @@ An example for:
 
 ## Expected output
 
-The output will be a standard `iperf` server output trimmed a little bit to show only the results. You will see a number of connections that were used to test. Their number is the value of the `-n` argument. In these rows you can also see the jitter and latencies of every individual connections. The `SUM` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packet/second (pps) rate.
+The output will be a standard `iperf` server output trimmed a little bit to show only the results. You will see a number of connections that were used to test. Their number is the value of the `-n` argument. In these rows you can also see the jitter and latencies of every individual connections. The `SUM` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
 
 ### Local measurment
 
@@ -165,12 +165,15 @@ Results
 [SUM] 0.0000-4.9597 sec  12 datagrams received out-of-order
 ```
 
-Notice that the average packet/second rate will be less lower in case of a hosted Kubernetes cluster than in case of running `STUNner` locally
+Notice that the average packets/second rate will be less lower in case of a hosted Kubernetes cluster than in case of running `STUNner` locally
 
-## Advice
+## Tips and Tricks
 
-It is advised to repeat the measurment with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, 1200.
-In the case of smaller packets, the average PPS rate will be higher than when using bigger packet sizes. But will also result in lower effective (packet drop under 1%) throughput. You should definitely change the arguments to test the performance of your setup ideally.
+* It is advised to repeat the measurment with different packet sizes.
+
+Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200.
+
+**Effect of packet sizes:** With smallish packets (e.g., 64B), the average packets/second rate will be higher than with largish packets (e.g., 1200B). Small packet sizes result lower effective throughput (when packet drop is < 1%). You should definitely change the arguments to test the performance of your setup ideally.
 
 ## Help
 
