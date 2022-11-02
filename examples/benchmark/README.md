@@ -165,12 +165,12 @@ Results
 [SUM] 0.0000-4.9597 sec  12 datagrams received out-of-order
 ```
 
-Notice that the avarage packet/second rate will be less lower in case of a hosted Kubernetes cluster than in case of running `STUNner` locally
+Notice that the average packet/second rate will be less lower in case of a hosted Kubernetes cluster than in case of running `STUNner` locally
 
 ## Advice
 
 It is advised to repeat the measurment with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, 1200.
-In the case of smaller packets, the avarage PPS rate will be higher than when using bigger packet sizes. But will also result in lower effective (packet drop under 1%) throughput. You should definitely change the arguments to test the performance of your setup ideally. 
+In the case of smaller packets, the average PPS rate will be higher than when using bigger packet sizes. But will also result in lower effective (packet drop under 1%) throughput. You should definitely change the arguments to test the performance of your setup ideally.
 
 ## Help
 
