@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"net"
 	"reflect"
 	"sort"
 )
@@ -52,10 +51,6 @@ func (req *ListenerConfig) Validate() error {
 	if req.Addr == "" {
 		req.Addr = "0.0.0.0"
 	}
-	if net.ParseIP(req.Addr) == nil {
-		return fmt.Errorf("invalid listener address %s in listener configuration: %q",
-			req.Addr, req.String())
-	}
 
 	if req.Port == 0 {
 		req.Port = DefaultPort
@@ -73,7 +68,6 @@ func (req *ListenerConfig) Validate() error {
 	}
 
 	sort.Strings(req.Routes)
-
 	return nil
 }
 

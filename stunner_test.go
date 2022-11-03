@@ -299,53 +299,65 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	}, nil
 }
 
-var testStunnerConfigsWithVnet = []v1alpha1.StunnerConfig{
+type StunnerTestConfigsWithVnet struct {
+	testName   string
+	conf       v1alpha1.StunnerConfig
+	clientAddr string
+}
+
+var testStunnerConfigsWithVnet = []StunnerTestConfigsWithVnet{
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		testName: "plaintext",
+		conf: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes:   []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "udp",
-			Addr:     "1.2.3.4",
-			Port:     3478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
 	},
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "longterm",
-			Credentials: map[string]string{
-				"secret": "my-secret",
+		testName: "longterm",
+		conf: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": "my-secret",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes:   []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "udp",
-			Addr:     "1.2.3.4",
-			Port:     3478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
 	},
 }
 
@@ -359,11 +371,10 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	for _, c := range testStunnerConfigsWithVnet {
-		auth := c.Auth.Type
-		testName := fmt.Sprintf("TestStunner_NewStunner_VNet_auth:%s", auth)
-		t.Run(testName, func(t *testing.T) {
-			log.Debugf("-------------- Running test: %s -------------", testName)
+	for _, test := range testStunnerConfigsWithVnet {
+		t.Run(test.testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", test.testName)
+			c := test.conf
 
 			// patch in the vnet
 			log.Debug("building virtual network")
@@ -381,7 +392,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
 
 			var u, p string
-			switch auth {
+			switch c.Auth.Type {
 			case "plaintext":
 				u = "user1"
 				p = "passwd1"

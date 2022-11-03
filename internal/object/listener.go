@@ -64,7 +64,7 @@ func (l *Listener) Inspect(old, new v1alpha1.Config) bool {
 		return true
 	}
 
-	// this is a reconciliaiton event!
+	// this is a reconciliation event!
 	req, ok := new.(*v1alpha1.ListenerConfig)
 	if !ok {
 		// should never happen
@@ -109,6 +109,13 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 
 	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
 	ipAddr := net.ParseIP(req.Addr)
+	// special-case "localhost"
+	if ipAddr == nil && req.Addr == "localhost" {
+		ipAddr = net.ParseIP("127.0.0.1")
+	}
+	if ipAddr == nil {
+		return fmt.Errorf("Invalid listener address: %s", req.Addr)
+	}
 
 	l.Proto = proto
 	l.Addr = ipAddr
