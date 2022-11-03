@@ -86,11 +86,11 @@ The below command will open:
 * an `iperf` client sending its traffic to the turn
 
 An example for:
+* a local benchmark
 * 5 turncats
 * 5 seconds of evaluation time
 * 1000 byte packets
 * 100 Mbits/sec
-* local benchmark
 ```
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p local
 ```
@@ -103,23 +103,28 @@ The below command will open:
 `STUNner` and `iperf` are running inside the Kubernetes Cluster.
 
 An example for:
+* a Kubernetes benchmark
 * 5 turncats
 * 5 seconds of evaluation time
 * 1000 byte packets
 * 100 Mbits/sec
-* Kubernetes benchmark
 ```
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p k8s
 ```
 
-## Expected output
+## Expected output / Getting the results
 
-The output will be a standard `iperf` server output trimmed a little bit to show only the results. You will see a number of connections that were used to test. Their number is the value of the `-n` argument. In these rows you can also see the jitter and latencies of every individual connections. The `SUM` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
+The output will be a standard `iperf` server output trimmed to show only the results. There are per-connections results and summarized results.
+
+* **Per-connection results:** The number of connections are set with the `-n` argument of the helper script. Rows starting like `[  4]` show per-connection results (e.g., throughput, jitter, and latency).
+* **Summarized results:** The `[SUM]` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
+
+Next, we see an example output for a local measurement and a measurement in Kubernetes.
 
 ### Local measurment
 
-In this case the output will contain only one summarized test.
-You should see something like this:
+In a local measurement the output contains a single summarized test.
+You should see a similar output:
 ```
 Number of concurrent turncat clients: 5
 Evaluation time: 1 sec
@@ -139,8 +144,7 @@ Results
 
 ### Kubernetes measurment
 
-In this case the output will contain one or more summarized tests. If the script were rerun twice, two `iperf` outputs would be combined. 
-You should see something like this:
+In case of a Kubernetes measurement, the output contains one or more summarized tests. If the script was rerun twice, two `iperf` outputs would be combined. You should an output similar to this:
 ```
 Number of concurrent turncat clients: 5
 Evaluation time: 1 sec
@@ -165,7 +169,7 @@ Results
 [SUM] 0.0000-4.9597 sec  12 datagrams received out-of-order
 ```
 
-Notice that the average packets/second rate will be less lower in case of a hosted Kubernetes cluster than in case of running `STUNner` locally
+Notice that the average packets/second rate will be slightly lower in case of a hosted Kubernetes cluster than in case of a local `STUNner` installation.
 
 ## Tips and Tricks
 
