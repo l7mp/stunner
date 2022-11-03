@@ -18,7 +18,7 @@ The tools used in the measurment are the following:
 
 When measuring latency with `iperf` you might be fooled because it is [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) which requires the clocks to be synchronized. This means you might see corrupted latencies such as negative ones.
 
-## Mesurement Setup
+## Measurement Setup
 
 ### Local setup
 
@@ -144,7 +144,7 @@ Results
 
 ### Kubernetes measurment
 
-In case of a Kubernetes measurement, the output contains one or more summarized tests. If the script was rerun twice, two `iperf` outputs would be combined. You should an output similar to this:
+In case of a Kubernetes measurement, the output contains one or more summarized tests. If the script was rerun twice, two `iperf` outputs would be combined. You should see an output similar to this:
 ```
 Number of concurrent turncat clients: 5
 Evaluation time: 1 sec
