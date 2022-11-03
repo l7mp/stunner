@@ -1,10 +1,10 @@
-# Performance evaluation
+# Performance Benchmarking
 
 With the help of this guide you are able to take performance measurments in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
 
 Compare the locally measured result to the result measured in Kubernetes and figure out the overhead cost. The extra cost of your cluster's networking may surprise you in terms of extra delay or more packet drops using the same bandwidth.
 
-Locally there is no installation needed, it should take less than a minute to measure. 
+Locally there is no installation needed, it should take less than a minute to measure.
 If you have a Kubernetes cluster up and running, the installation and measurement should take a few minutes max.
 
 ## Tools
