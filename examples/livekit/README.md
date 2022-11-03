@@ -4,8 +4,10 @@ This document guides you through the [LiveKit](https://livekit.io/) installation
 
 In this demo you will learn the following steps:
 - integrate a typical WebRTC application server with STUNner
-- deploy the LiveKit server into Kubernetes,
+- deploy the LiveKit server into Kubernetes
 - configure STUNner to expose LiveKit to clients
+
+## Intallation
 
 ## Prerequisites
 
@@ -13,18 +15,26 @@ The below installation instructions require an operational cluster running a sup
 
 Unfortunately, Minikube is not supported for this demo. The reason is that [Let's Encrypt certificate is not available with nip.io] (https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b). Later on you will learn more about this certificate.
 
+## Setup
+
+The figure below shows how LiveKit is deployed into Kubernetes without the contstraints of running in host network (`hostNetwork: true`). In this setup LiveKit uses STUNner as a 'local' `STUN` and `TURN` server which enhances the security and saves the overhead cost of using public a `STUN` server. 
+In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), [LiveKit server](https://github.com/livekit/livekit) for media exchange, an `Ingress gateway` to provide secure connections, and configure STUNner to expose the LiveKit server pool to clients. 
+
+![STUNner LiveKit intergration deployment architecture](../../doc/stunner_livekit.svg)
+
 ## Ingress
 
-In order to make this demo work you must have an ingress controller installed in your system.
+In order to make this example work you must have an ingress controller installed in your cluster.
 
 ```
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm install ingress-nginx ingress-nginx/ingress-nginx
 ```
+
 ## Installation guide
 
-Let's start with a disclaimer. The liveKit client example(browser) must have secure HTTP connection in order to work because, [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This induces that the client-server(LiveKit-server) connection must be secure too. According to the [docs](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer) and our experiences, self-signed certs do not work.
+Let's start with a disclaimer. The LiveKit client example(browser) must have secure HTTP connection in order to work because, [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This induces that the client-server(LiveKit-server) connection must be secure too. According to the [docs](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer) and our experiences, self-signed certs do not work.
 Due to these constraints, we must deploy `cert-manager` that can properly handle certificates. 
 
 Install cert-manager's CRDs.
@@ -50,8 +60,6 @@ my-cert-manager cert-manager/cert-manager \
 --namespace cert-manager \
 --version v1.8.0
 ```
-
-
 
 And now let's start the fun part. The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](livekit-server.yaml) packaged with STUNner.
 
@@ -93,6 +101,14 @@ The LiveKit bundle includes a lot of resources:
 But before instantiating the listed resources, we have one more thing to set. As it was mentioned earlier the LiveKit server must have a valid cert. It means you must have a domain that has CA signed certificate. If you have your own domain, you can create two subdomains that points to the `ingress-nginx-controller` service's IP. If you don't have your own domain, don't be upset there's a solution for you as well.
 [nip.io](nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and have a CA signed certificate. It allows us to point `client-<ingress-IP>.nip.io` to our `Ingress` gateway under a valid CA signed domain.
 
+---
+### Caveats
+
+It is important to mention that public wildcard DNS domains might run into [rate limiting](https://letsencrypt.org/docs/rate-limits/) issues easily because of they are free and widely used. If you have your own domain please use that to prevent these wildcard DNS services failing. In case you ran into rate limiting issues you should try using [other](https://moss.sh/free-wildcard-dns-services/) services like `nip.io`.
+
+---
+
+Let's jump right back where we left off.
 ```
 kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 INGRESSIP=$(kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
