@@ -92,6 +92,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		goto rollback
 	}
 
+	s.log.Infof("setting loglevel to %q", s.GetAdmin().LogLevel)
 	s.logger.SetLevel(s.GetAdmin().LogLevel)
 
 	new += len(adminState.NewJobQueue)

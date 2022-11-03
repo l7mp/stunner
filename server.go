@@ -4,11 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+
 	// "strings"
 
 	// "github.com/pion/logging"
 	"github.com/pion/dtls/v2"
 	"github.com/pion/turn/v2"
+
 	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -100,7 +102,7 @@ func (s *Stunner) Start() error {
 
 			cer, errTls := tls.LoadX509KeyPair(l.Cert, l.Key)
 			if errTls != nil {
-				return fmt.Errorf("cannot load cert/ley pair for creating DTLS listener at %s: %s",
+				return fmt.Errorf("cannot load cert/key pair for creating DTLS listener at %s: %s",
 					addr, errTls)
 			}
 
@@ -126,9 +128,6 @@ func (s *Stunner) Start() error {
 			return fmt.Errorf("internal error: unknown listener protocol " + l.Proto.String())
 		}
 	}
-
-	// start monitoring
-	s.monitoringFrontend.Start()
 
 	// start the DNS resolver threads
 	if s.resolver == nil {
@@ -165,7 +164,4 @@ func (s *Stunner) Stop() {
 		s.server.Close()
 	}
 	s.server = nil
-
-	// shutdown monitoring
-	s.monitoringFrontend.Stop()
 }

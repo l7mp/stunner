@@ -1786,6 +1786,93 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
+		testName: "changing the realm induces a server restart",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Realm: "dummy",
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
+		testName: "realm reset a server restart",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3479,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
 		testName: "adding a cluster to the wrong IP",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",

@@ -50,7 +50,7 @@ type Stunner struct {
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
-	monitoringFrontend                                          monitoring.Frontend
+	monitoringFrontend                                         monitoring.Frontend
 	net                                                        *vnet.Net
 	options                                                    Options
 }
@@ -59,7 +59,7 @@ type Stunner struct {
 func NewStunner() *Stunner {
 	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
 	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
-	mf := monitoring.NewFrontend("")
+	mf := monitoring.NewFrontend("", false, loggerFactory)
 	vnet := vnet.NewNet(nil)
 
 	s := Stunner{
@@ -74,15 +74,20 @@ func NewStunner() *Stunner {
 			object.NewListenerFactory(vnet, loggerFactory), loggerFactory),
 		clusterManager: manager.NewManager("cluster-manager",
 			object.NewClusterFactory(r, loggerFactory), loggerFactory),
-		resolver:          r,
+		resolver:           r,
 		monitoringFrontend: mf,
-		net:               vnet,
-		options:           Options{},
+		net:                vnet,
+		options:            Options{},
 	}
 
-	// register metrics
+	// start monitoring
 	monitoring.RegisterMetrics(s.log,
-		func() float64 { return float64(s.GetServer().AllocationCount()) })
+		func() float64 {
+			if s.server != nil {
+				return float64(s.server.AllocationCount())
+			}
+			return 0.0
+		})
 
 	return &s
 }
@@ -109,8 +114,9 @@ func (s *Stunner) WithOptions(options Options) *Stunner {
 	}
 
 	// monitoring
-	if options.DryRun == true {
-		s.monitoringFrontend = monitoring.NewMockFrontend()
+	if options.DryRun {
+		ep := s.monitoringFrontend.GetEndpoint()
+		s.monitoringFrontend = monitoring.NewFrontend(ep, options.DryRun, s.logger)
 		s.adminManager = manager.NewManager("admin-manager",
 			object.NewAdminFactory(s.monitoringFrontend, s.logger), s.logger)
 	}
@@ -225,6 +231,10 @@ func (s *Stunner) Close() {
 				err.Error())
 		}
 	}
+
+	// shutdown monitoring
+	monitoring.UnregisterMetrics(s.log)
+	s.monitoringFrontend.Stop()
 
 	s.resolver.Close()
 }

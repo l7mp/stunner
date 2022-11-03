@@ -1,165 +1,155 @@
 # Security
 
 Like any conventional gateway service, an improperly configured STUNner service may easily end up
-exposing sensitive services to the Internet. The below security guidelines will allow to minmize
-the risks associated with a misconfigured STUNner.
-
-## Table of Contents
-- [Security](#security)
-  - [Table of Contents](#table-of-contents)
-  - [Threat](#threat)
-  - [Locking down STUNner](#locking-down-stunner)
-  - [Authentication](#authentication)
-  - [Access control](#access-control)
-  - [Exposing internal IP addresses](#exposing-internal-ip-addresses)
-  - [Help](#help)
-  - [License](#license)
-  - [Acknowledgments](#acknowledgments)
+exposing sensitive services to the Internet. The below security guidelines will allow to minimize
+the risks associated with a misconfigured STUNner gateway service.
 
 ## Threat
 
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
-[`turncat`](../cmd/turncat) utility to reach the Kubernetes DNS service through a misconfigured
-STUNner gateway.
+[`turncat`](/cmd/turncat) utility and `dig` to query the Kubernetes DNS service through a
+misconfigured STUNner gateway.
 
-Start with a fresh STUNner installation. As usual, we store the STUNner configuration for later
-use.
+Start with a [fresh STUNner installation](/doc/INSTALL.md) into an empty namespace called `stunner`
+and apply the below configuration. 
 
 ```console
-$ export STUNNER_PUBLIC_ADDR=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_ADDR}')
-$ export STUNNER_PUBLIC_PORT=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PUBLIC_PORT}')
-$ export STUNNER_REALM=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_REALM}')
-$ export STUNNER_USERNAME=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_USERNAME}')
-$ export STUNNER_PASSWORD=$(kubectl get cm stunner-config -o jsonpath='{.data.STUNNER_PASSWORD}')
+cd stunner
+kubectl apply -f deploy/manifests/stunner-expose-kube-dns.yaml
 ```
 
-Next, learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster DNS service:
+This will open a STUNner Gateway at port UDP:3478 and add a UDPRoute with the Kubernetes cluster
+DNS service as the backend:
 
-```console
-$ export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.clusterIP}')
-```
-
-Fire up `turncat` locally; this will open a UDP server port on `localhost:5000` and forward all
-received packets to the cluster DNS service through STUNner.
-
-```console
-$ cd stunner
-$ go run cmd/turncat/main.go --realm $STUNNER_REALM --user ${STUNNER_USERNAME}=${STUNNER_PASSWORD} \
-  --log=all:TRACE udp:127.0.0.1:5000 turn:${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} udp:${KUBE_DNS_IP}:53
-```
-
-Now, in another terminal try to query the Kubernetes DNS service through the `turncat` tunnel for
-the internal service address allocated by Kubernetes for STUNner:
-
-```console
-$ dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
-```
-
-If all goes well, this should hang until `dig` times out. This is because the [default installation
-scripts block *all* communication](#access-control) from STUNner to the rest of the workload, and
-the default-deny ACL needs to be explicitly opened up for STUNner to be able to reach a specific
-service. To demonstrate the risk of an improperly configured STUNner gateway, we temporarily allow
-STUNner to access the Kube DNS service.
-
-```console
-$ kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
 metadata:
-  name: stunner-network-policy
+  name: stunner-udproute
+  namespace: stunner
 spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - namespaceSelector:
-        matchLabels: {}
-      podSelector:
-        matchLabels:
-          k8s-app: kube-dns
-    ports:
-    - protocol: UDP
-      port: 53
-EOF
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: kube-dns
+          namespace: kube-system
 ```
 
-Repeating the DNS query should now return the `ClusterIP` assigned to the `stunner` service:
+Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster DNS service:
 
 ```console
-$ dig +short  @127.0.0.1 -p 5000  stunner.default.svc.cluster.local
-10.120.4.153
+export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.clusterIP}')
 ```
+
+Build `turncat`, the Swiss-army-knife [testing tool](/cmd/turncat/README.md) for STUNner, fire up a
+UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service
+through STUNner.
+
+```console
+./turncat --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://${KUBE_DNS_IP}:53
+```
+
+Now, in another terminal query the Kubernetes DNS service through the `turncat` tunnel.
+
+```console
+dig +short @127.0.0.1 -p 5000 stunner.default.svc.cluster.local
+```
+
+You should see the internal Cluster IP address allocated by Kubernetes for the STUNner dataplane
+service. Experiment with other FQDNs, like `kubernetes.default.svc.cluster.local`, etc.; the
+Kubernetes cluster DNS service will readily return the the corresponding internal service IP
+addresses.
+
+This little experiment demonstrates the threats associated with a poorly configured STUNner
+gateway: it may allow external access to *any* UDP service running inside your cluster. The
+prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`) and
+(2) the user *must* specifically add a UDPRoute to the target service, otherwise STUNner blocks
+access to it.
+
+Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: stunner-udproute
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: dummy
+```
+
+Repeat the above `dig` command to query the Kubernetes DNS service again and observe how the query
+times out. This demonstrates that a properly locked down STUNner installation blocks all accesses
+outside of the backend services explicitly opened up via a UDPRoute.
 
 ## Locking down STUNner
 
-By default, the Kubernetes workload should be isolated from STUNner with a default-deny ACL (but
-see the below [security notice](#access-control) on access control).
+Unless properly locked down, STUNner may be used maliciously to open a tunnel to any UDP service
+running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the pods and
+services exposed via STUNner. 
 
-```console
-$ kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-EOF
-```
+STUNner's basic security model is as follows:
 
-Repeating the DNS query should again time out, as before.
+> In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
+attacker can reach only the media servers via STUNner but no other services. This is essentially
+the same level of security as if you put the media servers to the Internet over a public IP
+address, protected by a firewall that admits only UDP access.
 
-In summary, unless properly locked down, STUNner may be used maliciously to open a tunnel to any
-service running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the
-pods and services inside a cluster exposed via STUNner, using a properly configured Kubernetes ACL
-(`NetworkPolicy`).
-
-The below security considerations will greatly reduce the attack surface associated with
-STUNner. Overall, **a properly configured STUNner deployment will present exactly the same attack
-surface as a WebRTC infrastructure hosted on a public IP address** (possibly behind a firewall). In
-any case, use STUNner at your own risk.
+The below security considerations will greatly reduce this attack surface even further. In any
+case, use STUNner at your own risk.
 
 ## Authentication
 
 By default, STUNner uses a single statically set username/password pair for all clients and the
 password is available in plain text at the clients (`plaintext` authentication mode). Anyone with
-access to the static STUNner credentials can open a UDP tunnel to any service inside the Kubernetes
-cluster, unless [blocked](#access-control) by a properly configured Kubernetes `NetworkPolicy`.
+access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know
+the private IP address of the target service or pod and provided that a UDPRoute exists that
+specifies the target service as a backend. This means that a service is exposed only if STUNner is
+explicitly configured so.
 
 For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
-per-client fixed lifetime username/password pairs. See the [STUNner authentication
-guide](doc/AUTH.md) for configuring STUNner with the more secure `longterm` authentication mode.
+per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to
+steal and reuse STUNner's TURN credentials. See the [authentication guide](/doc/AUTH.md) for
+configuring STUNner with `longterm` authentication.
 
 ## Access control
 
-The ultimate condition for a secure STUNner deployment is a correctly configured access control
-regime that restricts external users to open transport relay connections inside the cluster. The
-ACL must make sure that only the media servers, and only on a limited set of UDP ports, can be
-reached externally.  This can be achieved using an Access Control List, essentially an "internal"
-firewall in the cluster, which in Kubernetes is called a `NetworkPolicy`.
+STUNner requires the user to explicitly open up external access to internal services by specifying
+a proper UDPRoute. For instance, the below UDPRoute allows access *only* to the `media-server`
+service in the `media-plane` namespace, and nothing else.
 
-The STUNner installation comes with a default ACL (i.e., `NetworkPolicy`) that locks down *all*
-access from STUNner to the rest of the workload (not even Kube DNS is allowed). This is to enforce
-the security best practice that the access permissions of STUNner be carefully customized before
-deployment.
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: stunner-udproute
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: media-server
+        - namespace: media-plane
+```
 
-Here is how to customize this ACL to secure the WebRTC media plane.  Suppose that we want STUNner
-to be able to reach *any* media server replica labeled as `app=media-server` over the UDP port
-range `[10000:20000]`, but we don't want transport relay connections via STUNner to succeed to
-*any* other pod. This will be enough to support WebRTC media, but will not allow clients to, e.g.,
-[reach the Kubernetes DNS service](#threat).
+To avoid potential misuse, STUNner disables open wildcard access to the entire cluster. (Note that
+in the [standalone mode](/doc/OBSOLETE.md) the user can still explicitly create an open `stunnerd`
+cluster, but this is discouraged).
 
-Assuming that the entire workload is deployed into the `default` namespace, the below
-`NetworkPolicy` ensures that all access from any STUNner pod to any media server pod is allowed
-over any UDP port between 10000 and 20000, and all other network access from STUNner is denied.
+For hardened deployments, it is possible to add a second level of isolation between STUNner and the
+rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will
+essentially implement a firewall, blocking all access from the source to the target workload except
+the services explicitly whitelisted by the user. The below example allows access from STUNner to
+*any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port
+range `[10000:20000]`, but nothing else.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -188,42 +178,9 @@ spec:
       endPort: 20000
 ```
 
-WARNING: Some Kubernetes CNIs do not support network policies, or support only a subset of what
-STUNner needs. We tested STUNner with [Calico](https://www.tigera.io/project-calico) and the
-standard GKE data plane, but your [mileage may vary](https://cilium.io).  In particular, only
-Kubernetes versions >1.22 support [ACLs with port
-ranges](https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-range-of-ports)
-(i.e., the `endPort` field). Furthermore, certain Kubernetes CNIs (like the GKE data plane v2),
-even if accepting the `endPort` parameter, will fail to correctly enforce it. For such cases the
-below `NetworkPolicy` will allow STUNner to access _all_ UDP ports on the media server; this is
-less secure, but still blocks malicious access via STUNner to any service other than the media
-servers.
-
-```yaml
-$ kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: stunner-network-policy
-spec:
-  podSelector:
-    matchLabels:
-      app: stunner
-  policyTypes:
-  - Egress
-  egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: media-server
-    ports:
-    - protocol: UDP
-EOF
-```
-
-In any case, [test your ACLs](https://banzaicloud.com/blog/network-policy) before exposing STUNner
-publicly; e.g., the [`turncat` utility](../cmd/turncat) packaged with STUNner can be used
-conveniently for this [purpose](../examples/simple-tunnel/README.md).
+Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/network-policy)
+before exposing STUNner publicly; e.g., the [`turncat` utility](../cmd/turncat) packaged with
+STUNner can be used conveniently for this [purpose](/examples/simple-tunnel/README.md).
 
 ## Exposing internal IP addresses
 
@@ -236,10 +193,12 @@ media servers via STUNner.  At the same time, this also has the bitter consequen
 addresses are now exposed to the WebRTC clients in ICE candidates.
 
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP
-address of all STUNner pods and all media server pods via STUNner. This should not pose a major
-security risk though: remember, none of these private IP addresses can be reached
-externally. Nevertheless, if worried about information exposure then STUNner may not be the best
-option for you.
+address of all STUNner pods and all media server pods. This should not pose a major security risk
+though: remember, none of these private IP addresses can be reached externally. Nevertheless, if
+worried about information exposure then STUNner may not be the best option at the moment. In later
+releases, we plan to obscure the transport relay connection addresses returned by STUNner, which
+would lock down external scanning attempts. Feel free to open an issue if you think this limitation
+is a blocker for you.
 
 ## Help
 

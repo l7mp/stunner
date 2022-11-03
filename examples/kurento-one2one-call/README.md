@@ -331,8 +331,8 @@ with STUNner.
    }
    ```
 
-1. Once configured with the above ICE server configuration, the browser will ask STUNner to open a
-   TURN transport relay connection for exchanging the video stream with Kurento and generates a
+1. Once bootstrapped with the above ICE server configuration, the browser will ask STUNner to open
+   a TURN transport relay connection for exchanging the video stream with Kurento and generates a
    local ICE candidate for each relay connection it creates. Note that only TURN-relay candidates
    are generated: host and server-reflexive candidates would not work with STUNner anyway. (This is
    why we set the `iceTransportPolicy` to type `relay` in the ICE server configuration above.)

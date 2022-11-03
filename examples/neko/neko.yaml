@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neko
+  labels:
+    app: neko
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neko
+  template:
+    metadata:
+      labels:
+        app: neko
+    spec:
+      containers:
+      - name: neko
+        image: m1k1o/neko:firefox
+        env:
+        - name: NEKO_SCREEN
+          value: 1280x720@30
+        - name: NEKO_PASSWORD
+          value: neko
+        - name: NEKO_PASSWORD_ADMIN
+          value: admin
+        - name: NEKO_EPR
+          value: 62001-62002
+        #- name: NEKO_UDPMUX
+        #  value: "62001"
+        - name: NEKO_ICELITE
+          value: "false"
+        - name: NEKO_NAT1TO1
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NEKO_ICESERVERS
+          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp", "stun:1.1.1.1:3478"], "username": "user-1", "credential": "pass-1","iceTransportPolicy": "relay"}]'
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: udp-one
+          containerPort: 62001
+          protocol: UDP
+        - name: udp-two
+          containerPort: 62002
+          protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neko-tcp
+  labels:
+    run: neko-tcp
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+  selector:
+    app: neko
+  #type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neko-udp
+  labels:
+    app: neko-udp
+spec:
+  ports:
+  - port: 62001
+    protocol: UDP
+    name: udp-one
+  - port: 62002
+    protocol: UDP
+    name: udp-two
+  selector:
+    app: neko
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: neko-ingress
+spec:
+  #ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: neko-tcp
+            port:
+              number: 8080
