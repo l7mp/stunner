@@ -18,7 +18,7 @@ The tools used in the measurment are the following:
 
 When measuring latency with `iperf` you might be fooled because it is [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) which requires the clocks to be synchronized. This means you might see corrupted latencies such as negative ones.
 
-## Architecture
+## Mesurement Setup
 
 ### Local setup
 
