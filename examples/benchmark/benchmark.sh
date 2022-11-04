@@ -1,4 +1,11 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+trap 'killall main -w &> /dev/null && killall iperf -w &> /dev/null && rm log.tmp &> /dev/null' EXIT
+
+
 
 usage="$(basename "$0") [-h] [-np n] [-t n] [-ps n] [-bw n] [-pl local|k8s]   -- a helper script for executing performance measurements using STUNner in or outside Kubernetes
 
@@ -103,11 +110,8 @@ sleep $((eval_time+2))
 if [[ $platform == "k8s" ]]; then
     kubectl logs "$(kubectl get pods -l app="iperf-server" -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')" > log.tmp
 fi
+
 echo
 echo "Results"
 < log.tmp grep -E -i 'pps|\[SUM\]'
-rm log.tmp
-
-killall main -w &> /dev/null
-killall iperf -w &> /dev/null
 exit
