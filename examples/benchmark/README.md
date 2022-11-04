@@ -144,7 +144,7 @@ Results
 
 ### Kubernetes measurment
 
-In case of a Kubernetes measurement, the output contains one or more summarized tests. If the script was rerun twice, two `iperf` outputs would be combined. You should see an output similar to this:
+In case of a Kubernetes measurement, the output contains one or more summarized tests. In case the user reruns the script, `iperf` outputs will be appended. You should see an output similar to this:
 ```
 Number of concurrent turncat clients: 5
 Evaluation time: 1 sec
