@@ -520,6 +520,11 @@ applications into Kubernetes.
   demo, deploying a basic WebRTC loopback server behind STUNner with some media processing
   added. In particular, the application uses computer vision and augmented reality techniques to
   add a funny hat on top of faces.
+* [Video-conferencing with LiveKit](/examples/livekit/README.md): This tutorial helps you deploy
+  the [LiveKit](https://livekit.io) WebRTC media server behind STUNner. The docs also show how to
+  obtain a valid TLS certificate to secure your signaling connections, courtesy of the wonderful
+  [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
+  Encrypt](https://letsencrypt.org).
 * [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md): This tutorial lets you play Super
   Mario or Street Fighter in your browser, courtesy of the amazing
   [CloudRetro](https://cloudretro.io) project and, of course, STUNner. The demo also presents a
