@@ -1,150 +1,220 @@
 # Using Livekit with STUNner
 
-This document guides you through the [LiveKit](https://livekit.io/) installation into Kubernetes, when it is used together with the STUNner WebRTC gateway.
+This document guides you through the installation of [LiveKit](https://livekit.io/) into Kubernetes, when it is used together with the STUNner gateway to ingest WebRTC media into the cluster.
 
-In this demo you will learn the following steps:
-- integrate a typical WebRTC application server with STUNner
-- deploy the LiveKit server into Kubernetes
-- configure STUNner to expose LiveKit to clients
-
-## Intallation
+In this demo you will learn to:
+- integrate a typical WebRTC application server with STUNner,
+- deploy the LiveKit server into Kubernetes, and
+- configure STUNner to expose LiveKit to clients.
 
 ## Prerequisites
 
 The below installation instructions require an operational cluster running a supported version of Kubernetes (>1.22). You can use any supported platform, any hosted or private Kubernetes cluster, but make sure that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes services should support this). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach your WebRTC infra.
 
-Unfortunately, Minikube is not supported for this demo. The reason is that [Let's Encrypt certificate is not available with nip.io] (https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b). Later on you will learn more about this certificate.
+Unfortunately, Minikube is not supported for this demo. The reason is that [Let's Encrypt certificate is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b). Later on you will learn more about this certificate.
 
 ## Setup
 
-The figure below shows how LiveKit is deployed into Kubernetes without the contstraints of running in host network (`hostNetwork: true`). In this setup LiveKit uses STUNner as a 'local' `STUN` and `TURN` server which enhances the security and saves the overhead cost of using public a `STUN` server. 
-In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), [LiveKit server](https://github.com/livekit/livekit) for media exchange, an `Ingress gateway` to provide secure connections, and configure STUNner to expose the LiveKit server pool to clients. 
+The recommended way to intall LiveKit into Kubernetes is deploying the LiveKit servers into the host network namespace of the Kubernetes nodes  (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and securoty concerns](/doc/WHY.md). 
+
+The figure below shows LiveKit deployed into regular Kubernetes pods, that is, without the host-networking hack. Here, setup LiveKit ide deployed behind STUNner in the [*media-plane deplpyment model*](/doc/DEPLOYMENT.md), so that STUNner acts as a 'local' STUN/TURN server for LiveKit, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal. 
 
 ![STUNner LiveKit intergration deployment architecture](../../doc/stunner_livekit.svg)
 
-## Ingress
+In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), [LiveKit server](https://github.com/livekit/livekit) for media exchange, a Kubernetes Ingress gateway to secure signaling connections, and STUNner as a media gateway to expose the LiveKit server pool to clients. 
 
-In order to make this example work you must have an ingress controller installed in your cluster.
+## Installation
 
-```
+Let's start with a disclaimer. The LiveKit client example browser must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. Unfottunately, self-signed TLS certs [will not work](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer), so we have to come up with a way to provide our clients with a valid TLS cert. This will have the infortunate consequence that the majority of the below installation will be about securing client connections to LiveKit; as it turns out, integrtating LiveKit with STUNner once HTTPS is correctly working is very simple.
+
+### TLS certificates
+
+As mentioned above, the LiveKit server will need a valid TLS cert, which means it must run behind an existing DNS domain name backed by a CA signed TLS certificate. This is simple if you have your own domain, but if you don't then [nip.io](nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and obtain a CA signed certificate for LiveKit. This will allow us to point the domain name `client-<ingress-IP>.nip.io` to an ingress HTTP gateway in our Kubernetes cluster, which will then use some automation (namely, cert-manager) to obtain a valid CA signed cert.
+
+Note that public wildcard DNS domains might run into [rate limiting](https://letsencrypt.org/docs/rate-limits/) issues. If this occurs you can try [alternative services](https://moss.sh/free-wildcard-dns-services/) instead of `nip.io`.
+
+### Ingress
+
+The first step of obtaining a valid cert is to install a Kubernetes Ingress: this will be used during the validation of our cert. 
+
+Install an ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but this is not required. 
+
+```console
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm install ingress-nginx ingress-nginx/ingress-nginx
 ```
 
-## Installation guide
+Wait until Kubernetes assignes an exetnal IP to the Ingress.
 
-Let's start with a disclaimer. The LiveKit client example(browser) must have secure HTTP connection in order to work because, [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This induces that the client-server(LiveKit-server) connection must be secure too. According to the [docs](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer) and our experiences, self-signed certs do not work.
-Due to these constraints, we must deploy `cert-manager` that can properly handle certificates. 
-
-Install cert-manager's CRDs.
+```console
+until [ -n "$(kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
 ```
+
+Store the Ingress IP address Kubernetes assigned to our Ingress; this will be needed later when we configure the validation pipeline for our TLS certs.
+
+```console
+kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+INGRESSIP=$(kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+```
+
+### Cert manager
+
+We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management. 
+
+First, Install cert-manager's CRDs.
+
+```console
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.crds.yaml
 ```
 
 Create a cert-manager namespace.
-```
+
+```console
 kubectl create namespace cert-manager
 ```
 
-Add the Helm repository which contains the cert-manager Helm chart.
-```
+Add the Helm repository which contains the cert-manager Helm chart and install the charts
+
+```console
 helm repo add cert-manager https://charts.jetstack.io
 helm repo update
+helm install my-cert-manager cert-manager/cert-manager \
+    --namespace cert-manager \
+    --version v1.8.0
 ```
 
-Install the cert-manager Helm chart. 
-```
-helm install \
-my-cert-manager cert-manager/cert-manager \
---namespace cert-manager \
---version v1.8.0
-```
+### STUNner
 
-And now let's start the fun part. The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](livekit-server.yaml) packaged with STUNner.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](/examples/livekit-server.yaml) packaged with STUNner.
 
-Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
+Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
+
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
-
 helm install stunner stunner/stunner --create-namespace --namespace=stunner
-
-#Namespace can be changed, if you change it, change it everywhere later on 
 ```
 
-Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
+Here, we installed STUNner into the identically named namespace. You can choose your own namespace, but then don't forget to adjust the below instuctions that assume STUNner lives in the `stunner` namespace.
 
-```
+Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the LiveKit server pods.
+
+```console
 git clone https://github.com/l7mp/stunner
-cd stunner/examples/livekit
-kubectl apply -f livekit-call-stunner.yaml
+cd stunner
+kubectl apply -f /examples/livekit/livekit-call-stunner.yaml
 ```
 
-In the next step we will set the STUNner LoadBalancer service IP as a TURN server for LiveKit.
-It can take up to a minute to allocate a public external IP for the service. With the first command you can check whether you got the IP or not. If the output looks correct then you can issue the second and third command. 
-```
-kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+The relavant parts here are the STUNner [Gateway definition](/doc/GATEWAY.md), which exposes the STUNner TURN server over UDP:3478, and the [UDPRoute definition](/doc/GATEWAY.md), which takes care of routing media to the LiveKit service. 
 
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: udp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: livekit-media-plane
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: livekit-server
+```
+
+Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service. 
+
+Wait until Kubernetes assignes an exetnal IP.
+
+```console
+until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+```
+
+### LiveKit
+
+Store the external IP assigned by Kubernetes to STUNner in an environment variable and write it into the LiveKit deployment manifest.
+
+```console
 STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 sed -i "s/stunner_ip/$STUNNERIP/g" livekit-server.yaml
 ```
 
-The LiveKit bundle includes a lot of resources:
-- a LiveKit-server
-- a client which is the [LiveKit react example](https://github.com/livekit/livekit-react)
-- a cluster issuer which is for the certificates
-- an Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster
+This will make sure that LiveKit is started with STUNner as the STUN/TURN server. Assuming that Kubernetes assignes the IP address 1.2.3.4 to STUNner (i.e., `STUNNERIP=1.2.3.4`), the relevant part of the LiveKit config would be something like the below:
 
-But before instantiating the listed resources, we have one more thing to set. As it was mentioned earlier the LiveKit server must have a valid cert. It means you must have a domain that has CA signed certificate. If you have your own domain, you can create two subdomains that points to the `ingress-nginx-controller` service's IP. If you don't have your own domain, don't be upset there's a solution for you as well.
-[nip.io](nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and have a CA signed certificate. It allows us to point `client-<ingress-IP>.nip.io` to our `Ingress` gateway under a valid CA signed domain.
-
----
-### Caveats
-
-It is important to mention that public wildcard DNS domains might run into [rate limiting](https://letsencrypt.org/docs/rate-limits/) issues easily because of they are free and widely used. If you have your own domain please use that to prevent these wildcard DNS services failing. In case you ran into rate limiting issues you should try using [other](https://moss.sh/free-wildcard-dns-services/) services like `nip.io`.
-
----
-
-Let's jump right back where we left off.
+```yaml
+...
+rtc:
+  ...
+  turn_servers:
+  - host: 1.2.3.4
+    username: user-1
+    credential: pass-1
+    protocol: udp
+    port: 3478
 ```
-kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-INGRESSIP=$(kubectl get service ingress-nginx-controller -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+
+We also need the Ingress external IP address we have stored previously for later use: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.  
+
+```console
 sed -i "s/ingressserviceip/$INGRESSIP/g" livekit-server.yaml
 ```
 
-Now apply the manifests:
-```
+Finally, fire up LiveKit. 
+
+```console
 kubectl apply -f livekit-server.yaml
-kubectl get pods
 ```
+
+The demo installation bundle includes a lot of resources to deploy LiveKit:
+* a LiveKit-server,
+* a web server serving the landing page using [LiveKit react example](https://github.com/livekit/livekit-react)
+* a cluster issuer for the TLS certificates,
+* an Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster.
+
+Wait until all pods become operational and jump right into testing!
 
 ## Test
 
-After installing everything, you shall execute the following command to retrieve the URL to open:
-```
+After installing everything, execute the following command to retrieve the URL of your fresh LiveKit demo app:
+
+```console
 echo client-$INGRESSIP.nip.io
 ```
+
 Copy the URL into your browser, and now you should be greeted with the 'LiveKit Video' title.
 
 On the landing page you must set the LiveKit URL, which is the LiveKit server's address, or in our case the other subdomain we set earlier in the Ingress' manifest.
+
 Executing the following command shall get you the required URL:
-```
+
+```console
 echo wss://mediaserver-$INGRESSIP.nip.io:443
 ```
 
-As for the token you must install the [livekit-cli](https://github.com/livekit/livekit-cli#installation) on your computer.
+To obtain a valid token, you must install the [livekit-cli](https://github.com/livekit/livekit-cli#installation) and issue the below command.
 
-```
+```console
 livekit-cli create-token \
     --api-key access_token --api-secret secret \
     --join --room room --identity user1 \
     --valid-for 24h
 ```
-Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a seperate browser tab you can see yourself twice with the twist that the other client's media is flowing through STUNner and the LiveKit-server deployed in you cluster.
+
+Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a seperate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the broswer tabs is flowing through STUNner and the LiveKit-server deployed in you Kubernetes cluster.
 
 ## Help
 
