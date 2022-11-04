@@ -43,15 +43,15 @@ You are good to go. No installation steps required.
 ## Install on Kubernetes
 
 Install it in case you would like to benchmark your Kubernetes setup. If you want to benchmark locally skip this step.
-
-Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
+Note that the benchmarking script does not support the standalone deployment.
+Install the STUNner Gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
+helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-namespace --namespace=stunner
 
-helm install stunner stunner/stunner
+helm install stunner stunner/stunner -create-namespace --namespace=stunner
 ```
 
 Configure STUNner to act as a STUN server towards [`turncat`](../turncat/README.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
@@ -97,7 +97,7 @@ An example for:
 ### Performance measuring with Kubernetes
 
 The below command will open:
-* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server
+* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwared to the STUNner public address obtained from STUNner configuration
 * an `iperf` client sending its traffic to the turn
 
 `STUNner` and `iperf` are running inside the Kubernetes Cluster.
