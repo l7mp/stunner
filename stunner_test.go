@@ -308,6 +308,7 @@ type StunnerTestConfigsWithVnet struct {
 var testStunnerConfigsWithVnet = []StunnerTestConfigsWithVnet{
 	{
 		testName: "plaintext",
+		clientAddr: "1.1.1.1",
 		conf: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
