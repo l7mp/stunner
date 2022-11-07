@@ -154,9 +154,7 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 		}
 	case v1alpha1.ClusterTypeStrictDNS:
 		conf.Endpoints = make([]string, len(c.Domains))
-		for i, d := range c.Domains {
-			conf.Endpoints[i] = d
-		}
+		copy(conf.Endpoints, c.Domains)
 		conf.Endpoints = sort.StringSlice(conf.Endpoints)
 	}
 	return &conf
