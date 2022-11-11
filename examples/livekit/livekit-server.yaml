@@ -217,11 +217,11 @@ spec:
   # ingressClassName: nginx
   tls:
   - hosts:
-      - client-ingressserviceip.sslip.io
-      - mediaserver-ingressserviceip.sslip.io
+      - client-ingressserviceip.nip.io
+      - mediaserver-ingressserviceip.nip.io
     secretName: livekit-secret-tls
   rules:
-  - host: client-ingressserviceip.sslip.io
+  - host: client-ingressserviceip.nip.io
     http:
       paths:
       - path: /
@@ -231,7 +231,7 @@ spec:
             name: lk-react
             port:
               number: 443
-  - host: mediaserver-ingressserviceip.sslip.io
+  - host: mediaserver-ingressserviceip.nip.io
     http:
       paths:
       - path: /
