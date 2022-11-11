@@ -46,7 +46,7 @@ helm repo update
 helm install ingress-nginx ingress-nginx/ingress-nginx
 ```
 
-Wait until Kubernetes assignes an exetnal IP to the Ingress.
+Wait until Kubernetes assigns an external IP to the Ingress.
 
 ```console
 until [ -n "$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
@@ -101,10 +101,10 @@ Configure STUNner to act as a STUN/TURN server to clients, and route all receive
 ```console
 git clone https://github.com/l7mp/stunner
 cd stunner
-kubectl apply -f /examples/livekit/livekit-call-stunner.yaml
+kubectl apply -f examples/livekit/livekit-call-stunner.yaml
 ```
 
-The relavant parts here are the STUNner [Gateway definition](/doc/GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](/doc/GATEWAY.md), which takes care of routing media to the pods running the LiveKit service.
+The relevant parts here are the STUNner [Gateway definition](/doc/GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](/doc/GATEWAY.md), which takes care of routing media to the pods running the LiveKit service.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
@@ -134,12 +134,12 @@ spec:
 
 Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service. 
 
-Wait until Kubernetes assignes an exetnal IP and store the external IP assigned by Kubernetes to
+Wait until Kubernetes assigns an external IP and store the external IP assigned by Kubernetes to
 STUNner in an environment variable for later use
 
 ```console
 until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### LiveKit
@@ -147,10 +147,10 @@ STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o js
 The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. In order to achieve this, first we path the public IP address of the STUNner STUN/TURN server we have learned above into our LiveKit deployment manifest:
 
 ```console
-sed -i "s/stunner_ip/$STUNNERIP/g" livekit-server.yaml
+sed -i "s/stunner_ip/$STUNNERIP/g" examples/livekit/livekit-server.yaml
 ```
 
-Assuming that Kubernetes assignes the IP address 1.2.3.4 to STUNner (i.e., `STUNNERIP=1.2.3.4`), the relevant part of the LiveKit config would be something like the below:
+Assuming that Kubernetes assigns the IP address 1.2.3.4 to STUNner (i.e., `STUNNERIP=1.2.3.4`), the relevant part of the LiveKit config would be something like the below:
 
 ```yaml
 ...
@@ -169,13 +169,13 @@ This will make sure that LiveKit is started with STUNner as the STUN/TURN server
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
 ```console
-sed -i "s/ingressserviceip/$INGRESSIP/g" livekit-server.yaml
+sed -i "s/ingressserviceip/$INGRESSIP/g" examples/livekit/livekit-server.yaml
 ```
 
 Finally, fire up LiveKit.
 
 ```console
-kubectl apply -f livekit-server.yaml
+kubectl apply -f examples/livekit/livekit-server.yaml
 ```
 
 The demo installation bundle includes a lot of resources to deploy LiveKit:
@@ -211,7 +211,7 @@ livekit-cli create-token \
     --valid-for 24h
 ```
 
-Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a seperate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the LiveKit-server deployed in you Kubernetes cluster.
+Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a separate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the LiveKit-server deployed in you Kubernetes cluster.
 
 ## Help
 
