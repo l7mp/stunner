@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+spec:
+  serviceName: "prosody"
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prosody
+      app.kubernetes.io/instance: jitsi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prosody
+        app.kubernetes.io/instance: jitsi
+    spec:
+      containers:
+        # - name: net-debug
+        #   image: l7mp/net-debug
+        - name: prosody
+          image: "l7mp/jitsi-prosody"
+          # image: jitsi/prosody:stable
+          imagePullPolicy: Always
+          envFrom:
+          - configMapRef:
+              name: jitsi-prosody
+          - secretRef:
+              name: jitsi-prosody
+          - secretRef:
+              name: 'prosody-jicofo'
+          - secretRef:
+              name: 'prosody-jvb'
+          - configMapRef:
+              name: 'prosody-common'
+          ports:
+            - name: xmpp-c2s
+              containerPort: 5222
+              protocol: TCP
+            - name: xmpp-s2s
+              containerPort: 5269
+              protocol: TCP
+            - name: xmpp-component
+              containerPort: 5347
+              protocol: TCP
+            - name: bosh-insecure
+              containerPort: 5280
+              protocol: TCP
+            - name: bosh-secure
+              containerPort: 5281
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /http-bind
+              port: bosh-insecure
+          readinessProbe:
+            httpGet:
+              path: /http-bind
+              port: bosh-insecure
+          volumeMounts:
+          - name: prosody-data
+            mountPath: /config/data
+      volumes:
+      - name: prosody-data
+        persistentVolumeClaim:
+          claimName: prosody-data
+  volumeClaimTemplates:
+  - metadata:
+      name: prosody-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 3G
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+spec:
+  clusterIP: None
+  ports:
+    - port: 5280
+      protocol: TCP
+      name: tcp-bosh-insecure
+    - port: 5281
+      protocol: TCP
+      name: tcp-bosh-secure
+    - port: 5347
+      protocol: TCP
+      name: tcp-xmpp-component
+    - port: 5222
+      protocol: TCP
+      name: tcp-xmpp-c2
+    - port: 5269
+      protocol: TCP
+      name: tcp-xmpp-s2
+  selector:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
