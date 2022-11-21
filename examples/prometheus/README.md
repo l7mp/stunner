@@ -1,4 +1,4 @@
-# Monitoring STUNner with Prometheus
+# Monitoring STUNner with Prometheus and Grafana
 
 This tutorial demonstrates monitoring of a STUNner instance with Prometheus and Grafana.
 
@@ -52,7 +52,6 @@ Next, we observe the `stunner_allocations_active` metrics:
 
 ![Prometheus Dashboard](prometheus-dashboard.png)
 
-
 #### Setup Grafana dashboard
 
 We use Grafana to visualize STUNner metrics.
@@ -67,7 +66,6 @@ The password is **admin**.
 
 At the first login you can change the password or leave as it is (use the Skip button).
 
-
 ##### 2. Check Prometheus data source (optional)
 
 The helm chart configures Prometheus as a data source. You can double check the data source at any time.
@@ -79,7 +77,6 @@ To do this click on *Configuration* (1), then *Data sources* (2), as shown here:
 This will open up the datasources page. At the bottom of the page there is button *Save & test*. Click on it and observe the datasource is working (2):
 
 ![grafana datasource check step 2](grafana-prom-datasource_0.png)
-
 
 ##### 3. Visualize a STUNner metric
 
@@ -98,7 +95,6 @@ This will open a panel configuration window.
 5. Click *Apply*
 
 ![Grafana Panel Configuration](grafana-add-panel-config_0.png)
-
 
 Finally, check the new panel showing the `stunner_allocations_active` metric:
 
