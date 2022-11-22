@@ -78,7 +78,7 @@ To do this click on *Configuration* (1), then *Data sources* (2), as shown here:
 
 This will open up the datasources page. At the bottom of the page there is button *Save & test*. Click on it and observe the datasource is working (2):
 
-![grafana datasource check step 2](grafana-prom-datasource_0.png)
+![grafana datasource check step 2](grafana-prom-datasource_1.png)
 
 #### 3. Visualize a STUNner metric
 
