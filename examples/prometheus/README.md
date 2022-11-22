@@ -37,14 +37,11 @@ The helm chart creates the namespace `monitoring` and installs Prometheus along 
 ## Usage
 
 ### Observe metrics on the Prometheus dashboard (optional)
-By default Prometheus dashboard is not accessable outside of the cluster. No worries if that is the case -- you can still observe the metrics with Grafana.
+By default Prometheus dashboard is not accessible outside of the cluster. No worries if that is the case -- you can still observe the metrics with Grafana.
 
 In certain deployments (e.g., local minikube) you can open the Prometheus dashboard by navigating your browser to prometheus service IP and port `9090`.  For example, if the prometheus service cluster-IP is `10.103.67.2`, navigate to `http://10.103.67.2:9090`.
 
 To get the service IP, use this command: `kubectl get svc -n monitoring prometheus -o custom-columns=:.spec.clusterIP --no-headers`; to have a clickable link: `echo -n "http://$(kubectl get svc -n monitoring prometheus -o custom-columns=:.spec.clusterIP --no-headers):9090"`
-
-If everything goes well, the Prometheus dashboard opens:
-TODO add img
 
 Next, we observe the `stunner_allocations_active` metrics:
 
