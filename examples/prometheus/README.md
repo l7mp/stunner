@@ -76,7 +76,7 @@ To do this click on *Configuration* (1), then *Data sources* (2), as shown here:
 
 ![Grafana Data Source Check Step 1](grafana-prom-datasource_0.png)
 
-This will open up the datasources page. At the bottom of the page there is button *Save & test*. Click on it and observe the datasource is working (2):
+This will open up the datasources page. Scroll down to the bottom, click button *Save & test* (1), and observe the datasource is working (2):
 
 ![Grafana Data Source Check Step 2](grafana-prom-datasource_1.png)
 
@@ -84,7 +84,7 @@ This will open up the datasources page. At the bottom of the page there is butto
 
 Next, we plot a STUNner metric. For this purpose, we create a new panel presenting the active allocations metric.
 
-Click on Add panel (1), then Add new panel (2):
+Click on *Add panel* (1), then *Add a new panel* (2):
 
 ![Grafana Add New Panel](grafana-add-panel-dashboard_0.png)
 
@@ -98,7 +98,7 @@ This will open a panel configuration window.
 
 ![Grafana Panel Configuration](grafana-add-panel-config_0.png)
 
-Finally, check the new panel showing the `stunner_allocations_active` metric:
+Finally, take a look at the Grafana dashboard with the new panel showing `stunner_allocations_active`:
 
 ![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
 
