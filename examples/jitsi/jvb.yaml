@@ -21,8 +21,6 @@ spec:
         app.kubernetes.io/component: jvb
     spec:
       containers:
-        # - name: net-debug
-        #   image: l7mp/net-debug
         - name: jitsi-meet
           image: "jitsi/jvb:stable-7830"
           imagePullPolicy: IfNotPresent

@@ -19,12 +19,9 @@ spec:
         app.kubernetes.io/instance: jitsi
     spec:
       containers:
-        # - name: net-debug
-        #   image: l7mp/net-debug
         - name: prosody
           image: "l7mp/jitsi-prosody"
-          # image: jitsi/prosody:stable
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           envFrom:
           - configMapRef:
               name: jitsi-prosody

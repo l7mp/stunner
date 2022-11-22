@@ -18,9 +18,10 @@ metadata:
   name: stunner-gatewayconfig
   namespace: stunner
 spec:
-  realm: "34.118.96.93.sslip.io"
+  realm: "34.118.96.93.nip.io"
+  logLevel: "all:DEBUG"
   authType: longterm
-  sharedSecret: "my-secret:1764971142"
+  sharedSecret: "my-shared-secret"
 
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2

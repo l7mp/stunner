@@ -17,12 +17,13 @@ spec:
         app.kubernetes.io/component: web
     spec:
       containers:
-        # - name: net-debug
-        #   image: l7mp/net-debug
         - name: jitsi-meet
-          # image: "l7mp/jitsi-7882"
           image: "jitsi/web:stable-7882"
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/custom-config.js
+              subPath: custom-config.js
           envFrom:
           - configMapRef:
               name: jitsi-meet
@@ -43,6 +44,10 @@ spec:
             httpGet:
               path: /
               port: 80
+      volumes:
+        - name: config-volume
+          configMap:
+            name: jitsi-meet-config
 ---
 apiVersion: v1
 kind: Service

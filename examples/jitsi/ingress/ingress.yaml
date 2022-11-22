@@ -13,9 +13,9 @@ spec:
   tls:
     - secretName: jitsi-secret
       hosts:
-      - 34.118.96.93.sslip.io # TODO: Change it
+      - 34.118.96.93.nip.io # TODO: Change it
   rules:
-    - host: 34.118.96.93.sslip.io # TODO: Change it
+    - host: 34.118.96.93.nip.io # TODO: Change it
       http:
         paths:
           - path: /

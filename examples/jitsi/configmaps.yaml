@@ -9,19 +9,19 @@ data:
   ENABLE_AUTH: "0"
   ENABLE_GUESTS: "1"
   ENABLE_P2P: "0"
-  PUBLIC_URL: "https://34.118.96.93.sslip.io" # TODO: Change this
+  PUBLIC_URL: "https://34.118.96.93.nip.io" # TODO: Change this
   TURN_ENABLE: "true"
-  TURN_HOST: "34.118.91.247"
+  TURN_HOST: "34.118.89.139"
   TURN_PORT: "3478"
   TURN_CREDENTIALS: "my-shared-secret"
-  TURN_TRANSPORT: "tcp"
+  TURN_TRANSPORT: "udp"
   JICOFO_AUTH_USER: "focus"
-  XMPP_DOMAIN: 34.118.96.93.sslip.io
-  XMPP_MUC_DOMAIN: muc.34.118.96.93.sslip.io
-  XMPP_AUTH_DOMAIN: auth.34.118.96.93.sslip.io
-  XMPP_GUEST_DOMAIN: guest.34.118.96.93.sslip.io
-  XMPP_RECORDER_DOMAIN: recorder.34.118.96.93.sslip.io
-  XMPP_INTERNAL_MUC_DOMAIN: internal-muc.34.118.96.93.sslip.io
+  XMPP_DOMAIN: 34.118.96.93.nip.io
+  XMPP_MUC_DOMAIN: muc.34.118.96.93.nip.io
+  XMPP_AUTH_DOMAIN: auth.34.118.96.93.nip.io
+  XMPP_GUEST_DOMAIN: guest.34.118.96.93.nip.io
+  XMPP_RECORDER_DOMAIN: recorder.34.118.96.93.nip.io
+  XMPP_INTERNAL_MUC_DOMAIN: internal-muc.34.118.96.93.nip.io
   ENABLE_XMPP_WEBSOCKET: "1"
   ENABLE_COLIBRI_WEBSOCKET: "1"
   XMPP_MUC_MODULES: "external_services,stanzadebug"
@@ -42,9 +42,20 @@ data:
   JICOFO_AUTH_USER: 'focus'
   XMPP_BOSH_URL_BASE: 'http://jitsi-prosody.default.svc.cluster.local:5280'
   NGINX_RESOLVER: '10.2.128.10'
-  DEPLOYMENTINFO_ENVIRONMENT: "34.118.12.231.sslip.io"
+  DEPLOYMENTINFO_ENVIRONMENT: "34.118.96.93.nip.io"
   DEPLOYMENTINFO_REGION: 'Europe/Budapest'
-
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-meet-config
+  labels:
+    app.kubernetes.io/name: jitsi-meet-config
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+data:
+  custom-config.js: |
+    config.useTurnUdp = true;
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -57,7 +68,8 @@ metadata:
 data:
   JVB_BREWERY_MUC: 'jvbbrewery'
   JVB_PORT: '10000'
-  # JVB_STUN_SERVERS: 'meet-jit-si-turnrelay.jitsi.net:443'
+  # JVB_STUN_SERVERS: '34.116.209.187:3478'
+  JVB_WS_SERVER_ID: '34.118.89.139'
   # JVB_STUN_SERVERS: ' '
   JVB_TCP_HARVESTER_DISABLED: '1'
   XMPP_SERVER: 'jitsi-prosody.default.svc.cluster.local'
