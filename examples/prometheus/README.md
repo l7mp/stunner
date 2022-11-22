@@ -74,11 +74,11 @@ The helm chart configures Prometheus as a data source. You can double check the 
 
 To do this click on *Configuration* (1), then *Data sources* (2), as shown here:
 
-![grafana datasource check step 1](grafana-prom-datasource_0.png)
+![Grafana Data Source Check Step 1](grafana-prom-datasource_0.png)
 
 This will open up the datasources page. At the bottom of the page there is button *Save & test*. Click on it and observe the datasource is working (2):
 
-![grafana datasource check step 2](grafana-prom-datasource_1.png)
+![Grafana Data Source Check Step 2](grafana-prom-datasource_1.png)
 
 #### 3. Visualize a STUNner metric
 
@@ -86,7 +86,7 @@ Next, we plot a STUNner metric. For this purpose, we create a new panel presenti
 
 Click on Add panel (1), then Add new panel (2):
 
-![Grafana Add new panel](grafana-add-panel-dashboard_0.png)
+![Grafana Add New Panel](grafana-add-panel-dashboard_0.png)
 
 This will open a panel configuration window.
 
@@ -100,7 +100,7 @@ This will open a panel configuration window.
 
 Finally, check the new panel showing the `stunner_allocations_active` metric:
 
-![Grafana Dashboard with the new panel](grafana-add-panel-dashboard_1.png)
+![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
 
 This ends the Prometheus/Grafana example.
 
