@@ -1,10 +1,10 @@
 # Monitoring STUNner with Prometheus and Grafana
 
-This tutorial demonstrates monitoring of a STUNner instance with Prometheus and Grafana.
+This tutorial demonstrates monitoring of a STUNner instance with [Prometheus](https://prometheus.io/) and [Grafana](https://grafana.com/).
 
 In this demo you will learn how to:
-* monitor STUNner with Prometheus
-* how to visualize STUNner metrics using Grafana
+* monitor STUNner with [Prometheus](https://prometheus.io/)
+* how to visualize STUNner metrics using [Grafana](https://grafana.com/)
 
 ## Installation
 
@@ -13,7 +13,7 @@ In this demo you will learn how to:
 * The tutorial assumes a fresh STUNner installation in a namespace called `stunner`; see the [STUNner installation and configuration guide](/doc/INSTALL.md).
 * You need a web browser to run this tutorial.
 
-### Setup
+### Enable STUNner metrics endpoint
 
 After installing STUNner, enable the STUNner metrics endpoint:
 ```console
@@ -25,16 +25,18 @@ Patch STUNner deployment to enable the monitoring port (required by the pod moni
 kubectl -n stunner patch deployment stunner --patch '{"spec":{"template":{"spec":{"containers":[{"name":"stunnerd","ports":[{"name": "web","containerPort": 8080 }]}]}}}}'
 ```
 
-#### Deploy Prometheus and Grafana
+### Deploy Prometheus and Grafana
 
 Deploy Prometheus with `helm`:
 ```console
-helm install stunner-prometheus stunner/stunner-prometheus
+helm install prometheus stunner/stunner-prometheus
 ```
 
-The helm chart creates the namespace `monitoring` and install Prometheus along with the prometheus-operator and Grafana.
+The helm chart creates the namespace `monitoring` and installs Prometheus along with the prometheus-operator, and Grafana.
 
-#### Observe metrics on the Prometheus dashboard (optional)
+## Usage
+
+### Observe metrics on the Prometheus dashboard (optional)
 By default Prometheus dashboard is not accessable outside of the cluster. No worries if that is the case -- you can still observe the metrics with Grafana.
 
 In certain deployments (e.g., local minikube) you can open the Prometheus dashboard by navigating your browser to prometheus service IP and port `9090`.  For example, if the prometheus service cluster-IP is `10.103.67.2`, navigate to `http://10.103.67.2:9090`.
@@ -52,13 +54,13 @@ Next, we observe the `stunner_allocations_active` metrics:
 
 ![Prometheus Dashboard](prometheus-dashboard.png)
 
-#### Setup Grafana dashboard
+### Setup Grafana dashboard
 
 We use Grafana to visualize STUNner metrics.
 
 To get the Grafana service IP, use this command: `kubectl get svc -n monitoring grafana -o custom-columns=:.spec.clusterIP --no-headers`; to have a clickable link: `echo -n "http://$(kubectl get svc -n monitoring grafana -o custom-columns=:.spec.clusterIP --no-headers)"`
 
-##### 1. Login
+#### 1. Login
 
 The default username is **admin**.
 
@@ -66,7 +68,7 @@ The password is **admin**.
 
 At the first login you can change the password or leave as it is (use the Skip button).
 
-##### 2. Check Prometheus data source (optional)
+#### 2. Check Prometheus data source (optional)
 
 The helm chart configures Prometheus as a data source. You can double check the data source at any time.
 
@@ -78,7 +80,7 @@ This will open up the datasources page. At the bottom of the page there is butto
 
 ![grafana datasource check step 2](grafana-prom-datasource_0.png)
 
-##### 3. Visualize a STUNner metric
+#### 3. Visualize a STUNner metric
 
 Next, we plot a STUNner metric. For this purpose, we create a new panel presenting the active allocations metric.
 
@@ -102,7 +104,7 @@ Finally, check the new panel showing the `stunner_allocations_active` metric:
 
 This ends the Prometheus/Grafana example.
 
-#### Generate allocations (optional)
+### Generate allocations (optional)
 
 To observe metric changes, generate STUNner connections and thus modify the `stunner_allocations_active` metric. For this purpose, we recommend [our examples](https://github.com/l7mp/stunner/tree/main/examples).
 
@@ -115,9 +117,9 @@ To observe metric changes, generate STUNner connections and thus modify the `stu
 
 ## Clean up
 
-Uninstall stunner-prometheus with `helm`:
+Uninstall prometheus with `helm`:
 ```console
-helm uninstall stunner-prometheus
+helm uninstall prometheus
 ```
 
 ## Help
@@ -132,4 +134,4 @@ MIT License - see [LICENSE](../../LICENSE) for full text.
 
 ## Acknowledgments
 
-Prometheus helm charts are based on [l7mp-prometheus charts](https://github.com/l7mp/l7mp/tree/master/helm-charts/l7mp-prometheus).
+Prometheus helm chart is based on the [l7mp-prometheus chart](https://github.com/l7mp/l7mp/tree/master/helm-charts/l7mp-prometheus).
