@@ -1,0 +1,476 @@
+# Configmaps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prosody-common
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+data:
+  ENABLE_AUTH: "0"
+  ENABLE_GUESTS: "1"
+  ENABLE_P2P: "0"
+  PUBLIC_URL: "https://<public-ingress-ip>.nip.io" # TODO: Change this
+  TURN_ENABLE: "true"
+  TURN_HOST: "<stunner-public-ip>" # TODO: Change this
+  TURN_PORT: "3478"
+  TURN_CREDENTIALS: "my-shared-secret"
+  TURN_TRANSPORT: "udp"
+  JICOFO_AUTH_USER: "focus"
+  XMPP_DOMAIN: <public-ingress-ip>.nip.io
+  XMPP_MUC_DOMAIN: muc.<public-ingress-ip>.nip.io
+  XMPP_AUTH_DOMAIN: auth.<public-ingress-ip>.nip.io
+  XMPP_GUEST_DOMAIN: guest.<public-ingress-ip>.nip.io
+  XMPP_RECORDER_DOMAIN: recorder.<public-ingress-ip>.nip.io
+  XMPP_INTERNAL_MUC_DOMAIN: internal-muc.<public-ingress-ip>.nip.io
+  ENABLE_XMPP_WEBSOCKET: "1"
+  ENABLE_COLIBRI_WEBSOCKET: "1"
+  XMPP_MUC_MODULES: "external_services"
+  TZ: 'UTC'
+  LOG_LEVEL: 'debug'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-meet
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+data:
+  DISABLE_HTTPS: "1"
+  JICOFO_AUTH_USER: 'focus'
+  XMPP_BOSH_URL_BASE: 'http://jitsi-prosody.default.svc.cluster.local:5280'
+  NGINX_RESOLVER: '<kube-dns>' # TODO: Change this
+  DEPLOYMENTINFO_REGION: 'Europe/Budapest'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-meet-config
+  labels:
+    app.kubernetes.io/name: jitsi-meet-config
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+data:
+  custom-config.js: |
+    config.useTurnUdp = true;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-jvb
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jvb
+data:
+  JVB_BREWERY_MUC: 'jvbbrewery'
+  JVB_PORT: '10000'
+  JVB_STUN_SERVERS: '<stunner-public-ip>:3478'
+  JVB_TCP_HARVESTER_DISABLED: '1'
+  XMPP_SERVER: 'jitsi-prosody.default.svc.cluster.local'
+  COLIBRI_REST_ENABLED: 'true'
+  ENABLE_COLIBRI_WEBSOCKET: 'false'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-jicofo
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jicofo
+data:
+  JVB_BREWERY_MUC: 'jvbbrewery'
+  XMPP_SERVER: 'jitsi-prosody.default.svc.cluster.local'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+data:
+---
+
+# Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prosody-jvb
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jvb
+type: Opaque
+data:
+  JVB_AUTH_USER: 'anZi'
+  JVB_AUTH_PASSWORD: 'WEtyd0VxR1ZDeg=='
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prosody-jicofo
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jicofo
+type: Opaque
+data:
+  JICOFO_AUTH_USER: 'Zm9jdXM='
+  JICOFO_AUTH_PASSWORD: 'aGFjbU1ZSUcyaA=='
+  JICOFO_COMPONENT_SECRET: 'VHZ1elB2SkNNeQ=='
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+type: Opaque
+data:
+---
+
+# ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: test@l7mp.io
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          name: jitsi-meet
+---
+
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jitsi-meet
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+  annotations:
+    kubernetes.io/ingress.class:  "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - secretName: jitsi-secret
+      hosts:
+      - <public-ingress-ip>.nip.io # TODO: Change it
+  rules:
+    - host: <public-ingress-ip>.nip.io # TODO: Change it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jitsi-meet
+                port:
+                  number: 80
+---
+
+# Jitsi web
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jitsi-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jitsi-meet
+      app.kubernetes.io/instance: jitsi
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jitsi-meet
+        app.kubernetes.io/instance: jitsi
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: jitsi-meet
+          image: "jitsi/web:stable-7882"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config/custom-config.js
+              subPath: custom-config.js
+          envFrom:
+          - configMapRef:
+              name: jitsi-meet
+          - configMapRef:
+              name: prosody-common
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+      volumes:
+        - name: config-volume
+          configMap:
+            name: jitsi-meet-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jitsi-meet
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: web
+---
+
+# Prosody
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+spec:
+  serviceName: "prosody"
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prosody
+      app.kubernetes.io/instance: jitsi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prosody
+        app.kubernetes.io/instance: jitsi
+    spec:
+      containers:
+        - name: prosody
+          image: "l7mp/jitsi-prosody"
+          imagePullPolicy: IfNotPresent
+          envFrom:
+          - configMapRef:
+              name: jitsi-prosody
+          - secretRef:
+              name: jitsi-prosody
+          - secretRef:
+              name: 'prosody-jicofo'
+          - secretRef:
+              name: 'prosody-jvb'
+          - configMapRef:
+              name: 'prosody-common'
+          ports:
+            - name: xmpp-c2s
+              containerPort: 5222
+              protocol: TCP
+            - name: xmpp-s2s
+              containerPort: 5269
+              protocol: TCP
+            - name: xmpp-component
+              containerPort: 5347
+              protocol: TCP
+            - name: bosh-insecure
+              containerPort: 5280
+              protocol: TCP
+            - name: bosh-secure
+              containerPort: 5281
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /http-bind
+              port: bosh-insecure
+          readinessProbe:
+            httpGet:
+              path: /http-bind
+              port: bosh-insecure
+          volumeMounts:
+          - name: prosody-data
+            mountPath: /config/data
+      volumes:
+      - name: prosody-data
+        persistentVolumeClaim:
+          claimName: prosody-data
+  volumeClaimTemplates:
+  - metadata:
+      name: prosody-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 3G
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jitsi-prosody
+  labels:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+spec:
+  clusterIP: None
+  ports:
+    - port: 5280
+      protocol: TCP
+      name: tcp-bosh-insecure
+    - port: 5281
+      protocol: TCP
+      name: tcp-bosh-secure
+    - port: 5347
+      protocol: TCP
+      name: tcp-xmpp-component
+    - port: 5222
+      protocol: TCP
+      name: tcp-xmpp-c2
+    - port: 5269
+      protocol: TCP
+      name: tcp-xmpp-s2
+  selector:
+    app.kubernetes.io/name: prosody
+    app.kubernetes.io/instance: jitsi
+---
+
+# Jicofo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jitsi-jicofo
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jicofo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jitsi-meet
+      app.kubernetes.io/instance: jitsi
+      app.kubernetes.io/component: jicofo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jitsi-meet
+        app.kubernetes.io/instance: jitsi
+        app.kubernetes.io/component: jicofo
+    spec:
+      containers:
+        - name: jitsi-meet
+          image: "jitsi/jicofo:stable-7830"
+          imagePullPolicy: IfNotPresent
+          envFrom:
+          - secretRef:
+              name: prosody-jicofo
+          - configMapRef:
+              name: prosody-common
+          - configMapRef:
+              name: jitsi-jicofo
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 8888
+          readinessProbe:
+            tcpSocket:
+              port: 8888
+---
+
+# JVB
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jitsi-jvb
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jvb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jitsi-meet
+      app.kubernetes.io/instance: jitsi
+      app.kubernetes.io/component: jvb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jitsi-meet
+        app.kubernetes.io/instance: jitsi
+        app.kubernetes.io/component: jvb
+    spec:
+      containers:
+        - name: jitsi-meet
+          image: "jitsi/jvb:stable-7830"
+          imagePullPolicy: IfNotPresent
+          envFrom:
+          - secretRef:
+              name: prosody-jvb
+          - configMapRef:
+              name: prosody-common
+          - configMapRef:
+              name: jitsi-jvb
+          env:
+          ports:
+            - name: rtp-udp
+              containerPort: 10000
+              protocol: UDP
+          livenessProbe:
+            httpGet:
+              path: /about/health
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /about/health
+              port: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jitsi-jvb
+  labels:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jvb
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 10000
+      protocol: UDP
+      name: rtp-udp
+      targetPort: 10000
+  selector:
+    app.kubernetes.io/name: jitsi-meet
+    app.kubernetes.io/instance: jitsi
+    app.kubernetes.io/component: jvb
