@@ -76,7 +76,7 @@ func main() {
 		watcherEnabled := false
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
-			log.Errorf("could not create config file watcher%s", err.Error())
+			log.Errorf("could not create config file watcher: %s", err.Error())
 			os.Exit(1)
 		}
 		defer watcher.Close()
