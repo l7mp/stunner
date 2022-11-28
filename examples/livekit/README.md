@@ -164,7 +164,23 @@ rtc:
     port: 3478
 ```
 
-This will make sure that LiveKit is started with STUNner as the STUN/TURN server. Note that LiveKit itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](/doc/DEPLOYMENT.md)); with the above configuration we are just telling LiveKit to instruct its clients to use STUNner to reach the LiveKit media servers.
+This will make sure that LiveKit is started with STUNner as the STUN/TURN server. If unsure about the STUNner settings to use, you can always use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
+
+``` console
+cd stunner
+cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
+STUN/TURN authentication type:  plaintext
+STUN/TURN username:             user-1
+STUN/TURN password:             pass-1
+Listener 1
+        Name:   udp-listener
+        Listener:       udp-listener
+        Protocol:       UDP
+        Public address: 1.2.3.4
+        Public port:    3478
+```
+
+Note that LiveKit itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](/doc/DEPLOYMENT.md)); with the above configuration we are just telling LiveKit to instruct its clients to use STUNner to reach the LiveKit media servers.
 
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
