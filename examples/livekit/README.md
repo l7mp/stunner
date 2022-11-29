@@ -135,7 +135,7 @@ spec:
 Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service. 
 
 Wait until Kubernetes assigns an external IP and store the external IP assigned by Kubernetes to
-STUNner in an environment variable for later use
+STUNner in an environment variable for later use.
 
 ```console
 until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
@@ -168,7 +168,7 @@ This will make sure that LiveKit is started with STUNner as the STUN/TURN server
 
 ``` console
 cd stunner
-cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
+cmd/stunnerctl/stunnerctl running-config default/stunnerd-config
 STUN/TURN authentication type:  plaintext
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
