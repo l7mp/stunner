@@ -45,7 +45,7 @@ outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes
 way to reach this service from the local iperf speed-test client is through STUNner.
 
 ```console
-get service iperf-server  -o wide
+kubectl get service iperf-server  -o wide
 NAME           TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)             AGE   SELECTOR
 iperf-server   ClusterIP   10.120.5.36   <none>        5001/UDP,5001/TCP   19s   app=iperf-server
 ```
