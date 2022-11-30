@@ -27,12 +27,12 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-//var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
+// var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
 var stunnerTestLoglevel string = "all:ERROR"
 
 //var stunnerTestLoglevel string = "all:INFO"
 
-//var stunnerTestLoglevel string = "all:TRACE"
+// var stunnerTestLoglevel string = "all:TRACE"
 
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
@@ -299,129 +299,8 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	}, nil
 }
 
-type StunnerTestConfigsWithVnet struct {
-	testName   string
-	conf       v1alpha1.StunnerConfig
-	clientAddr string
-}
-
-var testStunnerConfigsWithVnet = []StunnerTestConfigsWithVnet{
-	{
-		testName: "plaintext",
-		clientAddr: "1.1.1.1",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "udp",
-				Addr:     "1.2.3.4",
-				Port:     3478,
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
-	},
-	{
-		testName: "longterm",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "udp",
-				Addr:     "1.2.3.4",
-				Port:     3478,
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
-	},
-}
-
-func TestStunnerAuthServerVNet(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
-	log := loggerFactory.NewLogger("test")
-
-	for _, test := range testStunnerConfigsWithVnet {
-		t.Run(test.testName, func(t *testing.T) {
-			log.Debugf("-------------- Running test: %s -------------", test.testName)
-			c := test.conf
-
-			// patch in the vnet
-			log.Debug("building virtual network")
-			v, err := buildVNet(loggerFactory)
-			assert.NoError(t, err, err)
-
-			log.Debug("creating a stunnerd")
-			stunner := NewStunner().WithOptions(Options{
-				LogLevel:         stunnerTestLoglevel,
-				SuppressRollback: true,
-				Net:              v.podnet,
-			})
-
-			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
-
-			var u, p string
-			switch c.Auth.Type {
-			case "plaintext":
-				u = "user1"
-				p = "passwd1"
-			case "longterm":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
-				assert.NoError(t, err, err)
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
-
-			log.Debug("creating a client")
-			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
-			assert.NoError(t, err, "cannot create client listening socket")
-
-			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
-				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, true, loggerFactory}
-			stunnerEchoTest(testConfig)
-
-			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
-			stunner.Close()
-			assert.NoError(t, v.Close(), "cannot close VNet")
-		})
-	}
-}
-
 // *****************
-// TCP/TLS/DTLS tests over localhost: VNet supports UDP only so these tests will run over the localhost
+// UDP/TCP/TLS/DTLS tests over localhost: VNet supports UDP only so these tests will run over the localhost
 // *****************
 // Topology:
 //                /----- STUNner (udp/tcp/tls/dtls:23478)
