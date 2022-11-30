@@ -8,13 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	// "fmt"
-	// "net"
 	"strings"
 
-	// "github.com/pion/logging"
 	"github.com/pion/turn/v2"
-	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
@@ -22,12 +18,17 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with the TURN server for authenticating clients
+// time-windowed TURN auth username separator defined in
+// https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00
+const usernameSeparator = ":"
+
+// NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with
+// the TURN server for authenticating clients
 func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
 	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-		// dynamic: authHandler might have changed behind ur back
+		// dynamic: auth mode might have changed behind ur back
 		auth := s.GetAuth()
 
 		switch auth.Type {
@@ -46,20 +47,30 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			u := strings.Split(username, ":")
-			t, err := strconv.Atoi(u[1])
-			if err != nil {
+			// find the first thing that looks like a UNIX timestamp in the username
+			// and use that for checking the time-windowed credential, drop everything
+			// else
+			var timestamp int = 0
+			for _, ts := range strings.Split(username, usernameSeparator) {
+				t, err := strconv.Atoi(ts)
+				if err == nil {
+					timestamp = t
+					break
+				}
+			}
+
+			if timestamp == 0 {
 				auth.Log.Errorf("invalid time-windowed username %q", username)
 				return nil, false
 			}
 
-			if int64(t) < time.Now().Unix() {
+			if int64(timestamp) < time.Now().Unix() {
 				auth.Log.Errorf("expired time-windowed username %q", username)
 				return nil, false
 			}
 
 			mac := hmac.New(sha1.New, []byte(auth.Secret))
-			_, err = mac.Write([]byte(username))
+			_, err := mac.Write([]byte(username))
 			if err != nil {
 				auth.Log.Errorf("failed to hash username: %w", err.Error())
 				return nil, false
