@@ -52,8 +52,8 @@ production workload and a `dev` installation for experimentation, the below comm
 two dataplanes, one into the `pod` and another one into the `dev` namespace.
 
 ```console
-helm install stunner stunner/stunner --create-namespace --namespace=stunner-prod
-helm install stunner stunner/stunner --create-namespace --namespace=stunner-dev
+helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod
+helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
 ```
 
 Now, you can build a separate [gateway hierarchy](/doc/CONCEPTS.md) per each namespace to supply a
