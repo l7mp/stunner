@@ -15,24 +15,30 @@ In this demo you will learn how to:
 
 ### Enable STUNner metrics endpoint
 
-After installing STUNner, enable the STUNner metrics endpoint:
+1. Install STUNner:
+```console
+helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
+```
+2. [Configure STUNner](https://github.com/l7mp/stunner#configuration)
+
+3. Enable the STUNner metrics endpoint via the stunner-gateway-operator:
 ```console
 kubectl -n stunner patch gatewayconfigs.stunner.l7mp.io stunner-gatewayconfig --patch '{"spec": {"metricsEndpoint": "http://0.0.0.0:8080/metrics" }}' --type=merge
 ```
 
-Patch STUNner deployment to enable the monitoring port (required by the pod monitor):
+In case of an existing STUNner deployment you can enable the monitoring port (be careful: this restarts running pods!):
 ```console
 kubectl -n stunner patch deployment stunner --patch '{"spec":{"template":{"spec":{"containers":[{"name":"stunnerd","ports":[{"name": "web","containerPort": 8080 }]}]}}}}'
 ```
 
 ### Deploy Prometheus and Grafana
 
+Our helm chart creates the namespace `monitoring` and installs Prometheus along with the prometheus-operator, and Grafana.
+
 Deploy Prometheus with `helm`:
 ```console
 helm install prometheus stunner/stunner-prometheus
 ```
-
-The helm chart creates the namespace `monitoring` and installs Prometheus along with the prometheus-operator, and Grafana.
 
 ## Usage
 
