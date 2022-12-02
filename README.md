@@ -203,7 +203,8 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
 1. Given a fresh STUNner install, the first step is to register STUNner with the Kubernetes Gateway
    API. This amounts to creating a
    [GatewayClass](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.GatewayClass),
-   which serves as the root level configuration for your STUNner deployment.
+   which serves as the [root level configuration](/doc/GATEWAY.md#gatewayclass) for your STUNner
+   deployment.
 
    Each GatewayClass must specify a controller that will manage the Gateway objects created under
    the class hierarchy. In our case this must be set to `stunner.l7mp.io/gateway-operator` for
@@ -228,9 +229,9 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    EOF
    ```
 
-1. The next step is to set some general configuration for STUNner, most importantly the STUN/TURN
-   authentication [credentials](/doc/AUTH.md). This requires loading a GatewayConfig custom
-   resource into Kubernetes.
+1. The next step is to set some [general configuration](/doc/GATEWAY.md#gatewayconfig) for STUNner,
+   most importantly the STUN/TURN authentication [credentials](/doc/AUTH.md). This requires loading
+   a GatewayConfig custom resource into Kubernetes.
 
    Below we set the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner, using the
    username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`. See the
@@ -254,7 +255,8 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
 
    Note that these two steps are required only once per STUNner installation.
 
-1. At this point, we are ready to expose STUNner to clients! This occurs by loading a
+1. At this point, we are ready to [expose STUNner](/doc/GATEWAY.md#gateway) to clients! This occurs
+   by loading a
    [Gateway](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway)
    resource into Kubernetes.
 
@@ -291,9 +293,10 @@ The standard way to interact with STUNner is via Kubernetes via the standard [Ga
    attached to any Gateway by setting the `parentRef` to the Gateway's name, there is just one
    rule: the Gateway and the UDPRoute must both live in the same Kubernetes namespace.
 
-   The below UDPRoute will configure STUNner to route client connections received on the Gateway
-   called `udp-gateway` to the WebRTC media server pool identified by the Kubernetes service
-   `media-plane` in the `default` namespace.
+   The below UDPRoute will configure STUNner to [route client
+   connections](/doc/GATEWAY.md#udproute) received on the Gateway called `udp-gateway` to the
+   WebRTC media server pool identified by the Kubernetes service `media-plane` in the `default`
+   namespace.
 
    ```console
    kubectl apply -f - <<EOF

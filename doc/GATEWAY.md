@@ -89,7 +89,6 @@ spec:
   userName: "user-1"
   password: "pass-1"
   metricsEndpoint: "http://0.0.0.0:8080/metrics"
-EOF
 ```
 
 Below is a quick reference of the most important fields of the GatewayConfig
