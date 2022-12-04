@@ -180,14 +180,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	sigint := make(chan os.Signal, 1)
+	defer close(sigint)
+	signal.Notify(sigint, syscall.SIGINT)
+
+	sigterm := make(chan os.Signal, 1)
+	defer close(sigterm)
+	signal.Notify(sigterm, syscall.SIGTERM)
 
 	for {
 		select {
-		case <-sigs:
+		case <-sigint:
 			log.Info("normal exit")
 			os.Exit(0)
+
+		case <-sigterm:
+			log.Info("caught SIGTERM: performing a graceful shutdown")
+			st.GracefulShutdown()
 
 		case c := <-conf:
 			log.Trace("new configuration file available")

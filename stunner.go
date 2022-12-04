@@ -216,13 +216,21 @@ func (s *Stunner) String() string {
 		str = strings.Join(ls, ", ")
 	}
 
+	status := "READY"
+	if !s.ready {
+		status = "NOT-READY"
+	}
+	if s.shutdown {
+		status = "TERMINATING"
+	}
+
 	auth := s.GetAuth()
-	return fmt.Sprintf("authentication type: %s, realm: %s, listeners: %s",
-		auth.Type.String(), auth.Realm, str)
+	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s",
+		status, auth.Type.String(), auth.Realm, str)
 }
 
-// Close stops the STUNner daemon, cleans up any associated state and closes all connections it is
-// managing
+// Close stops the STUNner daemon, cleans up any internal state, and closes all connections
+// including the health-check and the metrics server listeners.
 func (s *Stunner) Close() {
 	s.log.Info("closing STUNner")
 
@@ -256,9 +264,6 @@ func (s *Stunner) Close() {
 		}
 	}
 
-	// shutdown monitoring
-	monitoring.UnregisterMetrics(s.log)
-	s.monitoringFrontend.Stop()
-
+	telemetry.UnregisterMetrics(s.log)
 	s.resolver.Close()
 }

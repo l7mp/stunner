@@ -1,9 +1,20 @@
 package object
 
 import (
-	"github.com/pion/logging"
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
+	// "time"
 
-	"github.com/l7mp/stunner/internal/monitoring"
+	"github.com/pion/logging"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	health "github.com/heptiolabs/healthcheck"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -69,11 +80,17 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
-	a.MetricsEndpoint = req.MetricsEndpoint
 
-	// monitoring
-	if err := a.MonitoringFrontend.Reconcile(a.MetricsEndpoint); err != nil {
-		a.log.Warnf("error in reconciling metrics endpoint: %s", err)
+	// health-check server reconciliation errors are FATAL (may break Kubernetes
+	// liveness/readiness checks): return any error encountered
+	if err := a.reconcileHealthCheck(req); err != nil {
+		return err
+	}
+
+	// metrics server reconciliation errors are NOT FATAL: just warn if something goes wrong
+	// but otherwise go on with reconciliation
+	if err := a.reconcileMetrics(req); err != nil {
+		a.log.Warnf("error reconciling metrics server:", err.Error())
 	}
 
 	return nil
@@ -246,5 +263,63 @@ func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
 		return &Admin{}, nil
 	}
 
-	return NewAdmin(conf, f.monitoringFrontend, f.logger)
+	return NewAdmin(conf, f.dry, f.rc, f.logger)
+}
+
+func getHealthAddr(e string) string {
+	// health-check disabled
+	if e == "" {
+		return ""
+	}
+
+	u, err := url.Parse(e)
+
+	// this should never happen: endpoint is validated
+	if err != nil {
+		return ""
+	}
+
+	addr := u.Hostname()
+	if addr == "" {
+		addr = "0.0.0.0"
+	}
+
+	port := u.Port()
+	if port == "" {
+		port = fmt.Sprintf("%d", v1alpha1.DefaultHealthCheckPort)
+	}
+
+	return addr + ":" + port
+}
+
+func getMetricsAddr(e string) (string, string) {
+	// metric scraping disabled
+	if e == "" {
+		return "", ""
+	}
+
+	u, err := url.Parse(e)
+
+	// this should never happen: endpoint is validated
+	if err != nil {
+		return "", ""
+	}
+
+	addr := u.Hostname()
+	if addr == "" {
+		addr = "0.0.0.0"
+	}
+
+	port := u.Port()
+	if port == "" {
+		port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
+	}
+	addr = addr + ":" + port
+
+	path := u.EscapedPath()
+	if path == "" {
+		path = "/"
+	}
+
+	return addr, path
 }

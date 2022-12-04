@@ -503,13 +503,13 @@ applications into Kubernetes.
 * [Opening a UDP tunnel via STUNner](/examples/simple-tunnel/README.md): This introductory tutorial
   shows how to tunnel an external connection via STUNner to a UDP service deployed into
   Kubernetes. The demo can be used to quickly check and benchmark a STUNner installation.
-  
+
 ### Headless deployment mode
 
 * [Direct one to one video call via STUNner](/examples/direct-one2one-call/README.md): This
   tutorial showcases STUNner acting as a TURN server for two WebRTC clients to establish
   connections between themselves, without the mediation of a media server.
-   
+
 ### Media-plane deployment model
 
 * [One to one video call with Kurento](/examples/kurento-one2one-call/README.md): This tutorial

@@ -14,10 +14,10 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// NewDefaultStunnerConfig builds a default configuration from a STUNner URI. Example: the URI
+// NewDefaultStunnerConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
-// username/password pair `user:pass`.
+// username/password pair `user:pass`. Health-checks and metric scarping are disabled.
 func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
