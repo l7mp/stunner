@@ -19,11 +19,12 @@ import (
 // *****************
 // Cluster tests with VNet
 // *****************
-// type StunnerClusterConfig struct {
-//         config v1alpha1.StunnerConfig
-//         echoServerAddr string
-//         result bool
-// }
+//
+//	type StunnerClusterConfig struct {
+//	        config v1alpha1.StunnerConfig
+//	        echoServerAddr string
+//	        result bool
+//	}
 type StunnerTestClusterConfig struct {
 	testName       string
 	config         v1alpha1.StunnerConfig
@@ -495,7 +496,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			}, loggerFactory)
 
 			log.Debug("creating a stunnerd")
-			stunner := NewStunner().WithOptions(Options{
+			stunner := NewStunner(Options{
 				LogLevel:         stunnerTestLoglevel,
 				SuppressRollback: true,
 				Resolver:         mockDns,

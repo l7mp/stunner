@@ -2,6 +2,7 @@
 package stunner
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 

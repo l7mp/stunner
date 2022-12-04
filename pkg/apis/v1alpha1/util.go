@@ -129,3 +129,42 @@ func (l ClusterType) String() string {
 		return "<unknown>"
 	}
 }
+
+// ClusterProtocol specifies the network protocol for a cluster
+type ClusterProtocol int
+
+const (
+	ClusterProtocolUDP ClusterProtocol = iota + 1
+	ClusterProtocolTCP
+	ClusterProtocolUnknown
+)
+
+const (
+	clusterProtocolUDPStr = "udp"
+	clusterProtocolTCPStr = "tcp"
+)
+
+// NewClusterProtocol parses the protocol specification
+func NewClusterProtocol(raw string) (ClusterProtocol, error) {
+	switch strings.ToLower(raw) {
+	case clusterProtocolUDPStr:
+		return ClusterProtocolUDP, nil
+	case clusterProtocolTCPStr:
+		return ClusterProtocolTCP, nil
+	default:
+		return ClusterProtocol(ClusterProtocolUnknown),
+			fmt.Errorf("unknown cluster protocol: \"%s\"", raw)
+	}
+}
+
+// String returns a string representation of a cluster protocol
+func (l ClusterProtocol) String() string {
+	switch l {
+	case ClusterProtocolUDP:
+		return clusterProtocolUDPStr
+	case ClusterProtocolTCP:
+		return clusterProtocolTCPStr
+	default:
+		return "<unknown>"
+	}
+}

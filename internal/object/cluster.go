@@ -17,6 +17,7 @@ import (
 type Cluster struct {
 	Name      string
 	Type      v1alpha1.ClusterType
+	Protocol  v1alpha1.ClusterProtocol
 	Endpoints []net.IPNet
 	Domains   []string
 	Resolver  resolver.DnsResolver // for strict DNS
@@ -75,6 +76,7 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 
 	c.log.Tracef("Reconcile: %#v", req)
 	c.Type, _ = v1alpha1.NewClusterType(req.Type)
+	c.Protocol, _ = v1alpha1.NewClusterProtocol(req.Protocol)
 
 	switch c.Type {
 	case v1alpha1.ClusterTypeStatic:
@@ -142,8 +144,9 @@ func (c *Cluster) ObjectName() string {
 // GetConfig returns the configuration of the running cluster
 func (c *Cluster) GetConfig() v1alpha1.Config {
 	conf := v1alpha1.ClusterConfig{
-		Name: c.Name,
-		Type: c.Type.String(),
+		Name:     c.Name,
+		Protocol: c.Protocol.String(),
+		Type:     c.Type.String(),
 	}
 
 	switch c.Type {

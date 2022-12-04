@@ -1,7 +1,7 @@
 package stunner
 
 import (
-	// "fmt"
+	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -2294,10 +2294,10 @@ func TestStunnerReconcileWithVNetE2E(t *testing.T) {
 	testStunnerReconcileWithVNet(t, testReconcileE2E, true)
 }
 
-////////////////////
+// //////////////////
 // reconcile rollback tests: these always start from a base connfiguration and test through a series
 // of rollbacktests
-///////////////////
+// /////////////////
 var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 	"reconcile protocol": {
 		{
