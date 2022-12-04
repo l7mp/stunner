@@ -16,7 +16,7 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// Start starts the STUNner server and starts listining on all requested server sockets
+// Start starts the STUNner server and starts listining on all requested server sockets.
 func (s *Stunner) Start() error {
 	s.log.Infof("STUNner server (re)starting with API version %q", s.version)
 
@@ -151,12 +151,12 @@ func (s *Stunner) Start() error {
 		s.server = t
 	}
 
-	s.log.Infof("TURN server running: %s", s.String())
+	s.log.Infof("TURN server running: %s", s.Status())
 
 	return nil
 }
 
-// Close stops the TURN server underneath STUNner
+// Close stops the TURN server underneath STUNner.
 func (s *Stunner) Stop() {
 	s.log.Info("stopping the STUNner server")
 

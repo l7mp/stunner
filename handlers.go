@@ -22,8 +22,8 @@ import (
 // https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00
 const usernameSeparator = ":"
 
-// NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with
-// the TURN server for authenticating clients
+// NewAuthHandler returns an authentication handler callback to be used with a TURN server for
+// authenticating clients.
 func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
@@ -87,7 +87,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 	}
 }
 
-// NewPermissionHandler returns a callback for STUNner to handle client permsission requests to access peers
+// NewPermissionHandler returns a callback to handle client permission requests to access peers.
 func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandler {
 	s.log.Trace("NewPermissionHandler")
 

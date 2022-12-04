@@ -9,14 +9,14 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// Reconcile handles the updates to the STUNner configuration. Some updates are destructive so the
+// Reconcile handles updates to the STUNner configuration. Some updates are destructive so the
 // server must be closed and restarted with the new configuration manually (see the documentation
 // of the corresponding STUNner objects for when STUNner may restart after a
-// reconciliation). Reconcile returns nil if is server restart was not requred,
+// reconciliation). Reconcile returns nil if a server restart was not requred,
 // v1alpha1.ErrRestartRequired to indicate that it performed a full shutdown-restart cycle to
 // reconcile the new config (unless DryRun is on), and an error if an error happened during
 // reconciliation, in which case it will rollback the last working configuration (unless
-// SuppressRollback is on)
+// SuppressRollback is on).
 func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	s.log.Debugf("reconciling STUNner for config: %#v ", req)
 
@@ -165,7 +165,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 
 		if err := s.Start(); err != nil {
 			s.log.Errorf("could not restart: %s", err.Error())
-			if s.options.SuppressRollback {
+			if s.suppressRollback {
 				return err
 			}
 

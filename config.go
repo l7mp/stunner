@@ -63,7 +63,7 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 }
 
 // LoadConfig loads a configuration from a file, substituting environment variables for
-// placeholders in the configuration file. Returns the new configuration or error if load fails
+// placeholders in the configuration file. Returns the new configuration or error if load fails.
 func LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 	c, err := os.ReadFile(config)
 	if err != nil {
@@ -101,7 +101,7 @@ func LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 	return &s, nil
 }
 
-// GetConfig returns the configuration of the running STUNner daemon
+// GetConfig returns the configuration of the running STUNner daemon.
 func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
 	s.log.Tracef("GetConfig")
 

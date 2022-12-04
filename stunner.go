@@ -57,7 +57,7 @@ type Stunner struct {
 // NewStunner creates a new STUNner deamon for the specified Options. Call Reconcile to reconcile
 // the daemon for a new configuration. Object lifecycle is as follows: the daemon is "alive"
 // (answers liveness probes if healthchecking is enabled) once the main object is successfully
-// initialized, and "ready" after the first successfull reconciliation (answers readiness probes if
+// initialized, and "ready" after the first successful reconciliation (answers readiness probes if
 // healthchecking is enabled). Calling program should catch SIGTERM signals and call
 // GracefulShutdown(), which will keep on serving connections but will fail readiness probes.
 func NewStunner(options Options) *Stunner {
@@ -113,57 +113,32 @@ func NewStunner(options Options) *Stunner {
 			return 0.0
 		})
 
-	return &s
-}
-
-// WithOptions will take into effect the options passed in
-func (s *Stunner) WithOptions(options Options) *Stunner {
-	s.options = options
-
-	if options.LogLevel != "" {
-		s.logger.SetLevel(options.LogLevel)
-	}
-
-	if options.Net != nil {
-		s.log.Warn("vnet is enabled")
-		s.net = options.Net
-		s.listenerManager = manager.NewManager("listener-manager",
-			object.NewListenerFactory(options.Net, s.logger), s.logger)
-	}
-
-	if options.Resolver != nil {
-		s.resolver = options.Resolver
-		s.clusterManager = manager.NewManager("cluster-manager",
-			object.NewClusterFactory(options.Resolver, s.logger), s.logger)
-	}
-
-	// monitoring
-	if options.DryRun {
-		ep := s.monitoringFrontend.GetEndpoint()
-		s.monitoringFrontend = monitoring.NewFrontend(ep, options.DryRun, s.logger)
-		s.adminManager = manager.NewManager("admin-manager",
-			object.NewAdminFactory(s.monitoringFrontend, s.logger), s.logger)
-	}
-	if options.MonitoringFrontend != nil {
-		s.monitoringFrontend = options.MonitoringFrontend
-		s.adminManager = manager.NewManager("admin-manager",
-			object.NewAdminFactory(options.MonitoringFrontend, s.logger), s.logger)
-	}
-
 	return s
 }
 
-// GetVersion returns the STUNner API version
+// GetVersion returns the STUNner API version.
 func (s *Stunner) GetVersion() string {
 	return s.version
 }
 
-// GetServer returns the TURN server instance running the STUNner daemon
+// IsReady returns true if the STUNner instance is ready to serve allocation requests.
+func (s *Stunner) IsReady() bool {
+	return s.ready
+}
+
+// GracefulShutdown causes STUNner to fail the readiness check. Manwhile, it will keep on serving
+// connections. This function should be called after the main program catches a SIGTERM.
+func (s *Stunner) GracefulShutdown() {
+	s.shutdown = true
+	s.ready = false
+}
+
+// GetServer returns the TURN server instance running the STUNner daemon.
 func (s *Stunner) GetServer() *turn.Server {
 	return s.server
 }
 
-// GetAdmin returns the adminisittive information for STUNner
+// GetAdmin returns the admin object underlying STUNner.
 func (s *Stunner) GetAdmin() *object.Admin {
 	a, found := s.adminManager.Get(v1alpha1.DefaultAdminName)
 	if !found {
@@ -172,7 +147,7 @@ func (s *Stunner) GetAdmin() *object.Admin {
 	return a.(*object.Admin)
 }
 
-// GetAdmin returns the STUNner authenitator
+// GetAuth returns the authenitation object underlying STUNner.
 func (s *Stunner) GetAuth() *object.Auth {
 	a, found := s.authManager.Get(v1alpha1.DefaultAuthName)
 	if !found {
@@ -181,7 +156,7 @@ func (s *Stunner) GetAuth() *object.Auth {
 	return a.(*object.Auth)
 }
 
-// GetListener returns a STUNner listener or nil of no listener with the given name found
+// GetListener returns a STUNner listener or nil of no listener with the given name was found.
 func (s *Stunner) GetListener(name string) *object.Listener {
 	l, found := s.listenerManager.Get(name)
 	if !found {
@@ -190,7 +165,7 @@ func (s *Stunner) GetListener(name string) *object.Listener {
 	return l.(*object.Listener)
 }
 
-// GetCluster returns a STUNner cluster or nil of no cluster with the given name found
+// GetCluster returns a STUNner cluster or nil if no cluster with the given name was found.
 func (s *Stunner) GetCluster(name string) *object.Cluster {
 	l, found := s.clusterManager.Get(name)
 	if !found {
@@ -199,13 +174,13 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 	return l.(*object.Cluster)
 }
 
-// GetLogger returns the logger factory of the running daemon, useful for creating a sub-logger
+// GetLogger returns the logger factory of the running daemon. Useful for creating a sub-logger.
 func (s *Stunner) GetLogger() logging.LoggerFactory {
 	return s.logger
 }
 
-// String returns a short description of the running STUNner instance
-func (s *Stunner) String() string {
+// Status returns a short status description of the running STUNner instance.
+func (s *Stunner) Status() string {
 	listeners := s.listenerManager.Keys()
 	ls := make([]string, len(listeners))
 	for i, l := range listeners {
