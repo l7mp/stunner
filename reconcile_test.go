@@ -17,6 +17,8 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
+var _ = fmt.Sprintf("%d", 1)
+
 // *****************
 // Reconciliation tests
 // *****************
@@ -1401,7 +1403,7 @@ func TestStunnerReconcile(t *testing.T) {
 			conf.Admin.LogLevel = stunnerTestLoglevel
 
 			log.Debug("creating a stunnerd")
-			s := NewStunner().WithOptions(Options{
+			s := NewStunner(Options{
 				DryRun:           true,
 				LogLevel:         stunnerTestLoglevel,
 				SuppressRollback: true,
@@ -1482,7 +1484,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	assert.NoError(t, nil, "start mock DNS")
 
 	log.Debug("creating a stunnerd")
-	s := NewStunner().WithOptions(Options{
+	s := NewStunner(Options{
 		LogLevel:         stunnerTestLoglevel,
 		SuppressRollback: rollback,
 		Resolver:         mockDns,

@@ -105,7 +105,7 @@ func TestTurncatPlaintext(t *testing.T) {
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner().WithOptions(Options{
+	stunner := NewStunner(Options{
 		LogLevel:         turncatTestLoglevel,
 		SuppressRollback: true,
 	})
@@ -226,7 +226,7 @@ func TestTurncatLongterm(t *testing.T) {
 	log := logger.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner().WithOptions(Options{
+	stunner := NewStunner(Options{
 		LogLevel:         turncatTestLoglevel,
 		SuppressRollback: true,
 	})

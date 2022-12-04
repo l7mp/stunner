@@ -221,7 +221,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			assert.NoError(t, err, err)
 
 			log.Debug("creating a stunnerd")
-			stunner := NewStunner().WithOptions(Options{
+			stunner := NewStunner(Options{
 				LogLevel:         stunnerTestLoglevel,
 				SuppressRollback: true,
 				Net:              v.podnet,

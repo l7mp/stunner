@@ -179,7 +179,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	return nil
 
 rollback:
-	if !s.options.SuppressRollback {
+	if !s.suppressRollback {
 		s.log.Infof("rolling back to previous configuration: %#v", rollback)
 		return s.Reconcile(*rollback)
 	}
