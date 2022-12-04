@@ -75,7 +75,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 
 	// a restart may be needed: close the running server while it still holds the actual
 	// configuration (i.e., before actually calling Reconcile on all objects)
-	if restart && !s.options.DryRun {
+	if restart && !s.dryRun {
 		s.log.Debug("closing running server")
 		s.Stop()
 	}
@@ -145,8 +145,14 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 
 	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d",
 		new, changed, deleted)
+	s.log.Info(s.Status())
 
-	if s.options.DryRun {
+	// we are "ready" unless we are being shut down
+	if !s.shutdown && !s.ready {
+		s.ready = true
+	}
+
+	if s.dryRun {
 		if restart {
 			return v1alpha1.ErrRestartRequired
 		}

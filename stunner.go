@@ -11,77 +11,101 @@ import (
 
 	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
-	"github.com/l7mp/stunner/internal/monitoring"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 const DefaultLogLevel = "all:WARN"
 
-// Options defines various options to define the way STUNner will run
+// Options defines various options for the STUNner server.
 type Options struct {
-	// DryRun will suppress sideeffects: it will not initialize listener sockets and it will
-	// not bring up the TURN server. This is mostly for testing, default is false
+	// DryRun suppresses sideeffects: STUNner will not initialize listener sockets and bring up
+	// the TURN server, and it will not fire up the health-check and the metrics
+	// servers. Intended for testing, default is false.
 	DryRun bool
-	// SuppressRollback controls whether to rollback the last working configuration after a
-	// failed reconciliation request. Default is false, which means to always rollback
+	// SuppressRollback controls whether to rollback to the last working configuration after a
+	// failed reconciliation request. Default is false, which means to always do a rollback.
 	SuppressRollback bool
 	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
-	// "all:TRACE" will force maximal loglevel throughout the daemon will
-	// "all:ERROR,auth:TRACE,turn:DEBUG" will suppress all logs except in the authentication
-	// subsystem and the TURN protocol logic
+	// "all:TRACE" will force maximal loglevel throughout, "all:ERROR,auth:TRACE,turn:DEBUG"
+	// will suppress all logs except in the authentication subsystem and the TURN protocol
+	// logic.
 	LogLevel string
-	// Resolver swaps the internal DNS resolver with a custom implementation (used mostly for
-	// testing)
+	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
+	// testing.
 	Resolver resolver.DnsResolver
-	// MonitoringFrontend serves Prometheus metrics data.
-	MonitoringFrontend monitoring.Frontend
-	// VNet will switch STUNner into testing mode, using a vnet.Net instance to run STUNner
-	// over an emulated data-plane
+	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
+	// emulated data-plane.
 	Net *vnet.Net
 }
 
-// Stunner is an instance of the STUNner deamon
+// Stunner is an instance of the STUNner deamon.
 type Stunner struct {
 	version                                                    string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
+	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	server                                                     *turn.Server
-	monitoringFrontend                                         monitoring.Frontend
 	net                                                        *vnet.Net
-	options                                                    Options
+	ready, shutdown                                            bool
 }
 
-// NewStunner creates a new empty STUNner deamon. Call Reconcile to reconcile the daemon for the given configuration
-func NewStunner() *Stunner {
-	loggerFactory := logger.NewLoggerFactory(DefaultLogLevel)
-	r := resolver.NewDnsResolver("dns-resolver", loggerFactory)
-	mf := monitoring.NewFrontend("", false, loggerFactory)
-	vnet := vnet.NewNet(nil)
+// NewStunner creates a new STUNner deamon for the specified Options. Call Reconcile to reconcile
+// the daemon for a new configuration. Object lifecycle is as follows: the daemon is "alive"
+// (answers liveness probes if healthchecking is enabled) once the main object is successfully
+// initialized, and "ready" after the first successfull reconciliation (answers readiness probes if
+// healthchecking is enabled). Calling program should catch SIGTERM signals and call
+// GracefulShutdown(), which will keep on serving connections but will fail readiness probes.
+func NewStunner(options Options) *Stunner {
+	logger := logger.NewLoggerFactory(DefaultLogLevel)
+	if options.LogLevel != "" {
+		logger.SetLevel(options.LogLevel)
+	}
+	log := logger.NewLogger("stunner")
 
-	s := Stunner{
-		version: v1alpha1.ApiVersion,
-		logger:  loggerFactory,
-		log:     loggerFactory.NewLogger("stunner"),
-		adminManager: manager.NewManager("admin-manager",
-			object.NewAdminFactory(mf, loggerFactory), loggerFactory),
-		authManager: manager.NewManager("auth-manager",
-			object.NewAuthFactory(loggerFactory), loggerFactory),
-		listenerManager: manager.NewManager("listener-manager",
-			object.NewListenerFactory(vnet, loggerFactory), loggerFactory),
-		clusterManager: manager.NewManager("cluster-manager",
-			object.NewClusterFactory(r, loggerFactory), loggerFactory),
-		resolver:           r,
-		monitoringFrontend: mf,
-		net:                vnet,
-		options:            Options{},
+	r := options.Resolver
+	if r == nil {
+		r = resolver.NewDnsResolver("dns-resolver", logger)
 	}
 
-	// start monitoring
-	monitoring.RegisterMetrics(s.log,
+	vnet := vnet.NewNet(nil)
+	if options.Net != nil {
+		log.Warn("vnet is enabled")
+		vnet = options.Net
+	}
+
+	s := &Stunner{
+		version:          v1alpha1.ApiVersion,
+		logger:           logger,
+		log:              log,
+		suppressRollback: options.SuppressRollback,
+		dryRun:           options.DryRun,
+		resolver:         r,
+		net:              vnet,
+	}
+
+	// readyness check function
+	rc := func() error {
+		if s.IsReady() {
+			return nil
+		} else {
+			return errors.New("server not ready")
+		}
+	}
+	s.adminManager = manager.NewManager("admin-manager",
+		object.NewAdminFactory(options.DryRun, rc, logger), logger)
+	s.authManager = manager.NewManager("auth-manager",
+		object.NewAuthFactory(logger), logger)
+	s.listenerManager = manager.NewManager("listener-manager",
+		object.NewListenerFactory(vnet, logger), logger)
+	s.clusterManager = manager.NewManager("cluster-manager",
+		object.NewClusterFactory(r, logger), logger)
+
+	telemetry.RegisterMetrics(s.log,
 		func() float64 {
 			if s.server != nil {
 				return float64(s.server.AllocationCount())
