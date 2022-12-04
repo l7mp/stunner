@@ -203,7 +203,7 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
-	case *fileConn:
+	case *FileConn:
 		// do nothing
 	default:
 		t.log.Error("internal error: unknown listener socket type")

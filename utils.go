@@ -18,7 +18,6 @@ type StunnerUri struct {
 	Addr                                  net.Addr
 }
 
-// wrap an os.File as a net.Conn
 type fileConnAddr struct {
 	file *os.File
 }
@@ -26,44 +25,45 @@ type fileConnAddr struct {
 func (s *fileConnAddr) Network() string { return "file" }
 func (s *fileConnAddr) String() string  { return s.file.Name() }
 
-type fileConn struct {
+type FileConn struct {
 	file *os.File
 }
 
-func (f *fileConn) Read(b []byte) (n int, err error) {
+func (f *FileConn) Read(b []byte) (n int, err error) {
 	return f.file.Read(b)
 }
 
-func (f *fileConn) Write(b []byte) (n int, err error) {
+func (f *FileConn) Write(b []byte) (n int, err error) {
 	return f.file.Write(b)
 }
 
-func (f *fileConn) Close() error {
+func (f *FileConn) Close() error {
 	return f.file.Close()
 }
 
-func (f *fileConn) LocalAddr() net.Addr {
+func (f *FileConn) LocalAddr() net.Addr {
 	return &fileConnAddr{file: f.file}
 }
 
-func (f *fileConn) RemoteAddr() net.Addr {
+func (f *FileConn) RemoteAddr() net.Addr {
 	return &fileConnAddr{file: f.file}
 }
 
-func (f *fileConn) SetDeadline(t time.Time) error {
+func (f *FileConn) SetDeadline(t time.Time) error {
 	return nil
 }
 
-func (f *fileConn) SetReadDeadline(t time.Time) error {
+func (f *FileConn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
-func (f *fileConn) SetWriteDeadline(t time.Time) error {
+func (f *FileConn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+// NewFileConn returns a wrapper that shows an os.File as a net.Conn.
 func NewFileConn(file *os.File) net.Conn {
-	return &fileConn{file: file}
+	return &FileConn{file: file}
 }
 
 // ParseUri parses a STUN/TURN server URI, e.g., "turn://user1:passwd1@127.0.0.1:3478?transport=udp"

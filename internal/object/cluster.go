@@ -160,6 +160,7 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 		copy(conf.Endpoints, c.Domains)
 		conf.Endpoints = sort.StringSlice(conf.Endpoints)
 	}
+
 	return &conf
 }
 
