@@ -102,6 +102,7 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `username` | `string` | The `username` for [`plaintext` authentication](/doc/AUTH.md). | No |
 | `password` | `string` | The credential for [`plaintext` authentication](/doc/AUTH.md). | No |
 | `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stiunnerd` pods.| No |
+| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stiunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on `http://0.0.0.0:8086`.| No |
 | `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
 | `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |

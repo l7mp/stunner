@@ -13,14 +13,14 @@ type AdminConfig struct {
 	// LogLevel is the desired log verbosity, e.g.: "stunner:TRACE,all:INFO". Default is
 	// "all:INFO".
 	LogLevel string `json:"loglevel,omitempty"`
-	// MetricsEndpoint is the URI in the form `http://address:port/path` at HTTP metric
-	// scraping requests are served. The scheme (`http://`") is mandatory. Default is to expose
-	// no metric endpoint.
+	// MetricsEndpoint is the URI in the form `http://address:port/path` at which HTTP metric
+	// requests are served. The scheme (`http://`") is mandatory. Default is to expose no
+	// metric endpoint.
 	MetricsEndpoint string `json:"metrics_endpoint,omitempty"`
 	// HealthCheckEndpoint is the URI of the form `http://address:port` exposed for external
 	// HTTP health-checking. A liveness probe responder will be exposed on path `/live` and
-	// readiness probe on path `/ready`. The scheme (`http://`") is mandatory, and if no port
-	// is specified then the default port is 8086. Default is no health-checking.
+	// readiness probe on path `/ready`. The scheme (`http://`) is mandatory, and if no port is
+	// specified then the default port is 8086. Default is no health-checking.
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
 }
 
