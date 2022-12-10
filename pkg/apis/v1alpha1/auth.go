@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 )
@@ -14,7 +15,7 @@ type AuthConfig struct {
 	// Credentials specifies the authententication credentials: for "plaintext" at least the
 	// keys "username" and "password" must be set, for "longterm" the key "secret" will hold
 	// the shared authentication secret.
-	Credentials map[string]string `json:"credentials"`
+	Credentials map[string]Secret `json:"credentials"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -25,6 +26,7 @@ func (req *AuthConfig) Validate() error {
 	if _, err := NewAuthType(req.Type); err != nil {
 		return err
 	}
+
 	if req.Realm == "" {
 		req.Realm = DefaultRealm
 	}
@@ -68,5 +70,6 @@ func (req *AuthConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *AuthConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	b, _ := json.Marshal(req)
+	return string(b)
 }

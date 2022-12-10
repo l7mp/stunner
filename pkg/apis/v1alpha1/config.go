@@ -3,12 +3,12 @@ package v1alpha1
 
 // Config is the main interface for STUNner configuration objects
 type Config interface {
-	// Validate checks a configuration and injects defaults
+	// Validate checks a configuration and injects defaults.
 	Validate() error
-	// Name returns the name of the object to be configured
+	// Name returns the name of the object to be configured.
 	ConfigName() string
-	// DeepEqual compares two configurations
+	// DeepEqual compares two configurations.
 	DeepEqual(other Config) bool
-	// String stringifies the configuration
+	// String stringifies the configuration.
 	String() string
 }

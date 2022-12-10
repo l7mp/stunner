@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -63,5 +64,6 @@ func (req *AdminConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *AdminConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	b, _ := json.Marshal(req)
+	return string(b)
 }

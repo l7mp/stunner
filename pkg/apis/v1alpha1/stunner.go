@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 )
@@ -104,5 +105,6 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	b, _ := json.Marshal(req)
+	return string(b)
 }

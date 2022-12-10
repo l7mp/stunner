@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -30,9 +31,9 @@ type ListenerConfig struct {
 	// listener.
 	MaxRelayPort int `json:"max_relay_port,omitempty"`
 	// Cert is the TLS cert.
-	Cert string `json:"cert,omitempty"`
+	Cert Secret `json:"cert,omitempty"`
 	// Key is the TLS key.
-	Key string `json:"key,omitempty"`
+	Key Secret `json:"key,omitempty"`
 	// Routes specifies the list of Routes allowed via a listener.
 	Routes []string `json:"routes,omitempty"`
 }
@@ -46,7 +47,7 @@ func (req *ListenerConfig) Validate() error {
 	if req.Protocol == "" {
 		req.Protocol = DefaultProtocol
 	}
-	_, err := NewListenerProtocol(req.Protocol)
+	proto, err := NewListenerProtocol(req.Protocol)
 	if err != nil {
 		return err
 	}
@@ -70,6 +71,15 @@ func (req *ListenerConfig) Validate() error {
 		}
 	}
 
+	if proto == ListenerProtocolTLS || proto == ListenerProtocolDTLS {
+		if len(req.Cert.B) == 0 {
+			return fmt.Errorf("empty TLS cert for %s listener", proto.String())
+		}
+		if len(req.Key.B) == 0 {
+			return fmt.Errorf("empty TLS key for %s listener", proto.String())
+		}
+	}
+
 	sort.Strings(req.Routes)
 	return nil
 }
@@ -86,6 +96,10 @@ func (req *ListenerConfig) DeepEqual(other Config) bool {
 }
 
 // String stringifies the configuration.
-func (l *ListenerConfig) String() string {
-	return fmt.Sprintf("%s://%s:%d", l.Protocol, l.Addr, l.Port)
+func (req *ListenerConfig) String() string {
+	b, e := json.Marshal(req)
+	if e != nil {
+		return e.Error()
+	}
+	return string(b)
 }

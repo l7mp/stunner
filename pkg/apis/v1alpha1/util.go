@@ -168,3 +168,29 @@ func (l ClusterProtocol) String() string {
 		return "<unknown>"
 	}
 }
+
+// Secret is a custom type to hold secrets. It is essentially a []byte, with the twist that it knows
+// how to remove itself from JSON output.
+type Secret struct {
+	B []byte
+}
+
+func NewSecret(s string) Secret {
+	return Secret{B: []byte(s)}
+}
+
+func (c Secret) MarshalJSON() ([]byte, error) {
+	if c.B == nil {
+		return []byte(`"` + "-EMPTY-" + `"`), nil
+	}
+	return []byte(`"` + "-SECRET-" + `"`), nil
+}
+
+func (c *Secret) UnmarshalJSON(dat []byte) error {
+	*c = Secret{B: dat}
+	return nil
+}
+
+func (c Secret) String() string {
+	return string(c.B)
+}

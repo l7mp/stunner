@@ -17,6 +17,7 @@ type ReconcileJob struct {
 
 type ReconciliationState struct {
 	NewJobQueue, ChangedJobQueue, DeletedJobQueue []ReconcileJob
+	Restarted                                     []object.Object
 }
 
 // PrepareReconciliation prepares the reconciliation of the objects handled by the manager and returns a
@@ -29,13 +30,14 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 		NewJobQueue:     []ReconcileJob{},
 		ChangedJobQueue: []ReconcileJob{},
 		DeletedJobQueue: []ReconcileJob{},
+		Restarted:       []object.Object{},
 	}
 
 	var restart error = nil
 
 	// find what has to be added or changed
 	for _, c := range confs {
-		m.log.Debugf("reconciling for conf %q: %#v", c.ConfigName(), c)
+		m.log.Debugf("reconciling for conf %q: %s", c.ConfigName(), c.String())
 
 		// make sure lists are sorted and names are OK
 		if err := c.Validate(); err != nil {
@@ -50,7 +52,8 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 			// make sure lists are sorted and names are OK
 			if err := runningConf.Validate(); err != nil {
 				return nil, fmt.Errorf("internal error: cannot validate running "+
-					"config (%#v) for object %s: %w", runningConf, o.ObjectName(), err)
+					"config (%s) for object %s: %w", runningConf.String(),
+					o.ObjectName(), err)
 			}
 
 			if runningConf.DeepEqual(c) {
@@ -60,6 +63,7 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 				state.ChangedJobQueue = append(state.ChangedJobQueue,
 					ReconcileJob{Object: o, NewConfig: c, OldConfig: runningConf})
 			}
+
 		} else {
 			m.log.Tracef("new object %q: adding to job queue", c.ConfigName())
 			// create a mock object so that we can call Inspect later on
@@ -79,17 +83,13 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 	}
 
 	m.log.Trace("inspecting the reconciliation job queue")
-	allJobs := []ReconcileJob{}
-	allJobs = append(allJobs, state.NewJobQueue...)
-	allJobs = append(allJobs, state.DeletedJobQueue...)
-	allJobs = append(allJobs, state.ChangedJobQueue...)
+	for _, j := range state.ChangedJobQueue {
+		m.log.Tracef("inspecting object %q for configuration change: %s -> %s",
+			j.Object.ObjectName(), j.OldConfig.String(), j.NewConfig.String())
 
-	for _, j := range allJobs {
-		m.log.Tracef("inspecting object %q for configuration change: %#v -> %#v",
-			j.Object.ObjectName(), j.OldConfig, j.NewConfig)
-
-		if re := j.Object.Inspect(j.OldConfig, j.NewConfig); re {
-			restart = v1alpha1.ErrRestartRequired
+		if j.Object.Inspect(j.OldConfig, j.NewConfig) {
+			state.Restarted = append(state.Restarted, j.Object)
+			restart = object.ErrRestartRequired
 		}
 	}
 
@@ -103,7 +103,7 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 	m.log.Trace("running the new-object job queue")
 	for _, j := range state.NewJobQueue {
 		o, err := m.factory.New(j.NewConfig)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
+		if err != nil && err != object.ErrRestartRequired {
 			m.log.Errorf("could not create new object: %s", err.Error())
 			return err
 		}
@@ -114,7 +114,8 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 	m.log.Trace("running the deletion job queue")
 	for _, j := range state.DeletedJobQueue {
 		o := j.Object
-		m.log.Tracef("deleting object %q: running conf: %#v", o.ObjectName(), j.OldConfig)
+		m.log.Tracef("deleting object %q: running conf: %s", o.ObjectName(),
+			j.OldConfig.String())
 		// ignore error
 		_ = m.Delete(o)
 	}
@@ -122,11 +123,11 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 	m.log.Trace("running the reconciliation job queue")
 	for _, j := range state.ChangedJobQueue {
 		o := j.Object
-		m.log.Tracef("reconciling object %q: %#v -> %#v", o.ObjectName(), j.OldConfig,
-			j.NewConfig)
+		m.log.Tracef("reconciling object %q: %s -> %s", o.ObjectName(),
+			j.OldConfig.String(), j.NewConfig.String())
 
 		err := o.Reconcile(j.NewConfig)
-		if err != nil && err != v1alpha1.ErrRestartRequired {
+		if err != nil && err != object.ErrRestartRequired {
 			return err
 		}
 	}

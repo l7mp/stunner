@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -67,5 +68,6 @@ func (req *ClusterConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *ClusterConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	b, _ := json.Marshal(req)
+	return string(b)
 }

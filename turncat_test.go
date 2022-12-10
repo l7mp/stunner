@@ -81,18 +81,20 @@ func turncatEchoTest(conf turncatEchoTestConfig) {
 	assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 }
 
-// *****************
-// UDP/TCP tests over localhost: VNet supports UDP only so these tests will run over the localhost
-// *****************
-// Topology:
-//
-//                +----- turncat (udp:25000, tcp:25000)
-//                |
-//                +----- STUNner (udp:23478, tcp:23478)
-//                |
-//     client--- lo
-//                |
-//                +----- echo-server (udp:25678)
+/********************************************
+ *
+ * UDP/TCP tests over localhost (VNet supports UDP only)
+ *
+ * Topology:
+ *                +----- turncat (udp:25000, tcp:25000)
+ *                |
+ *                +----- STUNner (udp:23478, tcp:23478)
+ *                |
+ *     client--- lo
+ *                |
+ *                +----- echo-server (udp:25678)
+ *
+ *********************************************/
 
 func TestTurncatPlaintext(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -117,9 +119,9 @@ func TestTurncatPlaintext(t *testing.T) {
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+			Credentials: map[string]v1alpha1.Secret{
+				"username": v1alpha1.NewSecret("user1"),
+				"password": v1alpha1.NewSecret("passwd1"),
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
@@ -141,9 +143,7 @@ func TestTurncatPlaintext(t *testing.T) {
 		}},
 	})
 
-	// restart required
-	assert.ErrorContains(t, err, "restart", "starting server")
-	// assert.NoError(t, err, "cannot set up STUNner daemon")
+	assert.NoError(t, err, "starting server")
 	defer stunner.Close()
 
 	testTurncatConfigs := []TurncatConfig{
@@ -237,8 +237,8 @@ func TestTurncatLongterm(t *testing.T) {
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type: "longterm",
-			Credentials: map[string]string{
-				"secret": sharedSecret,
+			Credentials: map[string]v1alpha1.Secret{
+				"secret": v1alpha1.NewSecret(sharedSecret),
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
@@ -259,7 +259,7 @@ func TestTurncatLongterm(t *testing.T) {
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
 	})
-	assert.ErrorContains(t, err, "restart", "starting server")
+	assert.NoError(t, err, "starting server")
 	// assert.NoError(t, err, "cannot set up STUNner daemon")
 	defer stunner.Close()
 

@@ -196,7 +196,7 @@ func main() {
 
 		case <-sigterm:
 			log.Info("caught SIGTERM: performing a graceful shutdown")
-			st.GracefulShutdown()
+			st.Shutdown()
 
 		case c := <-conf:
 			log.Trace("new configuration file available")
@@ -211,8 +211,8 @@ func main() {
 			err := st.Reconcile(*c)
 			log.Trace("reconciliation ready")
 			if err != nil {
-				if err == v1alpha1.ErrRestartRequired {
-					log.Debugf("reconciliation ready: server restarted")
+				if e, ok := err.(v1alpha1.ErrRestarted); ok {
+					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
 					log.Errorf("could not reconcile new configuration: %s, "+
 						"rolling back to last running config", err.Error())

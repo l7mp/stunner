@@ -36,9 +36,9 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 		Auth: v1alpha1.AuthConfig{
 			Type:  "plaintext",
 			Realm: v1alpha1.DefaultRealm,
-			Credentials: map[string]string{
-				"username": u.Username,
-				"password": u.Password,
+			Credentials: map[string]v1alpha1.Secret{
+				"username": {B: []byte(u.Username)},
+				"password": {B: []byte(u.Password)},
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{

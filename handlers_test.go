@@ -18,9 +18,11 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// *****************
-// Auth handler tests with VNet
-// *****************
+/********************************************
+ *
+ * Auth handler tests with VNet
+ *
+ *********************************************/
 
 // unfortunately the helper longTermCredentials() is not exported by pion/turn so we have to
 // reproduce the same functionality here for testing, but with the added twist that usernames can
@@ -53,9 +55,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -81,8 +83,8 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -111,8 +113,8 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -143,8 +145,8 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -175,8 +177,8 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -228,7 +230,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
+			assert.NoError(t, stunner.Reconcile(c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")

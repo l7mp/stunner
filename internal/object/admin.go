@@ -30,8 +30,7 @@ type Admin struct {
 	log                                  logging.LeveledLogger
 }
 
-// NewAdmin creates a new Admin object. Requires a server restart (returns
-// v1alpha1.ErrRestartRequired)
+// NewAdmin creates a new Admin object.
 func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
@@ -43,14 +42,14 @@ func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging
 		health: health.NewHandler(),
 		log:    logger.NewLogger("stunner-admin"),
 	}
-	admin.log.Tracef("NewAdmin: %#v", req)
+	admin.log.Tracef("NewAdmin: %s", req.String())
 
 	// health checker
 	// liveness probe always succeeds once we got here
 	admin.health.AddLivenessCheck("server-alive", func() error { return nil })
 	admin.health.AddReadinessCheck("server-ready", rc)
 
-	if err := admin.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
+	if err := admin.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
 		return nil, err
 	}
 
@@ -76,7 +75,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 		return err
 	}
 
-	a.log.Tracef("Reconcile: %#v", req)
+	a.log.Tracef("Reconcile: %s", req.String())
 
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
