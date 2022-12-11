@@ -121,7 +121,9 @@ Gateways describe the STUN/TURN server listeners exposed to clients.
 In the below example, we open a STUN/TURN listener on the UDP port 3478.  STUNner will
 automatically expose this listener on a public IP address and port by creating a [LoadBalancer
 service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
-Gateway. Then, it awaits clients to connect and, once authenticated, forward client connections to
+Gateway. The name and namespace of the automatically provisioned service are the same as those of
+the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port
+changes). Then, it awaits clients to connect and, once authenticated, forward client connections to
 an arbitrary service backend.
 
 ```yaml
