@@ -42,7 +42,6 @@ data:
   JICOFO_AUTH_USER: 'focus'
   XMPP_BOSH_URL_BASE: 'http://jitsi-prosody.default.svc.cluster.local:5280'
   NGINX_RESOLVER: '<kube-dns>' # TODO: Change this
-  DEPLOYMENTINFO_REGION: 'Europe/Budapest'
 ---
 apiVersion: v1
 kind: ConfigMap

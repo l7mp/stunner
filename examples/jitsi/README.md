@@ -11,7 +11,9 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-The below installation instructions require an operational cluster running a supported version of Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes services should support this). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach your WebRTC infra. As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); late on you will learn more about why this is crucial above.
+The tutorial assumes a fresh STUNner installation; see the STUNner installation and configuration guide. Create a namespace called stunner if there is none. You need a WebRTC-compatible browser to run this tutorial. Basically any modern browser will do; we usually test our WebRTC applications with Firefox and Chrome.
+
+As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); late on you will learn more about why this is crucial above.
 
 ## Setup
 
@@ -57,8 +59,8 @@ Store the Ingress IP address Kubernetes assigned to our Ingress; this will be ne
 
 ```console
 kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+export INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 ```
 
 ### Cert manger
@@ -148,12 +150,12 @@ Wait until Kubernetes assigns an external IP and store the external IP assigned 
 
 ```console
 until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### Jitsi
 
-The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. In order to achieve this, first we path the public IP address of the STUNner STUN/TURN server we have learned above into our Jitsi deployment manifest:
+The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. In order to achieve this, first we patch the public IP address of the STUNner STUN/TURN server we have learned above into our Jitsi deployment manifest:
 
 ```console
 sed -i "s/<stunner-public-ip>/$STUNNERIP/g" examples/jitsi/jitsi-server.yaml
@@ -167,10 +169,10 @@ We also need the Ingress external IP address we have stored previously: this wil
 sed -i "s/<public-ingress-ip>/$INGRESSIP/g" examples/jitsi/jitsi-server.yaml
 ```
 
-Because the web server using Nginx with a `resolver` param which will create a non-blocking DNS resolver we have to use the kube-dns.
+To use the web server, the corresponding Nginx `resolver` parameter must be the Kubernetes’ DNS address.
 
 ```console
-KUBEDNS=$(kubectl get svc kube-dns -n kube-system -o jsonpath='{.spec.clusterIP}')
+export KUBEDNS=$(kubectl get svc kube-dns -n kube-system -o jsonpath='{.spec.clusterIP}')
 sed -i "s/<kube-dns>/$KUBEDNS/g" examples/jitsi/jitsi-server.yaml
 ```
 
@@ -184,7 +186,7 @@ The demo installation bundle includes a lot of resources to deploy Jitsi:
 - Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster.
 - Jitsi web server serving the landing page
 - Cluster issuer for TLS certificates
-- Prosody XMPP server to mange the signalling within the cluster
+- Prosody XMPP server to manage the WebRTC session signaling within the cluster
 - Jicofo load balancer and connection broker to setup rooms on JVB
 - JVB videobridge
 
@@ -198,7 +200,7 @@ After installing everything, execute the following command to retrieve the URL o
 echo $INGRESSIP.nip.io
 ```
 
-Copy the URL into your browser, and now you should be greeted with the Jitsi webpage. In the landing page you should create a room first. After you created a room you can set your username and join the room. On another page you have to open this page again you should see the previously created room in the list. You only have to connect this room with another user and you can enjoy your company if everything works fine!
+Copy the URL into your browser, and now you should be greeted with the Jitsi webpage. In the landing page you should create a room first. After you created a room you can set your username and join the room. On another page you have to open this page again and you should see the previously created room in the list. You only have to connect this room with another user.
 
 ## Help
 

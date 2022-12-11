@@ -56,8 +56,8 @@ Store the Ingress IP address Kubernetes assigned to our Ingress; this will be ne
 
 ```console
 kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+export INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 ```
 
 ### Cert manager
@@ -132,14 +132,14 @@ spec:
         - name: livekit-server
 ```
 
-Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service. 
+Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service.
 
 Wait until Kubernetes assigns an external IP and store the external IP assigned by Kubernetes to
 STUNner in an environment variable for later use
 
 ```console
 until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### LiveKit
