@@ -115,8 +115,8 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
 				}
 			}
 		}
-		auth.Log.Debugf("permission denied on listener %q for client %q to peer %s: no route to endpoint",
-			l.Name, src.String(), peerIP)
+		auth.Log.Debugf("permission denied on listener %q for client %q to peer %s: "+
+			"no route to endpoint", l.Name, src.String(), peerIP)
 		return false
 	}
 }

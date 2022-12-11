@@ -13,6 +13,7 @@ import (
 	"github.com/pion/transport/vnet"
 	"github.com/pion/turn/v2"
 
+	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
@@ -254,13 +255,17 @@ func (l *Listener) Start() error {
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
 
-	relay := &turn.RelayAddressGeneratorPortRange{
+	relay := &telemetry.RelayAddressGenerator{
+		Name:         l.Name,
 		RelayAddress: l.Addr,
 		Address:      l.Addr.String(),
 		MinPort:      uint16(l.MinPort),
 		MaxPort:      uint16(l.MaxPort),
+		DryRun:       l.dryRun,
 		Net:          l.Net,
 	}
+
+	permissionHandler := l.handlerFactory.GetPermissionHandler(l)
 
 	addr := fmt.Sprintf("%s:%d", l.Addr.String(), l.Port)
 
@@ -273,10 +278,14 @@ func (l *Listener) Start() error {
 				addr, err)
 		}
 
+		if !l.dryRun {
+			udpListener = telemetry.NewPacketConn(udpListener, l.Name, telemetry.ListenerType)
+		}
+
 		conn := turn.PacketConnConfig{
 			PacketConn:            udpListener,
 			RelayAddressGenerator: relay,
-			PermissionHandler:     l.handlerFactory.GetPermissionHandler(l),
+			PermissionHandler:     permissionHandler,
 		}
 
 		pConns = append(pConns, conn)
@@ -284,14 +293,20 @@ func (l *Listener) Start() error {
 
 	case v1alpha1.ListenerProtocolTCP:
 		l.log.Debugf("setting up TCP listener at %s", addr)
+
 		tcpListener, err := net.Listen("tcp", addr)
 		if err != nil {
 			return fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
+
+		if !l.dryRun {
+			tcpListener = telemetry.NewListener(tcpListener, l.Name, telemetry.ListenerType)
+		}
+
 		conn := turn.ListenerConfig{
 			Listener:              tcpListener,
 			RelayAddressGenerator: relay,
-			PermissionHandler:     l.handlerFactory.GetPermissionHandler(l),
+			PermissionHandler:     permissionHandler,
 		}
 
 		lConns = append(lConns, conn)
@@ -319,10 +334,14 @@ func (l *Listener) Start() error {
 			return fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
 
+		if !l.dryRun {
+			tlsListener = telemetry.NewListener(tlsListener, l.Name, telemetry.ListenerType)
+		}
+
 		conn := turn.ListenerConfig{
 			Listener:              tlsListener,
 			RelayAddressGenerator: relay,
-			PermissionHandler:     l.handlerFactory.GetPermissionHandler(l),
+			PermissionHandler:     permissionHandler,
 		}
 
 		lConns = append(lConns, conn)
@@ -353,10 +372,14 @@ func (l *Listener) Start() error {
 			return fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
 
+		if !l.dryRun {
+			dtlsListener = telemetry.NewListener(dtlsListener, l.Name, telemetry.ListenerType)
+		}
+
 		conn := turn.ListenerConfig{
 			Listener:              dtlsListener,
 			RelayAddressGenerator: relay,
-			PermissionHandler:     l.handlerFactory.GetPermissionHandler(l),
+			PermissionHandler:     permissionHandler,
 		}
 
 		lConns = append(lConns, conn)

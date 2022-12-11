@@ -97,9 +97,9 @@ func NewStunner(options Options) *Stunner {
 
 	if !s.dryRun {
 		s.resolver.Start()
+		telemetry.Init()
+		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetAciveConnections() })
 	}
-
-	telemetry.RegisterMetrics(s.log, func() float64 { return s.GetAciveConnections() })
 
 	return s
 }
@@ -219,7 +219,11 @@ func (s *Stunner) Close() {
 		}
 	}
 
-	telemetry.UnregisterMetrics(s.log)
+	// telemetry.UnregisterMetrics(s.log)
+	if !s.dryRun {
+		telemetry.Close()
+	}
+
 	s.resolver.Close()
 }
 
