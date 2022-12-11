@@ -26,6 +26,7 @@ func main() {
 	var config = flag.StringP("config", "c", "", "Config file.")
 	var level = flag.StringP("log", "l", "", "Log level (default: all:INFO).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
+	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>.")
 	flag.Parse()
 
@@ -39,7 +40,7 @@ func main() {
 		logLevel = *level
 	}
 
-	st := stunner.NewStunner().WithOptions(stunner.Options{LogLevel: logLevel})
+	st := stunner.NewStunner(stunner.Options{LogLevel: logLevel, DryRun: *dryRun})
 	defer st.Close()
 
 	log := st.GetLogger().NewLogger("stunnerd")
@@ -76,7 +77,7 @@ func main() {
 		watcherEnabled := false
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
-			log.Errorf("could not create config file watcher%s", err.Error())
+			log.Errorf("could not create config file watcher: %s", err.Error())
 			os.Exit(1)
 		}
 		defer watcher.Close()
@@ -179,14 +180,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	sigint := make(chan os.Signal, 1)
+	defer close(sigint)
+	signal.Notify(sigint, syscall.SIGINT)
+
+	sigterm := make(chan os.Signal, 1)
+	defer close(sigterm)
+	signal.Notify(sigterm, syscall.SIGTERM)
 
 	for {
 		select {
-		case <-sigs:
+		case <-sigint:
 			log.Info("normal exit")
 			os.Exit(0)
+
+		case <-sigterm:
+			log.Info("caught SIGTERM: performing a graceful shutdown")
+			st.Shutdown()
 
 		case c := <-conf:
 			log.Trace("new configuration file available")
@@ -201,8 +211,8 @@ func main() {
 			err := st.Reconcile(*c)
 			log.Trace("reconciliation ready")
 			if err != nil {
-				if err == v1alpha1.ErrRestartRequired {
-					log.Debugf("reconciliation ready: server restarted")
+				if e, ok := err.(v1alpha1.ErrRestarted); ok {
+					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
 					log.Errorf("could not reconcile new configuration: %s, "+
 						"rolling back to last running config", err.Error())

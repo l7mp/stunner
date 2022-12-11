@@ -35,7 +35,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         - name: NEKO_ICESERVERS
-          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp", "stun:1.1.1.1:3478"], "username": "user-1", "credential": "pass-1","iceTransportPolicy": "relay"}]'
+          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp"], "username": "user-1", "credential": "pass-1","iceTransportPolicy": "relay"}]'
         ports:
         - name: http
           containerPort: 8080
@@ -59,7 +59,7 @@ spec:
     protocol: TCP
   selector:
     app: neko
-  #type: LoadBalancer
+  type: LoadBalancer
 ---
 apiVersion: v1
 kind: Service

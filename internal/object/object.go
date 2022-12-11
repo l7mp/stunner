@@ -1,6 +1,8 @@
 package object
 
 import (
+	"github.com/pion/turn/v2"
+
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -22,4 +24,15 @@ type Object interface {
 type Factory interface {
 	// New will spawn a new object from the factory
 	New(conf v1alpha1.Config) (Object, error)
+}
+
+// ReadinessHandler is a callback that allows an object to check the readiness of STUNner.
+type ReadinessHandler = func() error
+
+// HandlerFactory is a collection of helper functions that allow a listener to generate STUN/TURN
+// authentication and permission handlers.
+type HandlerFactory struct {
+	GetRealm             func() string
+	GetAuthHandler       func() turn.AuthHandler
+	GetPermissionHandler func(*Listener) turn.PermissionHandler
 }

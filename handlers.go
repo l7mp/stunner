@@ -4,16 +4,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha1" //nolint:gosec,gci
 	"encoding/base64"
+	"errors"
 	"net"
 	"strconv"
 	"time"
-	// "fmt"
-	// "net"
-	// "strings"
 
-	// "github.com/pion/logging"
+	"strings"
+
 	"github.com/pion/turn/v2"
-	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
@@ -21,12 +19,17 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// NewAuthHandler returns an authentication handler callback for STUNner, suitable to be used with the TURN server for authenticating clients
+// time-windowed TURN auth username separator defined in
+// https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00
+const usernameSeparator = ":"
+
+// NewAuthHandler returns an authentication handler callback to be used with a TURN server for
+// authenticating clients.
 func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
 	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-		// dynamic: authHandler might have changed behind ur back
+		// dynamic: auth mode might have changed behind ur back
 		auth := s.GetAuth()
 
 		switch auth.Type {
@@ -45,19 +48,30 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			t, err := strconv.Atoi(username)
-			if err != nil {
+			// find the first thing that looks like a UNIX timestamp in the username
+			// and use that for checking the time-windowed credential, drop everything
+			// else
+			var timestamp int = 0
+			for _, ts := range strings.Split(username, usernameSeparator) {
+				t, err := strconv.Atoi(ts)
+				if err == nil {
+					timestamp = t
+					break
+				}
+			}
+
+			if timestamp == 0 {
 				auth.Log.Errorf("invalid time-windowed username %q", username)
 				return nil, false
 			}
 
-			if int64(t) < time.Now().Unix() {
+			if int64(timestamp) < time.Now().Unix() {
 				auth.Log.Errorf("expired time-windowed username %q", username)
 				return nil, false
 			}
 
 			mac := hmac.New(sha1.New, []byte(auth.Secret))
-			_, err = mac.Write([]byte(username))
+			_, err := mac.Write([]byte(username))
 			if err != nil {
 				auth.Log.Errorf("failed to hash username: %w", err.Error())
 				return nil, false
@@ -74,7 +88,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 	}
 }
 
-// NewPermissionHandler returns a callback for STUNner to handle client permsission requests to access peers
+// NewPermissionHandler returns a callback to handle client permission requests to access peers.
 func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandler {
 	s.log.Trace("NewPermissionHandler")
 
@@ -101,8 +115,35 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
 				}
 			}
 		}
-		auth.Log.Debugf("permission denied on listener %q for client %q to peer %s: no route to endpoint",
-			l.Name, src.String(), peerIP)
+		auth.Log.Debugf("permission denied on listener %q for client %q to peer %s: "+
+			"no route to endpoint", l.Name, src.String(), peerIP)
 		return false
+	}
+}
+
+// NewHandlerFactory creates helper functions that allow a listener to generate STUN/TURN
+// authentication and permission handlers.
+func (s *Stunner) NewHandlerFactory() object.HandlerFactory {
+	return object.HandlerFactory{
+		GetRealm: func() string {
+			auth := s.GetAuth()
+			if auth == nil {
+				return ""
+			}
+			return auth.Realm
+		},
+		GetAuthHandler:       func() turn.AuthHandler { return s.NewAuthHandler() },
+		GetPermissionHandler: func(l *object.Listener) turn.PermissionHandler { return s.NewPermissionHandler(l) },
+	}
+}
+
+// NewReadinessHandler creates a helper function for checking the readiness of STUNner.
+func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
+	return func() error {
+		if s.IsReady() {
+			return nil
+		} else {
+			return errors.New("stunnerd not ready")
+		}
 	}
 }

@@ -44,8 +44,8 @@ This will expose STUNner on a public IP on UDP port 3478. A Kubernetes `LoadBala
 ephemeral public IP address to the service, so first we need to learn the external IP.
 
 ```
-kubectl get service stunner-gateway-udp-gateway-svc -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+STUNNERIP=$(kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 NOTE: this IP should be accessible from your browser. If that "public IP" is behind a NAT, you can overwrite it with the actual

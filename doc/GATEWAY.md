@@ -89,7 +89,6 @@ spec:
   userName: "user-1"
   password: "pass-1"
   metricsEndpoint: "http://0.0.0.0:8080/metrics"
-EOF
 ```
 
 Below is a quick reference of the most important fields of the GatewayConfig
@@ -102,7 +101,8 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
 | `username` | `string` | The `username` for [`plaintext` authentication](/doc/AUTH.md). | No |
 | `password` | `string` | The credential for [`plaintext` authentication](/doc/AUTH.md). | No |
-| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stiunnerd` pods.| No |
+| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
+| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on `http://0.0.0.0:8086`, use an empty string to disable.| No |
 | `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
 | `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
@@ -121,7 +121,9 @@ Gateways describe the STUN/TURN server listeners exposed to clients.
 In the below example, we open a STUN/TURN listener on the UDP port 3478.  STUNner will
 automatically expose this listener on a public IP address and port by creating a [LoadBalancer
 service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
-Gateway. Then, it awaits clients to connect and, once authenticated, forward client connections to
+Gateway. The name and namespace of the automatically provisioned service are the same as those of
+the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port
+changes). Then, it awaits clients to connect and, once authenticated, forward client connections to
 an arbitrary service backend.
 
 ```yaml

@@ -20,3 +20,4 @@ const DefaultAdminName = "default-admin-config"
 const DefaultAuthName = "default-auth-config"
 
 const DefaultMetricsPort int = 8080
+const DefaultHealthCheckPort int = 8086

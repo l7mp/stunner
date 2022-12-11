@@ -14,10 +14,10 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// NewDefaultStunnerConfig builds a default configuration from a STUNner URI. Example: the URI
+// NewDefaultStunnerConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
-// username/password pair `user:pass`.
+// username/password pair `user:pass`. Health-checks and metric scarping are disabled.
 func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
@@ -31,14 +31,15 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	c := &v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin: v1alpha1.AdminConfig{
-			LogLevel: v1alpha1.DefaultLogLevel,
+			LogLevel:        v1alpha1.DefaultLogLevel,
+			MetricsEndpoint: "http://:8088",
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type:  "plaintext",
 			Realm: v1alpha1.DefaultRealm,
-			Credentials: map[string]string{
-				"username": u.Username,
-				"password": u.Password,
+			Credentials: map[string]v1alpha1.Secret{
+				"username": {B: []byte(u.Username)},
+				"password": {B: []byte(u.Password)},
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
@@ -63,7 +64,7 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 }
 
 // LoadConfig loads a configuration from a file, substituting environment variables for
-// placeholders in the configuration file. Returns the new configuration or error if load fails
+// placeholders in the configuration file. Returns the new configuration or error if load fails.
 func LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 	c, err := os.ReadFile(config)
 	if err != nil {
@@ -101,7 +102,7 @@ func LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 	return &s, nil
 }
 
-// GetConfig returns the configuration of the running STUNner daemon
+// GetConfig returns the configuration of the running STUNner daemon.
 func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
 	s.log.Tracef("GetConfig")
 

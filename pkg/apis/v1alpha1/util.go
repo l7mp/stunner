@@ -129,3 +129,73 @@ func (l ClusterType) String() string {
 		return "<unknown>"
 	}
 }
+
+// ClusterProtocol specifies the network protocol for a cluster
+type ClusterProtocol int
+
+const (
+	ClusterProtocolUDP ClusterProtocol = iota + 1
+	ClusterProtocolTCP
+	ClusterProtocolUnknown
+)
+
+const (
+	clusterProtocolUDPStr = "udp"
+	clusterProtocolTCPStr = "tcp"
+)
+
+// NewClusterProtocol parses the protocol specification
+func NewClusterProtocol(raw string) (ClusterProtocol, error) {
+	switch strings.ToLower(raw) {
+	case clusterProtocolUDPStr:
+		return ClusterProtocolUDP, nil
+	case clusterProtocolTCPStr:
+		return ClusterProtocolTCP, nil
+	default:
+		return ClusterProtocol(ClusterProtocolUnknown),
+			fmt.Errorf("unknown cluster protocol: \"%s\"", raw)
+	}
+}
+
+// String returns a string representation of a cluster protocol
+func (l ClusterProtocol) String() string {
+	switch l {
+	case ClusterProtocolUDP:
+		return clusterProtocolUDPStr
+	case ClusterProtocolTCP:
+		return clusterProtocolTCPStr
+	default:
+		return "<unknown>"
+	}
+}
+
+// Secret is a custom type to hold secrets. It is essentially a []byte, with the twist that it knows
+// how to remove itself from JSON output.
+type Secret struct {
+	B []byte
+}
+
+func NewSecret(s string) Secret {
+	return Secret{B: []byte(s)}
+}
+
+func (c Secret) MarshalJSON() ([]byte, error) {
+	if c.B == nil {
+		return []byte(`"` + "-EMPTY-" + `"`), nil
+	}
+	return []byte(`"` + "-SECRET-" + `"`), nil
+}
+
+func (c *Secret) UnmarshalJSON(dat []byte) error {
+	// TODO: remove this hack
+	// since we are parsing bytes we get the full string in double-quotes, these need to be
+	// removed. this hack works for single-quoted, double-qouted and unquoted strings, but also
+	// removes quotes from INSIDE the username/password
+	dat = []byte(strings.Trim(string(dat), "\""))
+	*c = Secret{B: dat}
+	return nil
+}
+
+func (c Secret) String() string {
+	return string(c.B)
+}

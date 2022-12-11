@@ -31,8 +31,8 @@ The intended authentication workflow in STUNner is as follows.
 
 1. *A username/password pair is generated.* This is outside the scope of STUNner; however, STUNner
    comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to
-   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For 
-   instance, the below will automatically parse the running config and generate a username/password 
+   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For
+   instance, the below will automatically parse the running config and generate a username/password
    pair and a realm based on the current configuration.
    ```javascript
    const StunnerAuth = require('@l7mp/stunner-auth-lib');
@@ -142,20 +142,29 @@ though).
 
 ## Longterm authentication
 
-STUNner's `longterm` authentication mode provides clients time-limited access to STUNner.  STUNner
-`longterm` credentials are dynamically generated with a pre-configured lifetime and, once the
-lifetime expires, the credential cannot be used to authenticate (or refresh) with STUNner any
-more. This authentication mode is more secure since credentials are not shared between clients and
-come with a limited validity. Configuring `longterm` authentication may be more complex though,
-since credentials must be dynamically generated for each session and properly returned to clients.
+Somewhat confusingly, STUNner overloads the name `longterm` to denote a STUN/TURN authentication
+mode that provides clients time-limited access to STUNner.  STUNner `longterm` credentials are
+dynamically generated with a pre-configured lifetime and, once the lifetime expires, the credential
+cannot be used to authenticate (or refresh) with STUNner any more. This authentication mode is more
+secure since credentials are not shared between clients and come with a limited
+validity. Configuring `longterm` authentication may be more complex though, since credentials must
+be dynamically generated for each session and properly returned to clients.
 
-To implement this mode, STUNner adopts the [auth
-handlers](https://pkg.go.dev/github.com/pion/turn/v2#GenerateLongTermCredentials) from [Pion
-TURN](https://pkg.go.dev/github.com/pion/turn/v2). In particular, the username is a UNIX timestamp
-specifying the time at with the credential expires, and the password is a base-64 encoded string
-obtained by SHA-hashing the timestamp with a predefined shared secret. The advantage of this
-mechanism is that it is enough to know the shared secret for STUNner to be able to check the
-validity of a credential.
+To implement this mode, STUNner adopts the quasi-standard time-windowed TURN authentication
+credential format specified in the IETF draft titled [A REST API For Access To TURN
+Services](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this format,
+the TURN username consists of a colon-delimited combination of the expiration timestamp and the
+user-id parameter, where the user-id is some application-specific id that is opaque to STUNner and
+the timestamp specifies the date of expiry of the credential as a UNIX timestamp. Furthermore, the
+TURN password is computed from the a secret key shared with the TURN server and the returned
+username value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this
+scheme somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and
+the timestamp to appear in any order in the TURN username and it accepts usernames with a plain
+timestamp, without the colon and/or the user-id.
+
+The advantage of this mechanism is that it is enough to know the shared secret for STUNner to be
+able to check the validity of a credential. Note that the user-id is used only for the integrity
+check but STUNner in no way checks whether it identifies a valid user-id in the system.
 
 The below commands will configure STUNner to use `longterm` authentication mode, using the shared
 secret `my-secret`. By default, STUNner credentials are valid for one day.
@@ -168,7 +177,7 @@ metadata:
   namespace: stunner
 spec:
   realm: my-realm.example.com
-  authType: longerm
+  authType: longterm
   sharedSecret: "my-secret"
 ```
 

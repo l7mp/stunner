@@ -135,11 +135,11 @@ spec:
 Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service.
 
 Wait until Kubernetes assigns an external IP and store the external IP assigned by Kubernetes to
-STUNner in an environment variable for later use
+STUNner in an environment variable for later use.
 
 ```console
-until [ -n "$(kubectl get svc stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-export STUNNERIP=$(kubectl get service stunner-gateway-udp-gateway-svc -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+until [ -n "$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+export STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### LiveKit
@@ -164,7 +164,23 @@ rtc:
     port: 3478
 ```
 
-This will make sure that LiveKit is started with STUNner as the STUN/TURN server. Note that LiveKit itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](/doc/DEPLOYMENT.md)); with the above configuration we are just telling LiveKit to instruct its clients to use STUNner to reach the LiveKit media servers.
+This will make sure that LiveKit is started with STUNner as the STUN/TURN server. If unsure about the STUNner settings to use, you can always use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
+
+``` console
+cd stunner
+cmd/stunnerctl/stunnerctl running-config default/stunnerd-config
+STUN/TURN authentication type:  plaintext
+STUN/TURN username:             user-1
+STUN/TURN password:             pass-1
+Listener 1
+        Name:   udp-listener
+        Listener:       udp-listener
+        Protocol:       UDP
+        Public address: 1.2.3.4
+        Public port:    3478
+```
+
+Note that LiveKit itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](/doc/DEPLOYMENT.md)); with the above configuration we are just telling LiveKit to instruct its clients to use STUNner to reach the LiveKit media servers.
 
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 

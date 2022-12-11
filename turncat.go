@@ -19,27 +19,29 @@ import (
 
 const UDP_PACKET_SIZE = 1500
 
-// AuthGen is a function called by turncat to generate authentication tokens
+// AuthGen is a function called by turncat to generate authentication tokens.
 type AuthGen func() (string, string, error)
 
-// TurncatConfig is the main configuration for the turncat relay
+// TurncatConfig is the main configuration for the turncat relay.
 type TurncatConfig struct {
-	// ListenAddr is the listeninging socket address (local tunnel endpoint)
+	// ListenAddr is the listeninging socket address (local tunnel endpoint).
 	ListenerAddr string
-	// ServerAddr is the TURN server addrees (e.g. "turn:turn.abc.com:3478")
+	// ServerAddr is the TURN server addrees (e.g. "turn://turn.abc.com:3478").
 	ServerAddr string
-	// PeerAddr specifies the remote peer to connect to
+	// PeerAddr specifies the remote peer to connect to.
 	PeerAddr string
-	// Realm is the STUN/TURN realm
+	// Realm is the STUN/TURN realm.
 	Realm string
-	// AuthGet specifies the function to generate auth tokens
+	// AuthGet specifies the function to generate auth tokens.
 	AuthGen AuthGen
-	// InsecureMode controls whether self-signed TLS certificates are accepted by the TURN client
-	InsecureMode  bool
+	// InsecureMode controls whether self-signed TLS certificates are accepted by the TURN
+	// client.
+	InsecureMode bool
+	// LoggerFactory is an optional external logger.
 	LoggerFactory logging.LoggerFactory
 }
 
-// Turncat is the internal structure for representing a turncat relay
+// Turncat is the internal structure for representing a turncat relay.
 type Turncat struct {
 	listenerAddr  net.Addr
 	serverAddr    net.Addr
@@ -64,8 +66,8 @@ type connection struct {
 }
 
 // NewTurncat creates a new turncat relay from the specified config, creating a listener socket for
-// clients to connect and relaying client connections through the speficied STUN/TURN server to the
-// peer.
+// clients to connect to and relaying client connections through the speficied STUN/TURN server to
+// the peer.
 func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	loggerFactory := config.LoggerFactory
 	if loggerFactory == nil {
@@ -119,7 +121,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 
 	switch listener.Protocol {
 	case "file":
-		listenerConn = NewFileConn(os.Stdin)
+		listenerConn = util.NewFileConn(os.Stdin)
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		l, err := listenerConf.ListenPacket(context.Background(), listener.Addr.Network(),
 			listener.Addr.String())
@@ -177,7 +179,8 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	return t, nil
 }
 
-// Close terminates all relay connections created via turncat and deletes it. Errors in this phase are not critical and not propagated back to the caller.
+// Close terminates all relay connections created via turncat and deletes the relay. Errors in this
+// phase are not critical and not propagated back to the caller.
 func (t *Turncat) Close() {
 	t.log.Info("closing Turncat")
 
@@ -200,7 +203,7 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
-	case *fileConn:
+	case *util.FileConn:
 		// do nothing
 	default:
 		t.log.Error("internal error: unknown listener socket type")
@@ -540,7 +543,7 @@ func (t *Turncat) runListen() {
 }
 
 func (t *Turncat) runListenFile() {
-	listenerConn, ok := t.listenerConn.(*fileConn)
+	listenerConn, ok := t.listenerConn.(*util.FileConn)
 	if !ok {
 		t.log.Error("cannot listen on client connection: expected file")
 		// terminate go routine

@@ -1,26 +1,27 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 )
 
-// StunnerConfig configures the STUnner daemon
+// StunnerConfig specifies the configuration of the the STUnner daemon.
 type StunnerConfig struct {
-	// ApiVersion is the version of the STUNner API implemented
+	// ApiVersion is the version of the STUNner API implemented.
 	ApiVersion string `json:"version"`
-	// AdminConfig holds the administrative configuration
+	// AdminConfig holds administrative configuration.
 	Admin AdminConfig `json:"admin,omitempty"`
-	// Auth defines the specification of the STUN/TURN authentication mechanism used by STUNner
+	// Auth defines the STUN/TURN authentication mechanism.
 	Auth AuthConfig `json:"auth"`
-	// Listeners defines the listeners for STUNner
+	// Listeners defines the server sockets exposed to clients.
 	Listeners []ListenerConfig `json:"listeners,omitempty"`
-	// Clusters defines the upstream endpoints to which transport peer connections can be made
-	// through STUNner
+	// Clusters defines the upstream endpoints to which relay transport connections can be made
+	// by clients.
 	Clusters []ClusterConfig `json:"clusters,omitempty"`
 }
 
-// Validate checks if a listener configuration is correct
+// Validate checks if a listener configuration is correct.
 func (req *StunnerConfig) Validate() error {
 	// ApiVersion
 	if req.ApiVersion != ApiVersion {
@@ -38,11 +39,11 @@ func (req *StunnerConfig) Validate() error {
 	}
 
 	// validate listeners
-	for i, c := range req.Listeners {
-		if err := c.Validate(); err != nil {
+	for i, l := range req.Listeners {
+		if err := l.Validate(); err != nil {
 			return err
 		}
-		req.Listeners[i] = c
+		req.Listeners[i] = l
 	}
 	// listeners are sorted by name
 	sort.Slice(req.Listeners, func(i, j int) bool {
@@ -65,12 +66,12 @@ func (req *StunnerConfig) Validate() error {
 	return nil
 }
 
-// Name returns the name of the object to be configured
+// Name returns the name of the object to be configured.
 func (req *StunnerConfig) ConfigName() string {
 	return req.Admin.Name
 }
 
-// DeepEqual compares two configurations
+// DeepEqual compares two configurations.
 func (req *StunnerConfig) DeepEqual(conf Config) bool {
 	other, ok := conf.(*StunnerConfig)
 	if !ok {
@@ -102,7 +103,8 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 	return true
 }
 
-// String stringifies the configuration
+// String stringifies the configuration.
 func (req *StunnerConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	b, _ := json.Marshal(req)
+	return string(b)
 }

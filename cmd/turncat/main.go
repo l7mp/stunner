@@ -213,7 +213,7 @@ func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
 				auth.Type)
 		}
 		return func() (string, string, error) {
-			return turn.GenerateLongTermCredentials(s, defaultDuration)
+			return turn.GenerateLongTermCredentials(s.String(), defaultDuration)
 		}, nil
 
 	case stunnerv1alpha1.AuthTypePlainText:
@@ -229,7 +229,7 @@ func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
 				auth.Type)
 		}
 
-		return func() (string, string, error) { return u, p, nil }, nil
+		return func() (string, string, error) { return u.String(), p.String(), nil }, nil
 
 	default:
 		return nil, fmt.Errorf("unknown authentication type %q",
@@ -240,7 +240,8 @@ func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
 func getStunnerURI(config *stunnerv1alpha1.StunnerConfig) (string, error) {
 	// we should have only a single listener at this point
 	if len(config.Listeners) != 1 {
-		return "", fmt.Errorf("cannot find listener in STUNner configuration: %#v", config)
+		return "", fmt.Errorf("cannot find listener in STUNner configuration: %s",
+			config.String())
 	}
 
 	l := config.Listeners[0]

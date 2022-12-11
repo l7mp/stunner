@@ -1,17 +1,18 @@
 package stunner
 
 import (
-	"fmt"
-	"net"
-	"os"
-	// "reflect"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,19 +24,26 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/logger"
+	"github.com/l7mp/stunner/internal/resolver"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-//var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
+// var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
 var stunnerTestLoglevel string = "all:ERROR"
 
-//var stunnerTestLoglevel string = "all:INFO"
-
+// var stunnerTestLoglevel string = "all:INFO"
 //var stunnerTestLoglevel string = "all:TRACE"
 
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
+var certPem, keyPem, _ = generateKey()
+
+/********************************************
+ *
+ * test lib
+ *
+ *********************************************/
 type echoTestConfig struct {
 	t *testing.T
 	// net
@@ -118,12 +126,6 @@ func stunnerEchoTest(conf echoTestConfig) {
 
 			// assert.NotNil(t, err, "echo socket not nil")
 
-			log.Debug("obtaining TURN server")
-			server := conf.stunner.GetServer()
-
-			// ensure allocation is counted
-			assert.Equal(t, 1, server.AllocationCount())
-
 			go func() {
 				buf := make([]byte, 1600)
 				for {
@@ -173,14 +175,14 @@ func stunnerEchoTest(conf echoTestConfig) {
 
 }
 
-func generateKey(crtFile, keyFile *os.File) error {
+func generateKey() ([]byte, []byte, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return err
+		return []byte{}, []byte{}, err
 	}
 	keyBytes := x509.MarshalPKCS1PrivateKey(key)
 	// PEM encoding of private key
-	keyPEM := pem.EncodeToMemory(
+	keyPem := pem.EncodeToMemory(
 		&pem.Block{
 			Type:  "RSA PRIVATE KEY",
 			Bytes: keyBytes,
@@ -206,7 +208,7 @@ func generateKey(crtFile, keyFile *os.File) error {
 	//Create certificate using template
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
 	if err != nil {
-		return err
+		return []byte{}, []byte{}, err
 
 	}
 
@@ -218,10 +220,7 @@ func generateKey(crtFile, keyFile *os.File) error {
 		},
 	)
 
-	_, _ = crtFile.Write(certPem)
-	_, _ = keyFile.Write(keyPEM)
-
-	return nil
+	return certPem, keyPem, nil
 }
 
 // *****************
@@ -299,134 +298,16 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	}, nil
 }
 
-type StunnerTestConfigsWithVnet struct {
-	testName   string
-	conf       v1alpha1.StunnerConfig
-	clientAddr string
-}
-
-var testStunnerConfigsWithVnet = []StunnerTestConfigsWithVnet{
-	{
-		testName: "plaintext",
-		clientAddr: "1.1.1.1",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "udp",
-				Addr:     "1.2.3.4",
-				Port:     3478,
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
-	},
-	{
-		testName: "longterm",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
-				},
-			},
-			Listeners: []v1alpha1.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "udp",
-				Addr:     "1.2.3.4",
-				Port:     3478,
-				Routes:   []string{"allow-any"},
-			}},
-			Clusters: []v1alpha1.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-			}},
-		},
-	},
-}
-
-func TestStunnerAuthServerVNet(t *testing.T) {
-	lim := test.TimeOut(time.Second * 30)
-	defer lim.Stop()
-
-	report := test.CheckRoutines(t)
-	defer report()
-
-	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
-	log := loggerFactory.NewLogger("test")
-
-	for _, test := range testStunnerConfigsWithVnet {
-		t.Run(test.testName, func(t *testing.T) {
-			log.Debugf("-------------- Running test: %s -------------", test.testName)
-			c := test.conf
-
-			// patch in the vnet
-			log.Debug("building virtual network")
-			v, err := buildVNet(loggerFactory)
-			assert.NoError(t, err, err)
-
-			log.Debug("creating a stunnerd")
-			stunner := NewStunner().WithOptions(Options{
-				LogLevel:         stunnerTestLoglevel,
-				SuppressRollback: true,
-				Net:              v.podnet,
-			})
-
-			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
-
-			var u, p string
-			switch c.Auth.Type {
-			case "plaintext":
-				u = "user1"
-				p = "passwd1"
-			case "longterm":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
-				assert.NoError(t, err, err)
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
-
-			log.Debug("creating a client")
-			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
-			assert.NoError(t, err, "cannot create client listening socket")
-
-			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
-				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, true, loggerFactory}
-			stunnerEchoTest(testConfig)
-
-			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
-			stunner.Close()
-			assert.NoError(t, v.Close(), "cannot close VNet")
-		})
-	}
-}
-
-// *****************
-// TCP/TLS/DTLS tests over localhost: VNet supports UDP only so these tests will run over the localhost
-// *****************
-// Topology:
-//                /----- STUNner (udp/tcp/tls/dtls:23478)
-//     client--- lo
-//                \----- echo-server (udp:25678)
+/********************************************
+ *
+ *  UDP/TCP/TLS/DTLS tests over localhost (VNet supports UDP only)
+ *  *****************
+ *  Topology:
+ *                 /----- STUNner (udp/tcp/tls/dtls:23478)
+ *      client--- lo
+ *                 \----- echo-server (udp:25678)
+ *
+ *********************************************/
 
 func TestStunnerServerLocalhost(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
@@ -439,18 +320,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	certFile, err := os.CreateTemp("", "stunner_test.*.cert")
-	assert.NoError(t, err, "cannot create temp file for SSL cert")
-	defer certFile.Close()
-	defer func() { assert.NoError(t, os.Remove(certFile.Name()), "cannot delete SSL cert file") }()
-
-	keyFile, err := os.CreateTemp("", "stunner_test.*.key")
-	assert.NoError(t, err, "cannot create temp file for SSL key")
-	defer keyFile.Close()
-	defer func() { assert.NoError(t, os.Remove(keyFile.Name()), "cannot delete SSL key file") }()
-
-	err = generateKey(certFile, keyFile)
-	assert.NoError(t, err, "cannot generate SSL SSL cert/key")
+	// assert.NoError(t, err, "cannot generate SSL SSL cert/key")
 
 	testStunnerConfigsWithLocalhost := []v1alpha1.StunnerConfig{
 		// udp, plaintext
@@ -461,9 +331,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -486,8 +356,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -510,9 +380,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -535,8 +405,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -559,9 +429,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -569,8 +439,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     certFile.Name(),
-				Key:      keyFile.Name(),
+				Cert:     v1alpha1.Secret{certPem},
+				Key:      v1alpha1.Secret{keyPem},
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -586,8 +456,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]string{
-					"secret": "my-secret",
+				Credentials: map[string]v1alpha1.Secret{
+					"secret": v1alpha1.NewSecret("my-secret"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -595,8 +465,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     certFile.Name(),
-				Key:      keyFile.Name(),
+				Cert:     v1alpha1.Secret{certPem},
+				Key:      v1alpha1.Secret{keyPem},
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -612,9 +482,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -622,8 +492,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "dtls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     certFile.Name(),
-				Key:      keyFile.Name(),
+				Cert:     v1alpha1.Secret{certPem},
+				Key:      v1alpha1.Secret{keyPem},
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -648,8 +518,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		// 		Protocol: "dtls",
 		// 		Addr:     "127.0.0.1",
 		// 		Port:     23478,
-		// 		Cert:     certFile.Name(),
-		// 		Key:      keyFile.Name(),
+		//              Cert:     certPem,
+		//		Key:      keyPem,
 		// 		Routes:   []string{"allow-any"},
 		// 	}},
 		// 	Clusters: []v1alpha1.ClusterConfig{{
@@ -668,14 +538,23 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
 
 			log.Debug("creating a stunnerd")
-			stunner := NewStunner().WithOptions(Options{
+			stunner := NewStunner(Options{
 				LogLevel:         stunnerTestLoglevel,
 				SuppressRollback: true,
 			})
 
-			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
+			assert.False(t, stunner.shutdown, "lifecycle 1: alive")
+			assert.False(t, stunner.ready, "lifecycle 1: not-ready")
+			assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
 
+			log.Debug("starting stunnerd")
+			assert.NoError(t, stunner.Reconcile(c), "starting server")
+
+			assert.False(t, stunner.shutdown, "lifecycle 2: alive")
+			assert.True(t, stunner.ready, "lifecycle 2: ready")
+			assert.True(t, stunner.IsReady(), "lifecycle 2: ready")
+
+			var err error
 			var u, p string
 			switch auth {
 			case "plaintext":
@@ -701,22 +580,22 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				assert.NoError(t, cErr, "cannot create TCP client socket")
 				lconn = turn.NewSTUNConn(conn)
 			case "tls":
-				cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
+				cer, err := tls.X509KeyPair(certPem, keyPem)
 				assert.NoError(t, err, "cannot create certificate for TLS client socket")
 				conn, err := tls.Dial("tcp", stunnerAddr, &tls.Config{
 					MinVersion:         tls.VersionTLS12,
-					Certificates:       []tls.Certificate{cert},
+					Certificates:       []tls.Certificate{cer},
 					InsecureSkipVerify: true,
 				})
 				assert.NoError(t, err, "cannot create TLS client socket")
 				lconn = turn.NewSTUNConn(conn)
 			case "dtls":
-				cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
+				cer, err := tls.X509KeyPair(certPem, keyPem)
 				assert.NoError(t, err, "cannot create certificate for DTLS client socket")
 				// for some reason dtls.Listen requires a UDPAddr and not an addr string
 				udpAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 23478}
 				conn, err := dtls.Dial("udp", udpAddr, &dtls.Config{
-					Certificates:       []tls.Certificate{cert},
+					Certificates:       []tls.Certificate{cer},
 					InsecureSkipVerify: true,
 				})
 				assert.NoError(t, err, "cannot create DTLS client socket")
@@ -731,7 +610,882 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+
+			assert.False(t, stunner.shutdown, "lifecycle 3: alive")
+			assert.True(t, stunner.ready, "lifecycle 3: ready")
+			assert.True(t, stunner.IsReady(), "lifecycle 3: ready")
+
+			stunner.Shutdown()
+
+			assert.True(t, stunner.shutdown, "lifecycle 4: shutting down")
+			assert.False(t, stunner.ready, "lifecycle 4: not-ready")
+			assert.False(t, stunner.IsReady(), "lifecycle 4: not-ready")
+
 			stunner.Close()
+
+			assert.True(t, stunner.shutdown, "lifecycle 3: shutting down")
+			assert.False(t, stunner.ready, "lifecycle 3: not-ready")
+			assert.False(t, stunner.IsReady(), "lifecycle 3: not-ready")
 		})
 	}
+}
+
+// *****************
+// Cluster tests with VNet
+// *****************
+//
+//	type StunnerClusterConfig struct {
+//	        config v1alpha1.StunnerConfig
+//	        echoServerAddr string
+//	        result bool
+//	}
+type StunnerTestClusterConfig struct {
+	testName       string
+	config         v1alpha1.StunnerConfig
+	echoServerAddr string
+	result         bool
+}
+
+var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
+	{
+		testName: "open ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes:   []string{"echo-server-cluster"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "default cluster type static ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint with wrong peer addr: fail",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.6",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+	},
+	{
+		testName: "static endpoint with multiple routes ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+					"dummy_cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}, {
+				Name: "dummy_cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"9.8.7.6",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint with multiple routes and wrong peer addr fail",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"dummy_cluster",
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.6",
+				},
+			}, {
+				Name: "dummy_cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"9.8.7.6",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+	},
+	{
+		testName: "static endpoint with multiple ips ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.1",
+					"1.2.3.2",
+					"1.2.3.3",
+					"1.2.3.5",
+					"1.2.3.6",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint with multiple ips with wrong peer addr fail",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.1",
+					"1.2.3.2",
+					"1.2.3.3",
+					"1.2.3.6",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+	},
+	{
+		testName: "strict_dns ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STRICT_DNS",
+				Endpoints: []string{
+					"echo-server.l7mp.io",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "strict_dns cluster and wrong peer addr fail",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STRICT_DNS",
+				Endpoints: []string{
+					"echo-server.l7mp.io",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.10:5678",
+		result:         false,
+	},
+	{
+		testName: "strict_dns cluster with multiple domains ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STRICT_DNS",
+				Endpoints: []string{
+					"stunner.l7mp.io",
+					"echo-server.l7mp.io",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "multiple strict_dns clusters ok",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]v1alpha1.Secret{
+					"username": v1alpha1.NewSecret("user1"),
+					"password": v1alpha1.NewSecret("passwd1"),
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"stunner-cluster",
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "stunner-cluster",
+				Type: "STRICT_DNS",
+				Endpoints: []string{
+					"stunner.l7mp.io",
+				},
+			}, {
+				Name: "echo-server-cluster",
+				Type: "STRICT_DNS",
+				Endpoints: []string{
+					"echo-server.l7mp.io",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+}
+
+func TestStunnerClusterWithVNet(t *testing.T) {
+	lim := test.TimeOut(time.Second * 60)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	for _, c := range testClusterConfigsWithVNet {
+		t.Run(c.testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.testName)
+
+			// patch in the vnet
+			log.Debug("building virtual network")
+			v, err := buildVNet(loggerFactory)
+			assert.NoError(t, err, err)
+
+			log.Debug("setting up the mock DNS")
+			mockDns := resolver.NewMockResolver(map[string]([]string){
+				"stunner.l7mp.io":     []string{"1.2.3.4"},
+				"echo-server.l7mp.io": []string{"1.2.3.5"},
+				"dummy.l7mp.io":       []string{"1.2.3.10"},
+			}, loggerFactory)
+
+			log.Debug("creating a stunnerd")
+			stunner := NewStunner(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Resolver:         mockDns,
+				Net:              v.podnet,
+			})
+
+			log.Debug("starting stunnerd")
+			assert.NoError(t, stunner.Reconcile(c.config), "starting server")
+
+			var u, p string
+			auth := c.config.Auth.Type
+			switch auth {
+			case "plaintext":
+				u = "user1"
+				p = "passwd1"
+			case "longterm":
+				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
+				assert.NoError(t, err, err)
+			default:
+				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
+			}
+
+			log.Debug("creating a client")
+			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+			assert.NoError(t, err, "cannot create client listening socket")
+
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
+				c.echoServerAddr, true, true, c.result, loggerFactory}
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
+		})
+	}
+}
+
+/********************************************
+ *
+ * lifecycle + health check tests
+ *
+ *********************************************/
+type stunnerLifecycleTestConfig struct {
+	name, hcEndpoint                string
+	livenessTester, readinessTester func(t *testing.T, status bool, err error)
+}
+
+var testLifecycle = []stunnerLifecycleTestConfig{
+	{
+		name:       "enable with full health-check spec",
+		hcEndpoint: "http://127.0.0.1:8086",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+	{
+		name:       "disable",
+		hcEndpoint: "",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.Error(t, err, "liveness test: not running")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.Error(t, err, "readiness test: not running")
+		},
+	},
+	{
+		name:       "enable with no addr",
+		hcEndpoint: "http://:8086",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+	{
+		name:       "reconcile with a different port",
+		hcEndpoint: "http://0.0.0.0:8087",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+	{
+		name:       "reconcile with no addr and no port",
+		hcEndpoint: "http://",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+	{
+		name:       "reconcole with full health-check spec again",
+		hcEndpoint: "http://127.0.0.1:8086",
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+}
+
+func TestStunnerLifecycle(t *testing.T) {
+	lim := test.TimeOut(time.Second * 120)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	log.Debug("creating a stunnerd")
+	s := NewStunner(Options{
+		LogLevel: stunnerTestLoglevel,
+	})
+
+	assert.False(t, s.IsReady(), "empty server not ready")
+
+	log.Debug("starting stunnerd with an enmpty stunner config")
+	conf := v1alpha1.StunnerConfig{
+		ApiVersion: v1alpha1.ApiVersion,
+		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
+		Auth: v1alpha1.AuthConfig{
+			Credentials: map[string]v1alpha1.Secret{
+				"username": v1alpha1.NewSecret("user-1"),
+				"password": v1alpha1.NewSecret("pass-1"),
+			},
+		},
+		Listeners: []v1alpha1.ListenerConfig{},
+		Clusters:  []v1alpha1.ClusterConfig{},
+	}
+
+	log.Debug("reconciling empty server")
+	err := s.Reconcile(conf)
+	assert.NoError(t, err, "reconcile empty server")
+
+	// health-check empty server
+	_, err = doLivenessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "no default liveness check")
+	_, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "no default readiness check")
+
+	for _, c := range testLifecycle {
+		t.Run(c.name, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.name)
+
+			log.Debug("reconciling server")
+			conf.Admin.HealthCheckEndpoint = c.hcEndpoint
+			err := s.Reconcile(conf)
+			assert.NoError(t, err, "cannot reconcile")
+
+			// obtain hc address
+			u, err := url.Parse(c.hcEndpoint)
+			assert.NoError(t, err)
+
+			addr := u.Hostname()
+			if addr == "" || addr == "0.0.0.0" {
+				addr = "127.0.0.1"
+			}
+
+			port := u.Port()
+			if port == "" {
+				port = strconv.Itoa(v1alpha1.DefaultHealthCheckPort)
+			}
+
+			hc := fmt.Sprintf("http://%s:%s", addr, port)
+
+			status, err := doLivenessCheck(hc)
+			c.livenessTester(t, status, err)
+
+			status, err = doReadinessCheck(hc)
+			c.readinessTester(t, status, err)
+		})
+	}
+
+	// make sure health-check is running
+	conf.Admin.HealthCheckEndpoint = "0.0.0.0"
+	assert.NoError(t, s.Reconcile(conf), "cannot reconcile")
+
+	status, err := doLivenessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "liveness test before graceful-shutdown: running")
+	assert.True(t, status, "liveness test before graceful-shutdown: alive")
+
+	status, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "readiness test before graceful-shutdown: running")
+	assert.True(t, status, "readiness test before graceful-shutdown: ready")
+
+	s.Shutdown()
+
+	status, err = doLivenessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "liveness test after graceful-shutdown: running")
+	assert.True(t, status, "liveness test after graceful-shutdown: alive")
+
+	status, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "readiness test after graceful-shutdown: running")
+	assert.False(t, status, "readiness test after graceful-shutdown: ready")
+
+	s.Close()
+
+	_, err = doLivenessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "liveness test before close: not running")
+
+	status, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "readiness test before close: not running")
+}
+
+/********************************************
+ *
+ *  metric server tests
+ *
+ *********************************************/
+type stunnerMetricsTestConfig struct {
+	name, mcEndpoint string
+	metricsTester    func(t *testing.T, status bool, err error)
+}
+
+var testMetrics = []stunnerMetricsTestConfig{
+	{
+		name:       "enable with full metric-server spec",
+		mcEndpoint: "http://127.0.0.1:8086/metrics",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "metric server: running")
+			assert.True(t, status, "metric server: serving")
+		},
+	},
+	{
+		name:       "reconcile with no path",
+		mcEndpoint: "http://127.0.0.1:8086",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "metric server: running")
+			assert.True(t, status, "metric server: serving")
+		},
+	},
+	{
+		name:       "disable",
+		mcEndpoint: "",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.Error(t, err, "metric server: not running")
+		},
+	},
+	{
+		name:       "enable with no addr",
+		mcEndpoint: "http://:8086/metrics",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "metric server: running")
+			assert.True(t, status, "metric server: serving")
+		},
+	},
+	{
+		name:       "reconcile with a different port",
+		mcEndpoint: "http://0.0.0.0:8087/metrics",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "metric server: running")
+			assert.True(t, status, "metric server: serving")
+		},
+	},
+	{
+		name:       "reconcile with no addr and no port",
+		mcEndpoint: "http://",
+		metricsTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "metric server: running")
+			assert.True(t, status, "metric server: serving")
+		},
+	},
+}
+
+func TestStunnerMetrics(t *testing.T) {
+	lim := test.TimeOut(time.Second * 120)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	log.Debug("creating a stunnerd")
+	s := NewStunner(Options{
+		LogLevel: stunnerTestLoglevel,
+	})
+
+	assert.False(t, s.IsReady(), "empty server not ready")
+
+	log.Debug("starting stunnerd with an enmpty stunner config")
+	conf := v1alpha1.StunnerConfig{
+		ApiVersion: v1alpha1.ApiVersion,
+		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
+		Auth: v1alpha1.AuthConfig{
+			Credentials: map[string]v1alpha1.Secret{
+				"username": v1alpha1.NewSecret("user-1"),
+				"password": v1alpha1.NewSecret("pass-1"),
+			},
+		},
+		Listeners: []v1alpha1.ListenerConfig{},
+		Clusters:  []v1alpha1.ClusterConfig{},
+	}
+
+	log.Debug("reconciling empty server")
+	err := s.Reconcile(conf)
+	assert.NoError(t, err, "reconcile empty server")
+
+	assert.True(t, s.IsReady(), "server ready")
+
+	for _, c := range testMetrics {
+		t.Run(c.name, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.name)
+
+			log.Debug("reconciling server")
+			conf.Admin.MetricsEndpoint = c.mcEndpoint
+			err := s.Reconcile(conf)
+			assert.NoError(t, err, "cannot reconcile")
+
+			// obtain metric address
+			u, err := url.Parse(c.mcEndpoint)
+			assert.NoError(t, err)
+
+			addr := u.Hostname()
+			if addr == "" || addr == "0.0.0.0" {
+				addr = "127.0.0.1"
+			}
+
+			port := u.Port()
+			if port == "" {
+				port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
+			}
+
+			path := u.EscapedPath()
+			hc := fmt.Sprintf("http://%s:%s/%s", addr, port, path)
+
+			status, err := doHttp(hc)
+			c.metricsTester(t, status, err)
+		})
+	}
+
+	assert.True(t, s.IsReady(), "server ready")
+
+	s.Shutdown()
+
+	assert.False(t, s.IsReady(), "server ready")
+
+	s.Close()
+}
+
+func doHttp(uri string) (bool, error) {
+	resp, err := http.Get(uri)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func doLivenessCheck(uri string) (bool, error) {
+	return doHttp(uri + "/live")
+}
+
+func doReadinessCheck(uri string) (bool, error) {
+	return doHttp(uri + "/ready")
 }

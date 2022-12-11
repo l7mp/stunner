@@ -2,9 +2,9 @@ package object
 
 import (
 	// "fmt"
+	"errors"
 
 	"github.com/pion/logging"
-	// "github.com/pion/turn/v2"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
@@ -16,8 +16,7 @@ type Auth struct {
 	Log                               logging.LeveledLogger
 }
 
-// NewAuth creates a new authenticator. Requires a server restart (returns
-// v1alpha1.ErrRestartRequired)
+// NewAuth creates a new authenticator.
 func NewAuth(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.AuthConfig)
 	if !ok {
@@ -25,9 +24,9 @@ func NewAuth(conf v1alpha1.Config, logger logging.LoggerFactory) (Object, error)
 	}
 
 	auth := Auth{Log: logger.NewLogger("stunner-auth")}
-	auth.Log.Tracef("NewAuth: %#v", req)
+	auth.Log.Tracef("NewAuth: %s", req.String())
 
-	if err := auth.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
+	if err := auth.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
 		return nil, err
 	}
 
@@ -84,10 +83,10 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 	auth.Realm = req.Realm
 	switch atype {
 	case v1alpha1.AuthTypePlainText:
-		auth.Username = req.Credentials["username"]
-		auth.Password = req.Credentials["password"]
+		auth.Username = req.Credentials["username"].String()
+		auth.Password = req.Credentials["password"].String()
 	case v1alpha1.AuthTypeLongTerm:
-		auth.Secret = req.Credentials["secret"]
+		auth.Secret = req.Credentials["secret"].String()
 	}
 
 	return nil
@@ -105,14 +104,14 @@ func (auth *Auth) GetConfig() v1alpha1.Config {
 	r := v1alpha1.AuthConfig{
 		Type:        auth.Type.String(),
 		Realm:       auth.Realm,
-		Credentials: make(map[string]string),
+		Credentials: make(map[string]v1alpha1.Secret),
 	}
 	switch auth.Type {
 	case v1alpha1.AuthTypePlainText:
-		r.Credentials["username"] = auth.Username
-		r.Credentials["password"] = auth.Password
+		r.Credentials["username"] = v1alpha1.Secret{B: []byte(auth.Username)}
+		r.Credentials["password"] = v1alpha1.Secret{B: []byte(auth.Password)}
 	case v1alpha1.AuthTypeLongTerm:
-		r.Credentials["secret"] = auth.Secret
+		r.Credentials["secret"] = v1alpha1.Secret{B: []byte(auth.Secret)}
 	}
 
 	return &r

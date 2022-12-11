@@ -17,6 +17,7 @@ import (
 type Cluster struct {
 	Name      string
 	Type      v1alpha1.ClusterType
+	Protocol  v1alpha1.ClusterProtocol
 	Endpoints []net.IPNet
 	Domains   []string
 	Resolver  resolver.DnsResolver // for strict DNS
@@ -25,7 +26,7 @@ type Cluster struct {
 }
 
 // NewCluster creates a new cluster. Requires a server restart (returns
-// v1alpha1.ErrRestartRequired)
+// ErrRestartRequired)
 func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.ClusterConfig)
 	if !ok {
@@ -46,9 +47,9 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logg
 		log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
 	}
 
-	c.log.Tracef("NewCluster: %#v", req)
+	c.log.Tracef("NewCluster: %sv", req.String())
 
-	if err := c.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
+	if err := c.Reconcile(req); err != nil && err != ErrRestartRequired {
 		return nil, err
 	}
 
@@ -73,8 +74,9 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 		return err
 	}
 
-	c.log.Tracef("Reconcile: %#v", req)
+	c.log.Tracef("Reconcile: %s", req.String())
 	c.Type, _ = v1alpha1.NewClusterType(req.Type)
+	c.Protocol, _ = v1alpha1.NewClusterProtocol(req.Protocol)
 
 	switch c.Type {
 	case v1alpha1.ClusterTypeStatic:
@@ -142,8 +144,9 @@ func (c *Cluster) ObjectName() string {
 // GetConfig returns the configuration of the running cluster
 func (c *Cluster) GetConfig() v1alpha1.Config {
 	conf := v1alpha1.ClusterConfig{
-		Name: c.Name,
-		Type: c.Type.String(),
+		Name:     c.Name,
+		Protocol: c.Protocol.String(),
+		Type:     c.Type.String(),
 	}
 
 	switch c.Type {
@@ -157,6 +160,7 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 		copy(conf.Endpoints, c.Domains)
 		conf.Endpoints = sort.StringSlice(conf.Endpoints)
 	}
+
 	return &conf
 }
 
