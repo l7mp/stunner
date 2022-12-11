@@ -92,7 +92,7 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		}
 	}
 
-	s.log.Debugf("reconciliation preparation ready, restart required: %t",
+	s.log.Tracef("reconciliation preparation ready, restart required: %s",
 		restartStatus(restarted))
 
 	// finish reconciliation
@@ -163,8 +163,10 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 		s.ready = true
 	}
 
-	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, deleted objects: %d",
-		new, changed, deleted)
+	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, "+
+		"deleted objects: %d, restarted objcts: %d",
+		new, changed, deleted, len(restarted))
+
 	s.log.Info(s.Status())
 
 	if len(restarted) > 0 {

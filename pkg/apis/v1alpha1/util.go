@@ -187,6 +187,11 @@ func (c Secret) MarshalJSON() ([]byte, error) {
 }
 
 func (c *Secret) UnmarshalJSON(dat []byte) error {
+	// TODO: remove this hack
+	// since we are parsing bytes we get the full string in double-quotes, these need to be
+	// removed. this hack works for single-quoted, double-qouted and unquoted strings, but also
+	// removes quotes from INSIDE the username/password
+	dat = []byte(strings.Trim(string(dat), "\""))
 	*c = Secret{B: dat}
 	return nil
 }
