@@ -1,0 +1,73 @@
+name: "release-dev"
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  push_to_registry:
+    name: Push docker image to DockerHub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to DockerHub Registry
+        run: echo ${{ secrets.DOCKER_TOKEN }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
+      - name: Get the version
+        id: vars
+        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
+      - name: Build the tagged Docker image
+        run: docker build . --file Dockerfile --tag l7mp/stunnerd:dev
+      - name: Push the tagged Docker image
+        run: docker push l7mp/stunnerd:dev
+  push_chart:
+    name: Push charts to the web
+    runs-on: ubuntu-latest
+    steps:
+      - name: stunner checkout
+        uses: actions/checkout@v3
+        with:
+          path: stunner
+          ref: main
+          repository: l7mp/stunner
+      - name: l7mp.io checkout
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WEB_PAT_TOKEN }}
+          path: l7mp.io
+          ref: master
+          repository: l7mp/l7mp.io
+      - name: stunner-helm checkout
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.WEB_PAT_TOKEN }}
+          path: stunner-helm
+          ref: main
+          repository: l7mp/stunner-helm
+      - name: Set git config
+        run: |
+          git config --global user.email "l7mp.info@gmail.com"
+          git config --global user.name "BotL7mp"
+      - name: Build helm charts
+        run: |
+          cd stunner-helm/helm
+          sed -ri 's/^(\s*)(version\s*:\s*.*\s*$)/\1version: dev/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(appVersion\s*:\s*.*\s*$)/\1appVersion: dev/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(        tag\s*:\s*.*\s*$)/\1        tag: dev/' stunner/values.yaml
+          helm package *
+      - name: Update l7mp.io
+        run: |
+          rm -rf l7mp.io/stunner/stunner-dev*.tgz
+          cp stunner-helm/helm/*.tgz l7mp.io/stunner
+          helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
+          cd l7mp.io
+          git add .
+          git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
+          git push origin master
+      - name: Update stunner
+        run: |
+          cd stunner-helm
+          rm helm/*.tgz
+          git add .
+          git commit -m "Update helm chart" -m "(triggered by the 'Helm release' github action.)"
+          git push origin main
