@@ -29,11 +29,11 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
 var stunnerTestLoglevel string = "all:ERROR"
 
+// var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
 // var stunnerTestLoglevel string = "all:INFO"
-//var stunnerTestLoglevel string = "all:TRACE"
+// var stunnerTestLoglevel string = "all:TRACE"
 
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
@@ -331,9 +331,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -356,8 +356,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]v1alpha1.Secret{
-					"secret": v1alpha1.NewSecret("my-secret"),
+				Credentials: map[string]string{
+					"secret": "my-secret",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -380,9 +380,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -405,8 +405,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]v1alpha1.Secret{
-					"secret": v1alpha1.NewSecret("my-secret"),
+				Credentials: map[string]string{
+					"secret": "my-secret",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -429,9 +429,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -439,8 +439,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     v1alpha1.Secret{certPem},
-				Key:      v1alpha1.Secret{keyPem},
+				Cert:     string(certPem),
+				Key:      string(keyPem),
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -456,8 +456,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]v1alpha1.Secret{
-					"secret": v1alpha1.NewSecret("my-secret"),
+				Credentials: map[string]string{
+					"secret": "my-secret",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -465,8 +465,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     v1alpha1.Secret{certPem},
-				Key:      v1alpha1.Secret{keyPem},
+				Cert:     string(certPem),
+				Key:      string(keyPem),
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -482,9 +482,9 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -492,8 +492,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "dtls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     v1alpha1.Secret{certPem},
-				Key:      v1alpha1.Secret{keyPem},
+				Cert:     string(certPem),
+				Key:      string(keyPem),
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -628,6 +628,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 			assert.False(t, stunner.IsReady(), "lifecycle 3: not-ready")
 		})
 	}
+
 }
 
 // *****************
@@ -656,9 +657,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -688,9 +689,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -721,9 +722,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -755,9 +756,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -789,9 +790,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -830,9 +831,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -871,9 +872,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -909,9 +910,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -946,9 +947,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -980,9 +981,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1014,9 +1015,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1049,9 +1050,9 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "plaintext",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user1"),
-					"password": v1alpha1.NewSecret("passwd1"),
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1251,9 +1252,9 @@ func TestStunnerLifecycle(t *testing.T) {
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
 		Auth: v1alpha1.AuthConfig{
-			Credentials: map[string]v1alpha1.Secret{
-				"username": v1alpha1.NewSecret("user-1"),
-				"password": v1alpha1.NewSecret("pass-1"),
+			Credentials: map[string]string{
+				"username": "user-1",
+				"password": "pass-1",
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{},
@@ -1413,9 +1414,9 @@ func TestStunnerMetrics(t *testing.T) {
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
 		Auth: v1alpha1.AuthConfig{
-			Credentials: map[string]v1alpha1.Secret{
-				"username": v1alpha1.NewSecret("user-1"),
-				"password": v1alpha1.NewSecret("pass-1"),
+			Credentials: map[string]string{
+				"username": "user-1",
+				"password": "pass-1",
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{},

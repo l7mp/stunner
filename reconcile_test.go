@@ -38,9 +38,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -125,8 +125,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -151,8 +151,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -177,9 +177,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{},
@@ -201,9 +201,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -227,9 +227,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -251,9 +251,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -280,9 +280,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -367,9 +367,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: "anything",
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -454,9 +454,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				MetricsEndpoint: "http://0.0.0.0:8080/metrics",
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -544,9 +544,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("newuser"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "newuser",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -629,9 +629,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("newpass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "newpass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -715,8 +715,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]v1alpha1.Secret{
-					"secret": v1alpha1.NewSecret("newsecret"),
+				Credentials: map[string]string{
+					"secret": "newsecret",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -806,9 +806,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -888,9 +888,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -962,9 +962,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -993,9 +993,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1093,17 +1093,17 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "DTLS",
-				Cert:     v1alpha1.Secret{[]byte("dummy-cert")},
-				Key:      v1alpha1.Secret{[]byte("dummy-key")},
+				Cert:     "dummy-cert",
+				Key:      "dummy-key",
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
@@ -1202,17 +1202,17 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "TLS",
-				Cert:     v1alpha1.Secret{B: []byte("dummy-cert")},
-				Key:      v1alpha1.Secret{B: []byte("dummy-key")},
+				Cert:     "dummy-cert",
+				Key:      "dummy-key",
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
@@ -1311,9 +1311,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{},
@@ -1345,9 +1345,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1401,9 +1401,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1461,9 +1461,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1530,9 +1530,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1599,9 +1599,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1792,9 +1792,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{},
@@ -1814,9 +1814,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1844,9 +1844,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1879,9 +1879,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1922,9 +1922,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -1965,9 +1965,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("dummy"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "dummy",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2009,8 +2009,8 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Type: "longterm",
-				Credentials: map[string]v1alpha1.Secret{
-					"secret": v1alpha1.NewSecret("dummy"),
+				Credentials: map[string]string{
+					"secret": "dummy",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2052,9 +2052,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Realm: "stunner.l7mp.io",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2096,9 +2096,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Realm: "dummy",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2140,9 +2140,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Realm: "stunner.l7mp.io",
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2183,9 +2183,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2231,9 +2231,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2274,9 +2274,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2322,9 +2322,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2361,9 +2361,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2402,9 +2402,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2438,9 +2438,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2473,9 +2473,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2510,9 +2510,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2545,9 +2545,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -2575,9 +2575,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
-				Credentials: map[string]v1alpha1.Secret{
-					"username": v1alpha1.NewSecret("user"),
-					"password": v1alpha1.NewSecret("pass"),
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{},
@@ -2611,9 +2611,9 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
 				Auth: v1alpha1.AuthConfig{
-					Credentials: map[string]v1alpha1.Secret{
-						"username": v1alpha1.NewSecret("user"),
-						"password": v1alpha1.NewSecret("pass"),
+					Credentials: map[string]string{
+						"username": "user",
+						"password": "pass",
 					},
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
@@ -2647,9 +2647,9 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
 				Auth: v1alpha1.AuthConfig{
-					Credentials: map[string]v1alpha1.Secret{
-						"username": v1alpha1.NewSecret("user"),
-						"password": v1alpha1.NewSecret("pass"),
+					Credentials: map[string]string{
+						"username": "user",
+						"password": "pass",
 					},
 				},
 				Listeners: []v1alpha1.ListenerConfig{{

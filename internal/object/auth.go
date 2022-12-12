@@ -83,10 +83,10 @@ func (auth *Auth) Reconcile(conf v1alpha1.Config) error {
 	auth.Realm = req.Realm
 	switch atype {
 	case v1alpha1.AuthTypePlainText:
-		auth.Username = req.Credentials["username"].String()
-		auth.Password = req.Credentials["password"].String()
+		auth.Username = req.Credentials["username"]
+		auth.Password = req.Credentials["password"]
 	case v1alpha1.AuthTypeLongTerm:
-		auth.Secret = req.Credentials["secret"].String()
+		auth.Secret = req.Credentials["secret"]
 	}
 
 	return nil
@@ -104,14 +104,14 @@ func (auth *Auth) GetConfig() v1alpha1.Config {
 	r := v1alpha1.AuthConfig{
 		Type:        auth.Type.String(),
 		Realm:       auth.Realm,
-		Credentials: make(map[string]v1alpha1.Secret),
+		Credentials: make(map[string]string),
 	}
 	switch auth.Type {
 	case v1alpha1.AuthTypePlainText:
-		r.Credentials["username"] = v1alpha1.Secret{B: []byte(auth.Username)}
-		r.Credentials["password"] = v1alpha1.Secret{B: []byte(auth.Password)}
+		r.Credentials["username"] = auth.Username
+		r.Credentials["password"] = auth.Password
 	case v1alpha1.AuthTypeLongTerm:
-		r.Credentials["secret"] = v1alpha1.Secret{B: []byte(auth.Secret)}
+		r.Credentials["secret"] = auth.Secret
 	}
 
 	return &r

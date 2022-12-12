@@ -100,8 +100,8 @@ func (l *Listener) Inspect(old, new v1alpha1.Config) bool {
 		l.Port == req.Port && // ports unchanged
 		l.MinPort == req.MinRelayPort &&
 		l.MaxPort == req.MaxRelayPort &&
-		bytes.Compare(l.Cert, req.Cert.B) == 0 && // TLS creds unchanged
-		bytes.Compare(l.Key, req.Key.B) == 0 {
+		bytes.Compare(l.Cert, []byte(req.Cert)) == 0 && // TLS creds unchanged
+		bytes.Compare(l.Key, []byte(req.Key)) == 0 {
 		restart = false
 	}
 
@@ -152,8 +152,8 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	l.rawAddr = req.Addr
 	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
 	if proto == v1alpha1.ListenerProtocolTLS || proto == v1alpha1.ListenerProtocolDTLS {
-		l.Cert = clone(req.Cert.B)
-		l.Key = clone(req.Key.B)
+		l.Cert = []byte(req.Cert)
+		l.Key = []byte(req.Key)
 	}
 	l.Realm = l.handlerFactory.GetRealm()
 
@@ -196,8 +196,8 @@ func (l *Listener) GetConfig() v1alpha1.Config {
 		MaxRelayPort: l.MaxPort,
 	}
 
-	c.Cert = v1alpha1.Secret{B: clone(l.Cert)}
-	c.Key = v1alpha1.Secret{B: clone(l.Key)}
+	c.Cert = string(l.Cert)
+	c.Key = string(l.Key)
 
 	c.Routes = make([]string, len(l.Routes))
 	copy(c.Routes, l.Routes)

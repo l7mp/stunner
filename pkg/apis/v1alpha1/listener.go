@@ -1,10 +1,10 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // ListenerConfig specifies a server socket on which STUN/TURN connections will be served.
@@ -31,9 +31,9 @@ type ListenerConfig struct {
 	// listener.
 	MaxRelayPort int `json:"max_relay_port,omitempty"`
 	// Cert is the TLS cert.
-	Cert Secret `json:"cert,omitempty"`
+	Cert string `json:"cert,omitempty"`
 	// Key is the TLS key.
-	Key Secret `json:"key,omitempty"`
+	Key string `json:"key,omitempty"`
 	// Routes specifies the list of Routes allowed via a listener.
 	Routes []string `json:"routes,omitempty"`
 }
@@ -72,10 +72,10 @@ func (req *ListenerConfig) Validate() error {
 	}
 
 	if proto == ListenerProtocolTLS || proto == ListenerProtocolDTLS {
-		if len(req.Cert.B) == 0 {
+		if req.Cert == "" {
 			return fmt.Errorf("empty TLS cert for %s listener", proto.String())
 		}
-		if len(req.Key.B) == 0 {
+		if req.Key == "" {
 			return fmt.Errorf("empty TLS key for %s listener", proto.String())
 		}
 	}
@@ -97,9 +97,50 @@ func (req *ListenerConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *ListenerConfig) String() string {
-	b, e := json.Marshal(req)
-	if e != nil {
-		return e.Error()
+	status := []string{}
+
+	n := "-"
+	if req.Name != "" {
+		n = req.Name
 	}
-	return string(b)
+
+	pr, a, p := "udp", "-", "-"
+	if req.Protocol != "" {
+		pr = req.Protocol
+	}
+	if req.Addr != "" {
+		a = req.Addr
+	}
+	if req.Port != 0 {
+		p = fmt.Sprintf("%d", req.Port)
+	}
+	min, max := 0, 65535
+	if req.MinRelayPort != 0 {
+		min = req.MinRelayPort
+	}
+	if req.MaxRelayPort != 0 {
+		max = req.MaxRelayPort
+	}
+	status = append(status, fmt.Sprintf("%s://%s:%s<%d-%d>", pr, a, p, min, max))
+
+	a, p = "-", "-"
+	if req.PublicAddr != "" {
+		a = req.PublicAddr
+	}
+	if req.PublicPort != 0 {
+		p = fmt.Sprintf("%d", req.PublicPort)
+	}
+	status = append(status, fmt.Sprintf("public=%s:%s", a, p))
+
+	c, k := "-", "-"
+	if req.Cert != "" {
+		c = "<SECRET"
+	}
+	if req.Key != "" {
+		k = "<SECRET"
+	}
+	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
+	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ", ")))
+
+	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

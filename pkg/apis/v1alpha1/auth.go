@@ -1,9 +1,9 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // Auth defines the specification of the STUN/TURN authentication mechanism used by STUNner.
@@ -15,7 +15,7 @@ type AuthConfig struct {
 	// Credentials specifies the authententication credentials: for "plaintext" at least the
 	// keys "username" and "password" must be set, for "longterm" the key "secret" will hold
 	// the shared authentication secret.
-	Credentials map[string]Secret `json:"credentials"`
+	Credentials map[string]string `json:"credentials"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -70,6 +70,53 @@ func (req *AuthConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *AuthConfig) String() string {
-	b, _ := json.Marshal(req)
-	return string(b)
+	status := []string{}
+	if req.Realm != "" {
+		status = append(status, fmt.Sprintf("realm=%q", req.Realm))
+	}
+
+	if atype, err := NewAuthType(req.Type); err == nil {
+		switch atype {
+		case AuthTypePlainText:
+			u, userFound := req.Credentials["username"]
+			if userFound {
+				if u == "" {
+					u = "<MISSING>"
+				} else {
+					u = "<SECRET>"
+				}
+			} else {
+				u = "-"
+			}
+			p, passFound := req.Credentials["password"]
+			if passFound {
+				if p == "" {
+					p = "<MISSING>"
+				} else {
+					p = "<SECRET>"
+				}
+			} else {
+				p = "-"
+			}
+			status = append(status, fmt.Sprintf("type=%q,username=%q,password=%q",
+				atype.String(), u, p))
+
+		case AuthTypeLongTerm:
+			s, secretFound := req.Credentials["secret"]
+			if secretFound {
+				if s == "" {
+					s = "<MISSING>"
+				} else {
+					s = "<SECRET>"
+				}
+			} else {
+				s = "-"
+			}
+
+			status = append(status, fmt.Sprintf("type=%q,shared-secret=%q",
+				atype.String(), s))
+		}
+	}
+
+	return fmt.Sprintf("auth:{%s}", strings.Join(status, ","))
 }

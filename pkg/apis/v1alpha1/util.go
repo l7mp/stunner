@@ -168,34 +168,3 @@ func (l ClusterProtocol) String() string {
 		return "<unknown>"
 	}
 }
-
-// Secret is a custom type to hold secrets. It is essentially a []byte, with the twist that it knows
-// how to remove itself from JSON output.
-type Secret struct {
-	B []byte
-}
-
-func NewSecret(s string) Secret {
-	return Secret{B: []byte(s)}
-}
-
-func (c Secret) MarshalJSON() ([]byte, error) {
-	if c.B == nil {
-		return []byte(`"` + "-EMPTY-" + `"`), nil
-	}
-	return []byte(`"` + "-SECRET-" + `"`), nil
-}
-
-func (c *Secret) UnmarshalJSON(dat []byte) error {
-	// TODO: remove this hack
-	// since we are parsing bytes we get the full string in double-quotes, these need to be
-	// removed. this hack works for single-quoted, double-qouted and unquoted strings, but also
-	// removes quotes from INSIDE the username/password
-	dat = []byte(strings.Trim(string(dat), "\""))
-	*c = Secret{B: dat}
-	return nil
-}
-
-func (c Secret) String() string {
-	return string(c.B)
-}

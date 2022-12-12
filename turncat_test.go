@@ -119,9 +119,9 @@ func TestTurncatPlaintext(t *testing.T) {
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type: "plaintext",
-			Credentials: map[string]v1alpha1.Secret{
-				"username": v1alpha1.NewSecret("user1"),
-				"password": v1alpha1.NewSecret("passwd1"),
+			Credentials: map[string]string{
+				"username": "user1",
+				"password": "passwd1",
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
@@ -237,8 +237,8 @@ func TestTurncatLongterm(t *testing.T) {
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type: "longterm",
-			Credentials: map[string]v1alpha1.Secret{
-				"secret": v1alpha1.NewSecret(sharedSecret),
+			Credentials: map[string]string{
+				"secret": sharedSecret,
 			},
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
