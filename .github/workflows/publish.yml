@@ -75,5 +75,5 @@ jobs:
           cd stunner-helm
           rm helm/*.tgz
           git add .
-          git commit -m "Update helm chart" -m "(triggered by the 'Helm release' github action.)"
+          git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
           git push origin main

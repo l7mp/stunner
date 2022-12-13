@@ -62,5 +62,5 @@ jobs:
           helm repo index l7mp.io/stunner/ --url https://l7mp.io/stunner
           cd l7mp.io
           git add .
-          git commit -m "Update helm charts from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
+          git commit -m "Update dev helm chart from l7mp/stunner" -m "(triggered by the 'Helm release' github action.)"
           git push origin master
