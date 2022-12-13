@@ -51,10 +51,10 @@ jobs:
       - name: Build helm charts
         run: |
           cd stunner-helm/helm
-          sed -ri 's/^(\s*)(version\s*:\s*.*\s*$)/\1version: dev/' stunner/Chart.yaml
+          sed -ri 's/^(\s*)(name\s*:\s*.*\s*$)/\1name: stunner-dev/' stunner/Chart.yaml
           sed -ri 's/^(\s*)(appVersion\s*:\s*.*\s*$)/\1appVersion: dev/' stunner/Chart.yaml
           sed -ri 's/^(\s*)(        tag\s*:\s*.*\s*$)/\1        tag: dev/' stunner/values.yaml
-          helm package *
+          helm package ./stunner
       - name: Update l7mp.io
         run: |
           rm -rf l7mp.io/stunner/stunner-dev*.tgz
