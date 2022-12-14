@@ -26,7 +26,7 @@ In this tutorial we deploy a video room example using [LiveKit's React SDK](http
 
 Let's start with a disclaimer. The LiveKit client example browser must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. Unfottunately, self-signed TLS certs [will not work](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer), so we have to come up with a way to provide our clients with a valid TLS cert. This will have the unfortunate consequence that the majority of the below installation guide will be about securing client connections to LiveKit over TLS; as it turns out, once HTTPS is correctly working integrating LiveKit with STUNner is very simple.
 
-In the below example, STUNner will be installed into the identically named namespace, while LiveKit and the Ingress gateway will live in the default namespace. 
+In the below example, STUNner will be installed into the identically named namespace, while LiveKit and the Ingress gateway will live in the default namespace.
 
 ### TLS certificates
 
@@ -38,7 +38,7 @@ Note that public wildcard DNS domains might run into [rate limiting](https://let
 
 The first step of obtaining a valid cert is to install a Kubernetes Ingress: this will be used during the validation of our certificates and to terminate client TLS encrypted contexts.
 
-Install an ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but this is not required. 
+Install an ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but this is not required.
 
 ```console
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -56,13 +56,13 @@ Store the Ingress IP address Kubernetes assigned to our Ingress; this will be ne
 
 ```console
 kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+export INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 ```
 
 ### Cert manager
 
-We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management. 
+We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management.
 
 First, install cert-manager's CRDs.
 
@@ -81,7 +81,7 @@ helm install my-cert-manager cert-manager/cert-manager \
     --version v1.8.0
 ```
 
-At this point we have all the necessary boilerplate set up to automate TLS issuance for LiveKit. 
+At this point we have all the necessary boilerplate set up to automate TLS issuance for LiveKit.
 
 ### STUNner
 
@@ -132,14 +132,14 @@ spec:
         - name: livekit-server
 ```
 
-Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service. 
+Once the Gateway resouce is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service.
 
 Wait until Kubernetes assigns an external IP and store the external IP assigned by Kubernetes to
 STUNner in an environment variable for later use.
 
 ```console
 until [ -n "$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### LiveKit
