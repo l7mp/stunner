@@ -2,6 +2,12 @@ name: "release-dev"
 
 on:
   push:
+    paths:
+      - '**.go'
+      - '**.sh'
+    paths-ignore:
+      - 'doc/**'
+      - 'examples/**'
     branches:
       - 'main'
 
