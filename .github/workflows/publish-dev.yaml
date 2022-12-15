@@ -5,9 +5,8 @@ on:
     paths:
       - '**.go'
       - '**.sh'
-    paths-ignore:
-      - 'doc/**'
-      - 'examples/**'
+      - '!doc/**'
+      - '!examples/**'
     branches:
       - 'main'
 
