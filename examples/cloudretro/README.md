@@ -1,100 +1,107 @@
-# STUNner & CloudRetro: Cloudgaming and their nasty UDP streams in Kubernetes
+# STUNner demo: Cloud-gaming in Kubernetes with CloudRetro
 
-In this demo, we will install [CloudRetro](https://github.com/giongto35/cloud-game) on an existing Kubernetes cluster, and use STUNner to establish and redirect the UDP connection to its proper endpoint.
-
-CloudRetro is a simplified cloud-gaming service using WebRTC for multimedia, thus with the need of UDP-forwarding, which can be a pain under RTP.
-With STUNner, this issue can be solved.
+In this demo, we will install [CloudRetro](https://github.com/giongto35/cloud-game) into a
+Kubernetes cluster. CloudRetro is a simplified cloud-gaming service using WebRTC for rendering live
+audio/video gaming content in the client browser. In this demo, we use STUNner to establish the UDP
+media streams between clients and the CloudRetro media servers deployed into Kubernetes.
 
 ![STUNner & CloudRetro architecture](../../doc/stunner_cloudretro.svg)
 
-The upcoming steps are the following:
-* Install CloudRetro demo on your cluster
-* Install and configure STUNner with Gateway Operator
-* Configure CloudRetro to use STUNner
+In this demo you will learn how to:
+- integrate a typical WebRTC application with STUNner,
+- install the CloudRetro demo into your Kubernetes cluster,
+- configure STUNner to expose CloudRetro to clients.
 
-## Installation
+## Prerequisites
 
-### Prerequisities
+The below installation instructions require an operational cluster running a supported version of
+Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure
+that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes
+services should support this). Otherwise, STUNner will not be able to allocate a public IP address
+for clients to reach your WebRTC infra. 
 
-* A functional Kubernetes cluster (autopilot works as well)
-* kubectl
-* Docker
-* git
-* helm
+You will need a basic familiarity [with the CloudRetro
+architecture](https://webrtchacks.com/open-source-cloud-gaming-with-webrtc), especially the concept
+of Coordinators and Workers will be important below. Note further that this demo showcases only the
+barebones CloudRetro setup and so certain CloudRetro functions, like shared-save, shared-rooms,
+areas, etc., may not work.
 
-### Additional preparations
+## Single-cluster setup
 
-This demo provides some helpful scripts for the setup, so this repository should be cloned;
+In the first part of the demo, we use a single Kubernetes cluster. In the next section we extend
+this basic mode to a multi-cluster setup, which allows to deploy your game servers as close as
+possible to the clients and minimize latency.
+
+To simplify the setup, clone the STUNner git repository.
 
 ```console
 git clone https://github.com/l7mp/stunner
 cd stunner/examples/cloudretro
 ```
 
-### Quick-installing CLoudRetro
+### CloudRetro
 
-The included script sets up a demo CloudRetro service, with it's enviroment.
-For a more-detailed setup and architecture-overview, please visit the [CloudRetro](https://github.com/giongto35/cloud-game) repository.
-For this demo, we are going to use a forked-image, you can find it [here](https://github.com/l7mp/cloudretro-demo-build).
+The included script sets up a demo CloudRetro service.  For a more-detailed setup and
+architecture-overview, please visit the [CloudRetro](https://github.com/giongto35/cloud-game)
+docs.  For this demo, we are going to use a forked-image, you can find it
+[here](https://github.com/l7mp/cloudretro-demo-build).
 
 ```console
 kubectl apply -f cloudretro-setup-coordinator.yaml
 kubectl apply -f cloudretro-setup-workers.yaml
 ```
 
-After it's complete, configuring and restarting the Worker deployment is needed, for that purpose a script is included:
+After complete, you need to restart the Worker deployment:
 
 ```console
-chmod +x worker-config.sh
 ./worker-config.sh
 ```
 
 This will configure our Workers to successfully find their Coordinator.
 
-In the CloudRetro demo, we will be having multiple HTTPS web services, one linked to port 8000, and the other is to port 9000.
-From this, port 8000 is essential, while without port 9000 which is necessary for CloudRetro to work as intended, the demo should still work.
-
-If everything is successful, Kubernetes should assign an external address to the exposed service of the Coordinator, which clients will connect to.
-Running to following command will result the assigned address in a decimal four-octet format:
+In the CloudRetro demo we will be use multiple HTTPS web services, one linked to port 8000 and the
+other is to port 9000. If everything is successful, Kubernetes should assign an external address to
+the exposed service of the Coordinator, which clients will connect to.  Running to following
+command will result the IP address assigned by the Kubernetes load-balancer:
 
 ```console
-# Cat is present because some terminals do not breakline  ^._.^
-cat | kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+export EXTERNAL_IP=$(kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip})'
 ```
 
-In cases Kubernetes won't assign an external IP to your service, You will need to use NodePort service instead.
+If Kubernetes refuses to assign an external IP to your service after a couple of minutes, you will
+need to use the NodePort service instead.
 
-Clients connecting to this URL on a browser; `http://<service-ip>:8000` (don't forget to swap <service-ip> with the one mentioned above) will be presented a console-looking website, with seemingly no active additional service. The CloudRetro is running and working, but the endpoints can not establish an ICE connection. You can take a look at it in the console as well, this is because ICE can not create acceptable candidates through Kubernetes NATs, and not even a STUN server would help. RTP is unfit to handle this issue.
-That's why we need STUNner to make it work.
+Clients connecting to this URL on a browser; `http://${EXTERNAL-IP}:8000` will be presented a with
+a CloudRetro dashboard showing no active services: CloudRetro is running, but clients cannot
+establish an ICE connection. This is because clients cannot find a workable ICE candidate pair due to
+the CloudRetro servers running on a private pod IP address. That is where STUNner can help.
 
+### STUNner
 
-### Installing STUNner
-
-To install STUNner with a Gateway Operator, a helm chart is used. STUNner comes with an Operatorless Mode as well, for that please refer to [STUNner installation](https://github.com/l7mp/stunner#getting-started).
-For more details about Gateway Operator and it's use, please visit [here](https://github.com/l7mp/stunner-gateway-operator).
+Use the official [Helm charts](/doc/INSTALL.md#installation) to install STUNner.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace stunner
-
 helm install stunner stunner/stunner --namespace stunner
 ```
 
-By default, it will install STUNner with a Gateway Operator.
-
-Next step is to register STUNner with the Kubernetes Gateway API, with a GatewayClass what we are going to instantiate later on, and a default GatewayConfig for it.
+Next, register STUNner with the Kubernetes Gateway API.
 
 ```console
 kubectl apply -f stunner-gwcc.yaml
 ```
 
-This script will install these in no time.
-The default config has the 'username' as 'user-1' and 'password' as 'pass-1'. Feel free to modify these values.
+The default configuration uses the `plaintext` STUN/TURN authentication mode with the
+username/password pair `user-1/pass-1`; make sure to [customize](/doc/AUTH.md) these defaults.
 
-Now we are going to apply an instance of a Gateway, which will serve as a... yes, you got it right, a gateway for our WebRTC streams.
-The below Gateway specification will expose the STUNner gateway over the STUN/TURN listener service running on the UDP listener port 3478. STUNner will await clients to connect to this listener port and, once authenticated, let them connect to the services running inside the Kubernetes cluster; meanwhile, the NAT traversal functionality implemented by the STUN/TURN server embedded into STUNner will make sure that clients can connect from behind even the most over-zealous enterprise NAT or firewall.
+Next, we expose the CloudRetro media services over STUNner.  The below Gateway specification will
+expose the CloudRetro worker service over the STUNner STUN/TURN gateway running on the UDP
+port 3478. STUNner will await clients to connect to this listener port and, once authenticated, let
+them connect to the services running inside the Kubernetes cluster; meanwhile, the NAT traversal
+functionality implemented by the STUN/TURN server embedded into STUNner will make sure that clients
+can connect from behind even the most over-zealous enterprise NAT or firewall.
 
 ```console
 kubectl apply -f - <<EOF
@@ -112,11 +119,9 @@ spec:
 EOF
 ```
 
-With this, our Gateway Operator will create us a whole new LoadBalancer service for this Gateway, from which we can establish connection with STUNner. Although, this does not specify an endpoint for the UDP streams, so we are going to need an attached UDProute as well.
-
-Attaching an UDP route to the Gateway, so that clients will be able to connect via the public STUN/TURN listener UDP:3478 to the Worker LoadBalancer service we've created earlier (optionally with the cloudretro-setup.yaml).
-In our case, we named it worker-ci-udp-svc. Don't forget to specify the namespace, even if its in the default one.
-This is where we are connecting CloudRetro and STUNner.
+In order to make sure clients can connect to the CloudRetro workers, we need to attach a UDPRoute
+to this Gateway.  In our case, the worker Kubernetes service is called `worker-ci-udp-svc` deployed
+into the `cloudretro` namespace by the default installation scripts.
 
 ```console
 kubectl apply -f - <<EOF
@@ -137,93 +142,99 @@ EOF
 
 ### Configure CloudRetro to use STUNner
 
-Now that we've set up STUNner, it is ready for action. Although, for this to work, we have to configure CloudRetro to use it as well.
-Running the following, minimalistic script will do it for You;
+Finally, we need to configure CloudRetro to instruct clients to use STUNner as the STUN/TURN
+service to connect to it.  This is done automatically by the below script, which will read the
+running STUNner configuration from Kubernetes, set the `CLOUD_GAME_WEBRTC_ICESERVERS` parameter in
+the CloudRetro config accordingly and restart CloudRetro to pick up the new configuration.
 
 ```console
-chmod +x coordinator-config.sh
 ./coordinator-config.sh
 ```
 
-It will configure the Coordinator to provide STUNner as a TURN server for the clients, with the proper credentials for authentication.
+### Test
 
-### Joy
-
-And now everything is set as it should be, You are able to play SuperMario on Your CloudRetro installed in Kubernetes.
-Thanks STUNner.
+At this point, you should be able to play SuperMario on CloudRetro installed in Kubernetes.
 
 ![Supre Maro let's go](mario-super.gif)
 
-## But if You want more...
+## Multi-cluster setup
 
-Time to upgrade Your whole service to multi-cluster. The process itself is not so hard, You can do it all with an extra few steps.
-To make this context more clear, we will be talking about PRIMARY (the one You already have set up, having a coordinator) and SECONDARY clusters.
+Next, we extend the basic single-cluster setup to a multi-cluster deployment. Here, CloudRetro is
+installed into two Kubernetes clusters, preferably deployed in different geographic locations so
+that clients can always connect to the cloud-gaming servers closest to their location. STUNner will
+make sure that the mutli-cluster setup still works smoothly. We assume that the `primary` cluster
+already has CloudRetro and STUNner installed and configured as above, and we are going to add a
+`secondary` cluster with additional worker capability. We assume that `kubectl` is configured with
+two
+[contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+called `primary` and `secondary`.
 
-For the next steps, You might want to make your life easier and use the included scripts later on, but for that You need to set up [contexts](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/) for your clusters, so kubectl can handle both at the same time.
-The naming `'primary'` and `'secondary1'` is completely custom, just make sure to have distinguishable names, the scripts use these context names to determine which cluster it should apply to.
+### CloudRetro
 
-(Note; You can always do the following steps manually, completely eliminating the need for contexts)
-
-### CloudRetro setup on SECONDARY clusters
-
-Once You have a new SECONDARY cluster You want to integrate the CloudRetro with your already working one, the below yaml script will deploy workers only without a coordinator.
-
-```console
-kubectl apply -f cloudretro-setup-workers.yaml --context secondary1
-```
-
-Next, to make these workers connect to the coordinator, we are going to need the Coordinators address from the PRIMARY cluster. Remember, this time we don't have a coordinator locally. This address is also the one clients can connect to, or the external IP of your coordinator-lb-svc LoadBalancer service on Your PRIMARY cluster.
-The script below will configure the SECONDARY workers to connect to the remote-cluster coordinator;
+Deploy a CloudRetro worker service to the secondary cluster, but this time without the Coordinator
+service since that is already running in the primary cluster.
 
 ```console
-chmod +x worker-config.sh
-./worker-config.sh primary secondary1
+kubectl apply -f cloudretro-setup-workers.yaml --context secondary
 ```
 
-### STUNner setup on SECONDARY clusters
-
-This time we won't get into the details, for a detailed installation see the [Installing STUNner](https://github.com/l7mp/stunner/tree/main/examples/cloudretro#installing-stunner) chapter.
-The following script will repeat the exact same steps on Your SECONDARY cluster;
+In order for the workers in the secondary cluster to connect to the coordinator in the primary
+cluster, we are going to need the Coordinator's address from the primary cluster. (Remember, this
+time we don't have a coordinator locally.) This address is the same as the one your clients use to
+connect to CloudRetro, that is, the external IP of your `coordinator-lb-svc` LoadBalancer service
+on the primary cluster.  The script below will configure the workers in the secondary cluster to
+connect to the remote cluster coordinator.
 
 ```console
-chmod +x stunner-setup-for-cloudretro.sh
-./stunner-setup-for-cloudretro.sh secondary1
+./worker-config.sh primary secondary
 ```
 
-TODO: shared controll-plane setup, so one instance of STUNner will be enough
+### STUNner
 
-### Configure Coordinator for SECONDARY cluster workers
-
-Fortunately CloudRetro now supports multiple ICE-servers. In this step You will need to add the address of our SECONDARY STUNner gateway service as well.
-Running the following script will do that for You; although, You need to specify the PRIMARY and SECONDARY cluster contexts as arguments.
-The script supports up to 10 SECONDARY clusters, but You can always just change the limit.
+The following script will repeat the same steps as above to install STUNner into the secondary
+cluster.
 
 ```console
-chmod +x coordinator-config.sh
-./coordinator-config.sh primary secondary1
+./stunner-setup-for-cloudretro.sh secondary
 ```
 
-### Joy
+### Configure the Coordinator
 
-And Your CloudRetro is now officially a multicluster service! Congratulations!
-Keep in mind, that CloudRetro will connect to the relatively closest cluster if it's multiregion. This happens by a HTTP request from the Client to all known worker-groups, which the client chooses the closest one from.
+We use the fact that CloudRetro supports multiple ICE-servers. The only step remained is therefore
+to add the external address of the STUNner gateway deployed into the secondary cluster to the
+Coordinator in the primary.
 
-Although, you can manually choose workers by clicking the little `w` button under `options`.
+```console
+./coordinator-config.sh primary secondary
+```
 
-For example, two videos are included. Both were recorded from a client in the European region with 240 FPS.
-It is obvious, that the one made with an [US-region worker](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_us.mp4) (48 frame ~200,00ms) has latency between invoke and response much larger than in the [European one](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_eu.mp4) (20 frame ~83,33ms).
+### Test
 
-### Problems for the future
+At this CloudRetro should be officially a multicluster service: whenever you start a new game you
+will automatically be connected to the closest Worker service. Note that you can also manually
+choose workers by clicking the `w` button under `options`. 
 
-Even with this setup, STUNner is working like an UDP Gateway for our services. In case of failure, all the control-info exchange must happen again, taking precious time, resulting in delay. If we want to provide our UDP service "seamlessly", basically a whole new connection must be built in case of worker-pod failure, with no "ture" load-balancing.
+As a quick test, we have recorded a game session from a client started in the European region to a
+*local* CloudRetro deployment running in the [European
+one](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_eu.mp4) and a
+*remote* cluster in the [US-region
+worker](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_us.mp4). There is
+a visible improvement in the gaming experience when using a local CloudRetro worker: for the local
+cluster the latency between invoking an action and observing the corresponding action in the video
+is only 20 frames (roughly 80ms), while for a remote cluster the round-trip time is more than 48
+frames (about 200ms).
 
-This reconnection takes plenty of time, for example, a [demo video](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_reconnect_delay.mp4) included for this case.
-Even so, in this example much of the delay is the client realizing that the connection is no more.
+<!-- ### Problems for the future -->
 
+<!-- Even with this setup, STUNner is working like an UDP Gateway for our services. In case of failure, all the control-info exchange must happen again, taking precious time, resulting in delay. If we want to provide our UDP service "seamlessly", basically a whole new connection must be built in case of worker-pod failure, with no "ture" load-balancing. -->
+
+<!-- This reconnection takes plenty of time, for example, a [demo video](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_reconnect_delay.mp4) included for this case. -->
+<!-- Even so, in this example much of the delay is the client realizing that the connection is no more. -->
 
 ## Clean up
 
-Delete the demo deployments and services created, and also the gateway and UDPRoute we have made for STUNner using the below commands.
+Delete the demo deployments and services created, and also the gateway and UDPRoute we have made
+for STUNner using the below commands.
 
 ```console
 kubectl delete -f cloudretro-setup-coordinator.yaml
@@ -244,6 +255,3 @@ MIT License - see [LICENSE](../../LICENSE) for full text.
 ## Acknowledgments
 
 Demo adopted from [CloudRetro](https://github.com/giongto35/cloud-game).
-
-Please note that this demo is only for showcasing STUNner in this enviroment.
-Many CloudRetro functions do not work; shared-save, shared-roms, areas, etc.
