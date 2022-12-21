@@ -158,8 +158,8 @@ func NewClusterProtocol(raw string) (ClusterProtocol, error) {
 }
 
 // String returns a string representation of a cluster protocol
-func (l ClusterProtocol) String() string {
-	switch l {
+func (p ClusterProtocol) String() string {
+	switch p {
 	case ClusterProtocolUDP:
 		return clusterProtocolUDPStr
 	case ClusterProtocolTCP:

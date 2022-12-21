@@ -51,6 +51,7 @@ func (req *ListenerConfig) Validate() error {
 	if err != nil {
 		return err
 	}
+	req.Protocol = proto.String() // normalize
 
 	if req.Addr == "" {
 		req.Addr = "0.0.0.0"
@@ -140,7 +141,7 @@ func (req *ListenerConfig) String() string {
 		k = "<SECRET"
 	}
 	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
-	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ", ")))
+	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ",")))
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

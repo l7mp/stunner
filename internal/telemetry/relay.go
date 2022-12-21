@@ -47,9 +47,6 @@ type RelayAddressGenerator struct {
 	// Address is passed to Listen/ListenPacket when creating the Relay.
 	Address string
 
-	// DryRun suppresses telemetry collection.
-	DryRun bool
-
 	// Net is a pion/transport VNet, used for testing.
 	Net *vnet.Net
 }
@@ -95,9 +92,7 @@ func (r *RelayAddressGenerator) AllocatePacketConn(network string, requestedPort
 			return nil, nil, err
 		}
 
-		if !r.DryRun {
-			conn = NewPacketConn(conn, r.Name, ClusterType)
-		}
+		conn = NewPacketConn(conn, r.Name, ClusterType)
 
 		relayAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 		if !ok {
@@ -115,9 +110,7 @@ func (r *RelayAddressGenerator) AllocatePacketConn(network string, requestedPort
 			continue
 		}
 
-		if !r.DryRun {
-			conn = NewPacketConn(conn, r.Name, ClusterType)
-		}
+		conn = NewPacketConn(conn, r.Name, ClusterType)
 
 		relayAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 		if !ok {

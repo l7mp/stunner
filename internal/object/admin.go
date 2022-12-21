@@ -20,7 +20,7 @@ import (
 
 const DefaultAdminObjectName = "DefaultAdmin"
 
-// Admin is the main object holding STUNner administration info
+// Admin is the main object holding STUNner administration info.
 type Admin struct {
 	Name, LogLevel                       string
 	DryRun                               bool
@@ -56,15 +56,14 @@ func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging
 	return &admin, nil
 }
 
-// Inspect examines whether a configuration change on the object would require a restart. An empty
-// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
-// otherwise it will be reconciled from the old configuration to the new one
-func (a *Admin) Inspect(old, new v1alpha1.Config) bool {
-	return false
+// Inspect examines whether a configuration change requires a reconciliation (returns true if it
+// does) or restart (returns ErrRestartRequired).
+func (a *Admin) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
-// request
+// request.
 func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
@@ -95,13 +94,17 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	return nil
 }
 
-// Name returns the name of the object
+// ObjectName returns the name of the object.
 func (a *Admin) ObjectName() string {
-	// singleton!
 	return v1alpha1.DefaultAdminName
 }
 
-// GetConfig returns the configuration of the running object
+// ObjectType returns the type of the object.
+func (a *Admin) ObjectType() string {
+	return "admin"
+}
+
+// GetConfig returns the configuration of the running object.
 func (a *Admin) GetConfig() v1alpha1.Config {
 	a.log.Tracef("GetConfig")
 	return &v1alpha1.AdminConfig{
@@ -112,7 +115,7 @@ func (a *Admin) GetConfig() v1alpha1.Config {
 	}
 }
 
-// Close closes the Admin object
+// Close closes the Admin object.
 func (a *Admin) Close() error {
 	a.log.Tracef("Close")
 	if a.healthCheckServer != nil {

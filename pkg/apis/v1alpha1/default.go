@@ -3,6 +3,7 @@ package v1alpha1
 const ApiVersion string = "v1alpha1"
 const DefaultStunnerName = "default-stunnerd"
 const DefaultProtocol = "udp"
+const DefaultClusterProtocol = "udp"
 const DefaultPort int = 3478
 const DefaultLogLevel = "all:INFO"
 const DefaultRealm = "stunner.l7mp.io"

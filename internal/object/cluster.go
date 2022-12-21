@@ -25,8 +25,7 @@ type Cluster struct {
 	log       logging.LeveledLogger
 }
 
-// NewCluster creates a new cluster. Requires a server restart (returns
-// ErrRestartRequired)
+// NewCluster creates a new cluster.
 func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.ClusterConfig)
 	if !ok {
@@ -56,11 +55,10 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logg
 	return &c, nil
 }
 
-// Inspect examines whether a configuration change on the object would require a restart. An empty
-// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
-// otherwise it will be reconciled from the old configuration to the new one
-func (c *Cluster) Inspect(old, new v1alpha1.Config) bool {
-	return false
+// Inspect examines whether a configuration change requires a reconciliation (returns true if it
+// does) or restart (returns ErrRestartRequired).
+func (c *Cluster) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration.
@@ -135,13 +133,18 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 	return nil
 }
 
-// Name returns the name of the object
+// ObjectName returns the name of the object.
 func (c *Cluster) ObjectName() string {
 	// singleton!
 	return c.Name
 }
 
-// GetConfig returns the configuration of the running cluster
+// ObjectType returns the type of the object.
+func (c *Cluster) ObjectType() string {
+	return "cluster"
+}
+
+// GetConfig returns the configuration of the running cluster.
 func (c *Cluster) GetConfig() v1alpha1.Config {
 	conf := v1alpha1.ClusterConfig{
 		Name:     c.Name,
@@ -153,7 +156,8 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 	case v1alpha1.ClusterTypeStatic:
 		conf.Endpoints = make([]string, len(c.Endpoints))
 		for i, e := range c.Endpoints {
-			conf.Endpoints[i] = e.String()
+			// e.String() adds a /32 at the end of IPs, remove
+			conf.Endpoints[i] = strings.TrimRight(e.String(), "/32")
 		}
 	case v1alpha1.ClusterTypeStrictDNS:
 		conf.Endpoints = make([]string, len(c.Domains))
@@ -164,7 +168,7 @@ func (c *Cluster) GetConfig() v1alpha1.Config {
 	return &conf
 }
 
-// Close closes the cluster
+// Close closes the cluster.
 func (c *Cluster) Close() error {
 	c.log.Trace("closing cluster")
 
@@ -180,7 +184,7 @@ func (c *Cluster) Close() error {
 	return nil
 }
 
-// Route decides whwther a peer IP appears among the permitted endpoints of a cluster
+// Route decides whwther a peer IP appears among the permitted endpoints of a cluster.
 func (c *Cluster) Route(peer net.IP) bool {
 	c.log.Tracef("Route: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
 		peer.String())

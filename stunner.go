@@ -91,7 +91,7 @@ func NewStunner(options Options) *Stunner {
 	s.authManager = manager.NewManager("auth-manager",
 		object.NewAuthFactory(logger), logger)
 	s.listenerManager = manager.NewManager("listener-manager",
-		object.NewListenerFactory(vnet, s.NewHandlerFactory(), s.dryRun, logger), logger)
+		object.NewListenerFactory(vnet, s.NewRealmHandler(), logger), logger)
 	s.clusterManager = manager.NewManager("cluster-manager",
 		object.NewClusterFactory(r, logger), logger)
 
@@ -155,6 +155,15 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 		return nil
 	}
 	return l.(*object.Cluster)
+}
+
+// GetRealm returns the current STUN/TURN authentication realm.
+func (s *Stunner) GetRealm() string {
+	auth := s.GetAuth()
+	if auth == nil {
+		return ""
+	}
+	return auth.Realm
 }
 
 // GetLogger returns the logger factory of the running daemon. Useful for creating a sub-logger.

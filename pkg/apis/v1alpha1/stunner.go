@@ -124,3 +124,25 @@ func (req *StunnerConfig) String() string {
 
 	return fmt.Sprintf("{%s}", strings.Join(status, ","))
 }
+
+// GetListenerConfig finds a Listener by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetListenerConfig(name string) (ListenerConfig, error) {
+	for _, l := range req.Listeners {
+		if l.Name == name {
+			return l, nil
+		}
+	}
+
+	return ListenerConfig{}, ErrNoSuchListener
+}
+
+// GetClusterConfig finds a Cluster by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
+	for _, c := range req.Clusters {
+		if c.Name == name {
+			return c, nil
+		}
+	}
+
+	return ClusterConfig{}, ErrNoSuchCluster
+}

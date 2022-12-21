@@ -23,18 +23,12 @@ func (req *AuthConfig) Validate() error {
 	if req.Type == "" {
 		req.Type = DefaultAuthType
 	}
-	if _, err := NewAuthType(req.Type); err != nil {
-		return err
-	}
-
-	if req.Realm == "" {
-		req.Realm = DefaultRealm
-	}
 
 	atype, err := NewAuthType(req.Type)
 	if err != nil {
 		return err
 	}
+	req.Type = atype.String() // normalize
 
 	switch atype {
 	case AuthTypePlainText:
@@ -52,6 +46,10 @@ func (req *AuthConfig) Validate() error {
 		}
 	default:
 		return fmt.Errorf("invalid authentication type %q", req.Type)
+	}
+
+	if req.Realm == "" {
+		req.Realm = DefaultRealm
 	}
 
 	return nil

@@ -121,22 +121,6 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
 	}
 }
 
-// NewHandlerFactory creates helper functions that allow a listener to generate STUN/TURN
-// authentication and permission handlers.
-func (s *Stunner) NewHandlerFactory() object.HandlerFactory {
-	return object.HandlerFactory{
-		GetRealm: func() string {
-			auth := s.GetAuth()
-			if auth == nil {
-				return ""
-			}
-			return auth.Realm
-		},
-		GetAuthHandler:       func() turn.AuthHandler { return s.NewAuthHandler() },
-		GetPermissionHandler: func(l *object.Listener) turn.PermissionHandler { return s.NewPermissionHandler(l) },
-	}
-}
-
 // NewReadinessHandler creates a helper function for checking the readiness of STUNner.
 func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
 	return func() error {
@@ -145,5 +129,15 @@ func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
 		} else {
 			return errors.New("stunnerd not ready")
 		}
+	}
+}
+
+// NewRealmHandler creates a helper function for listeners to find out the authentication realm.
+func (s *Stunner) NewRealmHandler() object.RealmHandler {
+	return func() string {
+		if s != nil {
+			return s.GetRealm()
+		}
+		return ""
 	}
 }

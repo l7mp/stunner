@@ -31,25 +31,24 @@ func (req *ClusterConfig) Validate() error {
 	if req.Name == "" {
 		return fmt.Errorf("missing name in cluster configuration: %s", req.String())
 	}
+
 	if req.Type == "" {
 		req.Type = DefaultClusterType
 	}
-	if _, err := NewClusterType(req.Type); err != nil {
+	t, err := NewClusterType(req.Type)
+	if err != nil {
 		return err
 	}
+	req.Type = t.String() // normalize
 
 	if req.Protocol == "" {
-		req.Protocol = DefaultProtocol
+		req.Protocol = DefaultClusterProtocol
 	}
 	p, err := NewClusterProtocol(req.Protocol)
 	if err != nil {
 		return err
 	}
-
-	if p != ClusterProtocolUDP {
-		return fmt.Errorf("unsupported cluster protocol %s (use protocol %s)",
-			p.String(), ClusterProtocolUDP.String())
-	}
+	req.Protocol = p.String() // normalize
 
 	sort.Strings(req.Endpoints)
 	return nil
@@ -84,7 +83,7 @@ func (req *ClusterConfig) String() string {
 	}
 
 	status = append(status, fmt.Sprintf("endpoints=[%s]",
-		strings.Join(req.Endpoints, ", ")))
+		strings.Join(req.Endpoints, ",")))
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

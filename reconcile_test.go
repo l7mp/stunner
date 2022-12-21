@@ -1728,6 +1728,8 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	assert.NoError(t, err, err)
 
 	conf.Admin.LogLevel = stunnerTestLoglevel
+	conf.Admin.MetricsEndpoint = ""
+
 	log.Debug("setting up the mock DNS")
 	mockDns := resolver.NewMockResolver(map[string]([]string){
 		"stunner.l7mp.io":     []string{"1.2.3.4"},
@@ -2128,8 +2130,8 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoServerAddr:  "1.2.3.5:5678",
 		restart:         true,
 		bindSuccess:     true,
-		allocateSuccess: false,
-		echoResult:      false,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "reverting the realm induces another server restart",

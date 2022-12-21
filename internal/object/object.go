@@ -1,22 +1,22 @@
 package object
 
 import (
-	"github.com/pion/turn/v2"
-
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 // Object is the high-level interface for all STUNner objects like listeners, clusters, etc.
 type Object interface {
-	// ObjectName returns the name of the object
+	// ObjectName returns the name of the object.
 	ObjectName() string
-	// Inspect examines whether a configuration change on the object would require a restart
-	Inspect(old, new v1alpha1.Config) bool
-	// Reconcile updates the object for a new configuration, may return ErrRestartRequired
+	// ObjectType returns the type of the object.
+	ObjectType() string
+	// Inspect examines whether a configuration change requires a reconciliation or restart.
+	Inspect(old, new, full v1alpha1.Config) (bool, error)
+	// Reconcile updates the object for a new configuration.
 	Reconcile(conf v1alpha1.Config) error
-	// GetConfig returns the configuration of the running authenticator
+	// GetConfig returns the configuration of the running authenticator.
 	GetConfig() v1alpha1.Config
-	// Close closes the object, may return ErrRestartRequired
+	// Close closes the object, may return ErrRestartRequired.
 	Close() error
 }
 
@@ -29,10 +29,5 @@ type Factory interface {
 // ReadinessHandler is a callback that allows an object to check the readiness of STUNner.
 type ReadinessHandler = func() error
 
-// HandlerFactory is a collection of helper functions that allow a listener to generate STUN/TURN
-// authentication and permission handlers.
-type HandlerFactory struct {
-	GetRealm             func() string
-	GetAuthHandler       func() turn.AuthHandler
-	GetPermissionHandler func(*Listener) turn.PermissionHandler
-}
+// RealmHandler is a callback that allows an object to find out the authentication realm.
+type RealmHandler = func() string

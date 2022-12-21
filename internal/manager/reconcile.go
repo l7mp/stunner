@@ -2,9 +2,6 @@ package manager
 
 import (
 	"fmt"
-	// "sort"
-
-	// "github.com/pion/logging"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -17,32 +14,26 @@ type ReconcileJob struct {
 
 type ReconciliationState struct {
 	NewJobQueue, ChangedJobQueue, DeletedJobQueue []ReconcileJob
-	Restarted                                     []object.Object
+	ToBeStarted, ToBeRestarted                    []object.Object
 }
 
 // PrepareReconciliation prepares the reconciliation of the objects handled by the manager and returns a
 // set of reconciliation jobs to be performed, ErrRestartRequired if the server needs to be
-// restarted, and an error if the config was not accepted
-func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*ReconciliationState, error) {
+// restarted, and an error if the config was not accepted. Configuration must be validated.
+func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config, stunnerConf v1alpha1.Config) (*ReconciliationState, error) {
 	m.log.Tracef("preparing reconciliation")
 
 	state := ReconciliationState{
 		NewJobQueue:     []ReconcileJob{},
 		ChangedJobQueue: []ReconcileJob{},
 		DeletedJobQueue: []ReconcileJob{},
-		Restarted:       []object.Object{},
+		ToBeStarted:     []object.Object{},
+		ToBeRestarted:   []object.Object{},
 	}
-
-	var restart error = nil
 
 	// find what has to be added or changed
 	for _, c := range confs {
 		m.log.Debugf("reconciling for conf %q: %s", c.ConfigName(), c.String())
-
-		// make sure lists are sorted and names are OK
-		if err := c.Validate(); err != nil {
-			return nil, err
-		}
 
 		o, found := m.Get(c.ConfigName())
 		if found {
@@ -56,20 +47,32 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 					o.ObjectName(), err)
 			}
 
-			if runningConf.DeepEqual(c) {
-				m.log.Tracef("object %q unchanged", o.ObjectName())
-			} else {
+			m.log.Tracef("inspecting object %q for configuration change: %s -> %s",
+				o.ObjectName(), runningConf.String(), c.String())
+
+			changed, err := o.Inspect(runningConf, c, stunnerConf)
+			if err != nil && err != object.ErrRestartRequired {
+				return nil, err
+			}
+
+			if changed {
 				m.log.Tracef("object %q changes, adding to job queue", o.ObjectName())
 				state.ChangedJobQueue = append(state.ChangedJobQueue,
 					ReconcileJob{Object: o, NewConfig: c, OldConfig: runningConf})
+
+				if err == object.ErrRestartRequired {
+					m.log.Tracef("object %q asks for a restart", o.ObjectName())
+					state.ToBeRestarted = append(state.ToBeRestarted, o)
+				}
+
+			} else {
+				m.log.Tracef("object %q unchanged", o.ObjectName())
 			}
 
 		} else {
 			m.log.Tracef("new object %q: adding to job queue", c.ConfigName())
-			// create a mock object so that we can call Inspect later on
-			o, _ = m.factory.New(nil)
 			state.NewJobQueue = append(state.NewJobQueue,
-				ReconcileJob{Object: o, NewConfig: c, OldConfig: nil})
+				ReconcileJob{Object: nil, NewConfig: c, OldConfig: nil})
 		}
 	}
 
@@ -82,30 +85,22 @@ func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config) (*Reconcili
 		}
 	}
 
-	m.log.Trace("inspecting the reconciliation job queue")
-	for _, j := range state.ChangedJobQueue {
-		m.log.Tracef("inspecting object %q for configuration change: %s -> %s",
-			j.Object.ObjectName(), j.OldConfig.String(), j.NewConfig.String())
-
-		if j.Object.Inspect(j.OldConfig, j.NewConfig) {
-			state.Restarted = append(state.Restarted, j.Object)
-			restart = object.ErrRestartRequired
-		}
-	}
-
-	return &state, restart
+	return &state, nil
 }
 
-// FinishReconciliation finishes the reconciliation from the specified state
+// FinishReconciliation finishes the reconciliation from the specified state.
 func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 	m.log.Tracef("finishing reconciliation")
 
 	m.log.Trace("running the new-object job queue")
 	for _, j := range state.NewJobQueue {
 		o, err := m.factory.New(j.NewConfig)
-		if err != nil && err != object.ErrRestartRequired {
-			m.log.Errorf("could not create new object: %s", err.Error())
-			return err
+		if err != nil {
+			if err != object.ErrRestartRequired {
+				m.log.Errorf("could not create new object: %s", err.Error())
+				return err
+			}
+			state.ToBeStarted = append(state.ToBeStarted, o)
 		}
 		// ignore errors
 		_ = m.Upsert(o)
@@ -127,6 +122,7 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 			j.OldConfig.String(), j.NewConfig.String())
 
 		err := o.Reconcile(j.NewConfig)
+		// reconciled objects are already inspected for a restart: ignore restart requests
 		if err != nil && err != object.ErrRestartRequired {
 			return err
 		}
