@@ -1,9 +1,9 @@
-# Using Livekit with STUNner
+# STUNner demo: Video-conferencing with LiveKit
 
 This document guides you through the installation of [LiveKit](https://livekit.io/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
 In this demo you will learn to:
-- integrate a typical WebRTC application server with STUNner,
+- integrate a typical WebRTC application with STUNner,
 - obtain a valid TLS certificate to secure the signaling plane,
 - deploy the LiveKit server into Kubernetes, and
 - configure STUNner to expose LiveKit to clients.

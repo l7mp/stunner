@@ -1,6 +1,6 @@
-# Using Jitsi with STUNner
+# STUNner demo: Video-conferencing with Jitsi
 
-This document guides you through the installation of [Jitsi](https://jitsi.org/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
+This document guides you through the installation of [Jitsi](https://jitsi.org) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
 In this demo you will learn to:
 
