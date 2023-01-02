@@ -8,7 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
+
+	"github.com/l7mp/stunner/internal/util"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -16,54 +17,6 @@ type StunnerUri struct {
 	Protocol, Address, Username, Password string
 	Port                                  int
 	Addr                                  net.Addr
-}
-
-type fileConnAddr struct {
-	file *os.File
-}
-
-func (s *fileConnAddr) Network() string { return "file" }
-func (s *fileConnAddr) String() string  { return s.file.Name() }
-
-type FileConn struct {
-	file *os.File
-}
-
-func (f *FileConn) Read(b []byte) (n int, err error) {
-	return f.file.Read(b)
-}
-
-func (f *FileConn) Write(b []byte) (n int, err error) {
-	return f.file.Write(b)
-}
-
-func (f *FileConn) Close() error {
-	return f.file.Close()
-}
-
-func (f *FileConn) LocalAddr() net.Addr {
-	return &fileConnAddr{file: f.file}
-}
-
-func (f *FileConn) RemoteAddr() net.Addr {
-	return &fileConnAddr{file: f.file}
-}
-
-func (f *FileConn) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (f *FileConn) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (f *FileConn) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
-// NewFileConn returns a wrapper that shows an os.File as a net.Conn.
-func NewFileConn(file *os.File) net.Conn {
-	return &FileConn{file: file}
 }
 
 // ParseUri parses a STUN/TURN server URI, e.g., "turn://user1:passwd1@127.0.0.1:3478?transport=udp"
@@ -75,7 +28,7 @@ func ParseUri(uri string) (*StunnerUri, error) {
 		s.Protocol = "file"
 		// make turncat conf happy
 		s.Port = 1
-		s.Addr = &fileConnAddr{file: os.Stdin}
+		s.Addr = &util.FileConnAddr{File: os.Stdin}
 		return &s, nil
 	}
 

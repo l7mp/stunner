@@ -7,16 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/pion/transport/test"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/yaml"
 
 	"github.com/l7mp/stunner/internal/logger"
-
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
+/********************************************
+ *
+ * default-config
+ *
+ *********************************************/
 func TestStunnerDefaultServerVNet(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -57,7 +60,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(*c), "restart", "starting server")
+			assert.NoError(t, stunner.Reconcile(*c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -102,7 +105,7 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 
 	newConf := &v1alpha1.StunnerConfig{}
 	err = yaml.Unmarshal(file, newConf)
-	assert.NoError(t, err, "unmarschal config from fike")
+	assert.NoError(t, err, "unmarschal config from file")
 
 	ok := newConf.DeepEqual(c)
 	assert.True(t, ok, "config file roundtrip")

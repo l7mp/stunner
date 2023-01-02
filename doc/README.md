@@ -19,6 +19,7 @@
 * [Gateway API reference](/doc/GATEWAY.md)
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
+* [Monitoring](/doc/MONITORING.md)
 
 ## Tutorials
 
@@ -35,6 +36,7 @@
 * [One to one video call with Kurento](/examples/kurento-one2one-call)
 * [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md)
 * [Video-conferencing with LiveKit](/examples/livekit/README.md)
+* [Video-conferencing with Jitsi](/examples/jitsi/README.md)
 * [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md)
 * [Remote desktop access with Neko](/examples/neko/README.md)
 

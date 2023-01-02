@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 // ClusterConfig specifies a set of upstream peers STUNner can open transport relay connections
@@ -67,5 +68,23 @@ func (req *ClusterConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *ClusterConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	status := []string{}
+
+	n := "-"
+	if req.Name != "" {
+		n = req.Name
+	}
+
+	if req.Type != "" {
+		status = append(status, fmt.Sprintf("type=%q", req.Type))
+	}
+
+	if req.Protocol != "" {
+		status = append(status, fmt.Sprintf("protocol=%q", req.Protocol))
+	}
+
+	status = append(status, fmt.Sprintf("endpoints=[%s]",
+		strings.Join(req.Endpoints, ", ")))
+
+	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

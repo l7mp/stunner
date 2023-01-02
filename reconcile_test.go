@@ -1,6 +1,7 @@
 package stunner
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strconv"
@@ -151,7 +152,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			},
 			Auth: v1alpha1.AuthConfig{
 				Credentials: map[string]string{
-					"username": "user",
+					"password": "pass",
 				},
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
@@ -188,8 +189,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// deleting a listener requires a restart
-			assert.ErrorIs(t, err, v1alpha1.ErrRestartRequired, "restart required")
+			// deleting a listener does not require a restart
+			assert.NoError(t, err, "restarted")
 		},
 	},
 	{
@@ -826,7 +827,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// requires a restart!
-			assert.ErrorIs(t, err, v1alpha1.ErrRestartRequired, "restart required")
+			assert.Error(t, err, "restarted")
+			e, ok := err.(v1alpha1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Len(t, e.Objects, 1, "restarted object")
+			assert.Contains(t, e.Objects, "listener: default-listener")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
 
@@ -903,8 +908,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// requires a restart!
-			assert.ErrorIs(t, err, v1alpha1.ErrRestartRequired, "restart required")
+			// does not require a restart!
+			assert.NoError(t, err, "restarted")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
 
@@ -950,6 +955,37 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 	},
 	{
+		name: "reconcile-test: empty TLS credentials errs",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:         "newlistener",
+				Protocol:     "tls",
+				Addr:         "127.0.0.2",
+				Port:         1,
+				MinRelayPort: 10,
+				MaxRelayPort: 100,
+				Routes:       []string{"none", "dummy"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.ErrorContains(t, err, "empty TLS", "missing username")
+		},
+	},
+	{
 		name: "reconcile-test: reconcile additional listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
@@ -981,8 +1017,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// requires a restart!
-			assert.ErrorIs(t, err, v1alpha1.ErrRestartRequired, "restart required")
+			// does not require a restart!
+			assert.NoError(t, err, "restart")
 
 			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
 
@@ -991,6 +1027,224 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
+			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
+			assert.Equal(t, l.MaxPort, v1alpha1.DefaultMaxRelayPort, "listener maxport ok")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+
+			c := s.GetCluster("allow-any")
+			assert.NotNil(t, c, "cluster found")
+			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.Type, v1alpha1.ClusterTypeStatic, "cluster mode ok")
+			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			_, n, _ := net.ParseCIDR("0.0.0.0/0")
+			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
+			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+
+			// listener uses the old cluster for routing
+			p := s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+
+			l = s.GetListener("newlistener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
+			assert.Equal(t, l.Port, 1, "listener port ok")
+			assert.Equal(t, l.MinPort, 10, "listener minport ok")
+			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
+			assert.Len(t, l.Routes, 2, "listener route count ok")
+			// sorted!
+			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+
+			p = s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+
+		},
+	},
+	{
+		name: "reconcile-test: reconcile existing listener with TLS cert and add a new one",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "DTLS",
+				Cert:     "dummy-cert",
+				Key:      "dummy-key",
+				Routes:   []string{"allow-any"},
+			}, {
+				Name:         "newlistener",
+				Protocol:     "tcp",
+				Addr:         "127.0.0.2",
+				Port:         1,
+				MinRelayPort: 10,
+				MaxRelayPort: 100,
+				Routes:       []string{"none", "dummy"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			// default-listener restarts
+			assert.Error(t, err, "restarted")
+			e, ok := err.(v1alpha1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Len(t, e.Objects, 1, "restarted object")
+			assert.Contains(t, e.Objects, "listener: default-listener")
+
+			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
+
+			l := s.GetListener("default-listener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolDTLS, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
+			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
+			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
+			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
+			assert.Equal(t, l.MaxPort, v1alpha1.DefaultMaxRelayPort, "listener maxport ok")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+
+			c := s.GetCluster("allow-any")
+			assert.NotNil(t, c, "cluster found")
+			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.Type, v1alpha1.ClusterTypeStatic, "cluster mode ok")
+			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			_, n, _ := net.ParseCIDR("0.0.0.0/0")
+			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
+			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+
+			// listener uses the old cluster for routing
+			p := s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+
+			l = s.GetListener("newlistener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
+			assert.Equal(t, l.Port, 1, "listener port ok")
+			assert.Equal(t, l.MinPort, 10, "listener minport ok")
+			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
+			assert.Len(t, l.Routes, 2, "listener route count ok")
+			// sorted!
+			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+
+			p = s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
+			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+
+		},
+	},
+	{
+		name: "reconcile-test: reconcile existing listener with TLS cert and add a new one",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "TLS",
+				Cert:     "dummy-cert",
+				Key:      "dummy-key",
+				Routes:   []string{"allow-any"},
+			}, {
+				Name:         "newlistener",
+				Protocol:     "tcp",
+				Addr:         "127.0.0.2",
+				Port:         1,
+				MinRelayPort: 10,
+				MaxRelayPort: 100,
+				Routes:       []string{"none", "dummy"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			// default-listener restarts
+			assert.Error(t, err, "restarted")
+			e, ok := err.(v1alpha1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Len(t, e.Objects, 1, "restarted object")
+			assert.Contains(t, e.Objects, "listener: default-listener")
+
+			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
+
+			l := s.GetListener("default-listener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTLS, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
+			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
 			assert.Equal(t, l.MaxPort, v1alpha1.DefaultMaxRelayPort, "listener maxport ok")
@@ -1069,8 +1323,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// requires a restart!
-			assert.ErrorIs(t, err, v1alpha1.ErrRestartRequired, "restart required")
+			// does not require a restart!
+			assert.NoError(t, err, "restarted")
 
 			l := s.GetListener("default-listener")
 			assert.Nil(t, l, "listener found")
@@ -1410,7 +1664,7 @@ func TestStunnerReconcile(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, s.Reconcile(*conf), "restart", "starting server")
+			assert.NoError(t, s.Reconcile(*conf), "starting server")
 
 			runningConf := s.GetConfig()
 			assert.NotNil(t, runningConf, "default stunner get config ok")
@@ -1441,9 +1695,11 @@ func TestStunnerReconcile(t *testing.T) {
 	}
 }
 
-////////////////////
-// E2E reconcile test with a running server
-////////////////////
+/********************************************
+ *
+ * E2E reconcile test with a running server
+ *
+ *********************************************/
 
 type StunnerTestReconcileE2EConfig struct {
 	testName                                          string
@@ -1492,7 +1748,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	})
 
 	log.Debug("starting stunnerd")
-	assert.ErrorContains(t, s.Reconcile(*conf), "restart", "starting server")
+	assert.NoError(t, s.Reconcile(*conf), "starting server")
 
 	for _, c := range testcases {
 		t.Run(c.testName, func(t *testing.T) {
@@ -1503,7 +1759,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 			if c.restart {
 				assert.ErrorContains(t, err, "restart", "starting server")
 			} else {
-				assert.NoError(t, err, "cannot reconcile")
+				assert.NoError(t, err, "no restart")
 			}
 
 			// // make sure new clusters use the mockDns
@@ -1545,9 +1801,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Clusters:  []v1alpha1.ClusterConfig{},
 		},
 		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		restart:         false,
 		bindSuccess:     false,
-		allocateSuccess: true,
+		allocateSuccess: false,
 		echoResult:      false,
 	},
 	{
@@ -1567,7 +1823,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Name:     "udp",
 				Protocol: "udp",
 				Addr:     "1.2.3.4",
-				Port:     3479,
+				Port:     3480,
 				Routes: []string{
 					"echo-server-cluster",
 				},
@@ -1575,7 +1831,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Clusters: []v1alpha1.ClusterConfig{},
 		},
 		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
 		echoResult:      false,
@@ -1597,7 +1853,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Name:     "udp",
 				Protocol: "udp",
 				Addr:     "1.2.3.4",
-				Port:     3479,
+				Port:     3480,
 				Routes: []string{
 					"echo-server-cluster",
 				},
@@ -1617,6 +1873,49 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "adding a listener at the right port",
+		config: v1alpha1.StunnerConfig{
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: v1alpha1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}, {
+				Name:     "udp",
+				Protocol: "udp",
+				Addr:     "1.2.3.4",
+				Port:     3480,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: true,
+		echoResult:      true,
+	},
+	{
+		testName: "changing the port in the wrong listener",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
@@ -1752,6 +2051,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
+				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
@@ -1788,7 +2088,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		testName: "changing the realm induces a server restart",
+		testName: "realm reset induces a server restart",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
@@ -1828,17 +2128,18 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoServerAddr:  "1.2.3.5:5678",
 		restart:         true,
 		bindSuccess:     true,
-		allocateSuccess: true,
-		echoResult:      true,
+		allocateSuccess: false,
+		echoResult:      false,
 	},
 	{
-		testName: "realm reset a server restart",
+		testName: "reverting the realm induces another server restart",
 		config: v1alpha1.StunnerConfig{
 			ApiVersion: "v1alpha1",
 			Admin: v1alpha1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: v1alpha1.AuthConfig{
+				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
@@ -2047,7 +2348,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			}},
 		},
 		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
@@ -2283,7 +2584,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Clusters:  []v1alpha1.ClusterConfig{},
 		},
 		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
 		echoResult:      false,
@@ -2294,10 +2595,12 @@ func TestStunnerReconcileWithVNetE2E(t *testing.T) {
 	testStunnerReconcileWithVNet(t, testReconcileE2E, true)
 }
 
-// //////////////////
-// reconcile rollback tests: these always start from a base connfiguration and test through a series
-// of rollbacktests
-// /////////////////
+/********************************************
+ *
+ * reconcile rollback tests: start from a base connfiguration and test through a series of rollback
+ * tests
+ *
+ *********************************************/
 var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 	"reconcile protocol": {
 		{
@@ -2314,7 +2617,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					},
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
-					Name:     "udp",
+					Name:     "default-listener",
 					Protocol: "udp",
 					Addr:     "1.2.3.4",
 					Port:     3478,
@@ -2330,7 +2633,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				}},
 			},
 			echoServerAddr:  "1.2.3.5:5678",
-			restart:         true,
+			restart:         false,
 			bindSuccess:     true,
 			allocateSuccess: true,
 			echoResult:      true,
@@ -2350,7 +2653,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					},
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
-					Name:     "udp",
+					Name:     "default-listener",
 					Protocol: "tcp",
 					Addr:     "1.2.3.4",
 					Port:     3478,
@@ -2379,7 +2682,7 @@ func TestStunnerReconcileWithVNetRollback(t *testing.T) {
 	log := loggerFactory.NewLogger("rollback-test")
 
 	for name, testcase := range testReconcileRollback {
-		log.Debugf("-------------- Running new testtest: %s -------------", name)
+		log.Debugf("-------------- Running new test: %s -------------", name)
 		testStunnerReconcileWithVNet(t, testcase, false)
 	}
 }

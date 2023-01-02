@@ -2,13 +2,11 @@
 package stunner
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
-	"github.com/pion/turn/v2"
 
 	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
@@ -50,7 +48,6 @@ type Stunner struct {
 	resolver                                                   resolver.DnsResolver
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
-	server                                                     *turn.Server
 	net                                                        *vnet.Net
 	ready, shutdown                                            bool
 }
@@ -59,8 +56,8 @@ type Stunner struct {
 // the daemon for a new configuration. Object lifecycle is as follows: the daemon is "alive"
 // (answers liveness probes if healthchecking is enabled) once the main object is successfully
 // initialized, and "ready" after the first successful reconciliation (answers readiness probes if
-// healthchecking is enabled). Calling program should catch SIGTERM signals and call
-// GracefulShutdown(), which will keep on serving connections but will fail readiness probes.
+// healthchecking is enabled). Calling program should catch SIGTERM signals and call Shutdown(),
+// which will keep on serving connections but will fail readiness probes.
 func NewStunner(options Options) *Stunner {
 	logger := logger.NewLoggerFactory(DefaultLogLevel)
 	if options.LogLevel != "" {
@@ -89,30 +86,20 @@ func NewStunner(options Options) *Stunner {
 		net:              vnet,
 	}
 
-	// readyness check function
-	rc := func() error {
-		if s.IsReady() {
-			return nil
-		} else {
-			return errors.New("server not ready")
-		}
-	}
 	s.adminManager = manager.NewManager("admin-manager",
-		object.NewAdminFactory(options.DryRun, rc, logger), logger)
+		object.NewAdminFactory(options.DryRun, s.NewReadinessHandler(), logger), logger)
 	s.authManager = manager.NewManager("auth-manager",
 		object.NewAuthFactory(logger), logger)
 	s.listenerManager = manager.NewManager("listener-manager",
-		object.NewListenerFactory(vnet, logger), logger)
+		object.NewListenerFactory(vnet, s.NewHandlerFactory(), s.dryRun, logger), logger)
 	s.clusterManager = manager.NewManager("cluster-manager",
 		object.NewClusterFactory(r, logger), logger)
 
-	telemetry.RegisterMetrics(s.log,
-		func() float64 {
-			if s.server != nil {
-				return float64(s.server.AllocationCount())
-			}
-			return 0.0
-		})
+	if !s.dryRun {
+		s.resolver.Start()
+		telemetry.Init()
+		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetAciveConnections() })
+	}
 
 	return s
 }
@@ -127,16 +114,11 @@ func (s *Stunner) IsReady() bool {
 	return s.ready
 }
 
-// GracefulShutdown causes STUNner to fail the readiness check. Manwhile, it will keep on serving
+// Shutdown causes STUNner to fail the readiness check. Manwhile, it will keep on serving
 // connections. This function should be called after the main program catches a SIGTERM.
-func (s *Stunner) GracefulShutdown() {
+func (s *Stunner) Shutdown() {
 	s.shutdown = true
 	s.ready = false
-}
-
-// GetServer returns the TURN server instance running the STUNner daemon.
-func (s *Stunner) GetServer() *turn.Server {
-	return s.server
 }
 
 // GetAdmin returns the admin object underlying STUNner.
@@ -210,9 +192,6 @@ func (s *Stunner) Status() string {
 func (s *Stunner) Close() {
 	s.log.Info("closing STUNner")
 
-	// stop the server
-	s.Stop()
-
 	// ignore restart-required errors
 	if len(s.adminManager.Keys()) > 0 {
 		_ = s.GetAdmin().Close()
@@ -225,7 +204,7 @@ func (s *Stunner) Close() {
 	listeners := s.listenerManager.Keys()
 	for _, name := range listeners {
 		l := s.GetListener(name)
-		if err := l.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
+		if err := l.Close(); err != nil && err != object.ErrRestartRequired {
 			s.log.Errorf("Error closing listener %q at adddress %s: %s",
 				l.Proto.String(), l.Addr, err.Error())
 		}
@@ -234,12 +213,19 @@ func (s *Stunner) Close() {
 	clusters := s.clusterManager.Keys()
 	for _, name := range clusters {
 		c := s.GetCluster(name)
-		if err := c.Close(); err != nil && err != v1alpha1.ErrRestartRequired {
+		if err := c.Close(); err != nil && err != object.ErrRestartRequired {
 			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
 				err.Error())
 		}
 	}
 
-	telemetry.UnregisterMetrics(s.log)
+	// telemetry.UnregisterMetrics(s.log)
+	if !s.dryRun {
+		telemetry.Close()
+	}
+
 	s.resolver.Close()
 }
+
+// GetAciveConnections returns the number of active downstream (listener-side) TURN allocations.
+func (s *Stunner) GetAciveConnections() float64 { return 0.0 }

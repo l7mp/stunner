@@ -18,9 +18,11 @@ import (
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
-// *****************
-// Auth handler tests with VNet
-// *****************
+/********************************************
+ *
+ * Auth handler tests with VNet
+ *
+ *********************************************/
 
 // unfortunately the helper longTermCredentials() is not exported by pion/turn so we have to
 // reproduce the same functionality here for testing, but with the added twist that usernames can
@@ -228,7 +230,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.ErrorContains(t, stunner.Reconcile(c), "restart", "starting server")
+			assert.NoError(t, stunner.Reconcile(c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")

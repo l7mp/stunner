@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // StunnerConfig specifies the configuration of the the STUnner daemon.
@@ -104,5 +105,22 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	status := []string{}
+	status = append(status, fmt.Sprintf("version=%q", req.ApiVersion))
+	status = append(status, req.Admin.String())
+	status = append(status, req.Auth.String())
+
+	ls := []string{}
+	for _, l := range req.Listeners {
+		ls = append(ls, l.String())
+	}
+	status = append(status, fmt.Sprintf("listeners=[%s]", strings.Join(ls, ",")))
+
+	cs := []string{}
+	for _, c := range req.Clusters {
+		cs = append(cs, c.String())
+	}
+	status = append(status, fmt.Sprintf("clusters=[%s]", strings.Join(cs, ",")))
+
+	return fmt.Sprintf("{%s}", strings.Join(status, ","))
 }

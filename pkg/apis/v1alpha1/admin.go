@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 )
 
 // AdminConfig holds the administrative configuration.
@@ -63,5 +64,15 @@ func (req *AdminConfig) DeepEqual(other Config) bool {
 
 // String stringifies the configuration.
 func (req *AdminConfig) String() string {
-	return fmt.Sprintf("%#v", req)
+	status := []string{}
+	if req.LogLevel != "" {
+		status = append(status, fmt.Sprintf("logLevel=%q", req.LogLevel))
+	}
+	if req.MetricsEndpoint != "" {
+		status = append(status, fmt.Sprintf("metrics=%q", req.MetricsEndpoint))
+	}
+	if req.HealthCheckEndpoint != "" {
+		status = append(status, fmt.Sprintf("health-check=%q", req.HealthCheckEndpoint))
+	}
+	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
 }

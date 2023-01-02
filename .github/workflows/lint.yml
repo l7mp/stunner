@@ -1,7 +1,9 @@
-name: Tests
+name: Linter
 
 on:
   push:
+    paths:
+      - '**.go'
     branches:
       - '*'
     tags-ignore:

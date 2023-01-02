@@ -121,7 +121,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 
 	switch listener.Protocol {
 	case "file":
-		listenerConn = NewFileConn(os.Stdin)
+		listenerConn = util.NewFileConn(os.Stdin)
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		l, err := listenerConf.ListenPacket(context.Background(), listener.Addr.Network(),
 			listener.Addr.String())
@@ -203,7 +203,7 @@ func (t *Turncat) Close() {
 		if err := l.Close(); err != nil {
 			t.log.Warnf("error closing listener packet connection: %s", err.Error())
 		}
-	case *FileConn:
+	case *util.FileConn:
 		// do nothing
 	default:
 		t.log.Error("internal error: unknown listener socket type")
@@ -543,7 +543,7 @@ func (t *Turncat) runListen() {
 }
 
 func (t *Turncat) runListenFile() {
-	listenerConn, ok := t.listenerConn.(*FileConn)
+	listenerConn, ok := t.listenerConn.(*util.FileConn)
 	if !ok {
 		t.log.Error("cannot listen on client connection: expected file")
 		// terminate go routine

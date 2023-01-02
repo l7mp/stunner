@@ -26,7 +26,7 @@ type Cluster struct {
 }
 
 // NewCluster creates a new cluster. Requires a server restart (returns
-// v1alpha1.ErrRestartRequired)
+// ErrRestartRequired)
 func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.ClusterConfig)
 	if !ok {
@@ -47,9 +47,9 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logg
 		log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
 	}
 
-	c.log.Tracef("NewCluster: %#v", req)
+	c.log.Tracef("NewCluster: %sv", req.String())
 
-	if err := c.Reconcile(req); err != nil && err != v1alpha1.ErrRestartRequired {
+	if err := c.Reconcile(req); err != nil && err != ErrRestartRequired {
 		return nil, err
 	}
 
@@ -74,7 +74,7 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 		return err
 	}
 
-	c.log.Tracef("Reconcile: %#v", req)
+	c.log.Tracef("Reconcile: %s", req.String())
 	c.Type, _ = v1alpha1.NewClusterType(req.Type)
 	c.Protocol, _ = v1alpha1.NewClusterProtocol(req.Protocol)
 

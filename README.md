@@ -525,8 +525,13 @@ applications into Kubernetes.
   add a funny hat on top of faces.
 * [Video-conferencing with LiveKit](/examples/livekit/README.md): This tutorial helps you deploy
   the [LiveKit](https://livekit.io) WebRTC media server behind STUNner. The docs also show how to
-  obtain a valid TLS certificate to secure your signaling connections, courtesy of the wonderful
+  obtain a valid TLS certificate to secure your signaling connections, courtesy of the
   [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
+  Encrypt](https://letsencrypt.org).
+* [Video-conferencing with Jitsi](/examples/jitsi/README.md): This tutorial helps you deploy a
+  fully fledged [Jitsi](https://jitsi.org) video-conferencing service into Kubernetes behind
+  STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
+  connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
 * [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md): This tutorial lets you play Super
   Mario or Street Fighter in your browser, courtesy of the amazing
