@@ -193,7 +193,7 @@ func (s *Stunner) Status() string {
 
 	auth := s.GetAuth()
 	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s",
-		status, auth.Type.String(), auth.Realm, str)
+		status, auth.Realm, auth.Type.String(), str)
 }
 
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections
