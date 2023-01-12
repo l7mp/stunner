@@ -189,7 +189,7 @@ func (l *Listener) Close() error {
 			conn, ok := l.Conn.(turn.PacketConnConfig)
 			if !ok {
 				return fmt.Errorf("internal error: invalid conversion to " +
-					"turn.ListenerConfig")
+					"turn.PacketConnConfig")
 			}
 
 			if err := conn.PacketConn.Close(); err != nil && !util.IsClosedErr(err) {
