@@ -578,14 +578,14 @@ notable limitations at this point are as follows.
 
 ## Milestones
 
-* v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials
+* v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials.
 * v0.10: Dataplane: Long-term STUN/TURN credentials and [STUN/TURN over
   TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt) in standalone mode.
 * v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
-* v0.12: Security: Hide plain text credentials in the Gateway API and expose TLS/DTLS.
+* v0.12: Security: Expose TLS/DTLS settings via the Gateway API.
 * v0.13: Observability: Prometheus + Grafana dashboard.
+* v1.14: Performance: per-allocation CPU load-balancing for UDP and eBPF TURN acceleration.
 * v1.0: GA
-* v1.2: Performance: eBPF acceleration
 * v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help
