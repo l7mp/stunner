@@ -1,14 +1,8 @@
 package stunner
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +19,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/util"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
@@ -37,7 +32,7 @@ var stunnerTestLoglevel string = "all:ERROR"
 
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
-var certPem, keyPem, _ = generateKey()
+var certPem, keyPem, _ = util.GenerateSelfSignedKey()
 
 /********************************************
  *
@@ -173,54 +168,6 @@ func stunnerEchoTest(conf echoTestConfig) {
 	time.Sleep(150 * time.Millisecond)
 	client.Close()
 
-}
-
-func generateKey() ([]byte, []byte, error) {
-	key, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return []byte{}, []byte{}, err
-	}
-	keyBytes := x509.MarshalPKCS1PrivateKey(key)
-	// PEM encoding of private key
-	keyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: keyBytes,
-		},
-	)
-
-	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * 100 * time.Hour)
-
-	//Create certificate template
-	template := x509.Certificate{
-		SerialNumber:          big.NewInt(0),
-		Subject:               pkix.Name{CommonName: "localhost"},
-		SignatureAlgorithm:    x509.SHA256WithRSA,
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		BasicConstraintsValid: true,
-		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyAgreement |
-			x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-	}
-
-	//Create certificate using template
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	if err != nil {
-		return []byte{}, []byte{}, err
-
-	}
-
-	//pem encoding of certificate
-	certPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: derBytes,
-		},
-	)
-
-	return certPem, keyPem, nil
 }
 
 // *****************
@@ -1247,7 +1194,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 	assert.False(t, s.IsReady(), "empty server not ready")
 
-	log.Debug("starting stunnerd with an enmpty stunner config")
+	log.Debug("starting stunnerd with an empty stunner config")
 	conf := v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
@@ -1409,7 +1356,7 @@ func TestStunnerMetrics(t *testing.T) {
 
 	assert.False(t, s.IsReady(), "empty server not ready")
 
-	log.Debug("starting stunnerd with an enmpty stunner config")
+	log.Debug("starting stunnerd with an empty stunner config")
 	conf := v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},

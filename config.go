@@ -6,11 +6,11 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
-	// "github.com/pion/logging"
-	// "github.com/pion/turn/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -54,6 +54,15 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 			Type:      "STATIC",
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
+	}
+
+	if strings.ToUpper(u.Protocol) == "TLS" || strings.ToUpper(u.Protocol) == "DTLS" {
+		certPem, keyPem, err := util.GenerateSelfSignedKey()
+		if err != nil {
+			return nil, err
+		}
+		c.Listeners[0].Cert = string(certPem)
+		c.Listeners[0].Key = string(keyPem)
 	}
 
 	if err := c.Validate(); err != nil {
