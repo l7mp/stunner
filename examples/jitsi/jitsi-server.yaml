@@ -27,7 +27,7 @@ data:
   ENABLE_COLIBRI_WEBSOCKET: "1"
   XMPP_MUC_MODULES: "external_services"
   TZ: 'UTC'
-  LOG_LEVEL: 'debug'
+  LOG_LEVEL: 'info'
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -463,7 +463,7 @@ metadata:
     app.kubernetes.io/instance: jitsi
     app.kubernetes.io/component: jvb
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
     - port: 10000
       protocol: UDP
