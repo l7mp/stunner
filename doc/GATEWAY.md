@@ -60,7 +60,7 @@ Below is a quick reference of the most important fields of the GatewayClass
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `controllerName` | `string` | Reference to the controller that is managing the Gateways of this class. The value of this field MUST be specified as `stunner.l7mp.io/gateway-operator`. | Yes |
-| `parametersRef` | `object` | Reference to a GatewayConfig resource, identified by the `name` and `namespace`, which describes general STUNner configuration. The settings `group: "stunner.l7mp.io"` and `kind: GatewayConfig` are default and can be omitted.  Specifying any other group or kind is an error. | Yes |
+| `parametersRef` | `object` | Reference to a GatewayConfig resource, identified by the `name` and `namespace`, for general STUNner configuration. The settings `group: "stunner.l7mp.io"` and `kind: GatewayConfig` are default and can be omitted, any other group or kind is an error. | Yes |
 | `description` | `string` | Description helps describe a GatewayClass with more details. | No |
 
 ## GatewayConfig
@@ -70,9 +70,9 @@ STUN/TURN authentication [credentials](/doc/AUTH.md) clients can use to connect 
 STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a
 particular GatewayConfig in the `parametersRef`.  GatewayConfig resources are namespaced, and every
 hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error
-because the authentication credentials cannot be learned by the dataplane otherwise. The STUNner
-gateway operator will refuse to generate a dataplane running config until the user attaches a valid
-GatewayConfig to the hierarchy.
+because the authentication credentials cannot be learned by the dataplane otherwise. In such cases
+the STUNner gateway operator will refuse to generate a dataplane running config until the user
+attaches a valid GatewayConfig to the hierarchy.
 
 The following example sets the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner
 using the username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`.
@@ -84,6 +84,7 @@ metadata:
   name: stunner-gatewayconfig
   namespace: stunner
 spec:
+  logLevel: "all:DEBUG,turn:INFO"
   realm: stunner.l7mp.io
   authType: plaintext
   userName: "user-1"
@@ -97,6 +98,7 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `stunnerConfig` | `string` | The name of the ConfigMap into which the operator renders the `stunnerd` running configuration. Default: `stunnerd-config`. | No |
+| `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
 | `username` | `string` | The `username` for [`plaintext` authentication](/doc/AUTH.md). | No |
@@ -112,7 +114,8 @@ authentication, or a `sharedSecret` for the `longterm` mode. Missing both is an 
 
 Except the TURN authentication realm, all GatewayConfig resources are safe under modification. That
 is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting
-the TURN server. Changing the realm, however, induces a full TURN server restart.
+listeners/TURN servers. Changing the realm, however, induces a full TURN server restart (see
+below).
 
 ## Gateway
 
@@ -123,8 +126,7 @@ automatically expose this listener on a public IP address and port by creating a
 service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
 Gateway. The name and namespace of the automatically provisioned service are the same as those of
 the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port
-changes). Then, it awaits clients to connect and, once authenticated, forward client connections to
-an arbitrary service backend.
+changes). 
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -132,12 +134,42 @@ kind: Gateway
 metadata:
   name: udp-gateway
   namespace: stunner
-spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
     - name: udp-listener
       port: 3478
       protocol: UDP
+```
+
+The below more complex example defines two TURN listeners: a TCP listener at port 3478 and a
+TLS/TCP listener at port 443.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: complex-gateway
+  namespace: stunner
+  annotations:
+    stunner.l7mp.io/service-type: NodePort
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: "8086"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-path: "/live"
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: tcp-listener
+      port: 3478
+      protocol: TCP
+    - name: tls-listener
+      port: 443
+      protocol: TLS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            namespace: stunner
+            name: tls-secret
 ```
 
 Below is a quick reference of the most important fields of the Gateway
@@ -146,26 +178,48 @@ Below is a quick reference of the most important fields of the Gateway
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `gatewayClassName` | `string` | The name of the GatewayClass that provides the root of the hierarchy the Gateway is attached to. | Yes |
-| `listeners[0].name` | `string` | Name of the TURN listener. | No |
-| `listeners[0].port` | `int` | Network port for the TURN listener. | Yes |
-| `listeners[0].protocol` | `string` | Transport protocol for the TURN listener. Either UDP or TCP; support for TLS and DTLS will be added in the next release. | Yes |
+| `listeners` | `list` | The list of TURN listeners. | Yes |
 
-Note that STUNner assumes that there is only a *single* listener specified in each Gateway (that is
-why we fixed the listener list index above at 0). Multiple listeners are accepted and STUNner will
-install the corresponding TURN server listeners for each, but it will create only a *single*
-LoadBalancer service to expose the entire Gateway with all the listeners. Thus, the resultant
-public address/port provides access only to the first listener in the list. You can always create
-the missing LoadBalancer services manually, but this is not encouraged., Create *two* separately
-Gateways if you want multiple listeners, each with a single listener only.
+Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a
+`tls` configuration is required for TLS and DTLS listeners.
 
-Gateway resources are *not* safe for modification. For various reasons rooted in the limitations of
-the [pion/turn](https://github.com/pion/turn) library that provides the TURN services to STUNner,
-`stunnerd` daemons cannot add/remove TURN server listeners without restarting the whole TURN
-server. This will then terminate all active client sessions. We plan to address this restriction in
-a later release; until then, it is best to refrain from modifying the Gateways in production
-deployments. The suggested workaround is to create *another* STUNner gateway hierarchy, make the
-necessary changes there, direct clients to the new STUNner gateway service by providing them a new
-ICE server configuration, and finally delete the old hierarchy.
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `name` | `string` | Name of the TURN listener. | Yes |
+| `port` | `int` | Network port for the TURN listener. | Yes |
+| `protocol` | `string` | Transport protocol for the TURN listener. Either UDP, TCP, TLS or DTLS. | Yes |
+| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TLS/DTLS) |
+
+For TLS/DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not
+make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes
+Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig)
+of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and
+`tls.key` must hold the TLS PEM key.
+
+STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to
+clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be
+assigned a single externally reachable IP address. If you want multiple TURN listeners on different
+public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP
+services, TCP and TLS listeners are exposed as TCP. Mixed multi-protocol Gateways are not supported
+(this may change in the future): if you want to expose a UDP and a TCP listener then use separate
+Gateways or create the LoadBalancer service manually (if your Kubernetes platform support
+multi-protocol Services).
+
+In order to allow users to customize the automatically created Service, STUNner copies all
+annotations from the Gateway object verbatim into the Service. This is useful to, e.g., specify
+health-check settings for the Kubernetes load-balancer controller. There is one exception: the
+special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service
+created by STUNner. Value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the
+default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from
+exposing a Gateway publicly (useful for testing).
+
+Gateway resources are *not* safe for modification. This means that certain changes to a Gateway
+will restart the underlying TURN server, causing all active client sessions to terminate.  The
+particular rules are as follows:
+- adding or removing a listener will start/stop the underlying TURN server;
+- changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart
+  the underlying TURN server;
+- changing the TURN authentication realm will restart *all* TURN servers/listeners.
 
 ## UDPRoute
 
@@ -174,7 +228,7 @@ reached via the Gateway. Multiple UDPRoutes can attach to a Gateway, and each UD
 multiple backend services; in this case access to *all* backends in *each* of the attached
 UDPRoutes is allowed. An UDPRoute can be attached only to a Gateway *in the same namespace*, by
 setting the `parentRef` to the Gateway's name. Attaching Gateways and UDPRoutes across a namespace
-boundary is prohibited.
+boundary is not supported at the moment.
 
 The below UDPRoute will configure STUNner to route client connections received on the Gateway
 called `udp-gateway` to the media server pool identified by the Kubernetes service
@@ -201,10 +255,10 @@ Below is a quick reference of the most important fields of the UDPRoute
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `parentRefs` | `[]string` | A list of Gateways in the same namepace to attach the route to. Attaching UDPRoutes across namespaces is prohibited. | Yes |
-| `rules.backendRefs` | `list` | A list of `name`/`namespace` pairs specifying the backend services reachable through the UDPRoute. It is allowed to specify a service from a namespace other than the UDPRoute's own namespace. | No |
+| `rules.backendRefs` | `list` | A list of `name`/`namespace` pairs specifying the backend Service(s) reachable through the UDPRoute. It is allowed to specify a service from a namespace other than the UDPRoute's own namespace. | No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes
-without restarting the TURN server. 
+without restarting any listeners/TURN servers.
 
 ## Status
 
