@@ -95,8 +95,8 @@ func (l *Listener) Inspect(old, new, full v1alpha1.Config) (bool, error) {
 		l.Port == req.Port && // ports unchanged
 		l.MinPort == req.MinRelayPort &&
 		l.MaxPort == req.MaxRelayPort &&
-		bytes.Compare(l.Cert, cert) == 0 && // TLS creds unchanged
-		bytes.Compare(l.Key, key) == 0 {
+		bytes.Equal(l.Cert, cert) && // TLS creds unchanged
+		bytes.Equal(l.Key, key) {
 		restart = nil
 	}
 

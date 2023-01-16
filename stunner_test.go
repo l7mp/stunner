@@ -1279,7 +1279,7 @@ func TestStunnerLifecycle(t *testing.T) {
 	_, err = doLivenessCheck("http://127.0.0.1:8086")
 	assert.Error(t, err, "liveness test before close: not running")
 
-	status, err = doReadinessCheck("http://127.0.0.1:8086")
+	_, err = doReadinessCheck("http://127.0.0.1:8086")
 	assert.Error(t, err, "readiness test before close: not running")
 }
 

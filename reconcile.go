@@ -202,10 +202,8 @@ rollback:
 
 func (s *Stunner) stop(restarted []object.Object) error {
 	for _, o := range restarted {
-		switch o.(type) {
+		switch l := o.(type) {
 		case *object.Listener:
-			l, _ := o.(*object.Listener)
-
 			if err := l.Close(); err != nil {
 				return err
 			}
@@ -220,10 +218,8 @@ func (s *Stunner) stop(restarted []object.Object) error {
 
 func (s *Stunner) start(started, restarted []object.Object) error {
 	for _, o := range append(started, restarted...) {
-		switch o.(type) {
+		switch l := o.(type) {
 		case *object.Listener:
-			l, _ := o.(*object.Listener)
-
 			if err := s.StartServer(l); err != nil {
 				return err
 			}

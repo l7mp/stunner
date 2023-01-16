@@ -12,7 +12,6 @@ const (
 var (
 	promConnLabels           = []string{"name"}
 	promCounterLabels        = []string{"name", "direction"}
-	allocActiveGauge         *prometheus.GaugeFunc
 	promListenerPacketsTotal *prometheus.CounterVec
 	promListenerBytesTotal   *prometheus.CounterVec
 	promListenerConnsTotal   *prometheus.CounterVec
