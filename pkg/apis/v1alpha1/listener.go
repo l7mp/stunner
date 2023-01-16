@@ -30,9 +30,9 @@ type ListenerConfig struct {
 	// MaxRelayPort is the highest relay port assigned for the relay connections spawned by the
 	// listener.
 	MaxRelayPort int `json:"max_relay_port,omitempty"`
-	// Cert is the TLS cert.
+	// Cert is the base64-encoded TLS cert.
 	Cert string `json:"cert,omitempty"`
-	// Key is the TLS key.
+	// Key is the base64-encoded TLS key.
 	Key string `json:"key,omitempty"`
 	// Routes specifies the list of Routes allowed via a listener.
 	Routes []string `json:"routes,omitempty"`
@@ -135,10 +135,10 @@ func (req *ListenerConfig) String() string {
 
 	c, k := "-", "-"
 	if req.Cert != "" {
-		c = "<SECRET"
+		c = "<SECRET>"
 	}
 	if req.Key != "" {
-		k = "<SECRET"
+		k = "<SECRET>"
 	}
 	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
 	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ",")))

@@ -58,8 +58,10 @@ data:
   # * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
   STUNNER_MAX_PORT: "20000"
 
-  STUNNER_TLS_KEY: "/etc/ssl/certs/tls.key"
-  STUNNER_TLS_CERT: "/etc/ssl/certs/tls.crt"
+  STUNNER_TLS_KEY: |
+    XXXXXXX
+  STUNNER_TLS_CERT: |
+    YYYYYYY
   
 ---
 ## custom static stunnerd conf for TLS/DTLS
@@ -82,10 +84,10 @@ data:
         password: $STUNNER_PASSWORD
         secret: $STUNNER_SHARED_SECRET
     clusters:
-      - name: media-plane-cluster
+      - name: media-plane
         type: STRICT_DNS
         endpoints:
-          - media-server.default.svc.cluster.local
+          - media-plane.default.svc.cluster.local
     listeners:
       - name: stunner-dtls
         public_address: "$STUNNER_PUBLIC_ADDR"

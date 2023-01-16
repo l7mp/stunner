@@ -2,9 +2,11 @@ package object
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/vnet"
@@ -76,6 +78,14 @@ func (l *Listener) Inspect(old, new, full v1alpha1.Config) (bool, error) {
 	changed := !old.DeepEqual(req)
 
 	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
+	cert, err := base64.StdEncoding.DecodeString(req.Cert)
+	if err != nil {
+		return false, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
+	}
+	key, err := base64.StdEncoding.DecodeString(req.Key)
+	if err != nil {
+		return false, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
+	}
 
 	// the only chance we don't need a restart if only the Routes change
 	restart := ErrRestartRequired
@@ -85,8 +95,8 @@ func (l *Listener) Inspect(old, new, full v1alpha1.Config) (bool, error) {
 		l.Port == req.Port && // ports unchanged
 		l.MinPort == req.MinRelayPort &&
 		l.MaxPort == req.MaxRelayPort &&
-		bytes.Compare(l.Cert, []byte(req.Cert)) == 0 && // TLS creds unchanged
-		bytes.Compare(l.Key, []byte(req.Key)) == 0 {
+		bytes.Compare(l.Cert, cert) == 0 && // TLS creds unchanged
+		bytes.Compare(l.Key, key) == 0 {
 		restart = nil
 	}
 
@@ -128,8 +138,16 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	l.rawAddr = req.Addr
 	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
 	if proto == v1alpha1.ListenerProtocolTLS || proto == v1alpha1.ListenerProtocolDTLS {
-		l.Cert = []byte(req.Cert)
-		l.Key = []byte(req.Key)
+		cert, err := base64.StdEncoding.DecodeString(req.Cert)
+		if err != nil {
+			return fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
+		}
+		key, err := base64.StdEncoding.DecodeString(req.Key)
+		if err != nil {
+			return fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
+		}
+		l.Cert = cert
+		l.Key = key
 	}
 	l.Realm = l.getRealm()
 
@@ -141,7 +159,8 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 
 // String returns a short stable string representation of the listener, safe for applying as a key in a map.
 func (l *Listener) String() string {
-	uri := fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.Name, l.Proto, l.Addr, l.Port, l.MinPort, l.MaxPort)
+	uri := fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.Name, strings.ToLower(l.Proto.String()),
+		l.Addr, l.Port, l.MinPort, l.MaxPort)
 	return uri
 }
 

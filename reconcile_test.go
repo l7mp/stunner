@@ -20,6 +20,11 @@ import (
 
 var _ = fmt.Sprintf("%d", 1)
 
+const (
+	dummyCert64 = "ZHVtbXktY2VydA==" // "dummy-cert"
+	dummyKey64  = "ZHVtbXkta2V5"     // "dummy-key"
+)
+
 // *****************
 // Reconciliation tests
 // *****************
@@ -1102,8 +1107,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "DTLS",
-				Cert:     "dummy-cert",
-				Key:      "dummy-key",
+				Cert:     dummyCert64,
+				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
@@ -1211,8 +1216,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "TLS",
-				Cert:     "dummy-cert",
-				Key:      "dummy-key",
+				Cert:     dummyCert64,
+				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",

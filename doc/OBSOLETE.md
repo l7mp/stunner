@@ -422,10 +422,14 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /tmp/tls.key -out /t
 kubectl create secret tls stunner-tls --key /tmp/tls.key --cert /tmp/tls.crt
 ```
 
-Deploy a STUNner gateway in standalone mode with the pre-configured static manifest.
+Patch the TLS cert/key into the pre-configured static manifest and deploy the STUNner gateway.
+
 ```console
-cd stunner/
-kubectl apply -f deploy/manifests/stunner-standalone-tls.yaml
+cd stunner
+cat deploy/manifests/stunner-standalone-tls.yaml.template | \
+  perl -pe "s%XXXXXXX%`cat /tmp/tls.key | base64 -w 0`%g" |
+  perl -pe "s%YYYYYYY%`cat /tmp/tls.crt | base64 -w 0`%g" |
+  kubectl apply -f -
 ```
 
 This will fire up STUNner with two TURN listeners, a TLS/TCP and a DTLS/UDP listener, both at port

@@ -2,6 +2,7 @@ package stunner
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -33,6 +34,8 @@ var stunnerTestLoglevel string = "all:ERROR"
 //var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
 var certPem, keyPem, _ = util.GenerateSelfSignedKey()
+var certPem64 = base64.StdEncoding.EncodeToString(certPem)
+var keyPem64 = base64.StdEncoding.EncodeToString(keyPem)
 
 /********************************************
  *
@@ -386,8 +389,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     string(certPem),
-				Key:      string(keyPem),
+				Cert:     certPem64,
+				Key:      keyPem64,
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -412,8 +415,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "tls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     string(certPem),
-				Key:      string(keyPem),
+				Cert:     certPem64,
+				Key:      keyPem64,
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -439,8 +442,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				Protocol: "dtls",
 				Addr:     "127.0.0.1",
 				Port:     23478,
-				Cert:     string(certPem),
-				Key:      string(keyPem),
+				Cert:     certPem64,
+				Key:      keyPem64,
 				Routes:   []string{"allow-any"},
 			}},
 			Clusters: []v1alpha1.ClusterConfig{{
@@ -465,8 +468,6 @@ func TestStunnerServerLocalhost(t *testing.T) {
 		// 		Protocol: "dtls",
 		// 		Addr:     "127.0.0.1",
 		// 		Port:     23478,
-		//              Cert:     certPem,
-		//		Key:      keyPem,
 		// 		Routes:   []string{"allow-any"},
 		// 	}},
 		// 	Clusters: []v1alpha1.ClusterConfig{{
