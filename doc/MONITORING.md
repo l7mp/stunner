@@ -66,7 +66,80 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 
 ## Integration with Prometheus
 
+The STUNner helm repository contains a prebaked [helm chart](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus) for Prometheus and Grafana. The chart creates a `monitoring` namespace and installs a full Prometheus + Grafana setup with the prometheus-operator and the pod-monitor configured for monitoring the STUNner pods.
+
+To install the chart:
+```console
+helm install prometheus stunner/stunner-prometheus
+```
+
+Note: STUNner expect to work your own Prometheus installation. For setting up `PodMonitor`, please consult our [helm template](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-prometheus/templates/pod-monitor.yaml).
+
+### To observe metrics on the Prometheus dashboard
+By default the Prometheus dashboard is not accessible outside of the cluster. No worries if that is the case -- metrics are still observable in [Grafana](#integration-with-grafana).
+
+In certain deployments (e.g., a local minikube), the Prometheus dashboard is reachable at `prometheus` service IP and port `9090`.  For example, if the `prometheus` service cluster-IP is `10.103.67.2`, the URL is `http://10.103.67.2:9090`.
+
+To aid reaching the Prometheus dashboard, this one-liner creates a clickable link:
+```console
+echo -n "http://$(kubectl get svc -n monitoring prometheus -o custom-columns=:.spec.clusterIP --no-headers):9090"
+```
+
+On the Prometheus dashboard, observe the `stunner_allocations_active` metrics as:
+
+1. Write `stunner_allocations_active` to the marked field (next to the looking glass icon)
+2. Click on the `Execute` button
+3. Switch to `Graph` view tab.
+
+![Prometheus Dashboard](prometheus-dashboard.png)
+
+
 ## Integration with Grafana
+
+### Setup Grafana dashboard
+
+Grafana enables visualizing STUNner metrics.
+
+The Grafana dashboard is available at the `grafana` service IP and port 80.
+
+This one-liner creates a clickable link to the Grafana dashboard:
+```console
+echo -n "http://$(kubectl get svc -n monitoring grafana -o custom-columns=:.spec.clusterIP --no-headers)"
+```
+
+#### Configure Prometheus data source
+
+Note: The helm chart configures Prometheus as a data source.
+
+To configure/check the Prometheus data source in Grafana, first click on *Configuration* (1), then *Data sources* (2), as shown here:
+
+![Grafana Data Source Check Step 1](grafana-prom-datasource_0.png)
+
+This will open up the datasources page. Scroll down to the bottom, click button *Save & test* (1), and observe the datasource is working (2):
+
+![Grafana Data Source Check Step 2](grafana-prom-datasource_1.png)
+
+#### Visualize STUNner metrics
+
+As an example, we plot the  STUNner metric `stunner_allocations_active`. First, we create a new panel.
+
+Click on *Add panel* (1), then *Add a new panel* (2):
+
+![Grafana Add New Panel](grafana-add-panel-dashboard_0.png)
+
+This will open a panel configuration window.
+
+1. Set the datasource: prometheus
+2. Choose a metric. In this example, this is the `stunner_allocations_active`.
+3. Click on *Run queries* (this will update the figure)
+4. Fine-tune plot parameters. For example, set the title.
+5. Click *Apply*
+
+![Grafana Panel Configuration](grafana-add-panel-config_0.png)
+
+The expected outcome is a Grafana dashboard with the new panel showing `stunner_allocations_active`:
+
+![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
 
 ## Help
 
