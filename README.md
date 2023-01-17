@@ -63,6 +63,7 @@ See the full documentation [here](/doc/README.md).
 1. [Features](#features)
 1. [Getting started](#getting-started)
 1. [Tutorials](#tutorials)
+1. [Documentation](#documentation)
 1. [Caveats](#caveats)
 1. [Milestones](#milestones)
 
@@ -465,10 +466,10 @@ greeter) by STUNner.
    EOF
    ```
 
-1. Fire up `turncat` again, but this time let it connect through TLS. This is achieved
-   by specifying the name of the TLS listener (`tls-listener`) in the STUNner URI. The `-i` command
-   line argument (`--insecure`) is added so that `turncat` does no reject our self-signed TLS
-   certificate; you won't need this when using a real signed certificate.
+1. Fire up `turncat` again, but this time let it connect through TLS. This is achieved by
+   specifying the name of the TLS listener (`tls-listener`) in the STUNner URI. The `-i` command
+   line argument (`--insecure`) is added to prevent `turncat` from rejecting our insecure
+   self-signed TLS certificate; this will not be needed when using a real signed certificate.
 
    ```console
    ./turncat -i -l all:INFO - k8s://stunner/stunnerd-config:tls-listener udp://${PEER_IP}:9001
@@ -480,8 +481,8 @@ greeter) by STUNner.
 
    We have set the `turncat` loglevel to INFO to learn that this time `turncat` has connected via
    the TURN server `tls://10.96.55.200:443`. And that's it: STUNner automatically routes the
-   incoming TCP connection to the UDP greeter service, silently converting from TCP to UDP in the
-   background and back again on return.
+   incoming TLS/TCP connection to the UDP greeter service, silently converting from TLS/TCP to UDP
+   in the background and back again on return.
 
 ### Configuring WebRTC clients
 
