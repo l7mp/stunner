@@ -101,11 +101,11 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
-| `username` | `string` | The `username` for [`plaintext` authentication](/doc/AUTH.md). | No |
-| `password` | `string` | The credential for [`plaintext` authentication](/doc/AUTH.md). | No |
-| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
-| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on `http://0.0.0.0:8086`, use an empty string to disable.| No |
+| `username` | `string` | The username for [`plaintext` authentication](/doc/AUTH.md). | No |
+| `password` | `string` | The password for [`plaintext` authentication](/doc/AUTH.md). | No |
 | `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
+| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
+| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on  `http://0.0.0.0:8086/ready` and `http://0.0.0.0:8086/live`, use an empty string to disable.| No |
 | `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
 
@@ -114,19 +114,18 @@ authentication, or a `sharedSecret` for the `longterm` mode. Missing both is an 
 
 Except the TURN authentication realm, all GatewayConfig resources are safe under modification. That
 is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting
-listeners/TURN servers. Changing the realm, however, induces a full TURN server restart (see
+listeners/TURN servers. Changing the realm, however, induces a *full* TURN server restart (see
 below).
 
 ## Gateway
 
 Gateways describe the STUN/TURN server listeners exposed to clients.
 
-In the below example, we open a STUN/TURN listener on the UDP port 3478.  STUNner will
-automatically expose this listener on a public IP address and port by creating a [LoadBalancer
-service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) for each
-Gateway. The name and namespace of the automatically provisioned service are the same as those of
-the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port
-changes). 
+The below Gateway will configure STUNner to open a STUN/TURN listener on the UDP port 3478 and
+automatically expose it on a public IP address and port by creating a [LoadBalancer
+service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer). The name
+and namespace of the automatically provisioned service are the same as those of the Gateway, and
+the service is automatically updated if the Gateway changes (e.g., a port changes).
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -202,21 +201,29 @@ assigned a single externally reachable IP address. If you want multiple TURN lis
 public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP
 services, TCP and TLS listeners are exposed as TCP. Mixed multi-protocol Gateways are not supported
 (this may change in the future): if you want to expose a UDP and a TCP listener then use separate
-Gateways or create the LoadBalancer service manually (if your Kubernetes platform support
+Gateways or create the LoadBalancer service manually (if your Kubernetes platform supports
 multi-protocol Services).
 
-In order to allow users to customize the automatically created Service, STUNner copies all
-annotations from the Gateway object verbatim into the Service. This is useful to, e.g., specify
-health-check settings for the Kubernetes load-balancer controller. There is one exception: the
-special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service
-created by STUNner. Value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the
-default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from
-exposing a Gateway publicly (useful for testing).
+STUNner implements two ways to customize the automatically created Service, both involving setting
+certain
+[annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to the
+Service. First, if any annotation is set in the GatewayConfig `loadBalancerServiceAnnotations`
+object then those will be copied verbatim into the Service. Note that
+`loadBalancerServiceAnnotations` affect *all* LoadBalancer Services created by STUNner. Second,
+Service annotations can be customized on a per-Gateway basis as well by adding annotations to the
+Gateway resources. STUNner then copies all annotations from the Gateway verbatim into the Service,
+overwriting the annotations specified in the GatewayConfig on conflict. This is useful to, e.g.,
+specify health-check settings for the Kubernetes load-balancer controller. There is one exception:
+the special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the
+Service created by STUNner. Value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is
+the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner
+from exposing a Gateway publicly (useful for testing).
 
 Gateway resources are *not* safe for modification. This means that certain changes to a Gateway
 will restart the underlying TURN server, causing all active client sessions to terminate.  The
 particular rules are as follows:
-- adding or removing a listener will start/stop the underlying TURN server;
+- adding or removing a listener will start/stop *only* the TURN server to be started/stopped,
+  without affecting the rest of the listeners;
 - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart
   the underlying TURN server;
 - changing the TURN authentication realm will restart *all* TURN servers/listeners.

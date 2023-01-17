@@ -65,9 +65,10 @@ addresses.
 
 This little experiment demonstrates the threats associated with a poorly configured STUNner
 gateway: it may allow external access to *any* UDP service running inside your cluster. The
-prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`) and
-(2) the user *must* specifically add a UDPRoute to the target service, otherwise STUNner blocks
-access to it.
+prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`), (2)
+the target service *must* be wrapped with a UDPRoute, and (3) the attacker *must* know at least one
+pod address or the ClusterIP for the targeted service. Should any of this prerequisites miss,
+STUNner will block access to the target service.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -97,10 +98,10 @@ services exposed via STUNner.
 
 STUNner's basic security model is as follows:
 
-> In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
-attacker can reach only the media servers via STUNner but no other services. This is essentially
-the same level of security as if you put the media servers to the Internet over a public IP
-address, protected by a firewall that admits only UDP access.
+> In a properly configured deployment, STUNner provides the same level of security as a media
+server pool exposed to the Internet over public IP addresses, protected by a firewall that admits
+only UDP access. A malicious attacker, even possessing a valid TURN credential, can reach only the
+media servers deployed behind via STUNner, but no other services.
 
 The below security considerations will greatly reduce this attack surface even further. In any
 case, use STUNner at your own risk.
@@ -194,11 +195,14 @@ addresses are now exposed to the WebRTC clients in ICE candidates.
 
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP
 address of all STUNner pods and all media server pods. This should not pose a major security risk
-though: remember, none of these private IP addresses can be reached externally. Nevertheless, if
-worried about information exposure then STUNner may not be the best option at the moment. In later
-releases, we plan to obscure the transport relay connection addresses returned by STUNner, which
-would lock down external scanning attempts. Feel free to open an issue if you think this limitation
-is a blocker for you.
+though: remember, none of these private IP addresses can be reached externally. The attacker
+surface can be reduced to the STUNner pods' IP addresses by using the [symmetric ICE
+mode](/doc/DEPLOYMENT.md/symmetric-ice-mode).
+
+Nevertheless, if worried about information exposure then STUNner may not be the best option at the
+moment. In later releases, we plan to implement a feature to obscure the transport relay connection
+addresses returned by STUNner, which would lock down external scanning attempts. Feel free to open
+an issue if you think this limitation is a blocker for you.
 
 ## Help
 

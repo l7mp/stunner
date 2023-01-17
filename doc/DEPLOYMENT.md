@@ -45,9 +45,9 @@ There is no limitation as to how many gateway and media server pods can be opene
 which theoretically means limitless scalability. Furthermore, by creating connection-tracking state
 for each client session STUNner supports the dynamic scale-out of the media server pool without
 dropping active client connections. Whether scaling STUNner itself causes client connection drops
-is depending on the cloud provider's load-balancer service: if the load-balancer creates conntrack
-state for clients' UDP transport streams then STUNner can be scaled freely, otherwise scaling
-STUNner may result the [disconnection of a small number of client
+depend on the cloud provider's load-balancer service: if the load-balancer creates conntrack state
+for clients' UDP transport streams then STUNner can be scaled freely, otherwise scaling STUNner may
+result the [disconnection of a small number of client
 connections](https://cilium.io/blog/2020/11/10/cilium-19/#maglev).
 
 #### Asymmetric ICE mode
@@ -125,9 +125,10 @@ STUNner can run in one of two modes: in the default mode STUNner configuration i
 resources](https://gateway-api.sigs.k8s.io), while in the *standalone model* the user configures
 STUNner manually. The standalone mode provides perfect control over the way STUNner ingests media,
 but at the same time it requires users to deal with the subtleties of internal STUNner APIs that
-are subject to change between subsequent releases. We are actively working towards feature
-completeness for STUNner's operator-ful mode, and we consider the standalone model obsolete at this
-point. If still interested, comprehensive documentation can be found [here](/doc/OBSOLETE.md).
+are subject to change between subsequent releases. As of v0.14, STUNner's operator-ful mode is
+feature complete and the standalone model is considered obsolete. If still interested,
+comprehensive documentation for the standalone can be found [here](/doc/OBSOLETE.md), but this mode
+is no longer supported.
 
 ## Help
 

@@ -44,12 +44,11 @@ The intended authentication workflow in STUNner is as follows.
    server configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) returned to
    clients. E.g., using the above [Node.js
    library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib):
+   
    ```javascript
    const StunnerAuth = require('@l7mp/stunner-auth-lib');
    ...
    var ICE_config = StunnerAuth.getIceConfig({
-     address: '1.2.3.4',            // ovveride public address
-     port: 3478,                    // ovveride public port
      auth_type: 'plaintext',        // override the authentication type
      username: 'my-user',           // override username
      password: 'my-password',       // override password
@@ -57,7 +56,10 @@ The intended authentication workflow in STUNner is as follows.
    });
    console.log(ICE_config);
    ```
-   Output:
+   Note that the library is clever enough to parse out all settings from the running STUNner
+   configuration (e.g., the public IP address and port). All defaults  can be freely overridden
+   when calling `getIceConfig`. Below is a sample output:
+
    ```javascript
    {
      iceServers: [
@@ -75,8 +77,9 @@ The intended authentication workflow in STUNner is as follows.
    shows how to initialize a WebRTC
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
+
    ```javascript
-   var ICE_config = <Read ICE configuration sent by the application server>
+   var ICE_config = <obtain ICE configuration sent by the application server>
    var pc = new RTCPeerConnection(ICE_config);
    ```
 
@@ -136,27 +139,25 @@ spec:
 ```
 
 Note that modifying STUNner's credentials goes *without* restarting the TURN server: new
-connections will need to use the modified credentials but existing TURN connections should continue
-as normal (the application server may need to be restarted to learn the new TURN credentials
-though).
+connections will use the modified credentials but existing TURN connections should continue as
+normal (the application server may need to be restarted to learn the new TURN credentials though).
 
 ## Longterm authentication
 
 Somewhat confusingly, STUNner overloads the name `longterm` to denote a STUN/TURN authentication
-mode that provides clients time-limited access to STUNner.  STUNner `longterm` credentials are
-dynamically generated with a pre-configured lifetime and, once the lifetime expires, the credential
-cannot be used to authenticate (or refresh) with STUNner any more. This authentication mode is more
-secure since credentials are not shared between clients and come with a limited
-validity. Configuring `longterm` authentication may be more complex though, since credentials must
-be dynamically generated for each session and properly returned to clients.
+mode that provides clients time-limited access.  STUNner `longterm` credentials are dynamically
+generated with a pre-configured lifetime and, once the lifetime expires, the credential cannot be
+used to authenticate (or refresh) with STUNner any more. This authentication mode is more secure
+since credentials are not shared between clients and come with a limited validity. Configuring
+`longterm` authentication may be more complex though, since credentials must be dynamically
+generated for each session and properly returned to clients.
 
-To implement this mode, STUNner adopts the quasi-standard time-windowed TURN authentication
-credential format specified in the IETF draft titled [A REST API For Access To TURN
-Services](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this format,
-the TURN username consists of a colon-delimited combination of the expiration timestamp and the
-user-id parameter, where the user-id is some application-specific id that is opaque to STUNner and
-the timestamp specifies the date of expiry of the credential as a UNIX timestamp. Furthermore, the
-TURN password is computed from the a secret key shared with the TURN server and the returned
+To implement this mode, STUNner adopts the [quasi-standard time-windowed TURN authentication
+credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this
+format, the TURN username consists of a colon-delimited combination of the expiration timestamp and
+the user-id parameter, where the user-id is some application-specific id that is opaque to STUNner
+and the timestamp specifies the date of expiry of the credential as a UNIX timestamp. Furthermore,
+the TURN password is computed from the a secret key shared with the TURN server and the returned
 username value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this
 scheme somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and
 the timestamp to appear in any order in the TURN username and it accepts usernames with a plain

@@ -39,10 +39,10 @@ cd stunner
 kubectl apply -f examples/simple-tunnel/iperf-server.yaml
 ```
 
-This start an Deployment that runs the iperf server and wraps it in a Kubernetes service called
-`iperf-server` of type ClusterIP. Check this service and make sure that it is not exposed to the
-outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes sure that the only
-way to reach this service from the local iperf speed-test client is through STUNner.
+This will start an Deployment that runs the iperf server and wraps it in a Kubernetes service
+called `iperf-server` of type ClusterIP. Check this service and make sure that it is not exposed to
+the outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes sure that the
+only way to reach this service from the local iperf speed-test client is through STUNner.
 
 ```console
 kubectl get service iperf-server  -o wide
@@ -60,10 +60,10 @@ service.
 kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
 ```
 
-For convenience, below is a dump of the Gateways and UDPRoute resources the manifests
-create. Checl that the UDPRoute specifies the `iperf-server` service in the `backeddRef`. This
-makes sure that STUNner can forward the client connections received in any of the Gateways to the
-iperf server.
+For convenience, below is a dump of the Gateway and UDPRoute resources the manifests create. Note
+that the UDPRoute specifies the `iperf-server` service as the `backendRef`, which makes sure that
+STUNner will forward the client connections received in any of the Gateways to the iperf server.
+
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: Gateway
@@ -108,11 +108,9 @@ spec:
 
 ### Check your configuration
 
-Check whether you have all the necessary STUNner resources installed namespace.
-```console
-kubectl get gatewayconfigs,gateways,udproutes -n stunner
-NAME                                                  REALM             AUTH        AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   14s
+Check whether you have all the necessary STUNner resources installed namespace.  ```console kubectl
+get gatewayconfigs,gateways,udproutes -n stunner NAME REALM AUTH AGE
+gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig stunner.l7mp.io plaintext 14s
 
 NAME                                            CLASS                  ADDRESS   READY   AGE
 gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass             True    14s
@@ -147,9 +145,10 @@ NOTE: It usually takes 30-60 seconds for Kubernetes to assign an external IP add
 gateways. As long as the external address is in `<PENDING>` status, STUNner exposes the Gateway on
 a NodePort: in the above example the UDP Gateway's `udp-listener` is exposed on a node IP
 (`34.116.220.190`) and the NodePort 30501. Once Kubernetes finishes the exposition of the Gateway
-service, STUNner picks up the new address/port and update the config accordingly. The end
+service, STUNner picks up the new address/port and updates the config accordingly. The end
 result should be something similar to the below; observe how the `udp-listener` public port has
 changed to the requested port 3478 and the public address is updated as well.
+
 ``` console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
 [...]

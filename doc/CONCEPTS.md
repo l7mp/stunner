@@ -61,14 +61,14 @@ the dataplane to match the new user policies.
 
 The `stunnerd` daemon itself is essentially a simple TURN server on top of
 [pion/turn](https://github.com/pion/turn) written in Go. The daemon will instantiate a separate
-*listener* for each Gateway in the gateway hierarchy to terminate clients' TURN sessions, a
-*cluster* per each UDPRoute to forward packets to the backend services (e.g., to the media
-servers), with some ancillary administrative and authentication mechanisms in place to check client
-credentials before admitting traffic into the cluster, logging, etc.  There is a one-to-one mapping
-between the control-plane Gateway resources and the `stunnerd` TURN listeners, as well as between
-the UDPRoute resources and `stunnerd`'s clusters. Whenever you modify a Gateway (UDPRoute), the
-gateway operator renders a new dataplane configuration with the modified listener (cluster,
-respectively) specs and the `stunnerd` pods immediately reconcile their internal state to the new
+*TURN listener* for each Gateway listener in the gateway hierarchy to terminate clients' TURN
+sessions, a *cluster* per each UDPRoute to forward packets to the backend services (e.g., to the
+media servers), with some ancillary administrative and authentication mechanisms in place to check
+client credentials before admitting traffic into the cluster, logging, etc.  There is a one-to-one
+mapping between the control-plane Gateway listeners and the `stunnerd` TURN listeners, as well as
+between the UDPRoute resources and `stunnerd`'s clusters. Whenever you modify a Gateway (UDPRoute),
+the gateway operator renders a new dataplane configuration with the modified listener (cluster,
+respectively) specs and the `stunnerd` pods reconcile their internal state to the new
 configuration.  You are free to scale the dataplane to as many `stunnerd` pods as you like:
 Kubernetes will make sure that new client connections are distributed evenly over the scaled-out
 STUNner dataplane.

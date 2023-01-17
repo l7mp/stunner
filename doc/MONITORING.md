@@ -3,7 +3,7 @@
 STUNner can export various statistics into an external timeseries database like
 [Prometheus](https://prometheus.io). This allows one to observe the state of the STUNner media
 gateway instances, like CPU or memory use, as well as the amount of data received and sent, in
-quasi-real-time. Such statistics can then be presented to the operator in easy-to-use monitoring
+quasi-real-time. These statistics can then be presented to the operator in easy-to-use monitoring
 dashboards in [Grafana](https://grafana.com).
 
 ## Configuration
@@ -50,7 +50,7 @@ current Go process runtime. Some notable metrics as listed below, see more in th
 
 ### Connection statistics
 
-STUNner allows deep visibility into the amount of traffic sent and received on each listener
+STUNner provides deep visibility into the amount of traffic sent and received on each listener
 (downstream connections) and cluster (upstream connections). The particular metrics are as follows.
 
 | Metric | Description | Type | Labels |

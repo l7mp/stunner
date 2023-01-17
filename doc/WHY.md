@@ -8,11 +8,10 @@ is designed and built to fit into the Kubernetes and the cloud-native ecosystem.
 STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but these
 deployment options are not the main focus.
 
-Below we discuss the main pain points STUNner is trying to solve.
-
 ## The problem
 
-Kubernetes and WebRTC are currently foes, not friends.
+The main pain points STUNner is trying to solve are all related to that Kubernetes and WebRTC are
+currently foes, not friends.
 
 Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
 streaming workloads, and especially UDP/RTP based WebRTC media, feel like a foreign citizen. Most
@@ -23,13 +22,12 @@ a DNAT step to route packets to a node and then an SNAT step to put the packet t
 network, so that by the time a media packet reaches a pod essentially all header fields in the [IP
 5-tuple](https://www.techopedia.com/definition/28190/5-tuple) are modified, except the destination
 port. Then, if any pod sends the packet over to another pod via a Kubernetes service load-balancer
-then the packet will again undergo another DNAT step, and so on.
+then the packet will again undergo a DNAT step, and so on.
 
 The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
 protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
 describes it. Once an HTTP/TCP session is routed to a server it will remain there permanently, and
-the server does not need to re-identify the client per each packet because it has session context
-(and vice versa).
+the server does not need to re-identify the client per each packet because it has session context.
 
 This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
 UDP. RTP does not have anything remotely similar to an HTTP header. Consequently, the only
@@ -103,7 +101,7 @@ services](https://gateway-api.sigs.k8s.io) to ingest traffic into the cluster in
 manner. STUNner is exactly such a gateway service, carefully tailored to WebRTC media.
 
 Using STUNner allows you to specify a set of high-level declarative policies (UDP/TCP ports,
-authentication credentials, etc.) to define the way you want traffic to enter the cluster and to
+authentication credentials, etc.) to define the way you want traffic to enter the cluster and
 control the internal services client media can reach (i.e., UDP routes and backend services). This
 will then make it possible to leave behind the host-networking hack once and for all, and run,
 scale and monitor the media-plane workload in the usual private pod-network behind the secure
