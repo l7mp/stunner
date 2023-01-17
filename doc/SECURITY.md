@@ -97,10 +97,10 @@ services exposed via STUNner.
 
 STUNner's basic security model is as follows:
 
-> In a properly configured STUNner deployment, even possessing a valid TURN credential a malicious
-attacker can reach only the media servers via STUNner but no other services. This is essentially
-the same level of security as if you put the media servers to the Internet over a public IP
-address, protected by a firewall that admits only UDP access.
+> In a properly configured deployment, STUNner provides the same level of security as a media
+server pool exposed to the Internet over public IP addresses, protected by a firewall that admits
+only UDP access. A malicious attacker, even possessing a valid TURN credential, can reach only the
+media servers deployed behind via STUNner, but no other services.
 
 The below security considerations will greatly reduce this attack surface even further. In any
 case, use STUNner at your own risk.

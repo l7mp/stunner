@@ -12,12 +12,12 @@ these are automatically managed by STUNner. This depends on a functional LoadBal
 in your cluster (if using Minikube, try `minikube tunnel` to get an idea of how this
 works). STUNner automatically detects if LoadBalancer service integration is functional and falls
 back to using NodePorts when it is not; however, this may require manual tweaking of the firewall
-rules to route the UDP NodePort range.
+rules to admit the UDP NodePort range into the cluster.
 
-To recompile STUNner, at least Go v1.17 is required. Building the container images requires
+To recompile STUNner, at least Go v1.18 is required. Building the container images requires
 [Docker](https://docker.io) or [Podman](https://podman.io).
 
-## Helm installation 
+## Basic installation 
 
 The simplest way to deploy the full STUNner distro, with the dataplane and the controller
 automatically installed, is through [Helm](https://helm.sh). STUNner configuration parameters are
@@ -46,6 +46,8 @@ Install the dataplane:
 helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
+## Parallel deployments
+
 You can install multiple STUNner dataplanes side-by-side, provided that the corresponding
 namespaces are different. For instance, to create a `prod` dataplane installation for your
 production workload and a `dev` installation for experimentation, the below commands will install
@@ -62,6 +64,16 @@ distinct ingress gateway configuration per dataplane.
 For the list of available customizations, see the
 [STUNner-helm](https://github.com/l7mp/stunner-helm) repository. For installing STUNner in the
 standalone mode, consult the documentation [here](/doc/OBSOLETE.md).
+
+## Development version
+
+You can install the STUNner from the `dev` channel, which allows to track the latest development
+version. Use this at your own risk: we do not promise any stability for the dev-channel version.
+
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-dev
+```
 
 ## Help
 
