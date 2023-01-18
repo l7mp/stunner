@@ -65,17 +65,42 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends on behalf of a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 
 ## Integration with Prometheus
+In case of an existing Prometheus installation, STUNner works after setting up a PodMonitor or a ServiceMonitor. For an example, refer to [PodMonitor config](#podmonitor-config).
 
-The STUNner helm repository contains a prebaked [helm chart](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus) for Prometheus and Grafana. The chart creates a `monitoring` namespace and installs a full Prometheus + Grafana setup with the prometheus-operator and the pod-monitor configured for monitoring the STUNner pods.
+For fresh deployments, we give a full-fledged Prometheus+Grafana chart for monitoring STUNner deployments. Refer to [stunner-prometheus helm chart](#stunner-prometheus-helm-chart).
 
-To install the chart:
-```console
-helm install prometheus stunner/stunner-prometheus
+### PodMonitor config
+An example `PodMonitor` configuration based on our [helm template](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-prometheus/templates/pod-monitor.yaml):
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: prometheus-operator
+  labels:
+    metrics: stunner
+  namespace: monitoring
+spec:
+  podMetricsEndpoints:
+  - honorLabels: True
+    interval: 5s
+    port: web
+  selector:
+    matchExpressions:
+    -  {key: app, operator: In, values: ['stunner']}
+  namespaceSelector:
+    matchNames:
+      - stunner
+      - default
+      - monitoring
 ```
 
-Note: STUNner expect to work your own Prometheus installation. For setting up `PodMonitor`, please consult our [helm template](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-prometheus/templates/pod-monitor.yaml).
+### stunner-prometheus helm chart
+The STUNner helm repository contains a prebaked [helm chart](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus) for Prometheus and Grafana. The chart creates a `monitoring` namespace and installs a full Prometheus + Grafana setup with the prometheus-operator and the pod-monitor configured for monitoring the STUNner pods.
 
-### To observe metrics on the Prometheus dashboard
+To install the chart, please follow the steps of the chart's [README](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus).
+
+
+### How to observe metrics on the Prometheus dashboard
 By default the Prometheus dashboard is not accessible outside of the cluster. No worries if that is the case -- metrics are still observable in [Grafana](#integration-with-grafana).
 
 In certain deployments (e.g., a local minikube), the Prometheus dashboard is reachable at `prometheus` service IP and port `9090`.  For example, if the `prometheus` service cluster-IP is `10.103.67.2`, the URL is `http://10.103.67.2:9090`.
