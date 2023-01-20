@@ -6,19 +6,22 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/pion/dtls/v2 v2.1.5
 	github.com/pion/logging v0.2.2
-	github.com/pion/transport v0.13.0
+	github.com/pion/transport v0.14.1
 	// replace from l7mp/turn
-	github.com/pion/turn/v2 v2.0.8
+	github.com/pion/turn/v2 v2.0.9
 	github.com/prometheus/client_golang v1.14.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/heptiolabs/healthcheck v0.0.0-20211123025425-613501dd5deb
+require (
+	github.com/heptiolabs/healthcheck v0.0.0-20211123025425-613501dd5deb
+	github.com/pion/randutil v0.1.0
+)
 
 require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -44,7 +47,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/stun v0.3.5 // indirect
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -53,11 +55,11 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
-	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
+	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
 	golang.org/x/sys v0.2.0 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -73,4 +75,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
 
-replace github.com/pion/turn/v2 => github.com/l7mp/turn/v2 v2.0.10
+replace github.com/pion/turn/v2 => github.com/l7mp/turn/v2 v2.0.11
