@@ -45,12 +45,11 @@ You are good to go. No installation steps required.
 Install it in case you would like to benchmark your Kubernetes setup. If you want to benchmark locally skip this step.
 Note that the benchmarking script does not support the standalone deployment.
 Install the STUNner Gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
+
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
-helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-namespace --namespace=stunner
-
+helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-namespace --namespace=stunner-system
 helm install stunner stunner/stunner -create-namespace --namespace=stunner
 ```
 

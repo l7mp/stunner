@@ -31,16 +31,16 @@ repository](https://github.com/l7mp/stunner) and deploy the
 [manifest](kurento-magic-mirror.yaml) packaged with STUNner.
 
 Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
+
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
-
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
 helm install stunner stunner/stunner
 ```
 
 Install the WebRTC application and Kurento media servers, altogether with the corresponding services and Kubernetes objects (see the content of the yaml for details):
+
 ```console
 $ git clone https://github.com/l7mp/stunner
 $ cd stunner

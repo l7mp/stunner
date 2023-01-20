@@ -37,7 +37,7 @@ helm repo update
 Install the control plane:
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
 ```
 
 Install the dataplane:
@@ -71,8 +71,8 @@ STUNner provides a `dev` release channel, which allows to track the latest devel
 it at your own risk: we do not promise any stability for STUNner installed from the dev-channel.
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev
-helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-dev
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
 ```
 
 ## Help

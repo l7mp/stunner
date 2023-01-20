@@ -92,7 +92,7 @@ Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
 helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
