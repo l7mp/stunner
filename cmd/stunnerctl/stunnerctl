@@ -1,6 +1,6 @@
 #!/bin/bash
 
-USAGE="stunnercli running-config <namespace/name>"
+USAGE="stunnerctl running-config <namespace/name>"
 
 [ -z "$1" -o -z "$2" ] && echo $USAGE && exit 0
 COMMAND="$1"
