@@ -66,15 +66,13 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 
 ## Integration with Prometheus and Grafana
 
-Collection and visualization of STUNner relies on Prometheus and Grafana services. Installation and configuraiton of these tools are the following.
+Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a ready-to-use Prometheus and Grafana stack. See [Installation](#installation) for installation steps. Doing the visualization requires user input on the configuration. For details, check [Configuration and Usage](#configuration-and-usage).
 
 ### Installation
 
 A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm repo. To use this chart, the installation steps are the following.
 
-**Installation steps:**
-
-1. Configure STUNner to expose the metrics
+1. **Configure STUNner to expose the metrics**
 
 - Deploy STUNner with monitoring enabled to enable the monitoring port of STUNner pods
 ```console
@@ -83,12 +81,18 @@ helm install stunner stunner/stunner --create-namespace --namespace=stunner --se
 
 - [Expose the STUNner metrics-collection server in the GatewayConfig](#configuration)
 
+<details>
+<summary>GateWayConfig patching example</summary>
+
 An example to patch an existing GateWayConfig to expose `http://0.0.0.0:8080/metrics` as metricsEndpoint:
 ```console
 kubectl -n stunner patch gatewayconfigs.stunner.l7mp.io stunner-gatewayconfig --patch '{"spec": {"metricsEndpoint": "http://0.0.0.0:8080/metrics" }}' --type=merge
 ```
+</details>
 
-2. Install the Prometheus+Grafana stack with helm
+2. **Install the Prometheus+Grafana stack with a helm chart**
+
+This helm chart creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: installs Prometheus along with the prometheus-operator, and Grafana; configures PodMonitor for monitoring STUNner pods, and sets up Prometheus as a datasource for Grafana.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
@@ -97,13 +101,12 @@ helm repo update
 helm install prometheus stunner/stunner-prometheus
 ```
 
-The chart creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: installs Prometheus along with the prometheus-operator, and Grafana; configures PodMonitor for monitoring STUNner pods, and sets up Prometheus as a datasource for Grafana.
 
 ### Configuration and Usage
 
-The helm chart deploys a ready-to-use Prometheus and Grafana stack. But, it leaves the user to configure the visualization in Grafana. This involves two tasks: set up the Grafana dashboard, and visualize the STUNner metrics.
+The helm chart deploys a ready-to-use Prometheus and Grafana stack, and lets the user setup its metric visualization in Grafana. An interactive way to visualize STUNner metrics is to use the Grafana dashboard.
 
-#### Setup Grafana dashboard
+#### Access the Grafana dashboard
 
 The Grafana dashboard is available at the `grafana` NodePort service IP and port 80.
 
@@ -130,8 +133,7 @@ This will open the panel configuration.
 
 ![Grafana Panel Configuration](grafana-add-panel-config_0.png)
 
-
-The expected outcome is a Grafana dashboard with a new panel showing `stunner_listener_connections`.
+The expected outcome is the dashboard with a new panel showing `stunner_listener_connections`.
 
 An example dashboard with data collected from the [simple-tunnel](https://github.com/l7mp/stunner/tree/main/examples/simple-tunnel) example:
 
