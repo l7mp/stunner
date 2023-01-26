@@ -64,64 +64,38 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends on behalf of a listener.  Unreliable for clusters running on a connection-oriented a protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 | `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends on behalf of a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 
-## Integration with Prometheus
-In case of an existing Prometheus installation, STUNner works after setting up a PodMonitor or a ServiceMonitor. For an example, refer to [PodMonitor config](#podmonitor-config).
+## Integration with Prometheus and Grafana
+
+### Installation
 
 For fresh deployments, we give a full-fledged Prometheus+Grafana chart for monitoring STUNner deployments. Refer to [stunner-prometheus helm chart](#stunner-prometheus-helm-chart).
 
-### PodMonitor config
-An example `PodMonitor` configuration based on our [helm template](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-prometheus/templates/pod-monitor.yaml):
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: prometheus-operator
-  labels:
-    metrics: stunner
-  namespace: monitoring
-spec:
-  podMetricsEndpoints:
-  - honorLabels: True
-    interval: 5s
-    port: web
-  selector:
-    matchExpressions:
-    -  {key: app, operator: In, values: ['stunner']}
-  namespaceSelector:
-    matchNames:
-      - stunner
-      - default
-      - monitoring
-```
+**Installation steps:**
 
-### stunner-prometheus helm chart
-The STUNner helm repository contains a prebaked [helm chart](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus) for Prometheus and Grafana. The chart creates a `monitoring` namespace and installs a full Prometheus + Grafana setup with the prometheus-operator and the pod-monitor configured for monitoring the STUNner pods.
+1. Setup STUNner
 
-To install the chart, please follow the steps of the chart's [README](https://github.com/l7mp/stunner-helm/tree/main/helm/stunner-prometheus).
-
-
-### How to observe metrics on the Prometheus dashboard
-By default the Prometheus dashboard is not accessible outside of the cluster. No worries if that is the case -- metrics are still observable in [Grafana](#integration-with-grafana).
-
-In certain deployments (e.g., a local minikube), the Prometheus dashboard is reachable at `prometheus` service IP and port `9090`.  For example, if the `prometheus` service cluster-IP is `10.103.67.2`, the URL is `http://10.103.67.2:9090`.
-
-To aid reaching the Prometheus dashboard, this one-liner creates a clickable link:
+- Deploy STUNner with monitoring enabled
 ```console
-echo -n "http://$(kubectl get svc -n monitoring prometheus -o custom-columns=:.spec.clusterIP --no-headers):9090"
+helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
+```
+- Enable the STUNner metrics endpoint
+```console
+kubectl -n stunner patch gatewayconfigs.stunner.l7mp.io stunner-gatewayconfig --patch '{"spec": {"metricsEndpoint": "http://0.0.0.0:8080/metrics" }}' --type=merge
 ```
 
-On the Prometheus dashboard, observe the `stunner_allocations_active` metrics as:
+2. Install the Prometheus+Grafana chart
+```console
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
 
-1. Write `stunner_allocations_active` to the marked field (next to the looking glass icon)
-2. Click on the `Execute` button
-3. Switch to `Graph` view tab.
+helm install prometheus stunner/stunner-prometheus
+```
 
-![Prometheus Dashboard](prometheus-dashboard.png)
+The chart will create `monitoring` namespace and installs Prometheus along with the prometheus-operator, and Grafana. The chart installs a PodMonitor resource for monitoring STUNner pods, and configures Prometheus as a datasource for Grafana.
 
+### Configuration
 
-## Integration with Grafana
-
-### Setup Grafana dashboard
+#### Setup Grafana dashboard
 
 Grafana enables visualizing STUNner metrics.
 
@@ -146,7 +120,7 @@ This will open up the datasources page. Scroll down to the bottom, click button 
 
 #### Visualize STUNner metrics
 
-As an example, we plot the  STUNner metric `stunner_allocations_active`. First, we create a new panel.
+As an example, we plot the  STUNner metric `stunner_listener_connections`. First, we create a new panel.
 
 Click on *Add panel* (1), then *Add a new panel* (2):
 
@@ -155,16 +129,38 @@ Click on *Add panel* (1), then *Add a new panel* (2):
 This will open a panel configuration window.
 
 1. Set the datasource: prometheus
-2. Choose a metric. In this example, this is the `stunner_allocations_active`.
+2. Choose a metric. In this example, this is the `stunner_listener_connections`.
 3. Click on *Run queries* (this will update the figure)
 4. Fine-tune plot parameters. For example, set the title.
 5. Click *Apply*
 
 ![Grafana Panel Configuration](grafana-add-panel-config_0.png)
 
-The expected outcome is a Grafana dashboard with the new panel showing `stunner_allocations_active`:
+The expected outcome is a Grafana dashboard with the new panel showing `stunner_listener_connections`:
 
 ![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
+
+
+### Test
+
+### Observe metrics on the Prometheus dashboard
+By default the Prometheus dashboard is not accessible outside of the cluster. No worries if that is the case -- metrics are still observable in [Grafana](#integration-with-grafana).
+
+In certain deployments (e.g., a local minikube), the Prometheus dashboard is reachable at `prometheus` service IP and port `9090`.  For example, if the `prometheus` service cluster-IP is `10.103.67.2`, the URL is `http://10.103.67.2:9090`.
+
+To aid reaching the Prometheus dashboard, this one-liner creates a clickable link:
+```console
+echo -n "http://$(kubectl get svc -n monitoring prometheus -o custom-columns=:.spec.clusterIP --no-headers):9090"
+```
+
+On the Prometheus dashboard, observe the `stunner_listener_connections` metrics as:
+
+1. Write `stunner_listener_connections` to the marked field (next to the looking glass icon)
+2. Click on the `Execute` button
+3. Switch to `Graph` view tab.
+
+![Prometheus Dashboard](prometheus-dashboard.png)
+
 
 ## Help
 
