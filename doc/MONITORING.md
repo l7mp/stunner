@@ -81,15 +81,6 @@ helm install stunner stunner/stunner --create-namespace --namespace=stunner --se
 
 - [Expose the STUNner metrics-collection server in the GatewayConfig](#configuration)
 
-<details>
-<summary>GateWayConfig patching example</summary>
-
-An example to patch an existing GateWayConfig to expose `http://0.0.0.0:8080/metrics` as metricsEndpoint:
-```console
-kubectl -n stunner patch gatewayconfigs.stunner.l7mp.io stunner-gatewayconfig --patch '{"spec": {"metricsEndpoint": "http://0.0.0.0:8080/metrics" }}' --type=merge
-```
-</details>
-
 2. **Install the Prometheus+Grafana stack with a helm chart**
 
 This helm chart creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: installs Prometheus along with the prometheus-operator, and Grafana; configures PodMonitor for monitoring STUNner pods, and sets up Prometheus as a datasource for Grafana.
