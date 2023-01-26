@@ -66,11 +66,11 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 
 ## Integration with Prometheus and Grafana
 
-Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a ready-to-use Prometheus and Grafana stack. See [Installation](#installation) for installation steps. Doing the visualization requires user input on the configuration. For details, check [Configuration and Usage](#configuration-and-usage).
+Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a ready-to-use Prometheus and Grafana stack. See [Installation](#installation) for installation steps. Metrics visualization requires user input on configuring the plots. Refer to [Configuration and Usage](#configuration-and-usage) for details.
 
 ### Installation
 
-A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm repo. To use this chart, the installation steps are the following.
+A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm repo. To use this chart, the installation steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana stack with helm.
 
 1. **Configure STUNner to expose the metrics**
 
@@ -104,11 +104,11 @@ helm install prometheus stunner/stunner-prometheus
 
 ### Configuration and Usage
 
-The helm chart deploys a ready-to-use Prometheus and Grafana stack, and lets the user setup its metric visualization in Grafana. An interactive way to visualize STUNner metrics is to use the Grafana dashboard.
+The helm chart deploys a ready-to-use Prometheus and Grafana stack, but leaves the Grafana dashboard empty to let the user pick metrics and configure their visualization. An interactive way to visualize STUNner metrics is to use the Grafana dashboard.
 
 #### Access the Grafana dashboard
 
-The Grafana dashboard is available at the `grafana` NodePort service IP and port 80.
+To open the Grafana dashboard navigate a web browser to `grafana` NodePort service IP and port 80.
 
 The default username is **admin** with the password **admin**.
 
@@ -116,16 +116,15 @@ At the first login you can change the password or leave as it is (use the *Skip*
 
 #### Visualize STUNner metrics
 
-As an example, let us plot the STUNner metric `stunner_listener_connections`.
-First step is to create a new panel.
+As an example, let us plot the STUNner metric `stunner_listener_connections`. First step is to create a new panel, then to configure the plot parameters.
 
 Click on *Add panel* (1), then *Add a new panel* (2):
 
 ![Grafana Add New Panel](grafana-add-panel-dashboard_0.png)
 
-This will open the panel configuration.
+The *Add a new panel* will open the panel configuration. The configuration steps are the following.
 
-1. Set the datasource: prometheus
+1. Set the datasource: **prometheus**
 2. Choose a metric. In this example, this is the `stunner_listener_connections`.
 3. Click on *Run queries* (this will update the figure)
 4. Fine-tune plot parameters. For example, set the title.
@@ -133,19 +132,21 @@ This will open the panel configuration.
 
 ![Grafana Panel Configuration](grafana-add-panel-config_0.png)
 
-The expected outcome is the dashboard with a new panel showing `stunner_listener_connections`.
+The expected outcome is a new panel on the dashboard showing the `stunner_listener_connections` metric.
 
-An example dashboard with data collected from the [simple-tunnel](https://github.com/l7mp/stunner/tree/main/examples/simple-tunnel) example:
+Below is an example dashboard with data collected from the [simple-tunnel](https://github.com/l7mp/stunner/tree/main/examples/simple-tunnel) example:
 
 ![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
 
 
 ### Troubleshooting
 
-Both Prometheus and Grafana provides a dashboard to troubleshoot a running system, and observe the flow of metrics from STUNner to Prometheus, and from Prometheus to Grafana.
+Prometheus and Grafana both provide a dashboard to troubleshoot a running system, and to check the flow of metrics from STUNner to Prometheus, and from Prometheus to Grafana.
 
 ### Check Prometheus operations via its dashboard
-The Prometheus dashboard is available as the `prometheus` NodePort service. The dashboard enables checking running Prometheus configuration and testing the metrics collection.
+The Prometheus dashboard is available as the `prometheus` NodePort service (use the node IP and node port to connect with a web browser).
+
+The dashboard enables checking running Prometheus configuration and testing the metrics collection.
 
 For example, to observe the `stunner_listener_connections` metric on the Prometheus dashboard:
 
@@ -155,7 +156,7 @@ For example, to observe the `stunner_listener_connections` metric on the Prometh
 
 ![Prometheus Dashboard](prometheus-dashboard.png)
 
-Note: some STUNner metrics are not available until they are inactive (e.g., there is no active cluster).
+Note: some STUNner metrics are not available when they are inactive (e.g., there is no active cluster).
 
 #### Check Prometheus data source in Grafana
 
