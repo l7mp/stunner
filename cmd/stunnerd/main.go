@@ -130,7 +130,7 @@ func main() {
 				case e := <-watcher.Events:
 					log.Debugf("received watcher event: %s", e.String())
 
-					if e.Op == fsnotify.Remove {
+					if e.Has(fsnotify.Remove) {
 						log.Warnf("config file deleted %q, disabling watcher",
 							e.Op.String())
 
@@ -145,7 +145,7 @@ func main() {
 						continue
 					}
 
-					if e.Op != fsnotify.Write {
+					if !e.Has(fsnotify.Write) {
 						log.Warnf("unhandled notify op on config file %q (ignoring): %s",
 							e.Name, e.Op.String())
 						continue
