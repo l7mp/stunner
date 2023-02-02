@@ -3,7 +3,7 @@ module github.com/l7mp/stunner
 go 1.17
 
 require (
-	github.com/fsnotify/fsnotify v1.5.4
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/pion/dtls/v2 v2.1.5
 	github.com/pion/logging v0.2.2
 	github.com/pion/transport v0.14.1
