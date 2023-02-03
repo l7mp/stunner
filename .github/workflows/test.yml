@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - '**.go'
+      - 'go.mod'
+      - 'go.sum'
     branches:
       - '*'
     tags-ignore:
