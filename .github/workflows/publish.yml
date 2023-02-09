@@ -39,4 +39,4 @@ jobs:
           token: ${{ secrets.WEB_PAT_TOKEN }}
           repository: l7mp/stunner-helm
           event-type: stunner-release
-          client-payload: '{"tag": "${{steps.vars.outputs.tag}}"}'
+          client-payload: '{"tag": "${{steps.vars.outputs.tag}}", "type": "stunner"}'
