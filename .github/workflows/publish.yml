@@ -36,9 +36,8 @@ jobs:
       - name: Triggering release workflow in the stunner-helm repo
         uses: convictional/trigger-workflow-and-wait
         with:
-          github-token: ${{ secrets.WEB_PAT_TOKEN }}
+          github_token: ${{ secrets.WEB_PAT_TOKEN }}
           owner: l7mp
           repo: stunner-helm
-          event-type: release
           client_payload: '{"tag": "${{steps.vars.outputs.tag}}", "type": "stunner"}'
           workflow_file_name: publish.yaml
