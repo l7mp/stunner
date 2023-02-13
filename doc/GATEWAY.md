@@ -133,6 +133,7 @@ kind: Gateway
 metadata:
   name: udp-gateway
   namespace: stunner
+spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
     - name: udp-listener
