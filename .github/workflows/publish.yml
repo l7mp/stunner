@@ -34,7 +34,7 @@ jobs:
         run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
 
       - name: Triggering release workflow in the stunner-helm repo
-        uses: convictional/trigger-workflow-and-wait
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
           github_token: ${{ secrets.WEB_PAT_TOKEN }}
           owner: l7mp
