@@ -5,7 +5,7 @@ Kubernetes cluster. CloudRetro is a simplified cloud-gaming service using WebRTC
 audio/video gaming content in the client browser. In this demo, we use STUNner to establish the UDP
 media streams between clients and the CloudRetro media servers deployed into Kubernetes.
 
-![STUNner & CloudRetro architecture](../../doc/stunner_cloudretro.svg)
+![STUNner & CloudRetro architecture](../../doc/images/stunner_cloudretro.svg)
 
 In this demo you will learn how to:
 - integrate a typical WebRTC application with STUNner,
@@ -18,7 +18,7 @@ The below installation instructions require an operational cluster running a sup
 Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure
 that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes
 services should support this). Otherwise, STUNner will not be able to allocate a public IP address
-for clients to reach your WebRTC infra. 
+for clients to reach your WebRTC infra.
 
 You will need a basic familiarity [with the CloudRetro
 architecture](https://webrtchacks.com/open-source-cloud-gaming-with-webrtc), especially the concept
@@ -212,7 +212,7 @@ Coordinator in the primary.
 
 At this CloudRetro should be officially a multicluster service: whenever you start a new game you
 will automatically be connected to the closest Worker service. Note that you can also manually
-choose workers by clicking the `w` button under `options`. 
+choose workers by clicking the `w` button under `options`.
 
 As a quick test, we have recorded a game session from a client started in the European region to a
 *local* CloudRetro deployment running in the [European

@@ -26,7 +26,7 @@ the cluster and perform a speed test from the local console. We will use the
 [`turncat`](../../cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner
 acting as a STUN/TURN gateway.
 
-![STUNner benchmarks setup](../../doc/stunner_benchmark.svg)
+![STUNner benchmarks setup](../../doc/images/stunner_benchmark.svg)
 
 You can easily implement a makeshift VPN with STUNner using a similar setup.
 
