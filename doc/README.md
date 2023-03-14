@@ -1,7 +1,7 @@
 # STUNner documentation
 
 <p align="center">
-  <img alt="STUNner", src="doc/images/stunner.svg" width="50%" height="50%"></br>
+  <img alt="STUNner", src="images/stunner.svg" width="50%" height="50%"></br>
 </p>
 
 ## Overview
