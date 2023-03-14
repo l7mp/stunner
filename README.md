@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="STUNner", src="doc/stunner.svg" width="50%" height="50%"></br>
+  <img alt="STUNner", src="doc/images/stunner.svg" width="50%" height="50%"></br>
   <a href="https://discord.gg/DyPgEsbwzc" alt="Discord">
     <img alt="Discord" src="https://img.shields.io/discord/945255818494902282" /></a>
   <a href="https://go.dev/doc/go1.17" alt="Go">
@@ -99,7 +99,7 @@ application servers and media servers into ordinary Kubernetes pods, taking adva
 Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure
 like any other cloud-bound workload.
 
-![STUNner media-plane deployment architecture](./doc/stunner_arch.svg)
+![STUNner media-plane deployment architecture](./doc/images/stunner_arch.svg)
 
 Don't worry about the performance implications of processing all your media through a TURN server:
 STUNner is written in [Go](https://go.dev) so it is extremely fast, it is co-located with your

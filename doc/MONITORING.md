@@ -111,7 +111,7 @@ As an example, let us plot the STUNner metric `stunner_listener_connections`. Fi
 
 Click on *Add panel* (1), then *Add a new panel* (2):
 
-![Grafana Add New Panel](grafana-add-panel-dashboard_0.png)
+![Grafana Add New Panel](images/grafana-add-panel-dashboard_0.png)
 
 The *Add a new panel* will open the panel configuration. The configuration steps are the following.
 
@@ -121,13 +121,13 @@ The *Add a new panel* will open the panel configuration. The configuration steps
 4. Fine-tune plot parameters. For example, set the title.
 5. Click *Apply*
 
-![Grafana Panel Configuration](grafana-add-panel-config_0.png)
+![Grafana Panel Configuration](images/grafana-add-panel-config_0.png)
 
 The expected outcome is a new panel on the dashboard showing the `stunner_listener_connections` metric.
 
 Below is an example dashboard with data collected from the [simple-tunnel](https://github.com/l7mp/stunner/tree/main/examples/simple-tunnel) example:
 
-![Grafana Dashboard with the New Panel](grafana-add-panel-dashboard_1.png)
+![Grafana Dashboard with the New Panel](images/grafana-add-panel-dashboard_1.png)
 
 
 ### Troubleshooting
@@ -145,7 +145,7 @@ For example, to observe the `stunner_listener_connections` metric on the Prometh
 2. Click on the `Execute` button
 3. Switch to `Graph` view tab.
 
-![Prometheus Dashboard](prometheus-dashboard.png)
+![Prometheus Dashboard](images/prometheus-dashboard.png)
 
 Note: some STUNner metrics are not available when they are inactive (e.g., there is no active cluster).
 
@@ -153,11 +153,11 @@ Note: some STUNner metrics are not available when they are inactive (e.g., there
 
 To configure/check the Prometheus data source in Grafana, first click on *Configuration* (1), then *Data sources* (2), as shown here:
 
-![Grafana Data Source Check Step 1](grafana-prom-datasource_0.png)
+![Grafana Data Source Check Step 1](images/grafana-prom-datasource_0.png)
 
 This will open up the datasources page. Scroll down to the bottom, click button *Save & test* (1), and observe the datasource is working (2):
 
-![Grafana Data Source Check Step 2](grafana-prom-datasource_1.png)
+![Grafana Data Source Check Step 2](images/grafana-prom-datasource_1.png)
 
 ## Help
 

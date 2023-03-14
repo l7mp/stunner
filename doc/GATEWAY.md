@@ -18,7 +18,7 @@ IP addresses and ports clients can use to reach STUNner, TURN credentials, routi
 anchor of the gateway hierarchy is the GatewayClass object, and the rest of the resources form a
 complete hierarchy underneath it.
 
-![Gateway hierarchy](/doc/gateway_api.svg)
+![Gateway hierarchy](/doc/images/gateway_api.svg)
 
 In general, the scope of a gateway hierarchy is a single namespace, but this is not strictly
 enforced: e.g., the GatewayClass is
