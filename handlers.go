@@ -1,27 +1,17 @@
 package stunner
 
 import (
-	"crypto/hmac"
-	"crypto/sha1" //nolint:gosec,gci
-	"encoding/base64"
 	"errors"
 	"net"
-	"strconv"
-	"time"
-
-	"strings"
 
 	"github.com/pion/turn/v2"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
+	stnrauth "github.com/l7mp/stunner/pkg/apis/auth"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
-
-// time-windowed TURN auth username separator defined in
-// https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00
-const usernameSeparator = ":"
 
 // NewAuthHandler returns an authentication handler callback to be used with a TURN server for
 // authenticating clients.
@@ -37,48 +27,33 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
-			key := turn.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
+			key := stnrauth.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
+				auth.Log.Info("plaintext auth request: failed: invalid username")
 				return key, true
 			}
 
+			auth.Log.Info("plaintext auth request: success")
 			return nil, false
 
 		case v1alpha1.AuthTypeLongTerm:
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			// find the first thing that looks like a UNIX timestamp in the username
-			// and use that for checking the time-windowed credential, drop everything
-			// else
-			var timestamp int = 0
-			for _, ts := range strings.Split(username, usernameSeparator) {
-				t, err := strconv.Atoi(ts)
-				if err == nil {
-					timestamp = t
-					break
-				}
-			}
-
-			if timestamp == 0 {
-				auth.Log.Errorf("invalid time-windowed username %q", username)
+			if err := stnrauth.CheckTimeWindowedUsername(username); err != nil {
+				auth.Log.Infof("longterm auth request: failed: %s", err)
 				return nil, false
 			}
 
-			if int64(timestamp) < time.Now().Unix() {
-				auth.Log.Errorf("expired time-windowed username %q", username)
-				return nil, false
-			}
-
-			mac := hmac.New(sha1.New, []byte(auth.Secret))
-			_, err := mac.Write([]byte(username))
+			password, err := stnrauth.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Errorf("failed to hash username: %w", err.Error())
+				auth.Log.Infof("longterm auth request: error generating password: %s",
+					err)
 				return nil, false
 			}
-			password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-			return turn.GenerateAuthKey(username, auth.Realm, password), true
+			auth.Log.Info("longterm auth request: success")
+			return stnrauth.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:
 			auth.Log.Errorf("internal error: unknown authentication mode %q",
