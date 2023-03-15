@@ -13,8 +13,10 @@ import (
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
-	"github.com/pion/transport/test"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/stdnet"
+	"github.com/pion/transport/v2/test"
+	"github.com/pion/transport/v2/vnet"
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -45,7 +47,7 @@ var keyPem64 = base64.StdEncoding.EncodeToString(keyPem)
 type echoTestConfig struct {
 	t *testing.T
 	// net
-	podnet, wan *vnet.Net
+	podnet, wan transport.Net
 	// server
 	stunner     *Stunner
 	stunnerAddr string
@@ -204,7 +206,7 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 	}
 
 	// client side
-	podnet := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4", "1.2.3.5", "1.2.3.10"}})
+	podnet, _ := vnet.NewNet(&vnet.NetConfig{StaticIPs: []string{"1.2.3.4", "1.2.3.5", "1.2.3.10"}})
 	err = gw.AddNet(podnet)
 	if err != nil {
 		return nil, err
@@ -225,7 +227,7 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
 		return nil, err
 	}
 
-	wan := vnet.NewNet(&vnet.NetConfig{})
+	wan, _ := vnet.NewNet(&vnet.NetConfig{})
 	if err = nat.AddNet(wan); err != nil {
 		return nil, err
 	}
@@ -552,7 +554,8 @@ func TestStunnerServerLocalhost(t *testing.T) {
 				assert.NoError(t, fmt.Errorf("internal error: unknown client protocol in test"))
 			}
 
-			testConfig := echoTestConfig{t, vnet.NewNet(nil), vnet.NewNet(nil), stunner,
+			stdnet, _ := stdnet.NewNet()
+			testConfig := echoTestConfig{t, stdnet, stdnet, stunner,
 				stunnerAddr, lconn, u, p, net.IPv4(127, 0, 0, 1),
 				"127.0.0.1:25678", true, true, true, loggerFactory}
 			stunnerEchoTest(testConfig)

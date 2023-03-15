@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
 	"github.com/pion/turn/v2"
 
 	"github.com/l7mp/stunner/internal/util"
@@ -27,14 +27,14 @@ type Listener struct {
 	Conn                   interface{} // either turn.ListenerConfig or turn.PacketConnConfig
 	Server                 *turn.Server
 	Routes                 []string
-	Net                    *vnet.Net
+	Net                    transport.Net
 	getRealm               RealmHandler
 	logger                 logging.LoggerFactory
 	log                    logging.LeveledLogger
 }
 
 // NewListener creates a new listener. Requires a server restart (returns ErrRestartRequired)
-func NewListener(conf v1alpha1.Config, net *vnet.Net, realmHandler RealmHandler, logger logging.LoggerFactory) (Object, error) {
+func NewListener(conf v1alpha1.Config, net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*v1alpha1.ListenerConfig)
 	if !ok {
 		return nil, v1alpha1.ErrInvalidConf
@@ -242,13 +242,13 @@ func (l *Listener) Close() error {
 // ///////////
 // ListenerFactory can create now Listener objects
 type ListenerFactory struct {
-	net          *vnet.Net
+	net          transport.Net
 	realmHandler RealmHandler
 	logger       logging.LoggerFactory
 }
 
 // NewListenerFactory creates a new factory for Listener objects
-func NewListenerFactory(net *vnet.Net, realmHandler RealmHandler, logger logging.LoggerFactory) Factory {
+func NewListenerFactory(net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) Factory {
 	return &ListenerFactory{
 		net:          net,
 		realmHandler: realmHandler,

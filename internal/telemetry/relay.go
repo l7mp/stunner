@@ -8,7 +8,8 @@ import (
 	"net"
 
 	"github.com/pion/randutil"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/stdnet"
 )
 
 var (
@@ -48,7 +49,7 @@ type RelayAddressGenerator struct {
 	Address string
 
 	// Net is a pion/transport VNet, used for testing.
-	Net *vnet.Net
+	Net transport.Net
 }
 
 // Validate is called on server startup and confirms the RelayAddressGenerator is properly configured
@@ -58,7 +59,7 @@ func (r *RelayAddressGenerator) Validate() error {
 	}
 
 	if r.Net == nil {
-		r.Net = vnet.NewNet(nil)
+		r.Net, _ = stdnet.NewNet()
 	}
 
 	if r.Rand == nil {

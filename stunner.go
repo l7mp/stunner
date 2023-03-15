@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/stdnet"
 
 	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
@@ -37,7 +38,7 @@ type Options struct {
 	Resolver resolver.DnsResolver
 	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
 	// emulated data-plane.
-	Net *vnet.Net
+	Net transport.Net
 }
 
 // Stunner is an instance of the STUNner deamon.
@@ -48,7 +49,7 @@ type Stunner struct {
 	resolver                                                   resolver.DnsResolver
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
-	net                                                        *vnet.Net
+	net                                                        transport.Net
 	ready, shutdown                                            bool
 }
 
@@ -70,10 +71,17 @@ func NewStunner(options Options) *Stunner {
 		r = resolver.NewDnsResolver("dns-resolver", logger)
 	}
 
-	vnet := vnet.NewNet(nil)
-	if options.Net != nil {
-		log.Warn("vnet is enabled")
+	var vnet transport.Net
+	if options.Net == nil {
+		net, err := stdnet.NewNet() // defaults to native operation
+		if err != nil {
+			log.Error("could not create stdnet.NewNet")
+			return nil
+		}
+		vnet = net
+	} else {
 		vnet = options.Net
+		log.Warn("vnet is enabled")
 	}
 
 	s := &Stunner{
