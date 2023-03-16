@@ -54,11 +54,6 @@ jobs:
     name: Push helm charts to the
     runs-on: ubuntu-latest
     steps:
-
-      - name: Get the version
-        id: vars
-        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
-
       - name: Triggering release workflow in the stunner-helm repo
         uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:
