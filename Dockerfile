@@ -10,7 +10,7 @@ RUN go mod download
 
 COPY *.go ./
 COPY internal/ internal/
-COPY pkg/apis/v1alpha1/ pkg/apis/v1alpha1/
+COPY pkg/apis/ pkg/apis/
 
 COPY cmd/stunnerd/main.go cmd/stunnerd/
 COPY cmd/stunnerd/stunnerd.conf cmd/stunnerd/
