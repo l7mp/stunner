@@ -3,13 +3,11 @@ name: "release-dev"
 on:
   workflow_dispatch:
   push:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '**.sh'
-      - '!doc/**'
-      - '!examples/**'
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/**'
+      - 'doc/**'
+      - 'examples/**'
     branches:
       - 'main'
 
