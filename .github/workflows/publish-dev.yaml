@@ -15,28 +15,45 @@ on:
 
 jobs:
   push_to_registry:
-    name: Push docker image to DockerHub
+    name: Push Docker image to DockerHub
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Login to DockerHub Registry
-        run: echo ${{ secrets.DOCKER_TOKEN }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-      - name: Get the version
-        id: vars
-        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
-      - name: Build the tagged Docker image
-        run: docker build . --file Dockerfile --tag l7mp/stunnerd:dev
-      - name: Push the tagged Docker image
-        run: docker push l7mp/stunnerd:dev
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: l7mp/stunnerd
+          tags: |
+            type=raw,value=dev
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   push_chart:
-    name: Push charts to the web
+    name: Push helm charts to the
     runs-on: ubuntu-latest
     steps:
-
-      - name: Get the version
-        id: vars
-        run: echo ::set-output name=tag::$(echo ${GITHUB_REF:11})
-
       - name: Triggering release workflow in the stunner-helm repo
         uses: convictional/trigger-workflow-and-wait@v1.6.5
         with:

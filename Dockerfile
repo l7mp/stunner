@@ -15,7 +15,12 @@ COPY pkg/apis/ pkg/apis/
 COPY cmd/stunnerd/main.go cmd/stunnerd/
 COPY cmd/stunnerd/stunnerd.conf cmd/stunnerd/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
+RUN apkArch="$(apk --print-arch)"; \
+      case "$apkArch" in \
+        aarch64) export GOARCH='arm64' ;; \
+        *) export GOARCH='amd64' ;; \
+      esac; \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
 
 ###########
 # STUNNERD
