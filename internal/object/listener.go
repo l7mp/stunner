@@ -205,6 +205,7 @@ func (l *Listener) Close() error {
 		switch l.Proto {
 		case v1alpha1.ListenerProtocolUDP:
 			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
+
 			conn, ok := l.Conn.(turn.PacketConnConfig)
 			if !ok {
 				return fmt.Errorf("internal error: invalid conversion to " +
@@ -216,6 +217,7 @@ func (l *Listener) Close() error {
 			}
 		case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
 			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
+
 			conn, ok := l.Conn.(turn.ListenerConfig)
 			if !ok {
 				return fmt.Errorf("internal error: invalid conversion to " +
@@ -229,6 +231,8 @@ func (l *Listener) Close() error {
 			return fmt.Errorf("internal error: unknown listener protocol %q",
 				l.Proto.String())
 		}
+
+		l.Conn = nil
 	}
 
 	if l.Server != nil {

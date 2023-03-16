@@ -83,7 +83,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	changed += len(clusterState.ChangedJobQueue)
 	deleted += len(clusterState.DeletedJobQueue)
 
-	// find all objects (listeners) to be restarted and stop them each
+	// find all objects (listeners) to be restarted and stop each
 	if !s.dryRun {
 		if err := s.stop(toBeRestarted); err != nil {
 			s.log.Errorf("could not stop object: %s", err.Error())
