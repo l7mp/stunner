@@ -29,11 +29,11 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 
 			key := stnrauth.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
-				auth.Log.Info("plaintext auth request: failed: invalid username")
+				auth.Log.Debug("plaintext auth request: valid username found")
 				return key, true
 			}
 
-			auth.Log.Info("plaintext auth request: success")
+			auth.Log.Info("plaintext auth request: failed: invalid username")
 			return nil, false
 
 		case v1alpha1.AuthTypeLongTerm:

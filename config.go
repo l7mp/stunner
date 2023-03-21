@@ -8,11 +8,42 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pion/transport/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
+
+// Options defines various options for the STUNner server.
+type Options struct {
+	// DryRun suppresses sideeffects: STUNner will not initialize listener sockets and bring up
+	// the TURN server, and it will not fire up the health-check and the metrics
+	// servers. Intended for testing, default is false.
+	DryRun bool
+	// SuppressRollback controls whether to rollback to the last working configuration after a
+	// failed reconciliation request. Default is false, which means to always do a rollback.
+	SuppressRollback bool
+	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
+	// "all:TRACE" will force maximal loglevel throughout, "all:ERROR,auth:TRACE,turn:DEBUG"
+	// will suppress all logs except in the authentication subsystem and the TURN protocol
+	// logic.
+	LogLevel string
+	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
+	// testing.
+	Resolver resolver.DnsResolver
+	// UDPListenerThreadNum determines the number of readloop threads spawned per UDP listener
+	// (default is 4, must be >0 integer). TURN allocations will be automatically load-balanced
+	// by the kernel UDP stack based on the client 5-tuple. This setting controls the maximum
+	// number of CPU cores UDP listeners can scale to. Note that all other listener protocol
+	// types (TCP, TLS and DTLS) use per-client threads, so this setting affects only UDP
+	// listeners. For more info see https://github.com/pion/turn/pull/295.
+	UDPListenerThreadNum int
+	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
+	// emulated data-plane.
+	Net transport.Net
+}
 
 // NewDefaultStunnerConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with

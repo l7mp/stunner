@@ -10,6 +10,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/telemetry"
+	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
@@ -36,23 +37,25 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 	switch l.Proto {
 	case v1alpha1.ListenerProtocolUDP:
-		s.log.Debugf("setting up UDP listener at %s", addr)
-		udpListener, err := l.Net.ListenPacket("udp", addr)
+		socketPool := util.NewPacketConnPool(l.Net, s.udpThreadNum)
+
+		s.log.Debugf("setting up UDP listener socket pool at %s, size: %d", addr, socketPool.Size())
+		conns, err := socketPool.Make("udp", addr)
 		if err != nil {
-			return fmt.Errorf("failed to create UDP listener at %s: %s",
-				addr, err)
+			return err
 		}
 
-		udpListener = telemetry.NewPacketConn(udpListener, l.Name, telemetry.ListenerType)
+		for _, c := range conns {
+			udpListener := telemetry.NewPacketConn(c, l.Name, telemetry.ListenerType)
+			conn := turn.PacketConnConfig{
+				PacketConn:            udpListener,
+				RelayAddressGenerator: relay,
+				PermissionHandler:     permissionHandler,
+			}
 
-		conn := turn.PacketConnConfig{
-			PacketConn:            udpListener,
-			RelayAddressGenerator: relay,
-			PermissionHandler:     permissionHandler,
+			l.Conns = append(l.Conns, conn)
+			pConns = append(pConns, conn)
 		}
-
-		pConns = append(pConns, conn)
-		l.Conn = conn
 
 	case v1alpha1.ListenerProtocolTCP:
 		s.log.Debugf("setting up TCP listener at %s", addr)
@@ -71,7 +74,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		lConns = append(lConns, conn)
-		l.Conn = conn
+		l.Conns = append(l.Conns, conn)
 
 		// cannot test this on vnet, no TLS in vnet.Net
 	case v1alpha1.ListenerProtocolTLS:
@@ -99,7 +102,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		lConns = append(lConns, conn)
-		l.Conn = conn
+		l.Conns = append(l.Conns, conn)
 
 	case v1alpha1.ListenerProtocolDTLS:
 		s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
@@ -129,7 +132,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		lConns = append(lConns, conn)
-		l.Conn = conn
+		l.Conns = append(l.Conns, conn)
 
 	default:
 		return fmt.Errorf("internal error: unknown listener protocol " + l.Proto.String())

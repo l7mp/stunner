@@ -19,34 +19,13 @@ import (
 
 const DefaultLogLevel = "all:WARN"
 
-// Options defines various options for the STUNner server.
-type Options struct {
-	// DryRun suppresses sideeffects: STUNner will not initialize listener sockets and bring up
-	// the TURN server, and it will not fire up the health-check and the metrics
-	// servers. Intended for testing, default is false.
-	DryRun bool
-	// SuppressRollback controls whether to rollback to the last working configuration after a
-	// failed reconciliation request. Default is false, which means to always do a rollback.
-	SuppressRollback bool
-	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
-	// "all:TRACE" will force maximal loglevel throughout, "all:ERROR,auth:TRACE,turn:DEBUG"
-	// will suppress all logs except in the authentication subsystem and the TURN protocol
-	// logic.
-	LogLevel string
-	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
-	// testing.
-	Resolver resolver.DnsResolver
-	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
-	// emulated data-plane.
-	Net transport.Net
-}
-
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
 	version                                                    string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
+	udpThreadNum                                               int
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	net                                                        transport.Net
@@ -84,6 +63,11 @@ func NewStunner(options Options) *Stunner {
 		log.Warn("vnet is enabled")
 	}
 
+	udpThreadNum := 0
+	if options.UDPListenerThreadNum > 0 {
+		udpThreadNum = options.UDPListenerThreadNum
+	}
+
 	s := &Stunner{
 		version:          v1alpha1.ApiVersion,
 		logger:           logger,
@@ -91,6 +75,7 @@ func NewStunner(options Options) *Stunner {
 		suppressRollback: options.SuppressRollback,
 		dryRun:           options.DryRun,
 		resolver:         r,
+		udpThreadNum:     udpThreadNum,
 		net:              vnet,
 	}
 

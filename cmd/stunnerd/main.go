@@ -26,6 +26,7 @@ func main() {
 	var config = flag.StringP("config", "c", "", "Config file.")
 	var level = flag.StringP("log", "l", "", "Log level (default: all:INFO).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
+	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0, "Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0).")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>.")
 	flag.Parse()
@@ -40,7 +41,11 @@ func main() {
 		logLevel = *level
 	}
 
-	st := stunner.NewStunner(stunner.Options{LogLevel: logLevel, DryRun: *dryRun})
+	st := stunner.NewStunner(stunner.Options{
+		LogLevel:             logLevel,
+		DryRun:               *dryRun,
+		UDPListenerThreadNum: *udpThreadNum,
+	})
 	defer st.Close()
 
 	log := st.GetLogger().NewLogger("stunnerd")

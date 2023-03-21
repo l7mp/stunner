@@ -24,7 +24,7 @@ type Listener struct {
 	Port, MinPort, MaxPort int
 	rawAddr                string // net.IP.String() may rewrite the string representation
 	Cert, Key              []byte
-	Conn                   interface{} // either turn.ListenerConfig or turn.PacketConnConfig
+	Conns                  []any // either a set of turn.ListenerConfigs or turn.PacketConnConfigs
 	Server                 *turn.Server
 	Routes                 []string
 	Net                    transport.Net
@@ -49,6 +49,7 @@ func NewListener(conf v1alpha1.Config, net transport.Net, realmHandler RealmHand
 		Name:     req.Name,
 		Net:      net,
 		getRealm: realmHandler,
+		Conns:    []any{},
 		logger:   logger,
 		log:      logger.NewLogger(fmt.Sprintf("stunner-listener-%s", req.Name)),
 	}
@@ -201,12 +202,12 @@ func (l *Listener) GetConfig() v1alpha1.Config {
 func (l *Listener) Close() error {
 	l.log.Tracef("closing %s listener at %s", l.Proto.String(), l.Addr)
 
-	if l.Conn != nil {
+	for _, c := range l.Conns {
 		switch l.Proto {
 		case v1alpha1.ListenerProtocolUDP:
 			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
 
-			conn, ok := l.Conn.(turn.PacketConnConfig)
+			conn, ok := c.(turn.PacketConnConfig)
 			if !ok {
 				return fmt.Errorf("internal error: invalid conversion to " +
 					"turn.PacketConnConfig")
@@ -218,7 +219,7 @@ func (l *Listener) Close() error {
 		case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
 			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
 
-			conn, ok := l.Conn.(turn.ListenerConfig)
+			conn, ok := c.(turn.ListenerConfig)
 			if !ok {
 				return fmt.Errorf("internal error: invalid conversion to " +
 					"turn.ListenerConfig")
@@ -231,9 +232,9 @@ func (l *Listener) Close() error {
 			return fmt.Errorf("internal error: unknown listener protocol %q",
 				l.Proto.String())
 		}
-
-		l.Conn = nil
 	}
+
+	l.Conns = []any{}
 
 	if l.Server != nil {
 		l.Server.Close()

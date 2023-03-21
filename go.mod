@@ -1,12 +1,12 @@
 module github.com/l7mp/stunner
 
-go 1.17
+go 1.19
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/pion/dtls/v2 v2.1.5
 	github.com/pion/logging v0.2.2
-	github.com/pion/transport/v2 v2.0.2 // indirect
+	github.com/pion/transport/v2 v2.0.2
 	// replace from l7mp/turn
 	github.com/pion/turn/v2 v2.1.0
 	github.com/prometheus/client_golang v1.14.0
@@ -22,6 +22,7 @@ require (
 	github.com/heptiolabs/healthcheck v0.0.0-20211123025425-613501dd5deb
 	github.com/pion/randutil v0.1.0
 	github.com/pion/transport v0.13.0
+	golang.org/x/sys v0.6.0
 )
 
 require (
@@ -58,7 +59,6 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
-	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
