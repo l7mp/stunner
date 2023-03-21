@@ -39,7 +39,8 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	case v1alpha1.ListenerProtocolUDP:
 		socketPool := util.NewPacketConnPool(l.Net, s.udpThreadNum)
 
-		s.log.Debugf("setting up UDP listener socket pool at %s, size: %d", addr, socketPool.Size())
+		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
+			addr, socketPool.Size())
 		conns, err := socketPool.Make("udp", addr)
 		if err != nil {
 			return err
