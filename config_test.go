@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	// "reflect"
+	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -46,6 +48,8 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			// patch in the loglevel
 			c.Admin.LogLevel = stunnerTestLoglevel
+
+			checkDefaultConfig(t, c, "UDP")
 
 			// patch in the vnet
 			log.Debug("building virtual network")
@@ -100,6 +104,8 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	// patch in the loglevel
 	c.Admin.LogLevel = stunnerTestLoglevel
 
+	checkDefaultConfig(t, c, "UDP")
+
 	file, err2 := yaml.Marshal(c)
 	assert.NoError(t, err2, "marschal config fike")
 
@@ -109,4 +115,128 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 
 	ok := newConf.DeepEqual(c)
 	assert.True(t, ok, "config file roundtrip")
+}
+
+// TestStunnerConfigFileWatcher tests the config file watcher
+// - init watcher with nonexistent config file
+// - write the default config to the config file and check
+// - write a wrong config file: we should not receive anything
+// - update the config file and check
+func TestStunnerConfigFileWatcher(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test-watcher")
+
+	testName := "TestStunnerConfigFileWatcher"
+	log.Debugf("-------------- Running test: %s -------------", testName)
+
+	log.Debug("creating a temp file for config")
+	f, err := os.CreateTemp("", "stunner_conf_*.yaml")
+	assert.NoError(t, err, "creating temp config file")
+	// we just need the filename for now so we remove the fle first
+	file := f.Name()
+	assert.NoError(t, os.Remove(file), "removing temp config file")
+
+	log.Debug("creating a stunnerd")
+	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+
+	log.Debug("starting watcher")
+	conf := make(chan v1alpha1.StunnerConfig, 1)
+	defer close(conf)
+
+	log.Debug("init watcher with nonexistent config file")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = stunner.WatchConfig(ctx, file, conf)
+	assert.NoError(t, err, "creating config watcher")
+
+	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
+	time.Sleep(50 * time.Millisecond)
+
+	log.Debug("write the default config to the config file and check")
+	uri := "turn://user1:passwd1@1.2.3.4:3478?transport=udp"
+
+	log.Debug("creating default stunner config")
+	c, err := NewDefaultConfig(uri)
+	assert.NoError(t, err, "default config")
+
+	// patch in the loglevel
+	c.Admin.LogLevel = stunnerTestLoglevel
+
+	// recreate the temp file and write config
+	f, err = os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
+	assert.NoError(t, err, "recreate temp config file")
+	defer os.Remove(file)
+
+	y, err := yaml.Marshal(c)
+	assert.NoError(t, err, "marshal config file")
+	err = f.Truncate(0)
+	assert.NoError(t, err, "truncate temp file")
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err, "seek temp file")
+	_, err = f.Write(y)
+	assert.NoError(t, err, "write config to temp file")
+
+	// wait a bit so that the watcher has time to react
+	time.Sleep(50 * time.Millisecond)
+
+	// read back result
+	c2 := <-conf
+	checkDefaultConfig(t, &c2, "UDP")
+
+	log.Debug("write a wrong config file (WatchConfig does not validate)")
+	c2.Listeners[0].Protocol = "dummy"
+	y, err = yaml.Marshal(c2)
+	assert.NoError(t, err, "marshal config file")
+	err = f.Truncate(0)
+	assert.NoError(t, err, "truncate temp file")
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err, "seek temp file")
+	_, err = f.Write(y)
+	assert.NoError(t, err, "write config to temp file")
+
+	// this makes sure that we do not share anything with ConfigWatch
+	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
+
+	// wait a bit so that the watcher has time to react
+	time.Sleep(50 * time.Millisecond)
+
+	c3 := <-conf
+	checkDefaultConfig(t, &c3, "dummy")
+
+	log.Debug("update the config file and check")
+	c3.Listeners[0].Protocol = "TCP"
+	y, err = yaml.Marshal(c3)
+	assert.NoError(t, err, "marshal config file")
+	err = f.Truncate(0)
+	assert.NoError(t, err, "truncate temp file")
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err, "seek temp file")
+	_, err = f.Write(y)
+	assert.NoError(t, err, "write config to temp file")
+
+	// wait a bit so that the watcher has time to react
+	time.Sleep(50 * time.Millisecond)
+
+	// read back result
+	c4 := <-conf
+	checkDefaultConfig(t, &c4, "TCP")
+
+	stunner.Close()
+}
+
+func checkDefaultConfig(t *testing.T, c *v1alpha1.StunnerConfig, proto string) {
+	assert.Equal(t, "plaintext", c.Auth.Type, "auth-type")
+	assert.Equal(t, "user1", c.Auth.Credentials["username"], "username")
+	assert.Equal(t, "passwd1", c.Auth.Credentials["password"], "passwd")
+	assert.Len(t, c.Listeners, 1, "listeners len")
+	assert.Equal(t, "1.2.3.4", c.Listeners[0].Addr, "listener addr")
+	assert.Equal(t, 3478, c.Listeners[0].Port, "listener port")
+	assert.Equal(t, proto, c.Listeners[0].Protocol, "listener proto")
+	assert.Len(t, c.Clusters, 1, "clusters len")
+	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
+	assert.Len(t, c.Clusters[0].Endpoints, 1, "cluster endpoint len")
+	assert.Equal(t, "0.0.0.0/0", c.Clusters[0].Endpoints[0], "endpoint")
 }

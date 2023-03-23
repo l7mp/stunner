@@ -2,12 +2,12 @@ package main
 
 import (
 	// "fmt"
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	flag "github.com/spf13/pflag"
 
 	"github.com/l7mp/stunner"
@@ -50,7 +50,7 @@ func main() {
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
-	conf := make(chan *v1alpha1.StunnerConfig, 1)
+	conf := make(chan v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
 	if *config == "" && flag.NArg() == 1 {
@@ -63,7 +63,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		conf <- c
+		conf <- *c
 
 	} else if *config != "" && !*watch {
 		log.Infof("loading configuration from config file %q", *config)
@@ -74,112 +74,18 @@ func main() {
 			os.Exit(1)
 		}
 
-		conf <- c
+		conf <- *c
 
 	} else if *config != "" && *watch {
 		log.Infof("watching configuration file at %q", *config)
 
-		watcherEnabled := false
-		watcher, err := fsnotify.NewWatcher()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		err := st.WatchConfig(ctx, *config, conf)
 		if err != nil {
-			log.Errorf("could not create config file watcher: %s", err.Error())
+			log.Errorf("could not create config file watcher: %s", err)
 			os.Exit(1)
 		}
-		defer watcher.Close()
-
-		if err := watcher.Add(*config); err != nil {
-			log.Warnf("could not add config file %q watcher: %s (ignoring as %s is running "+
-				"in watch mode)", *config, err.Error(), os.Args[0])
-		} else {
-			log.Tracef("loading configuration file: %s", *config)
-			c, err := stunner.LoadConfig(*config)
-			if err != nil {
-				log.Warnf("could not load config file: %s", err.Error())
-			} else {
-				conf <- c
-			}
-			watcherEnabled = true
-		}
-
-		ticker := time.NewTicker(confUpdatePeriod)
-		defer ticker.Stop()
-
-		go func() {
-			for {
-				select {
-				case <-ticker.C:
-					// log.Tracef("periodic watcher tick: watchlist: %s, watcher enabled: %t",
-					//         watcher.WatchList(), watcherEnabled)
-					if watcherEnabled {
-						continue
-					}
-
-					log.Tracef("watcher inactive for config file %q: trying to activate it",
-						*config)
-					if err := watcher.Add(*config); err != nil {
-						log.Warnf("could not add config file %q to watcher: %s",
-							*config, err.Error())
-						continue
-					}
-					watcherEnabled = true
-
-					log.Tracef("loading configuration file: %s", *config)
-					c, err := stunner.LoadConfig(*config)
-					if err != nil {
-						log.Warnf("could not load config file: %s", err.Error())
-						continue
-					}
-
-					conf <- c
-
-				case e := <-watcher.Events:
-					log.Debugf("received watcher event: %s", e.String())
-
-					if e.Has(fsnotify.Remove) {
-						log.Warnf("config file deleted %q, disabling watcher",
-							e.Op.String())
-
-						if watcherEnabled {
-							if err := watcher.Remove(*config); err != nil {
-								log.Warnf("could not remove config file %q "+
-									"from watcher: %s", *config, err.Error())
-							}
-						}
-
-						watcherEnabled = false
-						continue
-					}
-
-					if !e.Has(fsnotify.Write) {
-						log.Warnf("unhandled notify op on config file %q (ignoring): %s",
-							e.Name, e.Op.String())
-						continue
-					}
-
-					log.Tracef("loading configuration file: %s", *config)
-					c, err := stunner.LoadConfig(*config)
-					if err != nil {
-						log.Warnf("could not load config file: %s", err.Error())
-						continue
-					}
-
-					conf <- c
-
-				case err := <-watcher.Errors:
-					log.Debugf("watcher error, deactivating watcher: %s", err.Error())
-
-					if watcherEnabled {
-						if err := watcher.Remove(*config); err != nil {
-							log.Warnf("could not remove config file %q from watcher: %s",
-								*config, err.Error())
-							continue
-						}
-					}
-
-					watcherEnabled = false
-				}
-			}
-		}()
 	} else {
 		flag.Usage()
 		os.Exit(1)
@@ -213,7 +119,7 @@ func main() {
 
 			// we have working stunnerd: reconcile
 			log.Debug("initiating reconciliation")
-			err := st.Reconcile(*c)
+			err := st.Reconcile(c)
 			log.Trace("reconciliation ready")
 			if err != nil {
 				if e, ok := err.(v1alpha1.ErrRestarted); ok {
