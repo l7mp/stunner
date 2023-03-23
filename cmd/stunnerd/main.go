@@ -81,7 +81,11 @@ func main() {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		err := st.WatchConfig(ctx, *config, conf)
+		err := stunner.WatchConfig(ctx, stunner.Watcher{
+			ConfigFile:    *config,
+			ConfigChannel: conf,
+			Logger:        st.GetLogger(),
+		})
 		if err != nil {
 			log.Errorf("could not create config file watcher: %s", err)
 			os.Exit(1)

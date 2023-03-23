@@ -149,7 +149,11 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err = stunner.WatchConfig(ctx, file, conf)
+	err = WatchConfig(ctx, Watcher{
+		ConfigFile:    file,
+		ConfigChannel: conf,
+		Logger:        loggerFactory,
+	})
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start

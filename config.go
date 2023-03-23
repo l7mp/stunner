@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/pion/logging"
 	"github.com/pion/transport/v2"
 	"sigs.k8s.io/yaml"
 
@@ -186,44 +187,44 @@ func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
 	return &c
 }
 
-type watchContext struct {
-	config  string
-	watcher *fsnotify.Watcher
-	ch      chan<- v1alpha1.StunnerConfig
+type Watcher struct {
+	// ConfigFile specifies the config file name to watch.
+	ConfigFile string
+	// ConfigChannel is used to return the configs read.
+	ConfigChannel chan<- v1alpha1.StunnerConfig
+	// Logger is a logger factory as returned by, e.g., stunner.GetLogger().
+	Logger logging.LoggerFactory
+	// Log is a leveled logger used to report progress. Either Logger or Log must be specified.
+	Log logging.LeveledLogger
 }
 
-type watchContextKey string
-
-// WatchConfig will watch a configuration file specified in the `config` parameter for changes and
-// emit a new `StunnerConfig` on the channel specified in the `ch` argument each time the file
-// changes. If no file exists at the given path it will periodically retry until the file
-// appears. Note that the configuration sent through the channel is not validated, make sure to
-// check for syntax errors on the receiver side. Use the `context` argument the cancel the watcher.
-func (s *Stunner) WatchConfig(ctx context.Context, config string, ch chan<- v1alpha1.StunnerConfig) error {
-	s.log.Tracef("WatchConfig")
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
+// WatchConfig will watch a configuration file specified in the `Watcher.ConfigFile` parameter for
+// changes and emit a new `StunnerConfig` on `Watcher.ConfigChannel` each time the file changes. If
+// no file exists at the given path, then WatchConfig will periodically retry until the file
+// appears. The configuration sent through the channel is not validated, make sure to check for
+// syntax errors on the receiver side. Use the `context` to cancel the watcher.
+func WatchConfig(ctx context.Context, w Watcher) error {
+	if w.ConfigChannel == nil {
+		return errors.New("uninitialized config channel")
 	}
 
-	// decorate context
-	ctx = context.WithValue(ctx, watchContextKey("watchContext"), watchContext{
-		config:  config,
-		watcher: watcher,
-		ch:      ch,
-	})
+	if w.ConfigFile == "" {
+		return errors.New("uninitialized config file path")
+	}
+
+	if w.Log == nil {
+		w.Log = w.Logger.NewLogger("watch-config")
+	}
+	w.Log.Tracef("WatchConfig")
 
 	go func() {
-		defer watcher.Close()
-
 		for {
 			// try to watch
-			if ok := s.configWatcher(ctx); !ok {
+			if ok := configWatcher(ctx, w); !ok {
 				return
 			}
 
-			if ok := s.tryWatchConfig(ctx); !ok {
+			if ok := tryWatchConfig(ctx, w); !ok {
 				return
 			}
 		}
@@ -236,11 +237,9 @@ func (s *Stunner) WatchConfig(ctx context.Context, config string, ch chan<- v1al
 // tryWatchConfig runs a timer to look for the config file at the given path and returns it
 // immediately once found. Returns true if further action is needed (configWatcher has to be
 // started) or false on normal exit.
-func (s *Stunner) tryWatchConfig(ctx context.Context) bool {
-	s.log.Tracef("tryWatchConfig")
-
-	watchContext := ctx.Value(watchContextKey("watchContext")).(watchContext)
-	config := watchContext.config
+func tryWatchConfig(ctx context.Context, w Watcher) bool {
+	w.Log.Tracef("tryWatchConfig")
+	config := w.ConfigFile
 
 	ticker := time.NewTicker(confUpdatePeriod)
 	defer ticker.Stop()
@@ -251,16 +250,16 @@ func (s *Stunner) tryWatchConfig(ctx context.Context) bool {
 			return false
 
 		case <-ticker.C:
-			s.log.Debugf("trying to read config file %q from periodic timer",
+			w.Log.Debugf("trying to read config file %q from periodic timer",
 				config)
 
 			// check if config file exists and it is readable
 			if _, err := os.Stat(config); errors.Is(err, os.ErrNotExist) {
-				s.log.Debugf("config file %q does not exist", config)
+				w.Log.Debugf("config file %q does not exist", config)
 
 				// report status in every 10th second
 				if time.Now().Second()%10 == 0 {
-					s.log.Warnf("waiting for config file %q", config)
+					w.Log.Warnf("waiting for config file %q", config)
 				}
 
 				continue
@@ -274,28 +273,33 @@ func (s *Stunner) tryWatchConfig(ctx context.Context) bool {
 // configWatcher actually watches the config and emits the configs found on the specified
 // channel. Returns true if further action is needed (tryWatachConfig is to be started) or false on
 // normal exit.
-func (s *Stunner) configWatcher(ctx context.Context) bool {
-	s.log.Tracef("configWatcher")
+func configWatcher(ctx context.Context, w Watcher) bool {
+	w.Log.Tracef("configWatcher")
 	prev := v1alpha1.StunnerConfig{}
 
-	watchContext := ctx.Value(watchContextKey("watchContext")).(watchContext)
-	config := watchContext.config
-	watcher := watchContext.watcher
-	ch := watchContext.ch
+	// create a new watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return true
+	}
+	defer watcher.Close()
+
+	config := w.ConfigFile
+	ch := w.ConfigChannel
 
 	if err := watcher.Add(config); err != nil {
-		s.log.Debugf("could not add config file %q watcher: %s", config, err.Error())
+		w.Log.Debugf("could not add config file %q watcher: %s", config, err.Error())
 		return true
 	}
 
 	// emit an initial config
 	c, err := LoadConfig(config)
 	if err != nil {
-		s.log.Warnf("could not load config file %q: %s", config, err.Error())
+		w.Log.Warnf("could not load config file %q: %s", config, err.Error())
 		return true
 	}
 
-	s.log.Debugf("config file successfully loaded from %q", config)
+	w.Log.Debugf("config file successfully loaded from %q", config)
 
 	// send a deepcopy over the channel
 	copy := v1alpha1.StunnerConfig{}
@@ -312,17 +316,17 @@ func (s *Stunner) configWatcher(ctx context.Context) bool {
 
 		case e, ok := <-watcher.Events:
 			if !ok {
-				s.log.Debug("config watcher event handler received invalid event")
+				w.Log.Debug("config watcher event handler received invalid event")
 				return true
 			}
 
-			s.log.Debugf("received watcher event: %s", e.String())
+			w.Log.Debugf("received watcher event: %s", e.String())
 
 			if e.Has(fsnotify.Remove) {
-				s.log.Warnf("config file deleted %q, disabling watcher", e.Op.String())
+				w.Log.Warnf("config file deleted %q, disabling watcher", e.Op.String())
 
 				if err := watcher.Remove(config); err != nil {
-					s.log.Debugf("could not remove config file %q watcher: %s",
+					w.Log.Debugf("could not remove config file %q watcher: %s",
 						config, err.Error())
 				}
 
@@ -330,27 +334,27 @@ func (s *Stunner) configWatcher(ctx context.Context) bool {
 			}
 
 			if !e.Has(fsnotify.Write) {
-				s.log.Debugf("unhandled notify op on config file %q (ignoring): %s",
+				w.Log.Debugf("unhandled notify op on config file %q (ignoring): %s",
 					e.Name, e.Op.String())
 				continue
 			}
 
-			s.log.Debugf("loading configuration file: %s", config)
+			w.Log.Debugf("loading configuration file: %s", config)
 			c, err = LoadConfig(config)
 			if err != nil {
 				// assume it is a YAML/JSON syntax error (LoadConfig does not
 				// validate): report and ignore
-				s.log.Warnf("could not load config file %q: %s", config, err.Error())
+				w.Log.Warnf("could not load config file %q: %s", config, err.Error())
 				continue
 			}
 
 			// suppress repeated events
 			if c.DeepEqual(&prev) {
-				s.log.Debugf("ignoring recurrent notify event for the same config file")
+				w.Log.Debugf("ignoring recurrent notify event for the same config file")
 				continue
 			}
 
-			s.log.Debugf("config file successfully loaded from %q", config)
+			w.Log.Debugf("config file successfully loaded from %q", config)
 
 			copy := v1alpha1.StunnerConfig{}
 			c.DeepCopyInto(&copy)
@@ -361,14 +365,14 @@ func (s *Stunner) configWatcher(ctx context.Context) bool {
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				s.log.Debugf("config watcher error handler received invalid error")
+				w.Log.Debugf("config watcher error handler received invalid error")
 				return true
 			}
 
-			s.log.Debugf("watcher error, deactivating watcher: %s", err.Error())
+			w.Log.Debugf("watcher error, deactivating watcher: %s", err.Error())
 
 			if err := watcher.Remove(config); err != nil {
-				s.log.Debugf("could not remove config file %q watcher: %s",
+				w.Log.Debugf("could not remove config file %q watcher: %s",
 					config, err.Error())
 			}
 
