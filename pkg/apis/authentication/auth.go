@@ -1,5 +1,5 @@
 // Package auth contains variuos routines to generate and check STUNner authentication credentials.
-package auth
+package authentication
 
 import (
 	"crypto/hmac"

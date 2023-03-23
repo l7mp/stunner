@@ -9,7 +9,7 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
-	stnrauth "github.com/l7mp/stunner/pkg/apis/auth"
+	stnrauth "github.com/l7mp/stunner/pkg/apis/authentication"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
