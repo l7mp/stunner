@@ -18,13 +18,13 @@ import (
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00).
 const UsernameSeparator = ":"
 
-// GenerateTimeWindowedUsername creates a time-windowed username used for autentication as per the
-// "REST API For Access To TURN Services"
+// GenerateTimeWindowedUsername creates a time-windowed username consisting of a validity timestamp
+// and an arbitrary user id, as per the "REST API For Access To TURN Services"
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec.
-func GenerateTimeWindowedUsername(startTime time.Time, timeout time.Duration, username string) string {
+func GenerateTimeWindowedUsername(startTime time.Time, timeout time.Duration, userid string) string {
 	endTime := startTime.Add(timeout).Unix()
 	timeUsername := strconv.FormatInt(endTime, 10)
-	return timeUsername + ":" + username
+	return timeUsername + ":" + userid
 }
 
 // CheckTimeWindowedUsername checks the validity of an authentication credential. The method mostly
@@ -32,7 +32,7 @@ func GenerateTimeWindowedUsername(startTime time.Time, timeout time.Duration, us
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec with the exception
 // that we make more effort to find out which component of the username is the UNIX timestamp: we
 // find the first thing that looks like a UNIX timestamp in the username and use that for checking
-// the time-windowed credential, and drop everything else.
+// the time-windowed credential, and reject everything else.
 func CheckTimeWindowedUsername(username string) error {
 	var timestamp int = 0
 	for _, ts := range strings.Split(username, UsernameSeparator) {
@@ -66,7 +66,7 @@ func GetLongTermCredential(username string, sharedSecret string) (string, error)
 }
 
 // GenerateAuthKey is a convenience function to easily generate keys in the format used by
-// AuthHandler; re-exporteed from pion/turn/v2 so that our callers will have a single import.
+// AuthHandler; re-exported from `pion/turn/v2` so that our callers will have a single import.
 func GenerateAuthKey(username, realm, password string) []byte {
 	return turn.GenerateAuthKey(username, realm, password)
 }
