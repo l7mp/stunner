@@ -91,7 +91,7 @@ func NewStunner(options Options) *Stunner {
 	if !s.dryRun {
 		s.resolver.Start()
 		telemetry.Init()
-		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetAciveConnections() })
+		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetActiveConnections() })
 	}
 
 	return s
@@ -229,5 +229,5 @@ func (s *Stunner) Close() {
 	s.resolver.Close()
 }
 
-// GetAciveConnections returns the number of active downstream (listener-side) TURN allocations.
-func (s *Stunner) GetAciveConnections() float64 { return 0.0 }
+// GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
+func (s *Stunner) GetActiveConnections() float64 { return 0.0 }
