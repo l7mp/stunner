@@ -2,7 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
-	"sort"
+	// "sort"
 	"strings"
 )
 
@@ -45,10 +45,10 @@ func (req *StunnerConfig) Validate() error {
 		}
 		req.Listeners[i] = l
 	}
-	// listeners are sorted by name
-	sort.Slice(req.Listeners, func(i, j int) bool {
-		return req.Listeners[i].Name < req.Listeners[j].Name
-	})
+	// // listeners are sorted by name
+	// sort.Slice(req.Listeners, func(i, j int) bool {
+	// 	return req.Listeners[i].Name < req.Listeners[j].Name
+	// })
 
 	// validate clusters
 	for i, c := range req.Clusters {
@@ -58,10 +58,10 @@ func (req *StunnerConfig) Validate() error {
 		req.Clusters[i] = c
 	}
 
-	// clusters are sorted by name
-	sort.Slice(req.Clusters, func(i, j int) bool {
-		return req.Clusters[i].Name < req.Clusters[j].Name
-	})
+	// // clusters are sorted by name
+	// sort.Slice(req.Clusters, func(i, j int) bool {
+	// 	return req.Clusters[i].Name < req.Clusters[j].Name
+	// })
 
 	return nil
 }
