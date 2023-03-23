@@ -61,8 +61,15 @@ func (req *ClusterConfig) ConfigName() string {
 
 // DeepEqual compares two configurations.
 func (req *ClusterConfig) DeepEqual(other Config) bool {
-	// endpoints must be sorted in both configs!
 	return reflect.DeepEqual(req, other)
+}
+
+// DeepCopyInto copies a configuration.
+func (req *ClusterConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*ClusterConfig)
+	*ret = *req
+	ret.Endpoints = make([]string, len(req.Endpoints))
+	copy(ret.Endpoints, req.Endpoints)
 }
 
 // String stringifies the configuration.

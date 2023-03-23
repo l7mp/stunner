@@ -109,6 +109,24 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 	return true
 }
 
+// DeepCopyInto copies a configuration.
+func (req *StunnerConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*StunnerConfig)
+	ret.ApiVersion = req.ApiVersion
+	req.Admin.DeepCopyInto(&ret.Admin)
+	req.Auth.DeepCopyInto(&ret.Auth)
+
+	ret.Listeners = make([]ListenerConfig, len(req.Listeners))
+	for i := range req.Listeners {
+		req.Listeners[i].DeepCopyInto(&ret.Listeners[i])
+	}
+
+	ret.Clusters = make([]ClusterConfig, len(req.Clusters))
+	for i := range req.Clusters {
+		req.Clusters[i].DeepCopyInto(&ret.Clusters[i])
+	}
+}
+
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
 	status := []string{}

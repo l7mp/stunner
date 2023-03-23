@@ -96,6 +96,14 @@ func (req *ListenerConfig) DeepEqual(other Config) bool {
 	return reflect.DeepEqual(req, other)
 }
 
+// DeepCopyInto copies a configuration.
+func (req *ListenerConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*ListenerConfig)
+	*ret = *req
+	ret.Routes = make([]string, len(req.Routes))
+	copy(ret.Routes, req.Routes)
+}
+
 // String stringifies the configuration.
 func (req *ListenerConfig) String() string {
 	status := []string{}

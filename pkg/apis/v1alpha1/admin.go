@@ -62,6 +62,13 @@ func (req *AdminConfig) DeepEqual(other Config) bool {
 	return reflect.DeepEqual(req, other)
 }
 
+// DeepCopyInto copies a configuration.
+func (req *AdminConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*AdminConfig)
+	// admin conf contians primitive types only so this is safe
+	*ret = *req
+}
+
 // String stringifies the configuration.
 func (req *AdminConfig) String() string {
 	status := []string{}

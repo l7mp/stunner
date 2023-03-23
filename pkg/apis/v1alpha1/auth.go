@@ -66,6 +66,16 @@ func (req *AuthConfig) DeepEqual(other Config) bool {
 	return reflect.DeepEqual(req, other)
 }
 
+// DeepCopyInto copies a configuration.
+func (req *AuthConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*AuthConfig)
+	*ret = *req
+	ret.Credentials = make(map[string]string, len(req.Credentials))
+	for k, v := range req.Credentials {
+		ret.Credentials[k] = v
+	}
+}
+
 // String stringifies the configuration.
 func (req *AuthConfig) String() string {
 	status := []string{}
