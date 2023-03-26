@@ -164,6 +164,11 @@ func (s *Stunner) GetLogger() logging.LoggerFactory {
 	return s.logger
 }
 
+// SetLogLevel sets the loglevel.
+func (s *Stunner) SetLogLevel(levelSpec string) {
+	s.logger.SetLevel(levelSpec)
+}
+
 // Status returns a short status description of the running STUNner instance.
 func (s *Stunner) Status() string {
 	listeners := s.listenerManager.Keys()
