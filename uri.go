@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/l7mp/stunner/internal/util"
+	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -88,6 +89,59 @@ func ParseUri(uri string) (*StunnerUri, error) {
 	}
 
 	return &s, nil
+}
+
+// GetUriFromListener returns a standard TURN URI from a listener config
+func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
+	proto, err := v1alpha1.NewListenerProtocol(req.Protocol)
+	if err != nil {
+		return "", err
+	}
+
+	service, protocol := "", ""
+	switch proto {
+	case v1alpha1.ListenerProtocolUDP:
+		service = "turn"
+		protocol = "udp"
+	case v1alpha1.ListenerProtocolTCP:
+		service = "turn"
+		protocol = "tcp"
+	case v1alpha1.ListenerProtocolDTLS:
+		service = "turns"
+		protocol = "udp"
+	case v1alpha1.ListenerProtocolTLS:
+		service = "turns"
+		protocol = "tcp"
+	}
+
+	addr := req.PublicAddr
+	if addr == "" {
+		// fallback to server addr
+		addr = req.Addr
+	}
+
+	port := req.PublicPort
+	if port == 0 {
+		// fallback to server addr
+		port = req.Port
+	}
+
+	uri := fmt.Sprintf("%s:%s:%d?%s", service, addr, port, protocol)
+	return uri, nil
+}
+
+// GetUriFromListener returns a standard TURN URI from a listener config
+func GetTurnUris(req *v1alpha1.StunnerConfig) ([]string, error) {
+	ret := []string{}
+	for i := range req.Listeners {
+		uri, err := GetUriFromListener(&req.Listeners[i])
+		if err != nil {
+			return []string{}, err
+		}
+		ret = append(ret, uri)
+	}
+
+	return ret, nil
 }
 
 func reuseAddr(network, address string, conn syscall.RawConn) error {
