@@ -126,7 +126,7 @@ func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
 		port = req.Port
 	}
 
-	uri := fmt.Sprintf("%s:%s:%d?%s", service, addr, port, protocol)
+	uri := fmt.Sprintf("%s:%s:%d?transport=%s", service, addr, port, protocol)
 	return uri, nil
 }
 
