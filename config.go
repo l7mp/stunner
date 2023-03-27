@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/l7mp/stunner/internal/resolver"
-	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 

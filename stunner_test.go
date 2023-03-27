@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/resolver"
-	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/logger"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
@@ -261,184 +260,224 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
  *
  *********************************************/
 
-var TestStunnerConfigsWithLocalhost = []v1alpha1.StunnerConfig{
-	// udp, plaintext
+type TestStunnerConfigCase struct {
+	config v1alpha1.StunnerConfig
+	uri    string
+}
+
+var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		config: v1alpha1.StunnerConfig{
+			// udp, plaintext
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "udp",
+				Protocol:   "udp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "udp",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turn:1.2.3.4:3478?transport=udp",
 	},
-	// udp, longterm
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "longterm",
-			Credentials: map[string]string{
-				"secret": "my-secret",
+		config: v1alpha1.StunnerConfig{
+			// udp, longterm
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": "my-secret",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "udp",
+				Protocol:   "udp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "udp",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turn:1.2.3.4:3478?transport=udp",
 	},
-	// tcp, plaintext
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		config: v1alpha1.StunnerConfig{
+			// tcp, plaintext
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "tcp",
+				Protocol:   "tcp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "tcp",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turn:1.2.3.4:3478?transport=tcp",
 	},
-	// tcp, longterm
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "longterm",
-			Credentials: map[string]string{
-				"secret": "my-secret",
+		config: v1alpha1.StunnerConfig{
+			// tcp, longterm
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": "my-secret",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "tcp",
+				Protocol:   "tcp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "tcp",
-			Protocol: "tcp",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turn:1.2.3.4:3478?transport=tcp",
 	},
-	// tls, plaintext
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		config: v1alpha1.StunnerConfig{
+			// tls, plaintext
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "tls",
+				Protocol:   "tls",
+				Addr:       "127.0.0.1",
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Port:       23478,
+				Cert:       certPem64,
+				Key:        keyPem64,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "tls",
-			Protocol: "tls",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Cert:     certPem64,
-			Key:      keyPem64,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turns:1.2.3.4:3478?transport=tcp",
 	},
-	// tls, longterm
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "longterm",
-			Credentials: map[string]string{
-				"secret": "my-secret",
+		config: v1alpha1.StunnerConfig{
+			// tls, longterm
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "longterm",
+				Credentials: map[string]string{
+					"secret": "my-secret",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "tls",
+				Protocol:   "tls",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Cert:       certPem64,
+				Key:        keyPem64,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "tls",
-			Protocol: "tls",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Cert:     certPem64,
-			Key:      keyPem64,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turns:1.2.3.4:3478?transport=tcp",
 	},
-	// dtls, plaintext
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		config: v1alpha1.StunnerConfig{
+			// dtls, plaintext
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "dtls",
+				Protocol:   "dtls",
+				Addr:       "127.0.0.1",
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Port:       23478,
+				Cert:       certPem64,
+				Key:        keyPem64,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "dtls",
-			Protocol: "dtls",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Cert:     certPem64,
-			Key:      keyPem64,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turns:1.2.3.4:3478?transport=udp",
 	},
 	// // dtls, longterm
 	// {
@@ -470,7 +509,7 @@ func TestStunnerServerLocalhost(t *testing.T) {
 	testStunnerLocalhost(t, 1, TestStunnerConfigsWithLocalhost)
 }
 
-func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []v1alpha1.StunnerConfig) {
+func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerConfigCase) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -483,13 +522,19 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []v1alpha1.Stunn
 
 	// assert.NoError(t, err, "cannot generate SSL SSL cert/key")
 
-	for _, c := range tests {
+	for _, test := range tests {
+		c := test.config
 		auth := c.Auth.Type
 		proto := c.Listeners[0].Protocol
 		testName := fmt.Sprintf("TestStunner_NewStunner_Localhost_auth:%s_client:%s", auth, proto)
 
 		t.Run(testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
+
+			log.Debug("testing TURN URI")
+			uri, err := GetUriFromListener(&c.Listeners[0])
+			assert.NoError(t, err, "GetUriFromListener")
+			assert.Equal(t, test.uri, uri, "listener uri")
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
@@ -509,15 +554,16 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []v1alpha1.Stunn
 			assert.True(t, stunner.ready, "lifecycle 2: ready")
 			assert.True(t, stunner.IsReady(), "lifecycle 2: ready")
 
-			var err error
 			var u, p string
 			switch auth {
 			case "plaintext":
 				u = "user1"
 				p = "passwd1"
 			case "longterm":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
+				u = a12n.GenerateTimeWindowedUsername(time.Now(), time.Minute, "")
+				p2, err := a12n.GetLongTermCredential(u, "my-secret")
 				assert.NoError(t, err, err)
+				p = p2
 			default:
 				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
 			}
@@ -584,7 +630,6 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []v1alpha1.Stunn
 			assert.False(t, stunner.IsReady(), "lifecycle 3: not-ready")
 		})
 	}
-
 }
 
 // *****************
