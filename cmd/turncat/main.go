@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/l7mp/stunner"
-	"github.com/l7mp/stunner/internal/logger"
 	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const usage = "turncat [-l|--log <level>] [-i|--insecure] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"

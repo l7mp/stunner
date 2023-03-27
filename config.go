@@ -95,7 +95,7 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	}
 
 	if strings.ToUpper(u.Protocol) == "TLS" || strings.ToUpper(u.Protocol) == "DTLS" {
-		certPem, keyPem, err := util.GenerateSelfSignedKey()
+		certPem, keyPem, err := GenerateSelfSignedKey()
 		if err != nil {
 			return nil, err
 		}

@@ -9,12 +9,12 @@ import (
 	"github.com/pion/transport/v2"
 	"github.com/pion/transport/v2/stdnet"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const DefaultLogLevel = "all:WARN"

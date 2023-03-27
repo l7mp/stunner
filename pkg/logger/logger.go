@@ -10,10 +10,9 @@ import (
 	"github.com/pion/logging"
 )
 
-// we move the scope/level to after the timestamp and unify the format
 const defaultFlags = log.Lmicroseconds | log.Lshortfile | log.Lmsgprefix
 
-// LoggerFactory defines levels by scopes and creates new LeveledLogger
+// LoggerFactory defines levels by scopes and creates new LeveledLogger.
 type LoggerFactory struct {
 	Writer          io.Writer
 	DefaultLogLevel logging.LogLevel
@@ -21,7 +20,7 @@ type LoggerFactory struct {
 	Loggers         map[string]*logging.DefaultLeveledLogger
 }
 
-// NewLoggerFactory sets up a scoped logger for STUNner
+// NewLoggerFactory sets up a scoped logger for STUNner.
 func NewLoggerFactory(levelSpec string) *LoggerFactory {
 	logger := LoggerFactory{}
 	logger.DefaultLogLevel = logging.LogLevelError
@@ -37,7 +36,7 @@ func NewLoggerFactory(levelSpec string) *LoggerFactory {
 	return &logger
 }
 
-// NewLogger either returns the existing LeveledLoogger (if it exists) for the given scope or creates a new one
+// NewLogger either returns the existing LeveledLoogger (if it exists) for the given scope or creates a new one.
 func (f *LoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 	logger, found := f.Loggers[scope]
 	if found {
@@ -64,7 +63,7 @@ func (f *LoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 	return l
 }
 
-// NewLogger returns a configured LeveledLogger for the given , argsscope
+// Setlevel sets the loglevel.
 func (f *LoggerFactory) SetLevel(levelSpec string) {
 	logLevels := map[string]logging.LogLevel{
 		"DISABLE": logging.LogLevelDisabled,

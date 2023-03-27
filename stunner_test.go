@@ -20,11 +20,12 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/util"
+	"github.com/l7mp/stunner/pkg/logger"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	a12n "github.com/l7mp/stunner/pkg/authentication"
 )
 
 var stunnerTestLoglevel string = "all:ERROR"
@@ -34,7 +35,7 @@ var stunnerTestLoglevel string = "all:ERROR"
 // var stunnerTestLoglevel string = "all:TRACE"
 // var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
-var certPem, keyPem, _ = util.GenerateSelfSignedKey()
+var certPem, keyPem, _ = GenerateSelfSignedKey()
 var certPem64 = base64.StdEncoding.EncodeToString(certPem)
 var keyPem64 = base64.StdEncoding.EncodeToString(keyPem)
 
