@@ -68,8 +68,8 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	c := &v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin: v1alpha1.AdminConfig{
-			LogLevel:        v1alpha1.DefaultLogLevel,
-			MetricsEndpoint: "http://:8088",
+			LogLevel: v1alpha1.DefaultLogLevel,
+			// MetricsEndpoint: "http://:8088",
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type:  "plaintext",

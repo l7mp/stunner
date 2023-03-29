@@ -1157,14 +1157,33 @@ func TestStunnerClusterWithVNet(t *testing.T) {
  *
  *********************************************/
 type stunnerLifecycleTestConfig struct {
-	name, hcEndpoint                string
+	name                            string
+	hcEndpoint                      *string
 	livenessTester, readinessTester func(t *testing.T, status bool, err error)
 }
 
+var testLifecycleURLSpecDefault = "http://127.0.0.1:8086"
+var testLifecycleURLDisable = ""
+var testLifecycleURLNoAddr = "http://:8086"
+var testLifecycleURLDiffPort = "http://0.0.0.0:8087"
+var testLifecycleURLNoAddrNoPort = "http://"
+
 var testLifecycle = []stunnerLifecycleTestConfig{
 	{
+		name:       "default",
+		hcEndpoint: nil,
+		livenessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "liveness test: running")
+			assert.True(t, status, "liveness test: alive")
+		},
+		readinessTester: func(t *testing.T, status bool, err error) {
+			assert.NoError(t, err, "readiness test: running")
+			assert.True(t, status, "readiness test: ready")
+		},
+	},
+	{
 		name:       "enable with full health-check spec",
-		hcEndpoint: "http://127.0.0.1:8086",
+		hcEndpoint: &testLifecycleURLSpecDefault,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "liveness test: running")
 			assert.True(t, status, "liveness test: alive")
@@ -1176,7 +1195,7 @@ var testLifecycle = []stunnerLifecycleTestConfig{
 	},
 	{
 		name:       "disable",
-		hcEndpoint: "",
+		hcEndpoint: &testLifecycleURLDisable,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.Error(t, err, "liveness test: not running")
 		},
@@ -1186,7 +1205,7 @@ var testLifecycle = []stunnerLifecycleTestConfig{
 	},
 	{
 		name:       "enable with no addr",
-		hcEndpoint: "http://:8086",
+		hcEndpoint: &testLifecycleURLNoAddr,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "liveness test: running")
 			assert.True(t, status, "liveness test: alive")
@@ -1198,7 +1217,7 @@ var testLifecycle = []stunnerLifecycleTestConfig{
 	},
 	{
 		name:       "reconcile with a different port",
-		hcEndpoint: "http://0.0.0.0:8087",
+		hcEndpoint: &testLifecycleURLDiffPort,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "liveness test: running")
 			assert.True(t, status, "liveness test: alive")
@@ -1210,7 +1229,7 @@ var testLifecycle = []stunnerLifecycleTestConfig{
 	},
 	{
 		name:       "reconcile with no addr and no port",
-		hcEndpoint: "http://",
+		hcEndpoint: &testLifecycleURLNoAddrNoPort,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "liveness test: running")
 			assert.True(t, status, "liveness test: alive")
@@ -1222,7 +1241,7 @@ var testLifecycle = []stunnerLifecycleTestConfig{
 	},
 	{
 		name:       "reconcole with full health-check spec again",
-		hcEndpoint: "http://127.0.0.1:8086",
+		hcEndpoint: &testLifecycleURLSpecDefault,
 		livenessTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "liveness test: running")
 			assert.True(t, status, "liveness test: alive")
@@ -1248,6 +1267,12 @@ func TestStunnerLifecycle(t *testing.T) {
 
 	assert.False(t, s.IsReady(), "empty server not ready")
 
+	// health-check empty server
+	_, err := doLivenessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "no default liveness check for empty server")
+	_, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.Error(t, err, "no default readiness check for empty server")
+
 	log.Debug("starting stunnerd with an empty stunner config")
 	conf := v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
@@ -1263,14 +1288,16 @@ func TestStunnerLifecycle(t *testing.T) {
 	}
 
 	log.Debug("reconciling empty server")
-	err := s.Reconcile(conf)
+	err = s.Reconcile(conf)
 	assert.NoError(t, err, "reconcile empty server")
 
-	// health-check empty server
-	_, err = doLivenessCheck("http://127.0.0.1:8086")
-	assert.Error(t, err, "no default liveness check")
-	_, err = doReadinessCheck("http://127.0.0.1:8086")
-	assert.Error(t, err, "no default readiness check")
+	status, err := doLivenessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "liveness test minimal server: running")
+	assert.True(t, status, "liveness test minimal server: alive")
+
+	status, err = doReadinessCheck("http://127.0.0.1:8086")
+	assert.NoError(t, err, "readiness test minimal server: running")
+	assert.True(t, status, "readiness test minimal server: ready")
 
 	for _, c := range testLifecycle {
 		t.Run(c.name, func(t *testing.T) {
@@ -1282,7 +1309,11 @@ func TestStunnerLifecycle(t *testing.T) {
 			assert.NoError(t, err, "cannot reconcile")
 
 			// obtain hc address
-			u, err := url.Parse(c.hcEndpoint)
+			e := "http://127.0.0.1:8086"
+			if c.hcEndpoint != nil {
+				e = *c.hcEndpoint
+			}
+			u, err := url.Parse(e)
 			assert.NoError(t, err)
 
 			addr := u.Hostname()
@@ -1306,10 +1337,11 @@ func TestStunnerLifecycle(t *testing.T) {
 	}
 
 	// make sure health-check is running
-	conf.Admin.HealthCheckEndpoint = "0.0.0.0"
+	h := "0.0.0.0"
+	conf.Admin.HealthCheckEndpoint = &h
 	assert.NoError(t, s.Reconcile(conf), "cannot reconcile")
 
-	status, err := doLivenessCheck("http://127.0.0.1:8086")
+	status, err = doLivenessCheck("http://127.0.0.1:8086")
 	assert.NoError(t, err, "liveness test before graceful-shutdown: running")
 	assert.True(t, status, "liveness test before graceful-shutdown: alive")
 
@@ -1349,7 +1381,7 @@ type stunnerMetricsTestConfig struct {
 var testMetrics = []stunnerMetricsTestConfig{
 	{
 		name:       "enable with full metric-server spec",
-		mcEndpoint: "http://127.0.0.1:8086/metrics",
+		mcEndpoint: "http://127.0.0.1:9080/metrics",
 		metricsTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "metric server: running")
 			assert.True(t, status, "metric server: serving")
@@ -1357,7 +1389,7 @@ var testMetrics = []stunnerMetricsTestConfig{
 	},
 	{
 		name:       "reconcile with no path",
-		mcEndpoint: "http://127.0.0.1:8086",
+		mcEndpoint: "http://127.0.0.1:9080",
 		metricsTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "metric server: running")
 			assert.True(t, status, "metric server: serving")
@@ -1372,7 +1404,7 @@ var testMetrics = []stunnerMetricsTestConfig{
 	},
 	{
 		name:       "enable with no addr",
-		mcEndpoint: "http://:8086/metrics",
+		mcEndpoint: "http://:9080/metrics",
 		metricsTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "metric server: running")
 			assert.True(t, status, "metric server: serving")
@@ -1380,7 +1412,7 @@ var testMetrics = []stunnerMetricsTestConfig{
 	},
 	{
 		name:       "reconcile with a different port",
-		mcEndpoint: "http://0.0.0.0:8087/metrics",
+		mcEndpoint: "http://0.0.0.0:9087/metrics",
 		metricsTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "metric server: running")
 			assert.True(t, status, "metric server: serving")
