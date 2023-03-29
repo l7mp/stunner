@@ -1,4 +1,9 @@
-site_name: STUNner test docs
+site_name: STUNner
+repo_url: https://github.com/l7mp/stunner
+repo_name: STUNner
+site_description: "Documentation of STUNner"
+site_author: L7mp Technologies Kft.
+copyright: L7mp Technologies Kft.
 theme:
   name: readthedocs
   highlightjs: true
