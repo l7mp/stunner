@@ -53,6 +53,7 @@ func main() {
 	conf := make(chan v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
+	var cancelWatcher context.CancelFunc
 	if *config == "" && flag.NArg() == 1 {
 		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
@@ -90,6 +91,8 @@ func main() {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		cancelWatcher = cancel
+
 		if err := stunner.WatchConfig(ctx, stunner.Watcher{
 			ConfigFile:    *config,
 			ConfigChannel: conf,
@@ -127,6 +130,12 @@ func main() {
 		case <-sigterm:
 			log.Info("caught SIGTERM: performing a graceful shutdown")
 			st.Shutdown()
+
+			// cancel the config watcher
+			if cancelWatcher != nil {
+				log.Info("canceling config watcher")
+				cancelWatcher()
+			}
 
 			go func() {
 				for {
