@@ -79,15 +79,23 @@ func main() {
 	} else if *config != "" && *watch {
 		log.Infof("watching configuration file at %q", *config)
 
+		// init stunnerd with an empty config: this bootstraps it with the default
+		// resources (above all, starts the health-checker)
+		initConf := stunner.NewZeroConfig()
+		log.Debug("bootstrapping with zero reconciliation")
+		if err := st.Reconcile(*initConf); err != nil {
+			log.Errorf("could not reconcile initial configuratoin: %s", err.Error())
+			os.Exit(1)
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		err := stunner.WatchConfig(ctx, stunner.Watcher{
+		if err := stunner.WatchConfig(ctx, stunner.Watcher{
 			ConfigFile:    *config,
 			ConfigChannel: conf,
 			Logger:        st.GetLogger(),
-		})
-		if err != nil {
-			log.Errorf("could not create config file watcher: %s", err)
+		}); err != nil {
+			log.Errorf("could not create config file watcher: %s", err.Error())
 			os.Exit(1)
 		}
 	} else {

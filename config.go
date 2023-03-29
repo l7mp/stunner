@@ -51,7 +51,26 @@ type Options struct {
 	Net transport.Net
 }
 
-// NewDefaultStunnerConfig builds a default configuration from a TURN server URI. Example: the URI
+// NewZeroConfig builds a zero configuration useful for bootstrapping STUNner. It starts with
+// plaintext authentication and opens no listeners and clusters.
+func NewZeroConfig() *v1alpha1.StunnerConfig {
+	return &v1alpha1.StunnerConfig{
+		ApiVersion: v1alpha1.ApiVersion,
+		Admin:      v1alpha1.AdminConfig{},
+		Auth: v1alpha1.AuthConfig{
+			Type:  "plaintext",
+			Realm: v1alpha1.DefaultRealm,
+			Credentials: map[string]string{
+				"username": "dummy-username",
+				"password": "dummy-password",
+			},
+		},
+		Listeners: []v1alpha1.ListenerConfig{},
+		Clusters:  []v1alpha1.ClusterConfig{},
+	}
+}
+
+// NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
 // username/password pair `user:pass`. Health-checks and metric scarping are disabled.
@@ -65,11 +84,13 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 		return nil, fmt.Errorf("Username/password must be set: '%s'", uri)
 	}
 
+	h := ""
 	c := &v1alpha1.StunnerConfig{
 		ApiVersion: v1alpha1.ApiVersion,
 		Admin: v1alpha1.AdminConfig{
 			LogLevel: v1alpha1.DefaultLogLevel,
 			// MetricsEndpoint: "http://:8088",
+			HealthCheckEndpoint: &h,
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type:  "plaintext",
