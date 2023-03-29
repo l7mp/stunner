@@ -29,7 +29,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 
 			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
-				auth.Log.Debug("plaintext auth request: valid username found")
+				auth.Log.Debug("plaintext auth request: valid username")
 				return key, true
 			}
 

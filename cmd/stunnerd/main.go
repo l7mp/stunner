@@ -111,8 +111,15 @@ func main() {
 	defer close(sigterm)
 	signal.Notify(sigterm, syscall.SIGTERM)
 
+	exit := make(chan bool, 1)
+	defer close(exit)
+
 	for {
 		select {
+		case <-exit:
+			log.Info("normal exit on graceful shutdown")
+			os.Exit(0)
+
 		case <-sigint:
 			log.Info("normal exit")
 			os.Exit(0)
@@ -120,6 +127,17 @@ func main() {
 		case <-sigterm:
 			log.Info("caught SIGTERM: performing a graceful shutdown")
 			st.Shutdown()
+
+			go func() {
+				for {
+					// check if we can exit
+					if st.AllocationCount() == 0 {
+						exit <- true
+						return
+					}
+					time.Sleep(time.Second)
+				}
+			}()
 
 		case c := <-conf:
 			log.Trace("new configuration file available")
