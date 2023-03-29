@@ -176,7 +176,9 @@ func (s *Stunner) AllocationCount() int {
 	listeners := s.listenerManager.Keys()
 	for _, name := range listeners {
 		l := s.GetListener(name)
-		n += l.Server.AllocationCount()
+		if l.Server != nil {
+			n += l.Server.AllocationCount()
+		}
 	}
 	return n
 }
