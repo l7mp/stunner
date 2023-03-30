@@ -14,7 +14,7 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](../../doc/INSTALL.md) to set up STUNner.
+Consult the [STUNner installation and configuration guide](../../INSTALL.md) to set up STUNner.
 
 ### Quick installation
 

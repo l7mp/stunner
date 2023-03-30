@@ -22,13 +22,13 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](../../doc/INSTALL.md) to set up STUNner.
+Consult the [STUNner installation and configuration guide](../../INSTALL.md) to set up STUNner.
 
 ### Quick installation
 
 The simplest way to deploy the demo is to clone the [STUNner git
 repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](kurento-magic-mirror.yaml) packaged with STUNner.
+[manifest](kurento-magic-mirror-server.yaml) packaged with STUNner.
 
 Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
 

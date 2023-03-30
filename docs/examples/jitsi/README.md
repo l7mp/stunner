@@ -21,7 +21,7 @@ The recommended way to install Jitsi into Kubernetes is deploying the media serv
 
 The figure below shows Jitsi deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, Jitsi is deployed behind STUNner in the media-plane deployment model, so that STUNner acts as a "local" STUN/TURN server for Jitsi, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-![STUNner Jitsi integration deployment architecture](../../doc/images/stunner_jitsi.svg)
+![STUNner Jitsi integration deployment architecture](../../images/stunner_jitsi.svg)
 
 In this tutorial we deploy a video room example using the [Jitsi framework](https://jitsi.github.io/handbook/docs/architecture) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the Jitsi JVB to clients.
 
@@ -88,7 +88,7 @@ At this point we have all the necessary boilerplate set up to automate TLS issua
 
 ### STUNner
 
-Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](/examples/jitsi-server.yaml) packaged with STUNner.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](jitsi-server.yaml) packaged with STUNner.
 
 Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
 
@@ -107,7 +107,7 @@ cd stunner
 kubectl apply -f examples/jitsi/jitsi-call-stunner.yaml
 ```
 
-The relevant parts here are the STUNner [Gateway definition](/doc/GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](/doc/GATEWAY.md), which takes care of routing media to the pods running the Jitsi service. Also, with the GatewayConfig object we set the `authType: longterm` parameter because Prosody can't use Plaintext authentication only long term.
+The relevant parts here are the STUNner [Gateway definition](../../GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../GATEWAY.md), which takes care of routing media to the pods running the Jitsi service. Also, with the GatewayConfig object we set the `authType: longterm` parameter because Prosody can't use Plaintext authentication only long term.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1alpha1
@@ -161,7 +161,7 @@ The crucial step of integrating *any* WebRTC media server with STUNner is to ens
 sed -i "s/<stunner-public-ip>/$STUNNERIP/g" examples/jitsi/jitsi-server.yaml
 ```
 
-This will make sure that Jitsi is started with STUNner as the STUN/TURN server. Note that Jitsi itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](/doc/DEPLOYMENT.md)); with the above configuration we are just telling Jitsi to instruct its clients to use STUNner to reach the Jitsi JVB.
+This will make sure that Jitsi is started with STUNner as the STUN/TURN server. Note that Jitsi itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](../../DEPLOYMENT.md)); with the above configuration we are just telling Jitsi to instruct its clients to use STUNner to reach the Jitsi JVB.
 
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 

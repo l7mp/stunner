@@ -4,6 +4,7 @@ repo_name: STUNner
 site_description: "Documentation of STUNner"
 site_author: L7mp Technologies Kft.
 copyright: L7mp Technologies Kft.
+use_directory_urls: true
 theme:
   name: readthedocs
   highlightjs: true

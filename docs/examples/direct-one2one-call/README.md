@@ -31,7 +31,7 @@ clients will connect to each other directly via STUNner. We will deploy a
 page with the embedded video viewports and download the client-side JavaScript code to the
 browsers.
 
-![STUNner standalone deployment architecture](../../doc/images/stunner_standalone_arch.svg)
+![STUNner standalone deployment architecture](../../images/stunner_standalone_arch.svg)
 
 Note that transcoding/transsizing and other media server goodies are not available in this setup:
 the clients must be fully compatible to be able to establish an audio/video session in this

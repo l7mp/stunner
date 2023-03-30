@@ -24,13 +24,13 @@ When measuring latency with `iperf` you might be fooled because it is [measuring
 
 All the components are running locally. All of them are using `127.0.0.1` addresses.
 
-![STUNner benchmark local test architecture](../../doc/images/stunner_benchmark_local.svg)
+![STUNner benchmark local test architecture](../../images/stunner_benchmark_local.svg)
 
 ### Kubernetes setup
 
 `iperf` and `turncat` clients are running locally, both `STUNner` and `iperf` server are running inside a Kubernetes Cluster in a pod.
 
-![STUNner benchmark Kubernetes test architecture](../../doc/images/stunner_benchmark_k8s.svg)
+![STUNner benchmark Kubernetes test architecture](../../images/stunner_benchmark_k8s.svg)
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-n
 helm install stunner stunner/stunner -create-namespace --namespace=stunner
 ```
 
-Configure STUNner to act as a STUN server towards [`turncat`](../turncat/README.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
+Configure STUNner to act as a STUN server towards [`turncat`](../../cmd/turncat.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
 
 ```
 kubectl apply -f iperf-server.yaml
@@ -64,7 +64,7 @@ kubectl apply -f performance-stunner.yaml
 
 ### Helper script parameters
 
-We bundle a helper script for executing performance measurements. The script uses optional arguments. The flags are the following: 
+We bundle a helper script for executing performance measurements. The script uses optional arguments. The flags are the following:
 * `-h` Show help text
 * `-n` Number of `turncat` clients (more of them can be used, this way each client will forward lesser traffic and none of them becomes the bottleneck while measuring)
 * `-t` Time in seconds to transmit for
