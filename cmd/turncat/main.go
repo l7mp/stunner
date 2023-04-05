@@ -39,6 +39,8 @@ func main() {
 	os.Args[0] = "turncat"
 	defaultDuration, _ = time.ParseDuration("1h")
 	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
+	// var user = flag.StringP("user", "u", "", "Set username. Auth fields in the TURN URI override this.")
+	// var passwd = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
 	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
 	flag.Parse()
