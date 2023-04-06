@@ -4,8 +4,6 @@ import (
 	"errors"
 	"net"
 
-	"github.com/pion/turn/v2"
-
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
@@ -15,7 +13,7 @@ import (
 
 // NewAuthHandler returns an authentication handler callback to be used with a TURN server for
 // authenticating clients.
-func (s *Stunner) NewAuthHandler() turn.AuthHandler {
+func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
 	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
@@ -64,7 +62,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 }
 
 // NewPermissionHandler returns a callback to handle client permission requests to access peers.
-func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandler {
+func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandler {
 	s.log.Trace("NewPermissionHandler")
 
 	return func(src net.Addr, peer net.IP) bool {
