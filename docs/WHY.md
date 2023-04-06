@@ -49,15 +49,16 @@ Kubernetes node) it is running on, inheriting the public address (if any) of the
 (hopefully) sidestepping the private pod network with the involved NATs.
 
 There are *lots* of reasons why this deployment model is less than ideal:
-* **Each node can run a single pod only.** The basic idea in Kubernetes is that nodes should run
+
+- **Each node can run a single pod only.** The basic idea in Kubernetes is that nodes should run
   lots of pods simultaneously, perhaps in the hundreds, in order to benefit from resource pooling
   and statistical multiplexing, amortize the costs of running the per-node Kubernetes boilerplate
   (the kubelet, kube-proxy, etc.), enable elastic scaling, etc. Using host-networking breaks this
   promise: since there is no guarantee that two media server pods would not both allocate the same
   UDP port to terminate a UDP/RTP stream, deploying both into the host-network namespace of the
   same node would easily result in hard-to-debug port clashes.
-  
-* **It inhibits elastic scaling.** Kubernetes scales workloads at the per-pod granularity. When
+
+- **It inhibits elastic scaling.** Kubernetes scales workloads at the per-pod granularity. When
   each node occupies an entire Kubernetes node, scaling the media plane equals adding/removing
   Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly process. In
   addition, it becomes very difficult to provision the resource requests and limits of each media
@@ -65,26 +66,26 @@ There are *lots* of reasons why this deployment model is less than ideal:
   while a `t2.xlarge` (8 vCPU/32 GB mem) is too costly for running, say, only a single 2-party
   call. Worse yet, the decision has to be made at installation time.
 
-* **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
+- **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
   servers to the Internet over a public IP address, and opening up all UDP ports for potentially
   malicious access, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
   your media servers behind a secure perimeter defense mechanism and lock down *all* uncontrolled
   access and nefarious business by running it over a private IP?
 
-* **It is a terrible waste of resources.** Think about this: when you use Kubernetes you pay a
+- **It is a terrible waste of resources.** Think about this: when you use Kubernetes you pay a
   double virtualization price. Namely, the node itself is usually just regular VM on a physical
   server, which means a first layer of virtualization, on top of which the pod runs in another
   container virtualization layer. It is only worth paying this prize if you amortize the cost of
   the VM across many containers/pods. If you run a single media server per node then why using
   Kubernetes at all? Just use a simple VM instead, and pay the virtualization cost only once.
 
-* **You still need a STUN/TURN server for clients to reach the cluster.** Putting the media server
+- **You still need a STUN/TURN server for clients to reach the cluster.** Putting the media server
   over a public IP solves only half of the problem: the server side. For the client side you still
   need a costly NAT traversal service to let clients behind a NAT to connect to your media
   servers. But why not putting the NAT-traversal facilities right into your Kubernetes cluster and
   share the same facility for the client and the server side?
 
-* **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
+- **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
   hosted Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP
   address for security purposes. This then precludes the host-networking hack. But even if nodes
   are publicly available, many Kubernetes services simply disable host-networking all together
@@ -115,9 +116,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

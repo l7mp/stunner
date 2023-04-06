@@ -8,7 +8,7 @@ Kubernetes. The tutorial can also be used to quickly check a STUNner installatio
 In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
 * configure STUNner to expose the service to clients,
-* use [`turncat`](../../cmd/turncat) to connect to the UDP service via STUNner,
+* use [`turncat`](../../cmd/turncat.md) to connect to the UDP service via STUNner,
 * benchmark your cloud-setup with [`iperfv2`](https://iperf.fr).
 
 ## Installation
@@ -16,7 +16,7 @@ In this tutorial you will learn how to:
 ### Prerequisites
 
 The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration
-guide](/doc/INSTALL.md). Create a namespace called `stunner` if there is none. You must have
+guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. You must have
 [`iperfv2`](https://iperf.fr) installed locally to run this tutorial.
 
 ### Setup
@@ -247,6 +247,6 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

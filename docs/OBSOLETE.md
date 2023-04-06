@@ -9,15 +9,22 @@ recommended way to interact with STUNner.
 
 ## Table of contents
 
-* [Prerequisites](#prerequisites)
-* [Installation](#installation)
-* [Configuration](#configuration)
-* [Learning the external IP and port](#learning-the-external-IP-and-port)
-* [Configuring WebRTC clients](#configuring-WebRTC-clients)
-* [Authentication](#authentication)
-* [Access control](#access-control)
-* [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp) 
-* [Enabling TURN transport over TLS and DTLS](#enabling-turn-transport-over-tls-and-dtls)
+- [Standalone mode](#standalone-mode)
+  - [Table of contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+    - [Installation with Helm](#installation-with-helm)
+    - [Manual installation](#manual-installation)
+  - [Configuration](#configuration)
+  - [Learning the external IP and port](#learning-the-external-ip-and-port)
+  - [Configuring WebRTC clients](#configuring-webrtc-clients)
+  - [Authentication](#authentication)
+  - [Access control](#access-control)
+  - [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp)
+  - [Enabling TURN transport over TLS and DTLS](#enabling-turn-transport-over-tls-and-dtls)
+  - [Help](#help)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## Prerequisites
 
@@ -42,8 +49,8 @@ helm repo update
 helm install stunner stunner/stunner --set stunner.standalone.enabled=true
 ```
 
-The below wiill create a new namespace named `stunner` and install the STUNner dataplane pods into that
-namespace. 
+The below will create a new namespace named `stunner` and install the STUNner dataplane pods into that
+namespace.
 
 ```console
 helm install stunner stunner/stunner --set stunner.standalone.enabled=true --create-namespace --namespace=stunner
@@ -65,7 +72,7 @@ cd stunner
 ```
 
 Then, customize the default settings in the STUNner service
-[manifest](/deploy/manifests/stunner-standalone.yaml) and deploy it via `kubectl`.
+[manifest](https://github.com/l7mp/stunner/blob/main/deploy/manifests/stunner-standalone.yaml) and deploy it via `kubectl`.
 
 ```console
 kubectl apply -f deploy/manifests/stunner-standalone.yaml
@@ -76,6 +83,7 @@ By default, all resources are created in the `default` namespace.
 ## Configuration
 
 The default STUNner installation will create the below Kubernetes resources:
+
 1. a ConfigMap that stores STUNner local configuration,
 2. a Deployment running one or more STUNner daemon replicas,
 3. a LoadBalancer service to expose the STUNner deployment on a public IP address and UDP port
@@ -88,7 +96,7 @@ be customized prior to deployment. In particular, make absolutely sure to custom
 tokens (`STUNNER_USERNAME` and `STUNNER_PASSWORD` for `plaintext` authentication, and
 `STUNNER_SHARED_SECRET` and possibly `STUNNER_DURATION` for the `longterm` authentication mode),
 otherwise STUNner will use hard-coded STUN/TURN credentials. This should not pose a major security
-risk (see [here](/doc/SECURITY.md) for more info), but it is still safer to customize the access
+risk (see [here](SECURITY.md) for more info), but it is still safer to customize the access
 tokens before exposing STUNner to the Internet.
 
 The most recent STUNner configuration is always available in the Kubernetes ConfigMap named
@@ -132,7 +140,7 @@ The most important STUNner configuration settings are as follows.
 * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
 
 The default configuration can be overridden by setting custom command line arguments when
-[launching the STUNner pods](/cmd/stunnerd/README.md). All examples below assume that STUNner is
+[launching the STUNner pods](cmd/stunnerd.md). All examples below assume that STUNner is
 deployed into the `default` namespace; see the installation notes below on how to override this.
 
 Note that changing in the configuration values becomes valid only once STUNner is restarted (see
@@ -149,7 +157,7 @@ fallback if an ingress load-balancer is not available. In both cases the externa
 port that WebRTC clients can use to reach STUNner may be set dynamically by Kubernetes. (Kubernetes
 lets you use your own [fix IP address and domain
 name](https://kubernetes.io/docs/concepts/services-networking/service/#choosing-your-own-ip-address),
-but the default installation scripts do not support this.) 
+but the default installation scripts do not support this.)
 
 In general, WebRTC clients will need to learn STUNner's external IP and port somehow. In order to
 simplify the integration of STUNner into the WebRTC application server, STUNner stores the dynamic
@@ -244,7 +252,7 @@ var pc = new RTCPeerConnection(ICE_config);
 
 STUNner relies on the STUN [long-term credential
 mechanism](https://www.rfc-editor.org/rfc/rfc8489.html#page-26) to provide user authentication. See
-[here](/doc/AUTH.md) for more detail on STUNner's authentication modes.
+[here](AUTH.md) for more detail on STUNner's authentication modes.
 
 The below commands will configure STUNner to use `plaintext` authentication using the
 username/password pair `my-user/my-password` and restart STUNner for the new configuration to take
@@ -268,7 +276,7 @@ kubectl rollout restart deployment/stunner
 ## Access control
 
 The security risks and best practices associated with STUNner are described
-[here](/doc/SECURITY.md), below we summarize the only step that is specific to the standalone mode:
+[here](SECURITY.md), below we summarize the only step that is specific to the standalone mode:
 configuring access control.
 
 By default, a standalone STUNner installation comes with an open route: this essentially means
@@ -443,8 +451,8 @@ export STUNNER_PUBLIC_ADDR_TLS=$(kubectl get svc stunner-tls -o jsonpath='{.stat
 export STUNNER_PUBLIC_ADDR_DTLS=$(kubectl get svc stunner-dtls -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
-Check your configuration with the handy [`turncat`](/cmd/turncat) utility and the [UDP
-greeter](/README.md#testing) service. First, query the UDP greeter service via TLS/TCP. Here, the
+Check your configuration with the handy [`turncat`](cmd/turncat.md) utility and the [UDP
+greeter](https://github.com/l7mp/stunner#testing) service. First, query the UDP greeter service via TLS/TCP. Here, the
 `turncat` command line argument `-i` puts `turncat` into insecure mode in order to accept our
 self-signed TURN sever TLS certificate.
 
@@ -491,7 +499,7 @@ var pc = new RTCPeerConnection(ICE_config);
 ```
 
 Note that the default Kubernetes manifest
-['stunner-standalone-tls.yaml'](/deploy/manifests/stunner-standalone-tls.yaml) opens up the
+['stunner-standalone-tls.yaml'](https://github.com/l7mp/stunner/blob/main/deploy/manifests/stunner-standalone-tls.yaml.template) opens up the
 NetworkPolicy for the `media-plane/default` service only, make sure to configure this to your own
 setup.
 
@@ -501,9 +509,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

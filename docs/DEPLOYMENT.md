@@ -6,7 +6,7 @@ fully fledged ingress gateway in front of an entire Kubernetes-based media serve
 when STUNner is configured as an ingress gateway then there are multiple [ICE models](#ice-models),
 based on whether only the client connects via STUNner or both clients and media servers use STUNner
 to set up the media-plane connection. Third, STUNner can run in one of two [control plane
-models](control-plane-models), based on whether the user manually supplies STUNner configuration or
+models](#control-plane-models), based on whether the user manually supplies STUNner configuration or
 there is a separate STUNner control plane that automatically reconciles the dataplane state based
 on a high-level [declarative API](https://gateway-api.sigs.k8s.io).
 
@@ -23,7 +23,7 @@ clients can use as a NAT traversal facility for establishing media connections b
 themselves. This is not that much different from a standard public STUN/TURN server setup, but in
 this case the STUN/TURN servers are deployed into Kubernetes.
 
-![STUNner headless deployment architecture](/doc/images/stunner_standalone_arch.svg)
+![STUNner headless deployment architecture](images/stunner_standalone_arch.svg)
 
 Note that for STUNner to be able to connect two or more WebRTC clients in the headless model *all*
 the clients *must* use STUNner as the TURN server. This is because STUNner opens the transport
@@ -39,7 +39,7 @@ servers and media servers into ordinary Kubernetes pods, taking advantage of Kub
 tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other
 cloud-bound workload.
 
-![STUNner media-plane deployment architecture](/doc/images/stunner_arch.svg)
+![STUNner media-plane deployment architecture](images/stunner_arch.svg)
 
 There is no limitation as to how many gateway and media server pods can be opened in this model,
 which theoretically means limitless scalability. Furthermore, by creating connection-tracking state
@@ -57,7 +57,7 @@ media-plane deployment model of STUNner is the *asymmetric ICE mode*. In this mo
 configured with STUNner as the TURN server and media servers run with no STUN or TURN servers
 whatsoever.
 
-![STUNner asymmetric ICE mode](/doc/images/stunner_asymmetric_ice.svg)
+![STUNner asymmetric ICE mode](images/stunner_asymmetric_ice.svg)
 
 In this model, the client is configured with STUNner as the TURN server so at a certain point in
 the ICE conversation it opens a TURN transport relay connection via STUNner. The IP address of the
@@ -72,13 +72,14 @@ can communicate with all other pods on any other node without a
 NAT"](https://kubernetes.io/docs/concepts/services-networking), the clients relay candidate and the
 servers' host candidate will have direct connectivity in the Kubernetes private container network
 and the ICE connectivity check will succeed. See more explanation
-[here](/examples/kurento-one2one-call/README.md#what-is-going-on-here).
+[here](examples/kurento-one2one-call/README.md#what-is-going-on-here).
 
 A word of warning here: when using STUNner refrain from configuring additional public STUN/TURN
 servers, apart from STUNner itself. The rules to follow in setting the [ICE server
-configuration](/README.md#configuring-webrtc-clients) in asymmetric ICE mode are as below:
-* on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
-* on the server do *not* configure *any* STUN or TURN servers at all.
+configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients) in asymmetric ICE mode are as below:
+
+- on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
+- on the server do *not* configure *any* STUN or TURN servers at all.
 
 Note that deviating from the above rules *might* work in certain cases, but may have uncanny and
 hard-to-debug side-effects. For instance, configuring clients and servers with public STUN servers
@@ -95,13 +96,14 @@ In the symmetric ICE mode both the client and the server obtain an ICE [relay
 candidate](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) from STUNner and
 the connection occurs directly via STUNner.
 
-![STUNner symmetric ICE mode](/doc/images/stunner_symmetric_ice.svg)
+![STUNner symmetric ICE mode](images/stunner_symmetric_ice.svg)
 
 In the symmetric mode the following rules apply for setting the [ICE server
-configuration](/README.md#configuring-webrtc-clients):
-* on both the clients and the server set STUNner as the *only* TURN server and configure *no* STUN
+configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients):
+
+- on both the clients and the server set STUNner as the *only* TURN server and configure *no* STUN
   servers, and
-* set the `iceTransportPolicy` to `relay` on both sides.
+- set the `iceTransportPolicy` to `relay` on both sides.
 
 Note that the `iceTransportPolicy: relay` setting is mandatory in this case, otherwise the
 connection falls back to the asymmetric mode (this is a consequence of the way [ICE assigns
@@ -115,7 +117,7 @@ The symmetric mode means more overhead compared to the asymmetric mode, since ST
 TURN encapsulation/decapsulation for both sides. However, the symmetric mode comes with certain
 operational advantages. Namely, this is the only ICE mode that would allow STUNner to obscure the
 internal IP addresses in the ICE candidates from attackers; note that this is not implemented yet,
-but feel free to open an issue if [exposing internal IP addresses](/doc/SECURITY.md) is blocking
+but feel free to open an issue if [exposing internal IP addresses](SECURITY.md) is blocking
 you from adopting STUNner.
 
 ## Control plane models
@@ -127,7 +129,7 @@ STUNner manually. The standalone mode provides perfect control over the way STUN
 but at the same time it requires users to deal with the subtleties of internal STUNner APIs that
 are subject to change between subsequent releases. As of v0.14, STUNner's operator-ful mode is
 feature complete and the standalone model is considered obsolete. If still interested,
-comprehensive documentation for the standalone can be found [here](/doc/OBSOLETE.md), but this mode
+comprehensive documentation for the standalone can be found [here](OBSOLETE.md), but this mode
 is no longer supported.
 
 ## Help
@@ -136,9 +138,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

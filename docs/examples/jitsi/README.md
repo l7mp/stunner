@@ -17,7 +17,7 @@ As a regrettable exception, Minikube is unfortunately not supported for this dem
 
 ## Setup
 
-The recommended way to install Jitsi into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`), or using a NodePort service or a dedicated Ingress to ingest WebRTC media traffic into the network. However, these options allow only one JVB instance per Kubernetes node and the host-network deployment model also comes with a set of uncanny [operational limitations and security concerns](https://github.com/l7mp/stunner/blob/jitsi/doc/WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
+The recommended way to install Jitsi into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`), or using a NodePort service or a dedicated Ingress to ingest WebRTC media traffic into the network. However, these options allow only one JVB instance per Kubernetes node and the host-network deployment model also comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
 
 The figure below shows Jitsi deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, Jitsi is deployed behind STUNner in the media-plane deployment model, so that STUNner acts as a "local" STUN/TURN server for Jitsi, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
@@ -208,6 +208,6 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

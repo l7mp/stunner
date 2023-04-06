@@ -17,7 +17,7 @@ rules to admit the UDP NodePort range into the cluster.
 To recompile STUNner, at least Go v1.18 is required. Building the container images requires
 [Docker](https://docker.io) or [Podman](https://podman.io).
 
-## Basic installation 
+## Basic installation
 
 The simplest way to deploy the full STUNner distro, with the dataplane and the controller
 automatically installed, is through [Helm](https://helm.sh). STUNner configuration parameters are
@@ -58,12 +58,12 @@ helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner
 helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
 ```
 
-Now, you can build a separate [gateway hierarchy](/doc/CONCEPTS.md) per each namespace to supply a
+Now, you can build a separate [gateway hierarchy](CONCEPTS.md) per each namespace to supply a
 distinct ingress gateway configuration per dataplane.
 
 For the list of available customizations, see the
 [STUNner-helm](https://github.com/l7mp/stunner-helm) repository. For installing STUNner in the
-standalone mode, consult the documentation [here](/doc/OBSOLETE.md).
+standalone mode, consult the documentation [here](OBSOLETE.md).
 
 ## Development version
 
@@ -81,9 +81,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

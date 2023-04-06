@@ -8,6 +8,7 @@ media streams between clients and the CloudRetro media servers deployed into Kub
 ![STUNner & CloudRetro architecture](../../images/stunner_cloudretro.svg)
 
 In this demo you will learn how to:
+
 - integrate a typical WebRTC application with STUNner,
 - install the CloudRetro demo into your Kubernetes cluster,
 - configure STUNner to expose CloudRetro to clients.
@@ -248,9 +249,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

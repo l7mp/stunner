@@ -1,6 +1,6 @@
 # Performance Benchmarking
 
-With the help of this guide you are able to take performance measurments in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
+With the help of this guide you are able to take performance measurements in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
 
 Compare the locally measured result to the result measured in Kubernetes and figure out the overhead cost. The extra cost of your cluster's networking may surprise you in terms of extra delay or more packet drops using the same bandwidth.
 
@@ -9,7 +9,8 @@ If you have a Kubernetes cluster up and running, the installation and measuremen
 
 ## Tools
 
-The tools used in the measurment are the following:
+The tools used in the measurement are the following:
+
 * `iperf` Using to create traffic flows between the clients and server
 * `turncat` Using to open a connection through STUNner to the iperf server
 * `STUNner` Acting as a STUN server towards `turncat` clients
@@ -65,12 +66,13 @@ kubectl apply -f performance-stunner.yaml
 ### Helper script parameters
 
 We bundle a helper script for executing performance measurements. The script uses optional arguments. The flags are the following:
-* `-h` Show help text
-* `-n` Number of `turncat` clients (more of them can be used, this way each client will forward lesser traffic and none of them becomes the bottleneck while measuring)
-* `-t` Time in seconds to transmit for
-* `-s` Size of the packet in bytes
-* `-b` Bandwidth to send in bits/sec
-* `-p` Platform, can be `local` or `k8s`
+
+- `-h` Show help text
+- `-n` Number of `turncat` clients (more of them can be used, this way each client will forward lesser traffic and none of them becomes the bottleneck while measuring)
+- `-t` Time in seconds to transmit for
+- `-s` Size of the packet in bytes
+- `-b` Bandwidth to send in bits/sec
+- `-p` Platform, can be `local` or `k8s`
 
 ```
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000 -p k8s
@@ -79,34 +81,38 @@ We bundle a helper script for executing performance measurements. The script use
 ### Performance measuring locally without Kubernetes
 
 The below command will open:
-* a `stunnerd` UDP listener at `127.0.0.1:5001`
-* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server
-* an `iperf` server at `127.0.0.1:5000`
-* an `iperf` client sending its traffic to the turn
+
+- a `stunnerd` UDP listener at `127.0.0.1:5001`
+- one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server
+- an `iperf` server at `127.0.0.1:5000`
+- an `iperf` client sending its traffic to the turn
 
 An example for:
-* a local benchmark
-* 5 turncats
-* 5 seconds of evaluation time
-* 1000 byte packets
-* 100 Mbits/sec
+
+- a local benchmark
+- 5 turncats
+- 5 seconds of evaluation time
+- 1000 byte packets
+- 100 Mbits/sec
 ```
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p local
 ```
 ### Performance measuring with Kubernetes
 
 The below command will open:
-* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwared to the STUNner public address obtained from STUNner configuration
-* an `iperf` client sending its traffic to the turn
+
+- one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwared to the STUNner public address obtained from STUNner configuration
+- an `iperf` client sending its traffic to the turn
 
 `STUNner` and `iperf` are running inside the Kubernetes Cluster.
 
 An example for:
-* a Kubernetes benchmark
-* 5 turncats
-* 5 seconds of evaluation time
-* 1000 byte packets
-* 100 Mbits/sec
+
+- a Kubernetes benchmark
+- 5 turncats
+- 5 seconds of evaluation time
+- 1000 byte packets
+- 100 Mbits/sec
 ```
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p k8s
 ```
@@ -184,6 +190,6 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

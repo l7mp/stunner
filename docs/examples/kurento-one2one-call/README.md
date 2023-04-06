@@ -7,17 +7,18 @@ clients connect to each other via the Kurento media server deployed into Kuberne
 servers are exposed to clients via a STUNner gateway.
 
 In this demo you will learn how to:
-* integrate a typical WebRTC application server with STUNner,
-* deploy the Kurento media server into Kubernetes,
-* configure STUNner to expose Kurento to clients, and
-* change the STUN/TURN credentials used by STUNner to improve security.
+
+- integrate a typical WebRTC application server with STUNner,
+- deploy the Kurento media server into Kubernetes,
+- configure STUNner to expose Kurento to clients, and
+- change the STUN/TURN credentials used by STUNner to improve security.
 
 ## Installation
 
 ### Prerequisites
 
 The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration
-guide](/doc/INSTALL.md). Create a namespace called `stunner` if there is none. You need a
+guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. You need a
 WebRTC-compatible browser to run this tutorial. Basically any modern browser will do; we usually
 test our WebRTC applications with Firefox.
 
@@ -98,98 +99,100 @@ The full application server code can be found
 summarize the most important steps needed to integrate `stunner-auth-lib` with the application
 server.
 
-1. Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
-   `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
-   library to pick up the most recent running config.
+- Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
+  `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
+  library to pick up the most recent running config.
 
-   ```yaml
-   apiVersion: apps/v1
-   kind: Deployment
-   [...]
-   spec:
-     [...]
-     template:
-       spec:
-         containers:
-         - name: webrtc-server
-           image: l7mp/kurento-one2one-call-server
-           command: ["npm"]
-           args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
-           # TURN server config to return to the user
-           env:
-             - name: STUNNER_CONFIG_FILENAME
-               value: "/etc/stunnerd/stunnerd.conf"
-           volumeMounts:
-             - name: stunnerd-config-volume
-               mountPath: /etc/stunnerd
-               readOnly: true
-             [...]
-         volumes:
-           - name: stunnerd-config-volume
-             configMap:
-               name: stunnerd-config
-               optional: true
-   [...]
-   ```
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+[...]
+spec:
+  [...]
+  template:
+    spec:
+      containers:
+      - name: webrtc-server
+        image: l7mp/kurento-one2one-call-server
+        command: ["npm"]
+        args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
+        # TURN server config to return to the user
+        env:
+          - name: STUNNER_CONFIG_FILENAME
+            value: "/etc/stunnerd/stunnerd.conf"
+        volumeMounts:
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+            readOnly: true
+          [...]
+      volumes:
+        - name: stunnerd-config-volume
+          configMap:
+            name: stunnerd-config
+            optional: true
+[...]
+```
 
-1. Include the library at the top of the [server-side JavaScript
-   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/server.js).
+- Include the library at the top of the [server-side JavaScript
+  code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/server.js).
 
-   ```js
-   const auth = require('@l7mp/stunner-auth-lib');
-   ```
+```js
+const auth = require('@l7mp/stunner-auth-lib');
+```
 
-1. Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
-   our case, this happens before returning a `registerResponse` to the client, so that the
-   generated ICE configuration can be piggy-backed on the response message.
+- Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
+  our case, this happens before returning a `registerResponse` to the client, so that the
+  generated ICE configuration can be piggy-backed on the response message.
 
-   ```js
-   function register(id, name, ws, callback) {
-     [...]
-     try {
-       let iceConfiguration = auth.getIceConfig();
-       ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
-     }
-     [...]
-   }
-   ```
+```js
+function register(id, name, ws, callback) {
+  [...]
+  try {
+    let iceConfiguration = auth.getIceConfig();
+    ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
+  }
+  [...]
+}
+```
 
-1. Modify the [client-side JavaScript
-   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
-   to parse the ICE configuration received from the application server from the `registerResponse`
-   message.
+- Modify the [client-side JavaScript
+  code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
+  to parse the ICE configuration received from the application server from the `registerResponse`
+  message.
 
-   ```js
-   var iceConfiguration;
+```js
+var iceConfiguration;
 
-   function resgisterResponse(message) {
-     if (message.response == 'accepted') {
-       iceConfiguration = message.iceConfiguration;
-     }
-     [...]
-   }
-   ```
+function resgisterResponse(message) {
+  if (message.response == 'accepted') {
+    iceConfiguration = message.iceConfiguration;
+  }
+  [...]
+}
+```
 
-1. Every time the client calls the [PeerConnection
-   constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection),
-   pass in the stored [ICE
-   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
-   `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
-   create PeerConnections with Kurento.
-   ```js
-   var options = {
-     [...]
-     configuration: iceConfiguration,
-   }
+- Every time the client calls the [PeerConnection
+  constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection),
+  pass in the stored [ICE
+  configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
+  `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
+  create PeerConnections with Kurento.
 
-   webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
-   ```
+```js
+var options = {
+  [...]
+  configuration: iceConfiguration,
+}
+
+webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
+```
 
 You can build the application server container locally from the tutorial
 [repo](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call), or you can
 use the below manifest to fire up the prebuilt container image in a single step. This will deploy
 the application server into the `stunner` namespace and exposes it in the Kubernetes LoadBalancer
 service called `webrtc-server`.
+
 ```console
 kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
 ```
@@ -234,6 +237,7 @@ into the default namespace and you should be good to go.
 Next, we deploy STUNner into the Kubernetes. The manifest below will set up a minimal STUNner
 gateway hierarchy to do just that: the setup includes a Gateway listener at UDP:3478 and a
 UDPRoute to forward incoming calls into the cluster.
+
 ```console
 kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
 ```
@@ -280,7 +284,7 @@ udproute.gateway.networking.k8s.io/kms-media-plane   95m
 
 You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
 
-``` console
+```console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
 STUN/TURN authentication type:  plaintext
 STUN/TURN username:             user-1
@@ -312,61 +316,61 @@ The HTML page served by the application server contains a handy console port, wh
 the call setup process. We use the logs from one of the clients to demonstrate call establishment
 with STUNner.
 
-1. After registering with the application server, the console should show the content of the
-   `registerResponse` message. If all goes well, the response should show the ICE configuration
-   returned by the application server. The configuration should contain a TURN URI for the UDP
-   Gateway we have created in STUNner. In addition, the authentication credentials and the public
-   IP addresses and ports should match those in the output of `stunnerctl`.
+- After registering with the application server, the console should show the content of the
+  `registerResponse` message. If all goes well, the response should show the ICE configuration
+  returned by the application server. The configuration should contain a TURN URI for the UDP
+  Gateway we have created in STUNner. In addition, the authentication credentials and the public
+  IP addresses and ports should match those in the output of `stunnerctl`.
 
-   ```js
-   {
-     "iceServers": [
-       {
-         "url": "turn:34.118.18.210:3478?transport=UDP",
-         "username": "user-1",
-         "credential": "pass-1"
-       }
-     ],
-     "iceTransportPolicy": "relay"
-   }
-   ```
+```js
+{
+  "iceServers": [
+    {
+      "url": "turn:34.118.18.210:3478?transport=UDP",
+      "username": "user-1",
+      "credential": "pass-1"
+    }
+  ],
+  "iceTransportPolicy": "relay"
+}
+```
 
-1. Once bootstrapped with the above ICE server configuration, the browser will ask STUNner to open
-   a TURN transport relay connection for exchanging the video stream with Kurento and generates a
-   local ICE candidate for each relay connection it creates. Note that only TURN-relay candidates
-   are generated: host and server-reflexive candidates would not work with STUNner anyway. (This is
-   why we set the `iceTransportPolicy` to type `relay` in the ICE server configuration above.)
-   Locally generated ICE candidates are sent by the browser over to the application server, which
-   in turn passes them over verbatim to Kurento.
+- Once bootstrapped with the above ICE server configuration, the browser will ask STUNner to open
+  a TURN transport relay connection for exchanging the video stream with Kurento and generates a
+  local ICE candidate for each relay connection it creates. Note that only TURN-relay candidates
+  are generated: host and server-reflexive candidates would not work with STUNner anyway. (This is
+  why we set the `iceTransportPolicy` to type `relay` in the ICE server configuration above.)
+  Locally generated ICE candidates are sent by the browser over to the application server, which
+  in turn passes them over verbatim to Kurento.
 
-   ```console
-   Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.42 51510 typ relay raddr 10.116.1.42 rport 51510" [...]}
-   ```
+```console
+Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.42 51510 typ relay raddr 10.116.1.42 rport 51510" [...]}
+```
 
-   Observe that the ICE candidate contains a private IP address (`10.116.1.42` in this case) as the
-   TURN relay connection address: this just happens to be the IP address of the STUNner pod that
-   receives the TURN allocation request from the browser.
+  Observe that the ICE candidate contains a private IP address (`10.116.1.42` in this case) as the
+  TURN relay connection address: this just happens to be the IP address of the STUNner pod that
+  receives the TURN allocation request from the browser.
 
-1. The media server generates ICE candidates as well. Since we disabled STUN/TURN in Kurento, only
-   host-type ICE candidates are generated by the media server. These will be sent back to the
-   clients as remote ICE candidates.
+- The media server generates ICE candidates as well. Since we disabled STUN/TURN in Kurento, only
+  host-type ICE candidates are generated by the media server. These will be sent back to the
+  clients as remote ICE candidates.
 
-   ```console
-   Received message: {[...] "candidate:1 1 UDP 2015363327 10.116.2.44 17325 typ host" [...]}
-   ```
+```console
+Received message: {[...] "candidate:1 1 UDP 2015363327 10.116.2.44 17325 typ host" [...]}
+```
 
-   Observe that the ICE candidate again contains a private IP: in fact, `10.116.2.44` is the pod IP
-   address belonging to the Kurento media server instance that received the call setup request from
-   the application server.
+  Observe that the ICE candidate again contains a private IP: in fact, `10.116.2.44` is the pod IP
+  address belonging to the Kurento media server instance that received the call setup request from
+  the application server.
 
-1. Once ICE candidates are exchanged, both clients have a set of local and remote ICE candidates
-   they can start to probe for connectivity. Local candidates were obtained from STUNner, these are
-   all relay-candidates and contain a pod IP address as the transport relay address, and the remote
-   candidates were generated by the media server. These are of host-type and likewise contain a pod
-   IP address. Since in the Kubernetes networking model ["pods can communicate with all other pods
-   on any other node without NAT"](https://kubernetes.io/docs/concepts/services-networking), all
-   local-remote ICE candidate pairs will have direct connectivity and ICE connectivity check will
-   succeed on the first candidate pair!
+- Once ICE candidates are exchanged, both clients have a set of local and remote ICE candidates
+  they can start to probe for connectivity. Local candidates were obtained from STUNner, these are
+  all relay-candidates and contain a pod IP address as the transport relay address, and the remote
+  candidates were generated by the media server. These are of host-type and likewise contain a pod
+  IP address. Since in the Kubernetes networking model ["pods can communicate with all other pods
+  on any other node without NAT"](https://kubernetes.io/docs/concepts/services-networking), all
+  local-remote ICE candidate pairs will have direct connectivity and ICE connectivity check will
+  succeed on the first candidate pair!
 
 After connecting, video starts to flow between the each client and the media server via the
 UDP/TURN connection opened by STUNner, and the media server can perform all audio- and
@@ -495,9 +499,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

@@ -13,10 +13,11 @@ public routable IP address. This demo was adopted here for using with STUNner, s
 installed into a standard Kubernetes cluster.
 
 In this demo you will learn the following steps to:
-* integrate a typical WebRTC application server to be used with STUNner,
-* deploy the modified application server into a Kubernetes,
-* deploy the Kurento media server into Kubernetes behind STUNner,
-* scale a standard WebRTC workload using Kubernetes and STUNner.
+
+- integrate a typical WebRTC application server to be used with STUNner,
+- deploy the modified application server into a Kubernetes,
+- deploy the Kurento media server into Kubernetes behind STUNner,
+- scale a standard WebRTC workload using Kubernetes and STUNner.
 
 ## Installation
 
@@ -85,9 +86,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

@@ -9,11 +9,11 @@ the risks associated with a misconfigured STUNner gateway service.
 Before deploying STUNner, it is worth evaluating the potential [security
 risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly
 configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the
-[`turncat`](/cmd/turncat) utility and `dig` to query the Kubernetes DNS service through a
+[`turncat`](cmd/turncat.md) utility and `dig` to query the Kubernetes DNS service through a
 misconfigured STUNner gateway.
 
-Start with a [fresh STUNner installation](/doc/INSTALL.md) into an empty namespace called `stunner`
-and apply the below configuration. 
+Start with a [fresh STUNner installation](INSTALL.md) into an empty namespace called `stunner`
+and apply the below configuration.
 
 ```console
 cd stunner
@@ -44,7 +44,7 @@ Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster
 export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.clusterIP}')
 ```
 
-Build `turncat`, the Swiss-army-knife [testing tool](/cmd/turncat/README.md) for STUNner, fire up a
+Build `turncat`, the Swiss-army-knife [testing tool](cmd/turncat.md) for STUNner, fire up a
 UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service
 through STUNner.
 
@@ -65,10 +65,13 @@ addresses.
 
 This little experiment demonstrates the threats associated with a poorly configured STUNner
 gateway: it may allow external access to *any* UDP service running inside your cluster. The
-prerequisites for this is that (1) the target service *must* run over UDP (e.g., `kube-dns`), (2)
-the target service *must* be wrapped with a UDPRoute, and (3) the attacker *must* know at least one
-pod address or the ClusterIP for the targeted service. Should any of this prerequisites miss,
-STUNner will block access to the target service.
+prerequisites for this:
+
+1. the target service *must* run over UDP (e.g., `kube-dns`),
+2. the target service *must* be wrapped with a UDPRoute
+3. the attacker *must* know at least one pod address or the ClusterIP for the targeted service.
+
+Should any of this prerequisites miss, STUNner will block access to the target service.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -94,7 +97,7 @@ outside of the backend services explicitly opened up via a UDPRoute.
 
 Unless properly locked down, STUNner may be used maliciously to open a tunnel to any UDP service
 running inside a Kubernetes cluster. Accordingly, it is critical to tightly control the pods and
-services exposed via STUNner. 
+services exposed via STUNner.
 
 STUNner's basic security model is as follows:
 
@@ -117,7 +120,7 @@ explicitly configured so.
 
 For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
 per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to
-steal and reuse STUNner's TURN credentials. See the [authentication guide](/doc/AUTH.md) for
+steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for
 configuring STUNner with `longterm` authentication.
 
 ## Access control
@@ -142,7 +145,7 @@ spec:
 ```
 
 To avoid potential misuse, STUNner disables open wildcard access to the entire cluster. (Note that
-in the [standalone mode](/doc/OBSOLETE.md) the user can still explicitly create an open `stunnerd`
+in the [standalone mode](OBSOLETE.md) the user can still explicitly create an open `stunnerd`
 cluster, but this is discouraged).
 
 For hardened deployments, it is possible to add a second level of isolation between STUNner and the
@@ -180,8 +183,8 @@ spec:
 ```
 
 Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/network-policy)
-before exposing STUNner publicly; e.g., the [`turncat` utility](../cmd/turncat) packaged with
-STUNner can be used conveniently for this [purpose](/examples/simple-tunnel/README.md).
+before exposing STUNner publicly; e.g., the [`turncat` utility](cmd/turncat.md) packaged with
+STUNner can be used conveniently for this [purpose](examples/simple-tunnel/README.md).
 
 ## Exposing internal IP addresses
 
@@ -197,7 +200,7 @@ The threat model is that, possessing the correct credentials, an attacker can sc
 address of all STUNner pods and all media server pods. This should not pose a major security risk
 though: remember, none of these private IP addresses can be reached externally. The attacker
 surface can be reduced to the STUNner pods' IP addresses by using the [symmetric ICE
-mode](/doc/DEPLOYMENT.md/symmetric-ice-mode).
+mode](DEPLOYMENT.md#symmetric-ice-mode).
 
 Nevertheless, if worried about information exposure then STUNner may not be the best option at the
 moment. In later releases, we plan to implement a feature to obscure the transport relay connection
@@ -210,9 +213,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

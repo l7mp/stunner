@@ -3,6 +3,7 @@
 This document guides you through the installation of [LiveKit](https://livekit.io/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
 In this demo you will learn to:
+
 - integrate a typical WebRTC application with STUNner,
 - obtain a valid TLS certificate to secure the signaling plane,
 - deploy the LiveKit server into Kubernetes, and
@@ -195,10 +196,11 @@ kubectl apply -f examples/livekit/livekit-server.yaml
 ```
 
 The demo installation bundle includes a lot of resources to deploy LiveKit:
-* a LiveKit-server,
-* a web server serving the landing page using [LiveKit react example](https://github.com/livekit/livekit-react)
-* a cluster issuer for the TLS certificates,
-* an Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster.
+
+- a LiveKit-server,
+- a web server serving the landing page using [LiveKit react example](https://github.com/livekit/livekit-react)
+- a cluster issuer for the TLS certificates,
+- an Ingress resource to terminate the secure connections between your browser and the Kubernetes cluster.
 
 Wait until all pods become operational and jump right into testing!
 
@@ -235,6 +237,6 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

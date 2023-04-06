@@ -31,57 +31,57 @@ The intended authentication workflow in STUNner is as follows.
 
 1. *A username/password pair is generated.* This is outside the scope of STUNner; however, STUNner
    comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to
-   simplify the generation of TURN credentials using STUNner's [running configuration](/doc/CONCEPTS.md). For
+   simplify the generation of TURN credentials using STUNner's [running configuration](CONCEPTS.md). For
    instance, the below will automatically parse the running config and generate a username/password
    pair and a realm based on the current configuration.
-   ```javascript
-   const StunnerAuth = require('@l7mp/stunner-auth-lib');
-   ...
-   var credentials = StunnerAuth.getStunnerCredentials();
-   ```
+```javascript
+const StunnerAuth = require('@l7mp/stunner-auth-lib');
+...
+var credentials = StunnerAuth.getStunnerCredentials();
+```
 2. *The clients receive the username/password pair over a secure channel.* The
    easiest way is to encode the username/password pair used for STUNner is in the [ICE
    server configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) returned to
    clients. E.g., using the above [Node.js
    library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib):
-   
-   ```javascript
-   const StunnerAuth = require('@l7mp/stunner-auth-lib');
-   ...
-   var ICE_config = StunnerAuth.getIceConfig({
-     auth_type: 'plaintext',        // override the authentication type
-     username: 'my-user',           // override username
-     password: 'my-password',       // override password
-     ice_transport_policy: 'relay', // override the ICE transport policy
-   });
-   console.log(ICE_config);
-   ```
-   Note that the library is clever enough to parse out all settings from the running STUNner
-   configuration (e.g., the public IP address and port). All defaults  can be freely overridden
-   when calling `getIceConfig`. Below is a sample output:
 
-   ```javascript
-   {
-     iceServers: [
-       {
-         url: 'turn://1.2.3.4:3478?transport=udp',
-         username: 'my-user',
-         credential: 'my-password'
-       }
-     ],
-     iceTransportPolicy: 'relay'
-   }
-   ```
+```javascript
+const StunnerAuth = require('@l7mp/stunner-auth-lib');
+...
+var ICE_config = StunnerAuth.getIceConfig({
+  auth_type: 'plaintext',        // override the authentication type
+  username: 'my-user',           // override username
+  password: 'my-password',       // override password
+  ice_transport_policy: 'relay', // override the ICE transport policy
+});
+console.log(ICE_config);
+```
+Note that the library is clever enough to parse out all settings from the running STUNner
+configuration (e.g., the public IP address and port). All defaults  can be freely overridden
+when calling `getIceConfig`. Below is a sample output:
+
+```javascript
+{
+  iceServers: [
+    {
+      url: 'turn://1.2.3.4:3478?transport=udp',
+      username: 'my-user',
+      credential: 'my-password'
+    }
+  ],
+  iceTransportPolicy: 'relay'
+}
+```
 
 3. *WebRTC clients are configured with the STUNner authentication credentials.* The below snippet
    shows how to initialize a WebRTC
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
 
-   ```javascript
-   var ICE_config = <obtain ICE configuration sent by the application server>
-   var pc = new RTCPeerConnection(ICE_config);
-   ```
+```javascript
+var ICE_config = <obtain ICE configuration sent by the application server>
+var pc = new RTCPeerConnection(ICE_config);
+```
 
 ## Plaintext authentication
 
@@ -91,7 +91,7 @@ that only a single username/password pair is used for *all* clients. This makes 
 e.g., the ICE server configuration can be written into the static Javascript code served to
 clients. At the same time, `plaintext` authentication is prone to leaking the credentials: once an
 attacker learns a `plaintext` STUNner credential they can use it without limits to reach STUNner
-(until the administrator rolls the credetials, see below).
+(until the administrator rolls the credentials, see below).
 
 You can select the authentication mode from the GatewayConfig resource of STUNner. For instance,
 the below GatewayConfig will configure STUNner to use `plaintext` authentication using the
@@ -119,12 +119,12 @@ a working TURN credential will allow an attacker to reach only the backend servi
 admitted by an appropriate UDPRoute. In other words, in a properly configured STUNner deployment
 the attacker will be able to reach only the media servers, which is essentially the same level of
 security as if you put the media servers to the Internet over an open public IP address. See
-[here](/doc/SECURITY.md) for further tips on hardened STUNner deployments.
+[here](SECURITY.md) for further tips on hardened STUNner deployments.
 
 In order to mitigate the risk, it is a good security practice to reset the username/password pair
 every once in a while.  Suppose you want to set the STUN/TURN username to `foo` and the password to
 `bar`. To do this simply re-apply a modified GatewayConfig: the
-[gateway-operator](/doc/CONCEPTS.md) will automatically reconcile the dataplane configuration to
+[gateway-operator](CONCEPTS.md) will automatically reconcile the dataplane configuration to
 enforce the new access tokens.
 
 ```yaml
@@ -198,9 +198,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

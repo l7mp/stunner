@@ -9,9 +9,9 @@ dashboards in [Grafana](https://grafana.com).
 ## Configuration
 
 Metrics collection is *not* enabled in the default installation. In order to open the
-metrics-collection endpoint for a [gateway hierarchy](/doc/GATEWAY.md#overview), configure an
+metrics-collection endpoint for a [gateway hierarchy](GATEWAY.md#overview), configure an
 appropriate HTTP URL in the `metricsEndpoint` field of corresponding the
-[GatewayConfig](/doc/GATEWAY.md#gatewayconfig) resource.
+[GatewayConfig](GATEWAY.md#gatewayconfig) resource.
 
 For instance, the below GatewayConfig will expose the metrics-collection server on the URL
 `http://:8080/metrics` in all the STUNner media gateway instances of the current gateway hierarchy.
@@ -125,7 +125,7 @@ The *Add a new panel* will open the panel configuration. The configuration steps
 
 The expected outcome is a new panel on the dashboard showing the `stunner_listener_connections` metric.
 
-Below is an example dashboard with data collected from the [simple-tunnel](https://github.com/l7mp/stunner/tree/main/examples/simple-tunnel) example:
+Below is an example dashboard with data collected from the [simple-tunnel](examples/simple-tunnel/README.md) example:
 
 ![Grafana Dashboard with the New Panel](images/grafana-add-panel-dashboard_1.png)
 
@@ -165,9 +165,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

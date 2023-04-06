@@ -7,8 +7,9 @@ Neko uses WebRTC to stream a desktop inside of a docker container to your browse
 However, integrating Neko into Kubernetes is far from trivial.
 
 In this demo you will learn the following steps to:
-* integrate a typical WebRTC application server to be used with STUNner,
-* deploy the Neko into Kubernetes behind STUNner,
+
+- integrate a typical WebRTC application server to be used with STUNner,
+- deploy the Neko into Kubernetes behind STUNner,
 
 ## Installation
 
@@ -73,9 +74,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 

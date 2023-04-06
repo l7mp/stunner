@@ -4,7 +4,7 @@ The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator)
 control plane configuration using the standard [Kubernetes Gateway
 API](https://gateway-api.sigs.k8s.io). This allows to configure STUNner in the familiar
 YAML-engineering style via Kubernetes manifests. The below reference gives a quick overview of the
-Gateway API. Note that STUNner implements only a subset of the full [spec](/doc/GATEWAY.md), see
+Gateway API. Note that STUNner implements only a subset of the full [spec](GATEWAY.md), see
 [here](https://github.com/l7mp/stunner-gateway-operator#caveats) for a list of the most important
 simplifications.
 
@@ -18,7 +18,7 @@ IP addresses and ports clients can use to reach STUNner, TURN credentials, routi
 anchor of the gateway hierarchy is the GatewayClass object, and the rest of the resources form a
 complete hierarchy underneath it.
 
-![Gateway hierarchy](/doc/images/gateway_api.svg)
+![Gateway hierarchy](images/gateway_api.svg)
 
 In general, the scope of a gateway hierarchy is a single namespace, but this is not strictly
 enforced: e.g., the GatewayClass is
@@ -66,7 +66,7 @@ Below is a quick reference of the most important fields of the GatewayClass
 ## GatewayConfig
 
 The GatewayConfig resource provides general configuration for STUNner, most importantly the
-STUN/TURN authentication [credentials](/doc/AUTH.md) clients can use to connect to
+STUN/TURN authentication [credentials](AUTH.md) clients can use to connect to
 STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a
 particular GatewayConfig in the `parametersRef`.  GatewayConfig resources are namespaced, and every
 hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error
@@ -74,7 +74,7 @@ because the authentication credentials cannot be learned by the dataplane otherw
 the STUNner gateway operator will refuse to generate a dataplane running config until the user
 attaches a valid GatewayConfig to the hierarchy.
 
-The following example sets the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner
+The following example sets the [`plaintext` authentication](AUTH.md) mechanism for STUNner
 using the username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`.
 
 ```yaml
@@ -101,12 +101,12 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
-| `username` | `string` | The username for [`plaintext` authentication](/doc/AUTH.md). | No |
-| `password` | `string` | The password for [`plaintext` authentication](/doc/AUTH.md). | No |
-| `sharedSecret` | `string` | The shared secret for [`longterm` authentication](/doc/AUTH.md). | No |
+| `username` | `string` | The username for [`plaintext` authentication](AUTH.md). | No |
+| `password` | `string` | The password for [`plaintext` authentication](AUTH.md). | No |
+| `sharedSecret` | `string` | The shared secret for [`longterm` authentication](AUTH.md). | No |
 | `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
 | `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on  `http://0.0.0.0:8086/ready` and `http://0.0.0.0:8086/live`, use an empty string to disable.| No |
-| `authLifetime` | `int` | The lifetime of [`longterm` authentication](/doc/AUTH.md) credentials in seconds. Not used by STUNner.| No |
+| `authLifetime` | `int` | The lifetime of [`longterm` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
 
 Note that at least a valid username/password pair *must* be supplied for `plaintext`
@@ -223,6 +223,7 @@ from exposing a Gateway publicly (useful for testing).
 Gateway resources are *not* safe for modification. This means that certain changes to a Gateway
 will restart the underlying TURN server, causing all active client sessions to terminate.  The
 particular rules are as follows:
+
 - adding or removing a listener will start/stop *only* the TURN server to be started/stopped,
   without affecting the rest of the listeners;
 - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart
@@ -262,7 +263,7 @@ Below is a quick reference of the most important fields of the UDPRoute
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
-| `parentRefs` | `[]string` | A list of Gateways in the same namepace to attach the route to. Attaching UDPRoutes across namespaces is prohibited. | Yes |
+| `parentRefs` | `[]string` | A list of Gateways in the same namespace to attach the route to. Attaching UDPRoutes across namespaces is prohibited. | Yes |
 | `rules.backendRefs` | `list` | A list of `name`/`namespace` pairs specifying the backend Service(s) reachable through the UDPRoute. It is allowed to specify a service from a namespace other than the UDPRoute's own namespace. | No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes
@@ -322,7 +323,7 @@ If you are not sure about whether the STUNner gateway operator successfully pick
 or UDPRoutes, it is worth checking the status to see what went wrong.
 
 ```console
-kubectl get <reosurce> -n <namespace> <name> -o jsonpath='{.status}'
+kubectl get <resource> -n <namespace> <name> -o jsonpath='{.status}'
 ```
 
 ## Help
@@ -331,9 +332,9 @@ STUNner development is coordinated in Discord, feel free to [join](https://disco
 
 ## License
 
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
+Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
 
-MIT License - see [LICENSE](../LICENSE) for full text.
+MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
 
 ## Acknowledgments
 
