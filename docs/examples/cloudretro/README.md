@@ -5,7 +5,7 @@ Kubernetes cluster. CloudRetro is a simplified cloud-gaming service using WebRTC
 audio/video gaming content in the client browser. In this demo, we use STUNner to establish the UDP
 media streams between clients and the CloudRetro media servers deployed into Kubernetes.
 
-![STUNner & CloudRetro architecture](../../docs/images/stunner_cloudretro.svg)
+![STUNner & CloudRetro architecture](../../images/stunner_cloudretro.svg)
 
 In this demo you will learn how to:
 - integrate a typical WebRTC application with STUNner,
@@ -78,7 +78,7 @@ the CloudRetro servers running on a private pod IP address. That is where STUNne
 
 ### STUNner
 
-Use the official [Helm charts](../../docs/INSTALL.md#installation) to install STUNner.
+Use the official [Helm charts](../../INSTALL.md#installation) to install STUNner.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
@@ -94,7 +94,7 @@ kubectl apply -f stunner-gwcc.yaml
 ```
 
 The default configuration uses the `plaintext` STUN/TURN authentication mode with the
-username/password pair `user-1/pass-1`; make sure to [customize](../../docs/AUTH.md) these defaults.
+username/password pair `user-1/pass-1`; make sure to [customize](../../AUTH.md) these defaults.
 
 Next, we expose the CloudRetro media services over STUNner.  The below Gateway specification will
 expose the CloudRetro worker service over the STUNner STUN/TURN gateway running on the UDP

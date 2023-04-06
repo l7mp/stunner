@@ -8,7 +8,7 @@ Kubernetes. The tutorial can also be used to quickly check a STUNner installatio
 In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
 * configure STUNner to expose the service to clients,
-* use [`turncat`](../../cmd/turncat/README.md) to connect to the UDP service via STUNner,
+* use [`turncat`](../../cmd/turncat) to connect to the UDP service via STUNner,
 * benchmark your cloud-setup with [`iperfv2`](https://iperf.fr).
 
 ## Installation
@@ -23,10 +23,10 @@ guide](/doc/INSTALL.md). Create a namespace called `stunner` if there is none. Y
 
 In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside
 the cluster and perform a speed test from the local console. We will use the
-[`turncat`](../../cmd/turncat/README.md) client utility to tunnel test traffic to the iperf server via STUNner
+[`turncat`](../../cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner
 acting as a STUN/TURN gateway.
 
-![STUNner benchmarks setup](../../docs/images/stunner_benchmark.svg)
+![STUNner benchmarks setup](../../images/stunner_benchmark.svg)
 
 You can easily implement a makeshift VPN with STUNner using a similar setup.
 
@@ -180,7 +180,7 @@ export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"
 
 Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this
 listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat`
-is clever enough to [parse the running STUNner configuration](../../cmd/turncat/README.md) from Kubernetes and set
+is clever enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set
 the STUN/TURN server public address/port and the authentication credentials
 accordingly.
 ``` console
