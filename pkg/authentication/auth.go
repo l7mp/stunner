@@ -18,6 +18,12 @@ import (
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00).
 const UsernameSeparator = ":"
 
+// AuthHandler specifies type of the TURN authentication handler used in Stunner. Re-exported from pion/turn for completeness.
+type AuthHandler = turn.AuthHandler
+
+// PermissionHandler specifies type of the TURN permission handler used in Stunner. Re-exported from pion/turn for completeness.
+type PermissionHandler = turn.PermissionHandler
+
 // GenerateTimeWindowedUsername creates a time-windowed username consisting of a validity timestamp
 // and an arbitrary user id, as per the "REST API For Access To TURN Services"
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec.
