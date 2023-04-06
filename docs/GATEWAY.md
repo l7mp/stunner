@@ -1,4 +1,4 @@
-# Gateway API reference
+# Reference
 
 The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) exposes the
 control plane configuration using the standard [Kubernetes Gateway

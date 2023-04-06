@@ -1,4 +1,4 @@
-package util
+package stunner
 
 import (
 	"crypto/rand"
@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// GenerateSelfSignedKey is a rudimentary hack to generate self-signed certificates used to
+// bootstrap the default config for TLS/DTLS listeners and for testing. Use for testing purposes
+// only!
 func GenerateSelfSignedKey() ([]byte, []byte, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {

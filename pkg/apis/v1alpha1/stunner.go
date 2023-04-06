@@ -25,7 +25,7 @@ type StunnerConfig struct {
 func (req *StunnerConfig) Validate() error {
 	// ApiVersion
 	if req.ApiVersion != ApiVersion {
-		return fmt.Errorf("unsupported API version: %s", req.ApiVersion)
+		return fmt.Errorf("unsupported API version: %q", req.ApiVersion)
 	}
 
 	// validate admin

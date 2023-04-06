@@ -21,8 +21,8 @@ const UsernameSeparator = ":"
 // GenerateTimeWindowedUsername creates a time-windowed username consisting of a validity timestamp
 // and an arbitrary user id, as per the "REST API For Access To TURN Services"
 // (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec.
-func GenerateTimeWindowedUsername(startTime time.Time, timeout time.Duration, userid string) string {
-	endTime := startTime.Add(timeout).Unix()
+func GenerateTimeWindowedUsername(startTime time.Time, duration time.Duration, userid string) string {
+	endTime := startTime.Add(duration).Unix()
 	timeUsername := strconv.FormatInt(endTime, 10)
 	return timeUsername + ":" + userid
 }
@@ -66,7 +66,7 @@ func GetLongTermCredential(username string, sharedSecret string) (string, error)
 }
 
 // GenerateAuthKey is a convenience function to easily generate keys in the format used by
-// AuthHandler; re-exported from `pion/turn/v2` so that our callers will have a single import.
+// AuthHandler. Re-exported from `pion/turn/v2` so that our callers will have a single import.
 func GenerateAuthKey(username, realm, password string) []byte {
 	return turn.GenerateAuthKey(username, realm, password)
 }

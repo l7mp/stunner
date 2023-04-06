@@ -14,8 +14,8 @@ import (
 	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 /********************************************

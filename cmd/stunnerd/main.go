@@ -53,6 +53,7 @@ func main() {
 	conf := make(chan v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
+	var cancelWatcher context.CancelFunc
 	if *config == "" && flag.NArg() == 1 {
 		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
@@ -79,15 +80,25 @@ func main() {
 	} else if *config != "" && *watch {
 		log.Infof("watching configuration file at %q", *config)
 
+		// init stunnerd with an empty config: this bootstraps it with the default
+		// resources (above all, starts the health-checker)
+		initConf := stunner.NewZeroConfig()
+		log.Debug("bootstrapping with zero reconciliation")
+		if err := st.Reconcile(*initConf); err != nil {
+			log.Errorf("could not reconcile initial configuratoin: %s", err.Error())
+			os.Exit(1)
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		err := stunner.WatchConfig(ctx, stunner.Watcher{
+		cancelWatcher = cancel
+
+		if err := stunner.WatchConfig(ctx, stunner.Watcher{
 			ConfigFile:    *config,
 			ConfigChannel: conf,
 			Logger:        st.GetLogger(),
-		})
-		if err != nil {
-			log.Errorf("could not create config file watcher: %s", err)
+		}); err != nil {
+			log.Errorf("could not create config file watcher: %s", err.Error())
 			os.Exit(1)
 		}
 	} else {
@@ -103,8 +114,15 @@ func main() {
 	defer close(sigterm)
 	signal.Notify(sigterm, syscall.SIGTERM)
 
+	exit := make(chan bool, 1)
+	defer close(exit)
+
 	for {
 		select {
+		case <-exit:
+			log.Info("normal exit on graceful shutdown")
+			os.Exit(0)
+
 		case <-sigint:
 			log.Info("normal exit")
 			os.Exit(0)
@@ -112,6 +130,23 @@ func main() {
 		case <-sigterm:
 			log.Info("caught SIGTERM: performing a graceful shutdown")
 			st.Shutdown()
+
+			// cancel the config watcher
+			if cancelWatcher != nil {
+				log.Info("canceling config watcher")
+				cancelWatcher()
+			}
+
+			go func() {
+				for {
+					// check if we can exit
+					if st.AllocationCount() == 0 {
+						exit <- true
+						return
+					}
+					time.Sleep(time.Second)
+				}
+			}()
 
 		case c := <-conf:
 			log.Trace("new configuration file available")

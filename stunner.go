@@ -9,12 +9,12 @@ import (
 	"github.com/pion/transport/v2"
 	"github.com/pion/transport/v2/stdnet"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const DefaultLogLevel = "all:WARN"
@@ -164,6 +164,25 @@ func (s *Stunner) GetLogger() logging.LoggerFactory {
 	return s.logger
 }
 
+// SetLogLevel sets the loglevel.
+func (s *Stunner) SetLogLevel(levelSpec string) {
+	s.logger.SetLevel(levelSpec)
+}
+
+// GetAllocations returns the number of active allocations summed over all listeners.  It can be
+// used to drain the server before closing.
+func (s *Stunner) AllocationCount() int {
+	n := 0
+	listeners := s.listenerManager.Keys()
+	for _, name := range listeners {
+		l := s.GetListener(name)
+		if l.Server != nil {
+			n += l.Server.AllocationCount()
+		}
+	}
+	return n
+}
+
 // Status returns a short status description of the running STUNner instance.
 func (s *Stunner) Status() string {
 	listeners := s.listenerManager.Keys()
@@ -185,8 +204,9 @@ func (s *Stunner) Status() string {
 	}
 
 	auth := s.GetAuth()
-	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s",
-		status, auth.Realm, auth.Type.String(), str)
+	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s"+
+		", active allocations: %d", status, auth.Realm, auth.Type.String(), str,
+		s.AllocationCount())
 }
 
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections

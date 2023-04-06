@@ -9,8 +9,8 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
-	stnrauth "github.com/l7mp/stunner/pkg/apis/authentication"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	a12n "github.com/l7mp/stunner/pkg/authentication"
 )
 
 // NewAuthHandler returns an authentication handler callback to be used with a TURN server for
@@ -27,9 +27,9 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
-			key := stnrauth.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
+			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
-				auth.Log.Debug("plaintext auth request: valid username found")
+				auth.Log.Debug("plaintext auth request: valid username")
 				return key, true
 			}
 
@@ -40,12 +40,12 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			if err := stnrauth.CheckTimeWindowedUsername(username); err != nil {
+			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
 				auth.Log.Infof("longterm auth request: failed: %s", err)
 				return nil, false
 			}
 
-			password, err := stnrauth.GetLongTermCredential(username, auth.Secret)
+			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
 				auth.Log.Infof("longterm auth request: error generating password: %s",
 					err)
@@ -53,7 +53,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			}
 
 			auth.Log.Info("longterm auth request: success")
-			return stnrauth.GenerateAuthKey(username, auth.Realm, password), true
+			return a12n.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:
 			auth.Log.Errorf("internal error: unknown authentication mode %q",

@@ -108,9 +108,12 @@ spec:
 
 ### Check your configuration
 
-Check whether you have all the necessary STUNner resources installed namespace.  ```console kubectl
-get gatewayconfigs,gateways,udproutes -n stunner NAME REALM AUTH AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig stunner.l7mp.io plaintext 14s
+Check whether you have all the necessary STUNner resources installed namespace.
+
+```console 
+kubectl get gatewayconfigs,gateways,udproutes -n stunner 
+NAME                                                  REALM             AUTH        AGE
+gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   3m53s
 
 NAME                                            CLASS                  ADDRESS   READY   AGE
 gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass             True    14s

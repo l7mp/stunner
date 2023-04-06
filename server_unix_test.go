@@ -10,37 +10,42 @@ import (
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 
-	"github.com/l7mp/stunner/internal/logger"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const clientNum = 20
 
 // multithreaded UDP tests
-var TestStunnerConfigsMultithreadedUDP = []v1alpha1.StunnerConfig{
-	// udp, plaintext
+var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 	{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: stunnerTestLoglevel,
-		},
-		Auth: v1alpha1.AuthConfig{
-			Type: "plaintext",
-			Credentials: map[string]string{
-				"username": "user1",
-				"password": "passwd1",
+		config: v1alpha1.StunnerConfig{
+			// udp, plaintext
+			ApiVersion: "v1alpha1",
+			Admin: v1alpha1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
 			},
+			Auth: v1alpha1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []v1alpha1.ListenerConfig{{
+				Name:       "udp",
+				Protocol:   "udp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []v1alpha1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
-			Name:     "udp",
-			Protocol: "udp",
-			Addr:     "127.0.0.1",
-			Port:     23478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []v1alpha1.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
+		uri: "turn:1.2.3.4:3478?transport=udp",
 	},
 }
 

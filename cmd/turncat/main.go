@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/l7mp/stunner"
-	"github.com/l7mp/stunner/internal/logger"
 	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const usage = "turncat [-l|--log <level>] [-i|--insecure] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
@@ -39,6 +39,8 @@ func main() {
 	os.Args[0] = "turncat"
 	defaultDuration, _ = time.ParseDuration("1h")
 	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
+	// var user = flag.StringP("user", "u", "", "Set username. Auth fields in the TURN URI override this.")
+	// var passwd = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
 	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
 	flag.Parse()
