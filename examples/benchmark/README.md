@@ -1,6 +1,6 @@
 # Performance Benchmarking
 
-With the help of this guide you are able to take performance measurments in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
+With the help of this guide you are able to take performance measurements in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
 
 Compare the locally measured result to the result measured in Kubernetes and figure out the overhead cost. The extra cost of your cluster's networking may surprise you in terms of extra delay or more packet drops using the same bandwidth.
 
@@ -9,7 +9,7 @@ If you have a Kubernetes cluster up and running, the installation and measuremen
 
 ## Tools
 
-The tools used in the measurment are the following:
+The tools used in the measurement are the following:
 * `iperf` Using to create traffic flows between the clients and server
 * `turncat` Using to open a connection through STUNner to the iperf server
 * `STUNner` Acting as a STUN server towards `turncat` clients
@@ -24,13 +24,13 @@ When measuring latency with `iperf` you might be fooled because it is [measuring
 
 All the components are running locally. All of them are using `127.0.0.1` addresses.
 
-![STUNner benchmark local test architecture](../../images/stunner_benchmark_local.svg)
+![STUNner benchmark local test architecture](../../docs/images/stunner_benchmark_local.svg)
 
 ### Kubernetes setup
 
 `iperf` and `turncat` clients are running locally, both `STUNner` and `iperf` server are running inside a Kubernetes Cluster in a pod.
 
-![STUNner benchmark Kubernetes test architecture](../../images/stunner_benchmark_k8s.svg)
+![STUNner benchmark Kubernetes test architecture](../../docs/images/stunner_benchmark_k8s.svg)
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-n
 helm install stunner stunner/stunner -create-namespace --namespace=stunner
 ```
 
-Configure STUNner to act as a STUN server towards [`turncat`](../../cmd/turncat.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
+Configure STUNner to act as a STUN server towards [`turncat`](../../cmd/turncat/README.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
 
 ```
 kubectl apply -f iperf-server.yaml
@@ -96,7 +96,7 @@ An example for:
 ### Performance measuring with Kubernetes
 
 The below command will open:
-* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwared to the STUNner public address obtained from STUNner configuration
+* one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwarded to the STUNner public address obtained from STUNner configuration
 * an `iperf` client sending its traffic to the turn
 
 `STUNner` and `iperf` are running inside the Kubernetes Cluster.
@@ -116,11 +116,11 @@ An example for:
 The output will be a standard `iperf` server output trimmed to show only the results. There are per-connections results and summarized results.
 
 * **Per-connection results:** The number of connections are set with the `-n` argument of the helper script. Rows starting like `[  4]` show per-connection results (e.g., throughput, jitter, and latency).
-* **Summarized results:** The `[SUM]` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
+* **Summarized results:** The `[SUM]` row summarizes the amount of transferred data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
 
 Next, we see an example output for a local measurement and a measurement in Kubernetes.
 
-### Local measurment
+### Local measurement
 
 In a local measurement the output contains a single summarized test.
 You should see a similar output:
@@ -172,7 +172,7 @@ Notice that the average packets/second rate will be slightly lower in case of a 
 
 ## Tips and Tricks
 
-* It is advised to repeat the measurment with different packet sizes.
+* It is advised to repeat the measurement with different packet sizes.
 
 Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200.
 
