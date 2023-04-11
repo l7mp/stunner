@@ -18,7 +18,7 @@
 
 * [Security](/doc/SECURITY.md)
 * [Authentication](/doc/AUTH.md)
-* [SCALING](/doc/SCALING.md)
+* [Scaling](/doc/SCALING.md)
 * [Monitoring](/doc/MONITORING.md)
 * [Reference](/doc/GATEWAY.md)
 
