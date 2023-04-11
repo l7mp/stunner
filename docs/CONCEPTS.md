@@ -14,7 +14,7 @@ service underlying STUNner is agnostic to NATs, STUNner can inject clients' medi
 private Kubernetes pod network, addressing all NAT traversals (client-side and server-side) in a
 single go.
 
-![STUNner architecture](images/stunner_arch_big.svg)
+![STUNner architecture](img/stunner_arch_big.svg)
 
 The unit of the STUNner configuration is a [designated Kubernetes
 namespace](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces) that holds

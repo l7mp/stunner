@@ -34,7 +34,7 @@ two-party WebRTC video-calls, the Kurento media server for media exchange and, p
 automatic audio/video transcoding, and configure STUNner to expose the Kurento server pool to
 clients.
 
-![STUNner media-plane deployment architecture](../../images/stunner_arch.svg)
+![STUNner media-plane deployment architecture](../../img/stunner_arch.svg)
 
 ### Application server
 

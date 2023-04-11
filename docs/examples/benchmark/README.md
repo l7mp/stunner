@@ -25,13 +25,13 @@ When measuring latency with `iperf` you might be fooled because it is [measuring
 
 All the components are running locally. All of them are using `127.0.0.1` addresses.
 
-![STUNner benchmark local test architecture](../../images/stunner_benchmark_local.svg)
+![STUNner benchmark local test architecture](../../img/stunner_benchmark_local.svg)
 
 ### Kubernetes setup
 
 `iperf` and `turncat` clients are running locally, both `STUNner` and `iperf` server are running inside a Kubernetes Cluster in a pod.
 
-![STUNner benchmark Kubernetes test architecture](../../images/stunner_benchmark_k8s.svg)
+![STUNner benchmark Kubernetes test architecture](../../img/stunner_benchmark_k8s.svg)
 
 ## Prerequisites
 

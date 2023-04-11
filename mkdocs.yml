@@ -8,6 +8,31 @@ use_directory_urls: true
 theme:
   name: readthedocs
   highlightjs: true
+nav:
+- 'README.md'
+- 'Why STUNner': 'WHY.md'
+- 'Deployment models': 'DEPLOYMENT.md'
+- 'Concepts': 'CONCEPTS.md'
+- 'Installation': 'INSTALL.md'
+- 'Gateway API refernce': 'GATEWAY.md'
+- 'Security': 'SECURITY.md'
+- 'Authentication': 'AUTH.md'
+- 'Monitoring': 'MONITORING.md'
+- 'Standalone mode': 'OBSOLETE.md'
+- 'Examples':
+  - 'Simple tunnel': 'examples/simple-tunnel/README.md'
+  - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
+  - 'Kurento one to one call': 'examples/kurento-one2one-call/README.md'
+  - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
+  - 'LiveKit': 'examples/livekit/README.md'
+  - 'Jitsi': 'examples/jitsi/README.md'
+  - 'Cloud Retro': 'examples/cloudretro/README.md'
+  - 'N.eko': 'examples/neko/README.md'
+  - 'Benchmark': 'examples/benchmark/README.md'
+- 'CMD':
+  - 'stunnerctl': 'cmd/stunnerctl.md'
+  - 'stunnerd': 'cmd/stunnerd.md'
+  - 'turncat': 'cmd/turncat.md'
 plugins:
   - search
   - mkdocstrings:

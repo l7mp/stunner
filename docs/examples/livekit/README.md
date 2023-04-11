@@ -19,7 +19,7 @@ The recommended way to install LiveKit into Kubernetes is deploying the media se
 
 The figure below shows LiveKit deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, LiveKit is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for LiveKit, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-![STUNner LiveKit intergration deployment architecture](../../images/stunner_livekit.svg)
+![STUNner LiveKit intergration deployment architecture](../../img/stunner_livekit.svg)
 
 In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), the [LiveKit server](https://github.com/livekit/livekit) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the LiveKit server pool to clients.
 

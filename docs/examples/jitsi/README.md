@@ -21,7 +21,7 @@ The recommended way to install Jitsi into Kubernetes is deploying the media serv
 
 The figure below shows Jitsi deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, Jitsi is deployed behind STUNner in the media-plane deployment model, so that STUNner acts as a "local" STUN/TURN server for Jitsi, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-![STUNner Jitsi integration deployment architecture](../../images/stunner_jitsi.svg)
+![STUNner Jitsi integration deployment architecture](../../img/stunner_jitsi.svg)
 
 In this tutorial we deploy a video room example using the [Jitsi framework](https://jitsi.github.io/handbook/docs/architecture) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the Jitsi JVB to clients.
 

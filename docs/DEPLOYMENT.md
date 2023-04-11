@@ -23,7 +23,7 @@ clients can use as a NAT traversal facility for establishing media connections b
 themselves. This is not that much different from a standard public STUN/TURN server setup, but in
 this case the STUN/TURN servers are deployed into Kubernetes.
 
-![STUNner headless deployment architecture](images/stunner_standalone_arch.svg)
+![STUNner headless deployment architecture](img/stunner_standalone_arch.svg)
 
 Note that for STUNner to be able to connect two or more WebRTC clients in the headless model *all*
 the clients *must* use STUNner as the TURN server. This is because STUNner opens the transport
@@ -39,7 +39,7 @@ servers and media servers into ordinary Kubernetes pods, taking advantage of Kub
 tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other
 cloud-bound workload.
 
-![STUNner media-plane deployment architecture](images/stunner_arch.svg)
+![STUNner media-plane deployment architecture](img/stunner_arch.svg)
 
 There is no limitation as to how many gateway and media server pods can be opened in this model,
 which theoretically means limitless scalability. Furthermore, by creating connection-tracking state
@@ -57,7 +57,7 @@ media-plane deployment model of STUNner is the *asymmetric ICE mode*. In this mo
 configured with STUNner as the TURN server and media servers run with no STUN or TURN servers
 whatsoever.
 
-![STUNner asymmetric ICE mode](images/stunner_asymmetric_ice.svg)
+![STUNner asymmetric ICE mode](img/stunner_asymmetric_ice.svg)
 
 In this model, the client is configured with STUNner as the TURN server so at a certain point in
 the ICE conversation it opens a TURN transport relay connection via STUNner. The IP address of the
@@ -96,7 +96,7 @@ In the symmetric ICE mode both the client and the server obtain an ICE [relay
 candidate](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) from STUNner and
 the connection occurs directly via STUNner.
 
-![STUNner symmetric ICE mode](images/stunner_symmetric_ice.svg)
+![STUNner symmetric ICE mode](img/stunner_symmetric_ice.svg)
 
 In the symmetric mode the following rules apply for setting the [ICE server
 configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients):

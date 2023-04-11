@@ -5,7 +5,7 @@ Kubernetes cluster. CloudRetro is a simplified cloud-gaming service using WebRTC
 audio/video gaming content in the client browser. In this demo, we use STUNner to establish the UDP
 media streams between clients and the CloudRetro media servers deployed into Kubernetes.
 
-![STUNner & CloudRetro architecture](../../images/stunner_cloudretro.svg)
+![STUNner & CloudRetro architecture](../../img/stunner_cloudretro.svg)
 
 In this demo you will learn how to:
 
