@@ -46,14 +46,3 @@ enable verbose logging.
 ```console
 ./turncat -v - k8s://stunner/stunnerd-config:udp-listener udp://10.0.0.1:9001
 ```
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Initial code adopted from [pion/stun](https://github.com/pion/stun) and
-[pion/turn](https://github.com/pion/turn).

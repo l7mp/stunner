@@ -183,13 +183,3 @@ Notice that the average packets/second rate will be slightly lower in case of a 
 Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200.
 
 **Effect of packet sizes:** With smallish packets (e.g., 64B), the average packets/second rate will be higher than with largish packets (e.g., 1200B). Small packet sizes result lower effective throughput (when packet drop is < 1%). You should definitely change the arguments to test the performance of your setup ideally.
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

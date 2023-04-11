@@ -22,9 +22,6 @@ recommended way to interact with STUNner.
   - [Access control](#access-control)
   - [Enabling TURN transport over TCP](#enabling-turn-transport-over-tcp)
   - [Enabling TURN transport over TLS and DTLS](#enabling-turn-transport-over-tls-and-dtls)
-  - [Help](#help)
-  - [License](#license)
-  - [Acknowledgments](#acknowledgments)
 
 ## Prerequisites
 
@@ -502,19 +499,3 @@ Note that the default Kubernetes manifest
 ['stunner-standalone-tls.yaml'](https://github.com/l7mp/stunner/blob/main/deploy/manifests/stunner-standalone-tls.yaml.template) opens up the
 NetworkPolicy for the `media-plane/default` service only, make sure to configure this to your own
 setup.
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Initial code adopted from [pion/stun](https://github.com/pion/stun) and
-[pion/turn](https://github.com/pion/turn).
-

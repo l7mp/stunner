@@ -230,13 +230,3 @@ livekit-cli create-token \
 ```
 
 Copy the access token into the token field and hit the Connect button. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a separate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the LiveKit-server deployed in you Kubernetes cluster.
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.

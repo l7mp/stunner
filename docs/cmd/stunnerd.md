@@ -107,14 +107,3 @@ static:
       minPort: 40000
       maxPort: 49999
 ```
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Initial code adopted from [pion/stun](https://github.com/pion/stun) and
-[pion/turn](https://github.com/pion/turn).

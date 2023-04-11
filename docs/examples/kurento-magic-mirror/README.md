@@ -79,17 +79,3 @@ health-checks and load-balancing should just work as expected.
 ```console
 $ kubectl scale deployment kms --replicas=4
 ```
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Demo adopted from [Kurento](https://www.kurento.org).

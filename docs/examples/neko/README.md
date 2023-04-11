@@ -71,13 +71,3 @@ Ideally, by opening your ingress controller in your browser, you should see the 
 ## Help
 
 STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Thanks for the Neko authors, especailly [Miroslav Šedivý](https://github.com/m1k1o) for the awesome project.

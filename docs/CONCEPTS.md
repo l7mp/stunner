@@ -72,18 +72,3 @@ respectively) specs and the `stunnerd` pods reconcile their internal state to th
 configuration.  You are free to scale the dataplane to as many `stunnerd` pods as you like:
 Kubernetes will make sure that new client connections are distributed evenly over the scaled-out
 STUNner dataplane.
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Initial code adopted from [pion/stun](https://github.com/pion/stun) and
-[pion/turn](https://github.com/pion/turn).

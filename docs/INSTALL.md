@@ -74,18 +74,3 @@ it at your own risk: we do not promise any stability for STUNner installed from 
 helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
 helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
 ```
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](https://github.com/l7mp/stunner/blob/main/AUTHORS).
-
-MIT License - see [LICENSE](https://github.com/l7mp/stunner/blob/main/LICENSE) for full text.
-
-## Acknowledgments
-
-Initial code adopted from [pion/stun](https://github.com/pion/stun) and
-[pion/turn](https://github.com/pion/turn).
