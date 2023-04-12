@@ -75,8 +75,8 @@ server to terminate the call. For more info on the application server protocol, 
 [Kurento
 documentation](https://doc-kurento.readthedocs.io/en/latest/tutorials/node/tutorial-one2one.html).
 
-In order start the ICE conversation using STUNner as the STUN/TURN server, the browsers will need
-to learn an ICE server configuration from the application server with STUNner's external IP
+In order to start the ICE conversation using STUNner as the STUN/TURN server, the browsers will
+need to learn an ICE server configuration from the application server with STUNner's external IP
 addresses/ports and the required STUN/TURN credentials. This must happen *before* the
 PeerConnection is created in the clients: once the PeerConnection is running we can no longer
 change the ICE configuration.
@@ -84,76 +84,100 @@ change the ICE configuration.
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
 `regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
-authentication modes (i.e., the `longterm` mode, see below), because the client's STUN/TURN
+authentication modes (i.e., the `ephemeral` mode, see below), because the client's STUN/TURN
 credentials might expire by the time they decide to connect. It is up to the application server
 developer to make sure that clients' ICE server configuration is periodically updated.
 
-We will use [`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small
-Node.js helper library that simplifies generating ICE configurations and STUNner credentials in the
-application server. The library will automatically parse the running STUNner configuration from the
-cluster and generate STUN/TURN credentials and ICE server configuration from the most recent
-running config.
+The default STUNner [install](/doc/INSTALL.md) contains a utility called the [STUNner
+authentication service](https://github.com/l7mp/stunner-auth-service) that is purposed specifically
+to generate ICE configurations in the application server. The service watches the running STUNner
+configuration(s) from via the Kubernetes API server and makes sure to generate STUN/TURN
+credentials and ICE server configuration from the most recent STUNner config.
 
 The full application server code can be found
-[here](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call), below we
-summarize the most important steps needed to integrate `stunner-auth-lib` with the application
-server.
+[here](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call); below we
+summarize the most important steps needed to call the STUNner authentication service in the
+application to generate an ICE config for each client.
 
-- Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
-  `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
-  library to pick up the most recent running config.
+1. Define the address and the port of the STUNner authentication service as environment variables
+   for the application server pod. This will allow the application server to query the STUNner
+   authentication server for TURN credentials. By default, the authentication service is available
+   at the address `stunner-auth.stunner-system.svc.cluster.local` on port TCP 8088 over HTTP, these
+   defaults can be overridden using the `STUNNER_AUTH_ADDR` and `STUNNER_AUTH_PORT` environment
+   variables. The ICE configuration returned by the auth service will contain an URI for all the
+   pbblic STUNner Gateways you define: you can filter on particular Kubernetes namespaces, gateways
+   or gateway listeners by the `STUNNER_NAMESPACE`, `STUNNER_GATEWAY` and `STUNNER_LISTENER`
+   environment variables. See more on the auth service STUNner authentication service
+   [here](https://github.com/l7mp/stunner-auth-service).
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-[...]
-spec:
-  [...]
-  template:
-    spec:
-      containers:
-      - name: webrtc-server
-        image: l7mp/kurento-one2one-call-server
-        command: ["npm"]
-        args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
-        # TURN server config to return to the user
-        env:
-          - name: STUNNER_CONFIG_FILENAME
-            value: "/etc/stunnerd/stunnerd.conf"
-        volumeMounts:
-          - name: stunnerd-config-volume
-            mountPath: /etc/stunnerd
-            readOnly: true
-          [...]
-      volumes:
-        - name: stunnerd-config-volume
-          configMap:
-            name: stunnerd-config
-            optional: true
-[...]
-```
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: webrtc-server
+   [...]
+   spec:
+     [...]
+     template:
+       spec:
+         containers:
+         - name: webrtc-server
+           image: l7mp/kurento-one2one-call-server
+           command: ["npm"]
+           args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
+           env:
+           - name: STUNNER_AUTH_ADDR
+             value: "stunner-auth.stunner-system.svc.cluster.local"
+           - name: STUNNER_AUTH_PORT
+             value: "8088"
+           - name: STUNNER_NAMESPACE
+             value: "stunner"
+           - name: STUNNER_GATEWAY
+             value: "udp-gateway"
+           - name: STUNNER_LISTENER
+             value: "udp-listener"
+   [...]
+   ```
 
-- Include the library at the top of the [server-side JavaScript
-  code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/server.js).
+1. Query the STUNner authentication server every time you want a valid ICE config. In our case, we
+   will return the ICE configuration before returning a `registerResponse` to the client, so that
+   the generated ICE configuration can be piggy-backed on the response message.
 
-```js
-const auth = require('@l7mp/stunner-auth-lib');
-```
-
-- Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
-  our case, this happens before returning a `registerResponse` to the client, so that the
-  generated ICE configuration can be piggy-backed on the response message.
-
-```js
-function register(id, name, ws, callback) {
-  [...]
-  try {
-    let iceConfiguration = auth.getIceConfig();
-    ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
-  }
-  [...]
-}
-```
+   ```js
+   function register(id, name, ws, callback) {
+     [...]
+     try {
+        let options = {
+          host: process.env.STUNNER_AUTH_ADDR,
+          port: process.env.STUNNER_AUTH_PORT,
+          method: 'GET',
+          path: url.format({
+            pathname: '/ice',
+            query: {
+              service: "turn",
+              username: name,
+              iceTransportPolicy: "relay",
+              namespace: process.env.STUNNER_NAMESPACE,
+              gateway: process.env.STUNNER_GATEWAY,
+              listener: process.env.STUNNER_LISTENER,
+            },
+          }),
+        };
+        var request_data = http.request(options, function (res) {
+            var response = '';
+            res.on('data', function (chunk) {
+                response += chunk;
+            });
+            res.on('end', function () {
+                iceConfData += response;
+                const iceConfiguration = JSON.parse(iceConfData);
+                ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
+            });
+       }
+     }
+     [...]
+   }
+   ```
 
 - Modify the [client-side JavaScript
   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
@@ -198,10 +222,9 @@ kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
 ```
 
 Note that we disable STUN/TURN in Kurento: STUNner will make sure that your media servers will not
-need to use NAT traversal (despite running with a private IP) and everything should work just
-fine. Here is the corresponding snippet from the
-[manifest](kurento-one2one-call-server.yaml), which sets Kurento's
-environment variables accordingly:
+need to use NAT traversal (despite running with a private IP) and everything should still work just
+fine. Below is the corresponding snippet from the [manifest](kurento-one2one-call-server.yaml), which sets
+Kurento's environment variables accordingly:
 
 ```yaml
 spec:
@@ -222,15 +245,10 @@ spec:
         [...]
 ```
 
-And that's all. We added roughly 10 lines of code to the Kurento demo to make it work with STUNner,
-with most of the changes needed to return the public STUN/TURN URI and credentials to clients. If
-you allocate STUNner to a stable IP and domain name, you don't even need to modify *anything* in
-the demo and it will just work.
-
-Note: due to a limitation of `stunner-auth-lib` currently the application server must run in the
-main STUNner namespace (usually called `stunner`), otherwise it will not be able to read the
-running config. This limitation will be removed in a later release. If in doubt, deploy everything
-into the default namespace and you should be good to go.
+And that's all. We added roughly 10-20 lines of fairly trivial code to the Kurento demo to make it
+work with STUNner, with most of the changes needed to return the public STUN/TURN URI and
+credentials to clients. If you allocate STUNner to a stable IP and domain name, you don't even need
+to modify *anything* in the demo and it will just work.
 
 ### STUNner configuration
 
@@ -242,16 +260,17 @@ UDPRoute to forward incoming calls into the cluster.
 kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
 ```
 
-In order to realize the media-plane deployment model, we set the `kms` service, which wraps the
+In order to realize the media-plane deployment model we set the `kms` service, which wraps the
 Kurento media server deployment, as the target in the UDPRoute. Note that the target service lives
 in another namespace (the UDPRoute is in `stunner` whereas the `kms` service is in the `default`
 namespace), STUNner will still be able to forward connections (this is a small departure from the
 [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io) spec, which requires you to install a
-TargetRef into the target namespace, STUNner ignores this for simplicity). The rest, that is,
-cross-connecting the clients' media streams with Kurento's WebRTC endpoints, is just pure TURN
+TargetRef into the target namespace; currently STUNner ignores this for simplicity). The rest, that
+is, cross-connecting the clients' media streams with Kurento's WebRTC endpoints, is just pure TURN
 magic.
 
-Here is the corresponding UDPRoute.
+Below is the corresponding UDPRoute.
+
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: UDPRoute
@@ -302,6 +321,7 @@ Listener 1
 At this point, everything should be set up to make a video-call from your browser via
 STUNner. Learn the external IP address Kubernetes assigned to the LoadBalancer service of the
 application server.
+
 ``` console
 export WEBRTC_SERVER_IP=$(kubectl get service -n stunner webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
@@ -401,7 +421,8 @@ applications with STUNner.
 ## Update STUN/TURN credentials
 
 As exemplified by `stunnerctl` output, STUNner currently runs with fairly poor security: using
-`plaintext` authentication, sharing a single username/password pair between all active sessions.
+`static` authentication (note that `static` is an alias to the legacy `plaintext` authentication
+type you see above), sharing a single username/password pair between all active sessions.
 
 ``` console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
@@ -411,7 +432,7 @@ STUN/TURN password:             pass-1
 ...
 ```
 
-Since plaintext credentials are just what they are, plaintext, it is easy to extract the STUN/TURN
+Since static credentials are just what they are, static, it is easy to extract the STUN/TURN
 credentials on the client side for potentially nefarious purposes. Note that attackers should not
 be able to make too much harm with these credentials, since the only Kubernetes service they can
 reach via STUNner is the Kurento media server pool. This is why we have installed the UDPRoute:
@@ -423,12 +444,13 @@ In other words, *STUNner's default security model is exactly the same as if we p
 servers and media servers on public-facing physical servers*.
 
 Still, it would be nice to use per-session passwords. STUNner allows you to do that, by changing
-the authentication type to `longterm` instead of `plaintext`. Even better: STUNner's longterm
-credentials are valid only for a specified time (one day by default, but you can override this when
-calling [`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib)), after which
-they expire and attackers can no longer reuse them. And to make things even better we don't even
-have to work too much to switch STUNner to the `longterm` authentication mode: it is enough to
-update the GatewayConfig and everything should happen from this point automagically.
+the authentication type to `ephemeral` (the legacy alias is `longterm`, but this is deprecated)
+instead of `static`. Even better: STUNner's ephemeral TURN credentials are valid only for a
+specified time (one day by default, but you can override this querying the [authentication
+service(https://github.com/l7mp/stunner-auth-service)), after which they expire and attackers can
+no longer reuse them. And to make things even better we don't even have to work too much to switch
+STUNner to the `ephemeral` authentication mode: it is enough to update the GatewayConfig and
+everything should happen from this point automagically.
 
 ```console
 kubectl apply -f - <<EOF
@@ -439,7 +461,7 @@ metadata:
   namespace: stunner
 spec:
   realm: stunner.l7mp.io
-  authType: longterm
+  authType: ephemeral
   sharedSecret: "my-very-secure-secret"
 EOF
 ```
@@ -448,8 +470,8 @@ Here is what happens: the [STUNner gateway
 operator](https://github.com/l7mp/stunner-gateway-operator) watches the Kubernetes API server for
 GateayConfig updates and re-renders STUNner's running config in response. STUNner pods in turn
 watch their own configuration file, and whenever there is a change they reconcile the TURN server
-for the new setup. In this case, STUNner will switch to `longterm` authentication, and all this
-goes without having to restart the server.
+for the new setup. In this case, STUNner will switch to `ephemeral` authentication mode, and all
+this goes without having to restart the server.
 
 Check that the running config indeed is updated correctly.
 
@@ -481,8 +503,8 @@ new, per-session STUN/TURN credentials.
 }
 ```
 
-Longterm credentials expire in one day, after which they are either refreshed (e.g., by forcing the
-users to re-register) or become useless.
+Ephemeral credentials expire in one day, after which they are either refreshed (e.g., by forcing
+the users to re-register) or become useless.
 
 ## Clean up
 
