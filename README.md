@@ -24,6 +24,8 @@
     <img src="https://img.shields.io/github/issues/l7mp/stunner" /></a>
   <a href="https://hub.docker.com/repository/docker/l7mp/stunnerd" alt="Docker pulls">
     <img src="https://img.shields.io/docker/pulls/l7mp/stunnerd" /></a>
+  <a href="https://stunner.readthedocs.io/en/latest/" alt="Read the Docs">
+    <img src="https://readthedocs.org/projects/stunner/badge/?version=latest" /></a>
   <a href="https://github.com/l7mp/stunner/actions/workflows/test.yml" alt="Tests">
     <img src="https://github.com/l7mp/stunner/actions/workflows/test.yml/badge.svg" /></a>
   <a href="https://github.com/l7mp/stunner/actions/workflows/publish.yml" alt="Release">
@@ -414,7 +416,7 @@ greeter) by STUNner.
 
 1. Store your TLS certificate in a Kubernetes Secret. Below we create a self-signed certificate for
    testing, make sure to substitute this with a valid certificate.
-   
+
    ```console
    openssl genrsa -out ca.key 2048
    openssl req -x509 -new -nodes -days 365 -key ca.key -out ca.crt -subj "/CN=yourdomain.com"
