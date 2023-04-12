@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: webrtc-server-secret
-  namespace: stunner
+  # namespace: stunner
 type: kubernetes.io/tls
 data:
   tls.crt: |
@@ -88,7 +88,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: webrtc-server
-  namespace: stunner
+  # namespace: stunner
 spec:
   selector:
     matchLabels:
@@ -102,27 +102,32 @@ spec:
       containers:
       - name: webrtc-server
         image: l7mp/kurento-one2one-call-server
+        imagePullPolicy: Always
+        # image: localhost/l7mp/kurento-one2one-call-server
+        # imagePullPolicy: Never
+        # command: [ "sleep" ]
+        # args: [ "infinity" ]
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms.default.svc.cluster.local:8888/kurento"]
-        imagePullPolicy: Always
         ports:
         - containerPort: 8443
         # TURN server config to return to the user
         env:
-          - name: STUNNER_CONFIG_FILENAME
-            value: "/etc/stunnerd/stunnerd.conf"
+          - name: STUNNER_AUTH_ADDR
+            value: "stunner-auth.stunner-system.svc.cluster.local"
+          - name: STUNNER_AUTH_PORT
+            value: "8088"
+          # - name: STUNNER_NAMESPACE
+          #   value: "stunner"
+          # - name: STUNNER_GATEWAY
+          #   value: "udp-gateway"
+          # - name: STUNNER_LISTENER
+          #   value: "udp-listener"
         volumeMounts:
           - name: webrtc-server-tls
             mountPath: "/app/keys"
             readOnly: true
-          - name: stunnerd-config-volume
-            mountPath: /etc/stunnerd
-            readOnly: true
       volumes:
-        - name: stunnerd-config-volume
-          configMap:
-            name: stunnerd-config
-            optional: true
         - name: webrtc-server-tls
           secret:
             secretName: webrtc-server-secret
@@ -137,7 +142,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: webrtc-server
-  namespace: stunner
+  # namespace: stunner
   labels:
     app: webrtc-server
 spec:
