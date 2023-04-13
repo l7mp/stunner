@@ -10,6 +10,7 @@ In this demo you will learn how to:
 
 - integrate a typical WebRTC application server with STUNner,
 - deploy the Kurento media server into Kubernetes,
+- use the STUNner authentication service to generate valid ICE configurations for clients,
 - configure STUNner to expose Kurento to clients, and
 - change the STUN/TURN credentials used by STUNner to improve security.
 
@@ -84,13 +85,13 @@ change the ICE configuration.
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
 `regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
-authentication modes (i.e., the `ephemeral` mode, see below), because the client's STUN/TURN
+authentication modes (i.e., the `ephemeral` mode, see below), because clients' STUN/TURN
 credentials might expire by the time they decide to connect. It is up to the application server
 developer to make sure that clients' ICE server configuration is periodically updated.
 
 The default STUNner [install](/doc/INSTALL.md) contains a utility called the [STUNner
 authentication service](https://github.com/l7mp/stunner-auth-service) that is purposed specifically
-to generate ICE configurations in the application server. The service watches the running STUNner
+to generate ICE configurations for the application server. The service watches the running STUNner
 configuration(s) from the Kubernetes API server and makes sure to generate STUN/TURN credentials
 and ICE server configuration from the most recent STUNner config.
 
