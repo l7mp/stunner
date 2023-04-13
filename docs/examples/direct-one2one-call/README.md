@@ -9,6 +9,7 @@ In this demo you will learn how to:
 
 - integrate a typical WebRTC application server with STUNner,
 - configure STUNner as a headless STUN/TURN server,
+- use the STUNner authentication service to generate valid ICE configurations for clients,
 - test STUNner from a browser with live video traffic, and
 - scale a WebRTC service with STUNner.
 
@@ -32,7 +33,7 @@ clients will connect to each other directly via STUNner. We will deploy a
 page with the embedded video viewports and download the client-side JavaScript code to the
 browsers.
 
-![STUNner standalone deployment architecture](../../img/stunner_standalone_arch.svg)
+![STUNner standalone deployment architecture](../../img/stunner_direct_one2one_arch.svg)
 
 Note that transcoding/transsizing and other media server goodies are not available in this setup:
 the clients must be fully compatible to be able to establish an audio/video session in this
@@ -53,7 +54,7 @@ SDP Offer, and sends it along to the application server in a `call` message. The
 forwards the SDP Offer to the callee in an `incomingCall` message. If accepting the call, the
 callee sets up a WebRTC PeerConnection, generates an SDP Answer, and returns it in an
 `incomingCallResponse` message to the application server. The SDP Answer is then forwarded back to
-the caller in an `callResponse` message. Meanwhile, the caller and the callee exchange ICE
+the caller in a `callResponse` message. Meanwhile, the caller and the callee exchange ICE
 candidates in the background. Once the ICE process connects, the caller and the callee start to
 exchange audio/video frames via STUNner until one of the parties sends a `stop` message to the
 application server to terminate the call.
@@ -66,54 +67,62 @@ change the ICE configuration.
 
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
-`registerResponse` message. We will use
-[`stunner-auth-lib`](https://www.npmjs.com/package/@l7mp/stunner-auth-lib), a small Node.js helper
-library that simplifies generating ICE configurations and STUNner credentials in the application
-server. The library will automatically parse the running STUNner configuration from the cluster and
-generate STUN/TURN credentials and ICE server configuration from the most recent running config.
+`regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
+authentication modes (i.e., the `ephemeral` mode, see below), because clients' STUN/TURN
+credentials might expire by the time they decide to connect. It is up to the application server
+developer to make sure that clients' ICE server configuration is periodically updated.
 
-The full application server code can be found [here](https://github.com/l7mp/kurento-tutorial-node/tree/master/direct-one2one-call), below we summarize the most important steps needed to integrate `stunner-auth-lib` with the application server.
+The default STUNner [install](/doc/INSTALL.md) contains a utility called the [STUNner
+authentication service](https://github.com/l7mp/stunner-auth-service) that is purposed specifically
+to generate ICE configurations for the application server. The service watches the running STUNner
+configuration(s) from the Kubernetes API server and makes sure to generate STUN/TURN credentials
+and ICE server configuration from the most recent STUNner config.
 
-- Map the STUNner configuration, which by default exists in the `stunner` namespace under the name
-   `stunnerd-config`, into the filesystem of the application server pod. This makes it possible for the
-   library to pick up the most recent running config.
+The full application server code can be found
+[here](https://github.com/l7mp/kurento-tutorial-node/tree/master/direct-one2one-call); below we
+summarize the most important steps needed to call the STUNner authentication service in the
+application to generate an ICE config for each client.
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-[...]
-spec:
-  [...]
-  template:
-    spec:
-      containers:
-      - name: webrtc-server
-        image: l7mp/direct-one2one-call-server
-        command: ["npm"]
-        args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
-        # TURN server config to return to the user
-        env:
-          - name: STUNNER_CONFIG_FILENAME
-            value: "/etc/stunnerd/stunnerd.conf"
-        volumeMounts:
-          - name: stunnerd-config-volume
-            mountPath: /etc/stunnerd
-            readOnly: true
-          [...]
-      volumes:
-        - name: stunnerd-config-volume
-          configMap:
-            name: stunnerd-config
-            optional: true
-[...]
-```
+1. Define the address and the port of the STUNner authentication service as environment variables
+   for the application server pod. This will allow the application server to query the STUNner
+   authentication server for TURN credentials. By default, the authentication service is available
+   at the address `stunner-auth.stunner-system.svc.cluster.local` on port TCP 8088 over HTTP, these
+   defaults can be overridden using the `STUNNER_AUTH_ADDR` and `STUNNER_AUTH_PORT` environment
+   variables. The ICE configuration returned by the auth service will contain an URI for each
+   public STUNner Gateway: you can filter on particular Kubernetes namespaces, gateways or gateway
+   listeners by the `STUNNER_NAMESPACE`, `STUNNER_GATEWAY` and `STUNNER_LISTENER` environment
+   variables. Since WebRTC media will be ingested into he cluster over the UDP listener called
+   `udp-listener` on the STUNner Gateway called `udp-gateway` deployed into the `stunner`
+   namespace, the Kubernetes manifest for the application server will look like the below.
 
-- Include the library at the top of the [server-side JavaScript
-   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/server.js).
-
-```js
-const auth = require('@l7mp/stunner-auth-lib');
-```
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: webrtc-server
+   [...]
+   spec:
+     [...]
+     template:
+       spec:
+         containers:
+         - name: webrtc-server
+           image: l7mp/direct-one2one-call-server
+           command: ["npm"]
+           args: ["start", "--", "--as_uri=https://0.0.0.0:8443"]
+           env:
+           - name: STUNNER_AUTH_ADDR
+             value: "stunner-auth.stunner-system.svc.cluster.local"
+           - name: STUNNER_AUTH_PORT
+             value: "8088"
+           - name: STUNNER_NAMESPACE
+             value: "stunner"
+           - name: STUNNER_GATEWAY
+             value: "udp-gateway"
+           - name: STUNNER_LISTENER
+             value: "udp-listener"
+   [...]
+   ```
 
 - Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
    our case, this happens before returning a `registerResponse` to the client, so that the
@@ -130,37 +139,74 @@ function register(id, name, ws, callback) {
 }
 ```
 
-- Modify the [client-side JavaScript
-   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/direct-one2one-call/static/js/index.js)
-   to parse the ICE configuration received from the application server from the `registerResponse`
-   message.
+1. Modify the application server code to query the STUNner authentication server every time a a
+   valid ICE config in needed. In particular, the code will return the ICE configuration before
+   returning a `registerResponse` to the client, so that the generated ICE configuration can be
+   piggy-backed on the response message.
 
-```js
-var iceConfiguration;
+   ```js
+   function register(id, name, ws, callback) {
+     [...]
+     try {
+        let options = {
+          host: process.env.STUNNER_AUTH_ADDR,
+          port: process.env.STUNNER_AUTH_PORT,
+          method: 'GET',
+          path: url.format({
+            pathname: '/ice',
+            query: {
+              service: "turn",
+              username: name,
+              iceTransportPolicy: "relay",
+              namespace: process.env.STUNNER_NAMESPACE,
+              gateway: process.env.STUNNER_GATEWAY,
+              listener: process.env.STUNNER_LISTENER,
+            },
+          }),
+        };
+        var request_data = http.request(options, function (res) {
+            var response = '';
+            res.on('data', function (chunk) {
+                response += chunk;
+            });
+            res.on('end', function () {
+                iceConfData += response;
+                const iceConfiguration = JSON.parse(iceConfData);
+                ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
+            });
+       }
+     }
+     [...]
+   }
+   ```
 
-function resgisterResponse(message) {
-  if (message.response == 'accepted') {
-    iceConfiguration = message.iceConfiguration;
+- Next, modify the client-side JavaScript code to parse the ICE configuration received from the
+  application server from the `registerResponse` message.
+
+  ```js
+  var iceConfiguration;
+  
+  function resgisterResponse(message) {
+    if (message.response == 'accepted') {
+      iceConfiguration = message.iceConfiguration;
+    }
+    [...]
   }
-  [...]
-}
-```
+  ```
 
-- Every time the client calls the [PeerConnection
-   constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection),
-   pass in the stored [ICE
-   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer).  Note that
-   `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
-   create PeerConnections with Kurento.
+- Then, every time the client calls the PeerConnection constructor pass in the stored [ICE
+  configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
+  `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
+  create PeerConnections with Kurento.
 
-```js
-var options = {
-  [...]
-  configuration: iceConfiguration,
-}
-
-webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
-```
+  ```js
+  var options = {
+    [...]
+    configuration: iceConfiguration,
+  }
+  
+  webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
+  ```
 
 Eventually, the call setup process will look like this.
 
@@ -176,11 +222,6 @@ service called `webrtc-server`.
 kubectl apply -f examples/direct-one2one-call/direct-one2one-call-server.yaml
 ```
 
-Note: due to a limitation of `stunner-auth-lib` currently the application server must run in the
-main STUNner namespace (usually called `stunner`), otherwise it will not be able to read the
-running config. This limitation will be removed in a later release. If in doubt, deploy everything
-into the default namespace and you should be good to go.
-
 ### STUNner configuration
 
 Next, we deploy STUNner into Kubernetes. The manifest below will set up a minimal STUNner
@@ -191,11 +232,31 @@ another one at TCP:3478, plus and a UDPRoute.
 kubectl apply -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
+The most important component in the STUNner configuration is the TURN Gateway: this will expose a
+public TURN server on the UDP port 3478 through which clients will connect to each other.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: udp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+```
+
+For later convenience we also create a TCP Gateway that runs on port TCP:3478.
+
 In order to realize the headless deployment model, we set STUNner's own service as the backend in
 the UDPRoute. This way, STUNner will loop back client connections to itself. The rest, that is,
 cross-connecting the clients' media streams between each other, is just pure TURN magic.
 
-Here is the corresponding UDPRoute.
+Here is the corresponding UDPRoute. Note that the route attaches itself to both the UDP and the TCP
+Gateway, so no matter on which gateway the client connects via our UDPRoute will apply.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -241,7 +302,7 @@ You can also use the handy `stunnerctl` CLI tool to dump the running STUNner con
 
 ``` console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
-STUN/TURN authentication type:  plaintext
+STUN/TURN authentication type:  static
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
 Listener 1
@@ -285,27 +346,27 @@ with STUNner.
   addition, the authentication credentials and the public IP addresses and ports should match
   those in the output of `stunnerctl`.
 
-```js
-{
-    "id": "registerResponse",
-    "response": "accepted",
-    "iceConfiguration": {
-        "iceServers": [
-            {
-                "url": "turn:34.118.82.225:3478?transport=UDP",
-                "username": "user-1",
-                "credential": "pass-1"
-            },
-            {
-                "url": "turn:34.118.8.3:3478?transport=TCP",
-                "username": "user-1",
-                "credential": "pass-1"
-            }
-        ],
-        "iceTransportPolicy": "relay"
-    }
-}
-```
+  ```js
+  {
+      "id": "registerResponse",
+      "response": "accepted",
+      "iceConfiguration": {
+          "iceServers": [
+              {
+                  "url": "turn:34.118.82.225:3478?transport=UDP",
+                  "username": "user-1",
+                  "credential": "pass-1"
+              },
+              {
+                  "url": "turn:34.118.8.3:3478?transport=TCP",
+                  "username": "user-1",
+                  "credential": "pass-1"
+              }
+          ],
+          "iceTransportPolicy": "relay"
+      }
+  }
+  ```
 
 - Once configured with the above ICE server configuration, the browser will ask STUNner to open a
   TURN transport relay connection for sending/receiving the media stream and generates a local
@@ -315,9 +376,9 @@ with STUNner.
   generated ICE candidates are sent by the browser to the application server, which in turn passes
   them over verbatim to the other client.
 
-```console
-Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
-```
+  ```console
+  Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
+  ```
 
   Observe that the ICE candidate contains a private IP address (`10.116.1.21` in this case) as the
   TURN relay connection address: this just happens to be the IP address of the STUNner pod that
@@ -327,9 +388,9 @@ Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay 
   ICE candidate. The process is executed in the other direction as well, so that eventually both
   parties will have a set of local and remote ICE candidates they can probe for connectivity.
 
-```console
-Received message: { [...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
-```
+  ```console
+  Received message: { [...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
+  ```
 
 - Once ICE candidates are exchanged, the browsers perform a connectivity check on each
   candidate pair. With STUNner this usually succeeds with the first pair.
@@ -356,30 +417,6 @@ WebRTC service and many things can go wrong. Below is a list of steps to help de
   guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html) to track down the
   issue. Remember: your ultimate friends `tcpdump` and `Wireshark` are always there for you to
   help!
-
-## Scaling
-
-Suppose that the single STUNner instance is no longer sufficient; e.g., due to concerns related to
-performance or availability.  In a "conventional" privately hosted setup, you would need to
-provision a new physical STUN/TURN server, allocate a public IP, add the new server to the
-STUN/TURN server pool, and monitor the liveliness of the new server continuously. This takes a lot
-of manual effort and considerable time.
-
-In Kubernetes, however, you can use a single command to scale STUNner to an *arbitrary number of
-replicas*. Kubernetes will add new nodes to the cluster if needed, add the new replicas
-to STUNNer's STUN/TURN server pool, and make them accessible behind a (single)
-public IP address/port pair, automatically load-balancing client media connections across the
-active STUNner replicas.
-
-The below command will fire up 15 STUNner replicas; this usually succeeds in a matter of seconds.
-
-```console
-kubectl scale deployment stunner --replicas=15
-```
-
-You can even use Kubernetes
-[autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) to adapt
-the size of the STUNner pool to the actual demand.
 
 ## Clean up
 
