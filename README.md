@@ -58,7 +58,7 @@ modification to your existing WebRTC codebase.  STUNner implements the standard 
 API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
 style via Kubernetes manifests.
 
-See the full documentation [here](/doc/README.md).
+See the full documentation [here](/docs/README.md).
 
 ## Table of Contents
 1. [Description](#description)
@@ -207,7 +207,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 1. Given a fresh STUNner install, the first step is to register STUNner with the Kubernetes Gateway
    API. This amounts to creating a
    [GatewayClass](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.GatewayClass),
-   which serves as the [root level configuration](/doc/GATEWAY.md#gatewayclass) for your STUNner
+   which serves as the [root level configuration](/docs/GATEWAY.md#gatewayclass) for your STUNner
    deployment.
 
    Each GatewayClass must specify a controller that will manage the Gateway objects created under
@@ -233,13 +233,13 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
    EOF
    ```
 
-1. The next step is to set some [general configuration](/doc/GATEWAY.md#gatewayconfig) for STUNner,
-   most importantly the STUN/TURN authentication [credentials](/doc/AUTH.md). This requires loading
+1. The next step is to set some [general configuration](/docs/GATEWAY.md#gatewayconfig) for STUNner,
+   most importantly the STUN/TURN authentication [credentials](/docs/AUTH.md). This requires loading
    a GatewayConfig custom resource into Kubernetes.
 
-   Below we set the [`plaintext` authentication](/doc/AUTH.md) mechanism for STUNner using the
+   Below we set the [`plaintext` authentication](/docs/AUTH.md) mechanism for STUNner using the
    username/password pair `user-1/pass-1` and the authentication realm `stunner.l7mp.io`. See the
-   package [docs](/doc/GATEWAY.md#gatewayconfig) for further configuration options.
+   package [docs](/docs/GATEWAY.md#gatewayconfig) for further configuration options.
 
    ```console
    kubectl apply -f - <<EOF
@@ -258,7 +258,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
    Note that these two steps are required only once per STUNner installation.
 
-1. At this point, we are ready to [expose STUNner](/doc/GATEWAY.md#gateway) to clients! This occurs
+1. At this point, we are ready to [expose STUNner](/docs/GATEWAY.md#gateway) to clients! This occurs
    by loading a
    [Gateway](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.Gateway)
    resource into Kubernetes.
@@ -297,7 +297,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
    rule: the Gateway and the UDPRoute must both live in the same Kubernetes namespace.
 
    The below UDPRoute will configure STUNner to [route client
-   connections](/doc/GATEWAY.md#udproute) received on the Gateway called `udp-gateway` to the
+   connections](/docs/GATEWAY.md#udproute) received on the Gateway called `udp-gateway` to the
    WebRTC media server pool identified by the Kubernetes service `media-plane` in the `default`
    namespace.
 
@@ -535,7 +535,7 @@ applications into Kubernetes.
 
 * [One to one video call with Kurento](/examples/kurento-one2one-call/README.md): This tutorial
   shows how to use STUNner to connect WebRTC clients to a media server deployed into Kubernetes
-  behind STUNner in the [media-plane deployment model](/doc/DEPLOYMENT.md). All this happens
+  behind STUNner in the [media-plane deployment model](/docs/DEPLOYMENT.md). All this happens
   *without* modifying the media server code in any way, just by adding 5-10 lines of
   straightforward JavaScript to configure clients to use STUNner as the TURN server.
 * [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md): This tutorial has been
@@ -566,7 +566,7 @@ applications into Kubernetes.
 
 ## Documentation
 
-See the full documentation [here](/doc/README.md).
+See the full documentation [here](/docs/README.md).
 
 ## Caveats
 
