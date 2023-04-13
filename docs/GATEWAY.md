@@ -74,8 +74,10 @@ because the authentication credentials cannot be learned by the dataplane otherw
 the STUNner gateway operator will refuse to generate a dataplane running config until the user
 attaches a valid GatewayConfig to the hierarchy.
 
-The following example sets the [`plaintext` authentication](AUTH.md) mechanism for STUNner
-using the username/password pair `user-1/pass-1`, and the authentication realm `stunner.l7mp.io`.
+The following example takes the [STUNner authentication settings](AUTH.md) from the Secret called
+called `stunner-auth-secret` in the `stunner` namespace, sets the authentication realm to
+`stunner.l7mp.io`, and puts the dataplane loglevel to `all:DEBUG,turn:INFO` (this will set all
+loggers to `DEBUG` level except the TURN protocol machinery's logger which is set to `INFO`).
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1alpha1
@@ -86,9 +88,9 @@ metadata:
 spec:
   logLevel: "all:DEBUG,turn:INFO"
   realm: stunner.l7mp.io
-  authType: plaintext
-  userName: "user-1"
-  password: "pass-1"
+  authRef: 
+    name: stunner-auth-secret
+    namespace: stunner
   metricsEndpoint: "http://0.0.0.0:8080/metrics"
 ```
 
@@ -100,19 +102,21 @@ Below is a quick reference of the most important fields of the GatewayConfig
 | `stunnerConfig` | `string` | The name of the ConfigMap into which the operator renders the `stunnerd` running configuration. Default: `stunnerd-config`. | No |
 | `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
-| `authType` | `string` | Type of the STUN/TURN authentication mechanism. Default: `plaintext`. | No |
-| `username` | `string` | The username for [`plaintext` authentication](AUTH.md). | No |
-| `password` | `string` | The password for [`plaintext` authentication](AUTH.md). | No |
-| `sharedSecret` | `string` | The shared secret for [`longterm` authentication](AUTH.md). | No |
+| `authRef` | `reference` | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials. | No |
+| `authType` | `string` | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`. | No |
+| `username` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
+| `password` | `string` | The password for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
+| `sharedSecret` | `string` | The shared secret for [`ephemeral` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
-| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on  `http://0.0.0.0:8086/ready` and `http://0.0.0.0:8086/live`, use an empty string to disable.| No |
-| `authLifetime` | `int` | The lifetime of [`longterm` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
+| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on `http://0.0.0.0:8086/ready` and `http://0.0.0.0:8086/live`, use an empty string to disable.| No |
+| `authLifetime` | `int` | The lifetime of [`ephemeral` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
 | `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
 
-Note that at least a valid username/password pair *must* be supplied for `plaintext`
-authentication, or a `sharedSecret` for the `longterm` mode. Missing both is an error.
+Note that at least a valid username/password pair *must* be supplied for `static` authentication,
+or a `sharedSecret` for the `ephemeral` mode, either via an external Secret or inline in the
+GatewayConfig. External authentication settings override inline settings. Missing both is an error.
 
-Except the TURN authentication realm, all GatewayConfig resources are safe under modification. That
+Except the TURN authentication realm, all GatewayConfig resources are safe for modification. That
 is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting
 listeners/TURN servers. Changing the realm, however, induces a *full* TURN server restart (see
 below).
