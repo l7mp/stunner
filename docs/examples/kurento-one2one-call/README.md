@@ -468,7 +468,7 @@ Still, it would be nice to use per-session passwords. STUNner allows you to do t
 the authentication type to `ephemeral` (the legacy alias is `longterm`, but this is deprecated)
 instead of `static`. Even better: STUNner's ephemeral TURN credentials are valid only for a
 specified time (one day by default, but you can override this querying the [authentication
-service(https://github.com/l7mp/stunner-auth-service)), after which they expire and attackers can
+service](https://github.com/l7mp/stunner-auth-service)), after which they expire and attackers can
 no longer reuse them. And to make things even better we don't even have to work too much to switch
 STUNner to the `ephemeral` authentication mode: it is enough to update the GatewayConfig and
 everything should happen from this point automagically.

@@ -112,16 +112,16 @@ case, use STUNner at your own risk.
 ## Authentication
 
 By default, STUNner uses a single statically set username/password pair for all clients and the
-password is available in plain text at the clients (`plaintext` authentication mode). Anyone with
+password is available in plain text at the clients (`static` authentication mode). Anyone with
 access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know
 the private IP address of the target service or pod and provided that a UDPRoute exists that
 specifies the target service as a backend. This means that a service is exposed only if STUNner is
 explicitly configured so.
 
-For more security sensitive workloads, we recommend the `longterm` authentication mode, which uses
+For more security sensitive workloads, we recommend the `ephemeral` authentication mode, which uses
 per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to
-steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for
-configuring STUNner with `longterm` authentication.
+steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for configuring
+STUNner with `ephemeral` authentication.
 
 ## Access control
 

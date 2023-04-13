@@ -14,9 +14,9 @@ mechanism](https://www.rfc-editor.org/rfc/rfc8489.html#page-26) to provide user 
 The long-term credential mechanism assumes that, prior to the communication, STUNner and the WebRTC
 clients agree on a username and password to be used for authentication.  The credential is
 considered long-term since it is assumed that it is provisioned for a user and remains in effect
-until the user is no longer a subscriber of the system (STUNner's `plaintext` authentication mode),
+until the user is no longer a subscriber of the system (STUNner's `static` authentication mode),
 or until the predefined lifetime of the username/password pair passes and the credential expires
-(`longterm` authentication mode in STUNner).
+(`ephemeral` authentication mode in STUNner).
 
 STUNner secures the authentication process against replay attacks using a digest challenge.  In
 this mechanism, the server sends the user a realm (used to guide the user or agent in selection of
@@ -30,73 +30,86 @@ integrity.  If they match, the request is authenticated, otherwise the server re
 The intended authentication workflow in STUNner is as follows.
 
 1. *A username/password pair is generated.* This is outside the scope of STUNner; however, STUNner
-   comes with a [small Node.js library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) to
-   simplify the generation of TURN credentials using STUNner's [running configuration](CONCEPTS.md). For
-   instance, the below will automatically parse the running config and generate a username/password
-   pair and a realm based on the current configuration.
-```javascript
-const StunnerAuth = require('@l7mp/stunner-auth-lib');
-...
-var credentials = StunnerAuth.getStunnerCredentials();
-```
-2. *The clients receive the username/password pair over a secure channel.* The
-   easiest way is to encode the username/password pair used for STUNner is in the [ICE
-   server configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer) returned to
-   clients. E.g., using the above [Node.js
-   library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib):
+   comes with a comprehensive [authentication
+   service](https://github.com/l7mp/stunner-auth-service) that can be queried for a valid ICE
+   configuration for STUNner.  The ICE configs returned by this service can be directly
+   [supplied](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#parameters)
+   by clients to the `PeerConnection` call, so that the resultant PeerConnections will be opened
+   via STUNner as the TURN server. The generated ICE configs are always up to date with the most
+   recent STUNner configuration, which makes sure that whenever you modify the STUNner Gateway API
+   configuration (say, switch from `static` authentication to `ephemeral`), your clients will
+   always receive an ICE config that reflects these changes (that is, the username/password pair
+   will provide a time-windowed credential).
+   
+   For instance, the below will query the STUnner auth service, which is by default available at
+   `stunner-auth.stunner-system:8088`, for a valid ICE config.
 
-```javascript
-const StunnerAuth = require('@l7mp/stunner-auth-lib');
-...
-var ICE_config = StunnerAuth.getIceConfig({
-  auth_type: 'plaintext',        // override the authentication type
-  username: 'my-user',           // override username
-  password: 'my-password',       // override password
-  ice_transport_policy: 'relay', // override the ICE transport policy
-});
-console.log(ICE_config);
-```
-Note that the library is clever enough to parse out all settings from the running STUNner
-configuration (e.g., the public IP address and port). All defaults  can be freely overridden
-when calling `getIceConfig`. Below is a sample output:
+   ```console
+   curl "http://stunner-auth.stunner-system:8088/ice?service=turn"
+   {
+     "iceServers": [
+       {
+         "username": "1681486023:"
+         "credential": "v+MZOBeGWnk2690oJVL0qwF8YHQ=",
+         "urls": [
+           "turn:10.98.80.250:3478?transport=udp",
+           "turn:10.105.169.152:3478?transport=tcp"
+         ],
+       }
+     ],
+     "iceTransportPolicy": "all"
+   }
+   ```
 
-```javascript
-{
-  iceServers: [
-    {
-      url: 'turn://1.2.3.4:3478?transport=udp',
-      username: 'my-user',
-      credential: 'my-password'
-    }
-  ],
-  iceTransportPolicy: 'relay'
-}
-```
+   Use the below to specify the lifetime of the generated credential to one hour (`ttl`, only makes sense when
+   STUNner uses `ephemeral` authentication credentials) for a user named `my-user`, and you want
+   the user to enter your cluster via the STUNner Gateway called `my-gateway` deployed into the
+   `my-namespace` namespace.
 
-3. *WebRTC clients are configured with the STUNner authentication credentials.* The below snippet
+   ```console
+   curl "http://stunner-auth.stunner-system:8088/ice?service=turn?ttl=3600&username=my-user&namespace=my-namespace&gateway=my-gateway"
+   ```
+   
+2. The clients *receive the ICE configuration over a secure channel.* This is outside the context
+   of STUNner; our advice is to return the ICE configuration during the session setup process, say,
+   along with the initial configuration returned for clients before starting the call.
+
+3. WebRTC clients are *configured with the ICE configuration* obtained above. The below snippet
    shows how to initialize a WebRTC
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
 
-```javascript
-var ICE_config = <obtain ICE configuration sent by the application server>
-var pc = new RTCPeerConnection(ICE_config);
+   ```javascript
+   var ICE_config = <obtain ICE configuration sent by the application server>
+   var pc = new RTCPeerConnection(ICE_config);
+   ```
+
+## Static authentication
+
+In STUNner, `static` authentication is the simplest and least secure authentication mode, basically
+corresponding to a traditional "log-in" username and password pair given to users. As of v0.15.0 STUNner
+accepts (and sometimes reports) the alias `plaintext` to mean `static` authentication; the use of
+`plaintext` is deprecated and will be removed in a later release).
+
+When STUNner is configured to use `static` authentication only a single username/password pair is
+used for *all* clients. This makes configuration easy; e.g., the ICE server configuration can be
+hardcoded into the static Javascript code served to clients. At the same time, `static`
+authentication is prone to leaking the credentials: once an attacker learns a username/password
+pair they can use it without limits to reach STUNner (until the administrator rolls the
+credentials, see below).
+
+The first step of configuring STUNner for the `static` authentication mode is to create a
+Kubernetes Secret to hold the username/password pair. The below will set the username to `my-user`
+and the password to `my-password`. Note that if no `type` is set then STUNner defaults to `static`
+authentication.
+
+```console
+kubectl -n stunner create secret generic stunner-auth-secret --from-literal=type=static \
+    --from-literal=username=my-user --from-literal=password=my-password
 ```
 
-## Plaintext authentication
-
-In STUNner, `plaintext` authentication is the simplest and least secure authentication mode,
-basically corresponding to a traditional "log-in" username and password pair given to users. Note
-that only a single username/password pair is used for *all* clients. This makes configuration easy;
-e.g., the ICE server configuration can be written into the static Javascript code served to
-clients. At the same time, `plaintext` authentication is prone to leaking the credentials: once an
-attacker learns a `plaintext` STUNner credential they can use it without limits to reach STUNner
-(until the administrator rolls the credentials, see below).
-
-You can select the authentication mode from the GatewayConfig resource of STUNner. For instance,
-the below GatewayConfig will configure STUNner to use `plaintext` authentication using the
-username/password pair `my-user/my-password` over the realm `my-realm.example.com`. Note that
-`plaintext` authentication is the default in STUNner.
+Then, we create or update the current [GatewayConfig](REFERENCE.md) to refer STUNner to this secret
+for setting the authentication credentials.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1alpha1
@@ -105,89 +118,86 @@ metadata:
   name: stunner-gatewayconfig
   namespace: stunner
 spec:
-  realm: my-realm.example.com
-  authType: plaintext
-  userName: "my-user"
-  password: "my-pass"
+  realm: stunner.l7mp.io
+  authRef:
+    name: stunner-auth-secret
+    namespace: stunner
 ```
 
-The term `plaintext` may be deceptive: the password is never exchanged in plain text between the
-client and STUNner over the Internet. However, since the WebRTC Javascript API uses the TURN
+The main use of static authentication is for testing. The reason for this is that static
+authentication credentials are easily discoverable: since the WebRTC Javascript API uses the TURN
 credentials unencrypted, an attacker can easily extract the STUNner credentials from the
-client-side Javascript code. This does not pose a major security risk though: remember, possessing
-a working TURN credential will allow an attacker to reach only the backend services explicitly
-admitted by an appropriate UDPRoute. In other words, in a properly configured STUNner deployment
-the attacker will be able to reach only the media servers, which is essentially the same level of
-security as if you put the media servers to the Internet over an open public IP address. See
-[here](SECURITY.md) for further tips on hardened STUNner deployments.
-
-In order to mitigate the risk, it is a good security practice to reset the username/password pair
-every once in a while.  Suppose you want to set the STUN/TURN username to `foo` and the password to
-`bar`. To do this simply re-apply a modified GatewayConfig: the
-[gateway-operator](CONCEPTS.md) will automatically reconcile the dataplane configuration to
-enforce the new access tokens.
+client-side Javascript code. In order to mitigate the risk, it is a good security practice to reset
+the username/password pair every once in a while.  This can be done by simply updating the Secret
+that holds the credentials.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
-kind: GatewayConfig
-metadata:
-  name: stunner-gatewayconfig
-  namespace: stunner
-spec:
-  userName: "foo"
-  password: "bar"
+kubectl -n stunner edit secret stunner-auth-secret
 ```
 
 Note that modifying STUNner's credentials goes *without* restarting the TURN server: new
 connections will use the modified credentials but existing TURN connections should continue as
 normal (the application server may need to be restarted to learn the new TURN credentials though).
 
-## Longterm authentication
+## Ephemeral authentication
 
-Somewhat confusingly, STUNner overloads the name `longterm` to denote a STUN/TURN authentication
-mode that provides clients time-limited access.  STUNner `longterm` credentials are dynamically
-generated with a pre-configured lifetime and, once the lifetime expires, the credential cannot be
-used to authenticate (or refresh) with STUNner any more. This authentication mode is more secure
-since credentials are not shared between clients and come with a limited validity. Configuring
-`longterm` authentication may be more complex though, since credentials must be dynamically
+For production use, STUNner provides the `ephemeral` authentication mode that uses per-client
+time-limited STUN/TURN authentication credentials.  Ephemeral credentials are dynamically generated
+with a pre-configured lifetime and, once the lifetime expires, the credential cannot be used to
+authenticate (or refresh) with STUNner any more. This authentication mode is more secure since
+credentials are not shared between clients and come with a limited lifetime. Configuring
+`ephemeral` authentication may be more complex though, since credentials must be dynamically
 generated for each session and properly returned to clients.
 
 To implement this mode, STUNner adopts the [quasi-standard time-windowed TURN authentication
 credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this
 format, the TURN username consists of a colon-delimited combination of the expiration timestamp and
 the user-id parameter, where the user-id is some application-specific id that is opaque to STUNner
-and the timestamp specifies the date of expiry of the credential as a UNIX timestamp. Furthermore,
-the TURN password is computed from the a secret key shared with the TURN server and the returned
-username value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this
-scheme somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and
-the timestamp to appear in any order in the TURN username and it accepts usernames with a plain
+and the timestamp specifies the date of expiry of the credential as a UNIX timestamp. The TURN
+password is computed from the a secret key shared with the TURN server and the returned username
+value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this scheme
+somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and the
+timestamp to appear in any order in the TURN username and it accepts usernames with a plain
 timestamp, without the colon and/or the user-id.
 
 The advantage of this mechanism is that it is enough to know the shared secret for STUNner to be
 able to check the validity of a credential. Note that the user-id is used only for the integrity
 check but STUNner in no way checks whether it identifies a valid user-id in the system.
 
-The below commands will configure STUNner to use `longterm` authentication mode, using the shared
-secret `my-secret`. By default, STUNner credentials are valid for one day.
+In order to switch from `static` mode to `ephemeral` authentication, it is enough to simply update
+the Secret that holds the credentials. The below will set the shared secret `my-shared-secret` for
+the ephemeral authentication mode.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
-kind: GatewayConfig
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
 metadata:
-  name: stunner-gatewayconfig
+  name: stunner-auth-secret
   namespace: stunner
-spec:
-  realm: my-realm.example.com
-  authType: longterm
-  sharedSecret: "my-secret"
+type: Opaque
+stringData:
+  type: ephemeral
+  secret: my-shared-secret
+EOF
 ```
 
-The below snippet shows how to use the [authentication helper lib](https://www.npmjs.com/package/@l7mp/stunner-auth-lib)
-to generate the appropriate credentials to be returned to clients.
-```javascript
-var cred = StunnerAuth.getStunnerCredentials({
-    auth_type: 'longterm',   // override authentication mode
-    secret: 'my-secret',     // override the shared secret
-    duration: 24 * 60 * 60,  // lifetime the longterm credential is effective
-});
+Obtaining an ICE config from the STUNner authentication service will now return an ephemeral TURN
+credential that is valid only for a single day. 
+
+```console
+curl "http://stunner-auth.stunner-system:8088/ice?service=turn&username=user-id"
+{
+  "iceServers": [
+    {
+      "username": "1681490135:user-id"
+      "credential": "WSfJZ8QIi8ebu1uWhxlclvyjEPY=",
+      "urls": [
+        "turn:10.105.169.152:3478?transport=tcp",
+        "turn:10.98.80.250:3478?transport=udp"
+      ],
+    }
+  ],
+  "iceTransportPolicy": "all"
+}
 ```
