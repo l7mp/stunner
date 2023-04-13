@@ -124,21 +124,6 @@ application to generate an ICE config for each client.
    [...]
    ```
 
-- Call the library's `getIceConfig()` method every time you want a new valid ICE configuration. In
-   our case, this happens before returning a `registerResponse` to the client, so that the
-   generated ICE configuration can be piggy-backed on the response message.
-
-```js
-function register(id, name, ws, callback) {
-  [...]
-  try {
-    let iceConfiguration = auth.getIceConfig();
-    ws.send(JSON.stringify({id: 'registerResponse', response: 'accepted', iceConfiguration: iceConfiguration}));
-  }
-  [...]
-}
-```
-
 1. Modify the application server code to query the STUNner authentication server every time a a
    valid ICE config in needed. In particular, the code will return the ICE configuration before
    returning a `registerResponse` to the client, so that the generated ICE configuration can be
@@ -180,33 +165,33 @@ function register(id, name, ws, callback) {
    }
    ```
 
-- Next, modify the client-side JavaScript code to parse the ICE configuration received from the
-  application server from the `registerResponse` message.
+1. Next, modify the client-side JavaScript code to parse the ICE configuration received from the
+   application server from the `registerResponse` message.
 
-  ```js
-  var iceConfiguration;
-  
-  function resgisterResponse(message) {
-    if (message.response == 'accepted') {
-      iceConfiguration = message.iceConfiguration;
-    }
-    [...]
-  }
-  ```
+   ```js
+   var iceConfiguration;
+   
+   function resgisterResponse(message) {
+     if (message.response == 'accepted') {
+       iceConfiguration = message.iceConfiguration;
+     }
+     [...]
+   }
+   ```
 
-- Then, every time the client calls the PeerConnection constructor pass in the stored [ICE
-  configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
-  `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
-  create PeerConnections with Kurento.
+1. Then, every time the client calls the PeerConnection constructor pass in the stored [ICE
+   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
+   `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
+   create PeerConnections with Kurento.
 
-  ```js
-  var options = {
-    [...]
-    configuration: iceConfiguration,
-  }
-  
-  webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
-  ```
+   ```js
+   var options = {
+     [...]
+     configuration: iceConfiguration,
+   }
+   
+   webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
+   ```
 
 Eventually, the call setup process will look like this.
 

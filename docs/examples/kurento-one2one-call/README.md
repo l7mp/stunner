@@ -182,37 +182,37 @@ application to generate an ICE config for each client.
    }
    ```
 
-- Next, modify the [client-side JavaScript
-  code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
-  to parse the ICE configuration received from the application server from the `registerResponse`
-  message.
+1. Next, modify the [client-side JavaScript
+   code](https://github.com/l7mp/kurento-tutorial-node/blob/master/kurento-one2one-call/static/js/index.js)
+   to parse the ICE configuration received from the application server from the `registerResponse`
+   message.
 
-  ```js
-  var iceConfiguration;
-  
-  function resgisterResponse(message) {
-    if (message.response == 'accepted') {
-      iceConfiguration = message.iceConfiguration;
-    }
-    [...]
-  }
-  ```
+   ```js
+   var iceConfiguration;
+   
+   function resgisterResponse(message) {
+     if (message.response == 'accepted') {
+       iceConfiguration = message.iceConfiguration;
+     }
+     [...]
+   }
+   ```
 
-- Then, every time the client calls the [PeerConnection
-  constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection),
-  pass in the stored [ICE
-  configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
-  `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
-  create PeerConnections with Kurento.
+1. Then, every time the client calls the [PeerConnection
+   constructor](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection),
+   pass in the stored [ICE
+   configuration](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer). Note that
+   `kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv` is a small wrapper that makes it more convenient to
+   create PeerConnections with Kurento.
 
-  ```js
-  var options = {
-    [...]
-    configuration: iceConfiguration,
-  }
-  
-  webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
-  ```
+   ```js
+   var options = {
+     [...]
+     configuration: iceConfiguration,
+   }
+   
+   webRtcPeer = kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(options, ...);
+   ```
 
 You can build the application server container locally from the tutorial
 [repo](https://github.com/l7mp/kurento-tutorial-node/tree/master/kurento-one2one-call), or you can
