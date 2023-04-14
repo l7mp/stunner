@@ -94,6 +94,9 @@ func NewStunner(options Options) *Stunner {
 		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetActiveConnections() })
 	}
 
+	// TODO: remove this when STUNner gains self-managed dataplanes
+	s.ready = true
+
 	return s
 }
 

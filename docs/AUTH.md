@@ -80,16 +80,16 @@ The intended authentication workflow in STUNner is as follows.
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
 
    ```javascript
-   var ICE_config = <obtain ICE configuration sent by the application server>
-   var pc = new RTCPeerConnection(ICE_config);
+   var iceConfig = <obtain ICE configuration sent by the application server>
+   var pc = new RTCPeerConnection(iceConfig);
    ```
 
 ## Static authentication
 
 In STUNner, `static` authentication is the simplest and least secure authentication mode, basically
-corresponding to a traditional "log-in" username and password pair given to users. As of v0.15.0 STUNner
-accepts (and sometimes reports) the alias `plaintext` to mean `static` authentication; the use of
-`plaintext` is deprecated and will be removed in a later release).
+corresponding to a traditional "log-in" username and password pair given to users. STUNner accepts
+(and sometimes reports) the alias `plaintext` to mean the `static` authentication mode; the use of
+`plaintext` is deprecated and will be removed in a later release.
 
 When STUNner is configured to use `static` authentication only a single username/password pair is
 used for *all* clients. This makes configuration easy; e.g., the ICE server configuration can be
@@ -147,7 +147,10 @@ with a pre-configured lifetime and, once the lifetime expires, the credential ca
 authenticate (or refresh) with STUNner any more. This authentication mode is more secure since
 credentials are not shared between clients and come with a limited lifetime. Configuring
 `ephemeral` authentication may be more complex though, since credentials must be dynamically
-generated for each session and properly returned to clients.
+generated for each session and properly returned to clients. STUNner accepts (and sometimes
+reports) the alias `longterm` to mean the `ephemeral` authentication mode; the use of `longterm` is
+deprecated and will be removed in a later release. Note also that the alias `timewindowed` is also
+accepted.
 
 To implement this mode, STUNner adopts the [quasi-standard time-windowed TURN authentication
 credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this

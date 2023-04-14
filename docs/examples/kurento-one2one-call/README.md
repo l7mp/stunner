@@ -10,9 +10,10 @@ In this demo you will learn how to:
 
 - integrate a typical WebRTC application server with STUNner,
 - deploy the Kurento media server into Kubernetes,
-- use the STUNner authentication service to generate valid ICE configurations for clients,
+- use the STUNner authentication service to generate ICE configurations for clients,
 - configure STUNner to expose Kurento to clients, and
-- change the STUN/TURN credentials used by STUNner to improve security.
+- update the STUN/TURN credentials used by STUNner to improve security.
+
 
 ## Installation
 
