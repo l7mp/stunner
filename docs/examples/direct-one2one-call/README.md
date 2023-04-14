@@ -9,9 +9,8 @@ In this demo you will learn how to:
 
 - integrate a typical WebRTC application server with STUNner,
 - configure STUNner as a headless STUN/TURN server,
-- use the STUNner authentication service to generate valid ICE configurations for clients,
-- test STUNner from a browser with live video traffic, and
-- scale a WebRTC service with STUNner.
+- use the STUNner authentication service to generate valid ICE configurations for clients, and
+- test STUNner from a browser with live video traffic.
 
 ## Installation
 
