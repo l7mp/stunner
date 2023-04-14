@@ -102,7 +102,7 @@ Configure STUNner to act as a STUN/TURN server to clients, and route all receive
 ```console
 git clone https://github.com/l7mp/stunner
 cd stunner
-kubectl apply -f examples/livekit/livekit-call-stunner.yaml
+kubectl apply -f docs/examples/livekit/livekit-call-stunner.yaml
 ```
 
 The relevant parts here are the STUNner [Gateway definition](../../GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../GATEWAY.md), which takes care of routing media to the pods running the LiveKit service.
@@ -148,7 +148,7 @@ export STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.sta
 The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. In order to achieve this, first we path the public IP address of the STUNner STUN/TURN server we have learned above into our LiveKit deployment manifest:
 
 ```console
-sed -i "s/stunner_ip/$STUNNERIP/g" examples/livekit/livekit-server.yaml
+sed -i "s/stunner_ip/$STUNNERIP/g" docs/examples/livekit/livekit-server.yaml
 ```
 
 Assuming that Kubernetes assigns the IP address 1.2.3.4 to STUNner (i.e., `STUNNERIP=1.2.3.4`), the relevant part of the LiveKit config would be something like the below:
@@ -186,13 +186,13 @@ Note that LiveKit itself will not use STUNner (that would amount to a less effic
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
 ```console
-sed -i "s/ingressserviceip/$INGRESSIP/g" examples/livekit/livekit-server.yaml
+sed -i "s/ingressserviceip/$INGRESSIP/g" docs/examples/livekit/livekit-server.yaml
 ```
 
 Finally, fire up LiveKit.
 
 ```console
-kubectl apply -f examples/livekit/livekit-server.yaml
+kubectl apply -f docs/examples/livekit/livekit-server.yaml
 ```
 
 The demo installation bundle includes a lot of resources to deploy LiveKit:
