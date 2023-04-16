@@ -58,11 +58,12 @@ spec:
             value: ""
         ports:
         - containerPort: 8888
-        resources:
-          requests:
-            cpu: "100m"
-          limits:
-            cpu: "1000m"
+        # Uncomment this if you want to easily demo k8s autoscaling
+        # resources:
+        #   requests:
+        #     cpu: "100m"
+        #   limits:
+        #     cpu: "1000m"
 
       # Uncomment this if you want to deploy a sidecar container to sniff traffic
       # - name: net-debug
@@ -109,20 +110,19 @@ spec:
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
         imagePullPolicy: Always
         # command: ["/bin/sh"]
-        # args: ["-c", "while true; do echo hello; sleep 10;done"]
+        # args: ["-c", "while true; do sleep 10;done"]
         # imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443
         # TURN server config to return to the user
         env:
-          - name: STUNNER_CONFIG_FILENAME
-            value: "/etc/stunnerd/stunnerd.conf"
+          - name: STUNNER_AUTH_ADDR
+            value: "stunner-auth.stunner-system.svc.cluster.local"
+          - name: STUNNER_AUTH_PORT
+            value: "8088"
         volumeMounts:
           - name: webrtc-server-tls
             mountPath: "/app/keys"
-            readOnly: true
-          - name: stunnerd-config-volume
-            mountPath: "/etc/stunnerd"
             readOnly: true
 
       # - name: net-debug
@@ -131,10 +131,6 @@ spec:
       #   args: ["-c", "while true; do echo hello; sleep 10;done"]
 
       volumes:
-        - name: stunnerd-config-volume
-          configMap:
-            name: stunnerd-config
-            optional: true
         - name: webrtc-server-tls
           secret:
             secretName: webrtc-server-secret
