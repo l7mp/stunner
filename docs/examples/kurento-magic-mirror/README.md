@@ -45,14 +45,14 @@ Install the WebRTC application and Kurento media servers, altogether with the co
 ```console
 $ git clone https://github.com/l7mp/stunner
 $ cd stunner
-$ kubectl apply -f examples/kurento-magic-mirror/kurento-magic-mirror-server.yaml
+$ kubectl apply -f docs/examples/kurento-magic-mirror/kurento-magic-mirror-server.yaml
 ```
 
 ### Configuration
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
 ```console
-$ kubectl apply -f examples/kurento-magic-mirror/kurento-magic-mirror-stunner.yaml
+$ kubectl apply -f docs/examples/kurento-magic-mirror/kurento-magic-mirror-stunner.yaml
 ```
 
 The demo exposes a publicly available HTTPS web service on port 8443. Kubernetes assigns an
