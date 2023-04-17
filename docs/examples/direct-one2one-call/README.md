@@ -203,7 +203,7 @@ the application server into the `stunner` namespace and exposes it in the Kubern
 service called `webrtc-server`.
 
 ```console
-kubectl apply -f examples/direct-one2one-call/direct-one2one-call-server.yaml
+kubectl apply -f docs/examples/direct-one2one-call/direct-one2one-call-server.yaml
 ```
 
 ### STUNner configuration
@@ -213,7 +213,7 @@ gateway hierarchy to do just that: the setup includes two Gateway listeners, one
 another one at TCP:3478, plus and a UDPRoute.
 
 ```console
-kubectl apply -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
+kubectl apply -f docs/examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
 The most important component in the STUNner configuration is the TURN Gateway: this will expose a
@@ -407,6 +407,6 @@ WebRTC service and many things can go wrong. Below is a list of steps to help de
 Delete the demo deployment using the below command:
 
 ```console
-kubectl delete -f examples/direct-one2one-call/direct-one2one-call-server.yaml
-kubectl delete -f examples/direct-one2one-call/direct-one2one-call-stunner.yaml
+kubectl delete -f docs/examples/direct-one2one-call/direct-one2one-call-server.yaml
+kubectl delete -f docs/examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```

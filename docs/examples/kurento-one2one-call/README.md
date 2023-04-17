@@ -221,7 +221,7 @@ the application server into the `stunner` namespace and exposes it in the Kubern
 service called `webrtc-server`.
 
 ```console
-kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
+kubectl apply -f docs/examples/kurento-one2one-call/kurento-one2one-call-server.yaml
 ```
 
 Note that we disable STUN/TURN in Kurento: STUNner will make sure that your media servers will not
@@ -260,7 +260,7 @@ gateway hierarchy to do just that: the setup includes a Gateway listener at UDP:
 UDPRoute to forward incoming calls into the cluster.
 
 ```console
-kubectl apply -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
+kubectl apply -f docs/examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
 ```
 
 The most important component in the STUNner configuration is the TURN Gateway: this will expose a
@@ -532,6 +532,6 @@ the users to re-register) or become useless.
 Delete the demo deployment using the below command:
 
 ```console
-kubectl delete -f examples/kurento-one2one-call/kurento-one2one-call-server.yaml
-kubectl delete -f examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
+kubectl delete -f docs/examples/kurento-one2one-call/kurento-one2one-call-server.yaml
+kubectl delete -f docs/examples/kurento-one2one-call/kurento-one2one-call-stunner.yaml
 ```
