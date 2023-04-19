@@ -19,6 +19,7 @@
 * [Gateway API reference](GATEWAY.md)
 * [Security](SECURITY.md)
 * [Authentication](AUTH.md)
+* [Scaling](SCALING.md)
 * [Monitoring](MONITORING.md)
 
 ## Tutorials
