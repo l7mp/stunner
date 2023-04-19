@@ -93,13 +93,3 @@ This feature enables the full support for graceful scale-down: the user can scal
 Caveats: 
 - currently the max lifetime for `stunner` to remain alive for 1 hour after being deleted: this means that `stunner` will remain active only for 1 hour after it has been deleted/scaled-down. You can always set this in by adjusting the `terminationGracePeriod` on your `stunnerd` pods.
 - if there are active (or very recent) TURN allocations then the `stunner` pod may refuse to be removed after a kubectl delete. Use `kubectl delete pod --grace-period=0 --force -n stunner stunner-XXX` to force removal.
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
-## License
-
-Copyright 2021-2023 by its authors. Some rights reserved. See [AUTHORS](../AUTHORS).
-
-MIT License - see [LICENSE](../LICENSE) for full text.
