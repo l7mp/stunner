@@ -2,6 +2,7 @@ package stunner
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -119,8 +120,8 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 		if err != nil {
 			return nil, err
 		}
-		c.Listeners[0].Cert = string(certPem)
-		c.Listeners[0].Key = string(keyPem)
+		c.Listeners[0].Cert = base64.StdEncoding.EncodeToString(certPem)
+		c.Listeners[0].Key = base64.StdEncoding.EncodeToString(keyPem)
 	}
 
 	if err := c.Validate(); err != nil {
