@@ -104,8 +104,7 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        # image: l7mp/kurento-magic-mirror-server TODO update
-        image: nmate/kurento-magic-mirror-server:latest
+        image: l7mp/kurento-magic-mirror-server:latest
         command: ["npm"]
         args: ["start", "--", "--as_uri=https://0.0.0.0:8443", "--ws_uri=ws://kms-control.default.svc.cluster.local:8888/kurento"]
         imagePullPolicy: Always
