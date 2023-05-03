@@ -204,10 +204,30 @@ STUNner will automatically generate a Kubernetes LoadBalancer service to expose 
 clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be
 assigned a single externally reachable IP address. If you want multiple TURN listeners on different
 public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP
-services, TCP and TLS listeners are exposed as TCP. Mixed multi-protocol Gateways are not supported
-(this may change in the future): if you want to expose a UDP and a TCP listener then use separate
-Gateways or create the LoadBalancer service manually (if your Kubernetes platform supports
-multi-protocol Services).
+services, TCP and TLS listeners are exposed as TCP.
+
+Mixed multi-protocol Gateways are supported, this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. By default, the STUNner gateway-operator disables the use of mixed-protocol LBs for specific Gateways. However, it can be enabled by annotating your Gateway resource with the `stunner.l7mp.io/enable-mixed-protocol-lb: "true"` key/value pair. The below Gateway will expose both ports with their respective protocols.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: mixed-protocol-gateway
+  annotations:
+    stunner.l7mp.io/enable-mixed-protocol-lb: "true"
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: UDP
+    - name: tcp-listener
+      port: 3479
+      protocol: TCP
+```
+
+> **Warning**  
+> Note that the mixed-protocol LB feature might not be supported by your Kubernetes platform.
 
 STUNner implements two ways to customize the automatically created Service, both involving setting
 certain
