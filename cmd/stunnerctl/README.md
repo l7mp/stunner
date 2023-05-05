@@ -5,6 +5,7 @@ A CLI tool to simplify the interaction with STUNner.
 ## Usage
 
 Dump the running config from a live STUNner deployment in human-readable format.
+
 ```console
 cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
 STUN/TURN authentication type:	plaintext
