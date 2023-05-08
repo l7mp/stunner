@@ -216,7 +216,7 @@ kind: Gateway
 metadata:
   name: mixed-protocol-gateway
   annotations:
-    stunner.l7mp.io/enable-mixed-protocol-lb: "true"
+    stunner.l7mp.io/enable-mixed-protocol-lb: true
 spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
@@ -250,7 +250,6 @@ a Gateway publicly (useful for testing).
 Gateway resources are *not* safe for modification. This means that certain changes to a Gateway
 will restart the underlying TURN server, causing all active client sessions to terminate.  The
 particular rules are as follows:
-
 - adding or removing a listener will start/stop *only* the TURN server to be started/stopped,
   without affecting the rest of the listeners;
 - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart

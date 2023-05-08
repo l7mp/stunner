@@ -30,10 +30,10 @@ resources](https://pauldally.medium.com/horizontalpodautoscaler-uses-request-not
 to determine when to scale-up or down the number of instances.
 
 STUNner comes with a full support for horizontal scaling using the the Kubernetes built-in
-[HorizontalPodAutoscaler]](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale)
+[HorizontalPodAutoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale)
 (HPA). The triggering event can be based on arbitrary metric, say, the [number of active client
 connections](#MONITORING.md) per STUNner dataplane pod. Below we use the CPU utilization for
-simplicity. 
+simplicity.
 
 Scaling STUNner *up* occurs by Kubernetes adding more pods to the STUNner dataplane deployment and
 load-balancing client requests across the running pods. This should (theoretically) never interrupt
@@ -52,15 +52,15 @@ browsers.
 
 In order to avoid client disconnects on scale-down, STUNner supports a feature called [graceful
 shutdown](https://cloud.google.com/blog/products/containers-kubernetes/kubernetes-best-practices-terminating-with-grace). This
-means that `stunnerd` pods would refuse to terminate as long as there are active TURN allocations,
-and automatically remove themselves only once all allocations are deleted or timed out. It is
-important that *terminating* pods will not be counted by the HorizontalPodAutoscaler towards the
+means that `stunnerd` pods would refuse to terminate as long as there are active TURN allocations
+on them, and automatically remove themselves only once all allocations are deleted or timed out. It
+is important that *terminating* pods will not be counted by the HorizontalPodAutoscaler towards the
 average CPU load, and hence would not affect autoscaling decisions. In addition, new TURN
 allocation requests would never be routed by Kubernetes to terminating `stunnerd` pods.
 
-Graceful shutdown enables full support for autocaling STUNner without affecting active client
+Graceful shutdown enables full support for scaling STUNner down without affecting active client
 connections. As usual, however, some caveats apply:
-1. Currently the max lifetime for `stunner` to remain alive is 1 hour after being deleted: this
+1. Currently the max lifetime for `stunnerd` to remain alive is 1 hour after being deleted: this
    means that `stunnerd` will remain active only for 1 hour after it has been deleted/scaled-down
    even if active allocations would last longer. You can always set this by adjusting the
    `terminationGracePeriod` on your `stunnerd` pods.
@@ -77,7 +77,7 @@ connections. As usual, however, some caveats apply:
 
 Below is a simple
 [HorizontalPodAutoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
-config for autoscaling `stunner`. The example assumes that the [Kubernetes metric
+config for autoscaling `stunnerd`. The example assumes that the [Kubernetes metric
 server](https://github.com/kubernetes-sigs/metrics-server#installation) is available in the
 cluster.
 
@@ -103,9 +103,9 @@ spec:
         averageUtilization: 300
 ```
 
-Here, `scaleTargetRef` selects the STUNner Deployment named `stunner` as the scaling target and the
-deployment will always run at least 1 pod and at most 10 pods. Understanding how Kubernetes chooses
-the number of running pods is, however, a bit tricky.
+Here, `scaleTargetRef` selects the STUNner Deployment named `stunnerd` as the scaling target and
+the deployment will always run at least 1 pod and at most 10 pods. Understanding how Kubernetes
+chooses the number of running pods is, however, a bit tricky.
 
 Suppose that the configured resources in the STUNner deployment are the following.
 
@@ -123,9 +123,8 @@ Suppose that, initially, there is only a single `stunnerd` pod in the cluster. A
 in, CPU utilization is increasing. Scale out will be triggered when CPU usage of the `stunnerd` pod
 reaches 1500 millicore CPU (three times the requested CPU). If more calls come and the total CPU
 usage of the `stunnerd` pods reaches 3000 millicore, which amounts to 1500 millicore on average,
-scale out would happen again. When users leave, load will drop and the average CPU will fall under
-3000 millicore. At this point Kubernetes will automatically scale-in and remove one of the
-`stunner` instances. Recall, this would never affect existing connections thanks to graceful
+scale out would happen again. When users leave, load will drop and the total CPU utilization will
+fall under 3000 millicore. At this point Kubernetes will automatically scale-in and remove one of
+the `stunnerd` instances. Recall, this would never affect existing connections thanks to graceful
 shutdown.
-
 
