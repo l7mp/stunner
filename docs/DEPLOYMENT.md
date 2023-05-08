@@ -1,14 +1,15 @@
 # Deployment models
 
-STUNner supports various deployment models. First, it supports multiple [architectural
-models](#architectural-models) where it can act either as a simple headless STUN/TURN server or a
-fully fledged ingress gateway in front of an entire Kubernetes-based media server pool. Second,
-when STUNner is configured as an ingress gateway then there are multiple [ICE models](#ice-models),
-based on whether only the client connects via STUNner or both clients and media servers use STUNner
-to set up the media-plane connection. Third, STUNner can run in one of two [control plane
-models](#control-plane-models), based on whether the user manually supplies STUNner configuration or
-there is a separate STUNner control plane that automatically reconciles the dataplane state based
-on a high-level [declarative API](https://gateway-api.sigs.k8s.io).
+STUNner can be deployed in many combinations to support a wide range of operational
+requirements. First, it supports multiple [architectural models](#architectural-models) where it
+can act either as a simple headless STUN/TURN server or a fully fledged ingress gateway in front of
+an entire Kubernetes-based media server pool. Second, when STUNner is configured as an ingress
+gateway then there are multiple [ICE models](#ice-models), based on whether only the client
+connects via STUNner or both clients and media servers use STUNner to set up the media-plane
+connection. Third, STUNner can run in one of two [control plane models](#control-plane-models),
+based on whether the user manually supplies STUNner configuration or there is a separate STUNner
+control plane that automatically reconciles the dataplane state based on a high-level [declarative
+API](https://gateway-api.sigs.k8s.io).
 
 ## Architectural models
 
@@ -19,16 +20,17 @@ server pool deployed *behind* STUNner.
 ### Headless deployment model
 
 In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that WebRTC
-clients can use as a NAT traversal facility for establishing media connections between
+clients and servers can use as a NAT traversal facility for establishing media connections between
 themselves. This is not that much different from a standard public STUN/TURN server setup, but in
 this case the STUN/TURN servers are deployed into Kubernetes.
 
 ![STUNner headless deployment architecture](img/stunner_standalone_arch.svg)
 
-Note that for STUNner to be able to connect two or more WebRTC clients in the headless model *all*
-the clients *must* use STUNner as the TURN server. This is because STUNner opens the transport
-relay connections *inside* the cluster, on a private IP address, and this address is reachable only
-to STUNner itself, but not for external STUN/TURN servers.
+> **Warning**  
+For STUNner to be able to connect WebRTC clients and servers in the headless model *all* the
+clients and servers *must* use STUNner as the TURN server. This is because STUNner opens the
+transport relay connections *inside* the cluster, on a private IP address, and this address is
+reachable only to STUNner itself, but not for external STUN/TURN servers.
 
 ### Media-plane deployment model
 
@@ -69,19 +71,25 @@ connection. In contrast, servers run without any STUN/TURN server whatsoever, so
 only. Due to servers being deployed into ordinary Kubernetes pods, the server's host candidate will
 likewise contain a private pod IP address. Then, since in the Kubernetes networking model ["pods
 can communicate with all other pods on any other node without a
-NAT"](https://kubernetes.io/docs/concepts/services-networking), the clients relay candidate and the
-servers' host candidate will have direct connectivity in the Kubernetes private container network
+NAT"](https://kubernetes.io/docs/concepts/services-networking), clients' relay candidates and the
+servers' host candidates will have direct connectivity in the Kubernetes private container network
 and the ICE connectivity check will succeed. See more explanation
 [here](examples/kurento-one2one-call/README.md#what-is-going-on-here).
 
-A word of warning here: when using STUNner refrain from configuring additional public STUN/TURN
-servers, apart from STUNner itself. The rules to follow in setting the [ICE server
-configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients) in asymmetric ICE mode are as below:
+A word of warning: when using STUNner refrain from configuring additional public STUN/TURN servers,
+apart from STUNner itself. The rules to follow in setting the [ICE server
+configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients) in asymmetric ICE mode
+are as below:
 
 - on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
-- on the server do *not* configure *any* STUN or TURN servers at all.
+- on the server do *not* configure *any* STUN or TURN servers whatsoever.
 
-Note that deviating from the above rules *might* work in certain cases, but may have uncanny and
+Most users will want to deploy STUNner using the asymmetric ICE mode. In the rest of the docs,
+unless noted otherwise we will assume the asymmetric ICE mode with the media plane deployment
+model.
+
+> **Warning**  
+Deviating from the above rules *might* work in certain cases, but may have uncanny and
 hard-to-debug side-effects. For instance, configuring clients and servers with public STUN servers
 in certain unlucky situations may allow them to connect via server-reflexive ICE candidates,
 completely circumventing STUNner. This is on the one hand extremely fragile and, on the other hand,
@@ -105,8 +113,8 @@ configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients):
   servers, and
 - set the `iceTransportPolicy` to `relay` on both sides.
 
-Note that the `iceTransportPolicy: relay` setting is mandatory in this case, otherwise the
-connection falls back to the asymmetric mode (this is a consequence of the way [ICE assigns
+The `iceTransportPolicy: relay` setting is mandatory in this case, otherwise the connection falls
+back to the asymmetric mode (this is a consequence of the way [ICE assigns
 priorities](https://www.ietf.org/rfc/rfc5245.txt) to different connection types).  Furthermore, it
 is a good practice to configure the STUNner TURN URI in the server-side ICE server configuration
 with the *internal* IP address and port used by STUNner (i.e., the ClusterIP of the `stunner`

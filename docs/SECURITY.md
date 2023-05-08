@@ -71,7 +71,7 @@ prerequisites for this:
 2. the target service *must* be wrapped with a UDPRoute
 3. the attacker *must* know at least one pod address or the ClusterIP for the targeted service.
 
-Should any of this prerequisites miss, STUNner will block access to the target service.
+Should any of these prerequisites miss, STUNner will block access to the target service.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -104,19 +104,19 @@ STUNner's basic security model is as follows:
 > In a properly configured deployment, STUNner provides the same level of security as a media
 server pool exposed to the Internet over public IP addresses, protected by a firewall that admits
 only UDP access. A malicious attacker, even possessing a valid TURN credential, can reach only the
-media servers deployed behind via STUNner, but no other services.
+media servers deployed behind STUNner, but no other services.
 
 The below security considerations will greatly reduce this attack surface even further. In any
 case, use STUNner at your own risk.
 
 ## Authentication
 
-By default, STUNner uses a single statically set username/password pair for all clients and the
-password is available in plain text at the clients (`static` authentication mode). Anyone with
-access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know
-the private IP address of the target service or pod and provided that a UDPRoute exists that
-specifies the target service as a backend. This means that a service is exposed only if STUNner is
-explicitly configured so.
+By default, STUNner uses a single static username/password pair for all clients and the password is
+available in plain text at the clients (`static` authentication mode). Anyone with access to the
+static STUNner credentials can open a UDP tunnel via STUNner, provided that they know the private
+IP address of the target service or pod and provided that a UDPRoute exists that specifies the
+target service as a backend. This means that a service is exposed only if STUNner is explicitly
+configured so.
 
 For more security sensitive workloads, we recommend the `ephemeral` authentication mode, which uses
 per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to
@@ -198,8 +198,8 @@ addresses are now exposed to the WebRTC clients in ICE candidates.
 
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP
 address of all STUNner pods and all media server pods. This should not pose a major security risk
-though: remember, none of these private IP addresses can be reached externally. The attacker
-surface can be reduced to the STUNner pods' IP addresses by using the [symmetric ICE
+though: remember, none of these private IP addresses can be reached externally. The attack surface
+can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE
 mode](DEPLOYMENT.md#symmetric-ice-mode).
 
 Nevertheless, if worried about information exposure then STUNner may not be the best option at the

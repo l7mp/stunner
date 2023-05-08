@@ -17,10 +17,10 @@
 ## User guides
 
 * [Gateway API reference](GATEWAY.md)
-* [Security](SECURITY.md)
 * [Authentication](AUTH.md)
-* [Scaling](SCALING.md)
 * [Monitoring](MONITORING.md)
+* [Scaling](SCALING.md)
+* [Security](SECURITY.md)
 
 ## Tutorials
 

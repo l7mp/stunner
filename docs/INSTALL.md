@@ -14,7 +14,7 @@ works). STUNner automatically detects if LoadBalancer service integration is fun
 back to using NodePorts when it is not; however, this may require manual tweaking of the firewall
 rules to admit the UDP NodePort range into the cluster.
 
-To recompile STUNner, at least Go v1.18 is required. Building the container images requires
+To recompile STUNner, at least Go v1.19 is required. Building the container images requires
 [Docker](https://docker.io) or [Podman](https://podman.io).
 
 ## Basic installation
@@ -22,10 +22,9 @@ To recompile STUNner, at least Go v1.18 is required. Building the container imag
 The simplest way to deploy the full STUNner distro, with the dataplane and the controller
 automatically installed, is through [Helm](https://helm.sh). STUNner configuration parameters are
 available for customization as [Helm
-Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying the STUNner
-dataplane into a separate Kubernetes namespace and we usually name this namespace as `stunner`, in
-order to isolate it from the rest of the workload. The control plane operator can be deployed into
-any namespace.
+Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying each
+STUNner dataplane into a separate Kubernetes namespace (e.g., `stunner`), while the gateway
+operator should go into the `stunner-system` namespace (but effectively any namespace would work).
 
 First, register the STUNner repository with Helm.
 

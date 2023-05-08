@@ -1,37 +1,86 @@
 # Scaling
 
-<!-- ## Table of Contents
+[Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) is one of
+the key features in Kubernetes. This means that Kubernetes will automatically increase the number
+of pods that run a service as the demand for the service increases, and reduce the number of pods
+when the demand drops. This improves service quality, simplifies management, and reduces
+operational costs by avoiding the need to over-provision services to the peak load. Most
+importantly, autoscaling saves you from having to guess the number of nodes or pods needed to run
+your workload: Kubernetes will automatically and dynamically resize your workload based on demand.
 
-- [Why](#why)
-- [Scaling with STUNner](#scaling-with-stunner)
-  - [Scaling-up (out)](#scaling-up-out)
-  - [Scaling-down (in)](#scaling-down-in)
-  - [Graceful shutdown](#more-on-the-graceful-shutdown)
-- [Example](#example) -->
+Further factors to autoscale your WebRTC workload are:
+- smaller load on each instance: this might result in better and more stable performance;
+- smaller blast radius: less calls will be affected if a pod fails for some reason.
 
-## Why
+Autoscaling a production service, especially one as sensitive to latency and performance as WebRTC,
+can be challenging. This guide will provide the basics on autoscaling; see the [official
+docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) for more detail.
 
-[Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) is one of the key features in Kubernetes. It is a feature in which the cluster is capable of increasing the number of pods as the demand for a service increases and decrease the number of pods as the requirement decreases.
+## Horizontal scaling
 
-The biggest advantage of using Kubernetes for autoscaling is it reduces operational costs and saves you from a lot of head-scratching by simplifying management and improving service quality. You do not need to guess the number of nodes or pods needed to run your workloads. It scales up or down dynamically based on resource utilization, thus saving you dollars.
+It is a good practice to scale Kubernetes workloads
+[horizontally](https://openmetal.io/docs/edu/openstack/horizontal-scaling-vs-vertical-scaling)
+(that is, by adding or removing service pods) instead of vertically (that is, by migrating to a
+more powerful server) when demand increases. Correspondingly it is a good advice to set the
+[resource limits and
+requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) to the
+bare minimum and let Kubernetes to automatically scale out the service by adding more pods if
+needed.  Note that that HPA [uses the requested amount of
+resources](https://pauldally.medium.com/horizontalpodautoscaler-uses-request-not-limit-to-determine-when-to-scale-97643d808997)
+to determine when to scale-up or down the number of instances.
 
-When defining a Kubernetes deployment's [resource limits and requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/), it is a recommended practice to *not* go for an indefinite amount of CPUs ([which would be vertical scaling instead horizontal scaling](https://openmetal.io/docs/edu/openstack/horizontal-scaling-vs-vertical-scaling/)) but to keep the limits down and scale out (increase) the number of running pods if needed. Scaling a service might be scary and complex, this guide aims to overcome the fear.
+STUNner comes with a full support for horizontal scaling using the the Kubernetes built-in
+[HorizontalPodAutoscaler]](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale)
+(HPA). The triggering event can be based on arbitrary metric, say, the [number of active client
+connections](#MONITORING.md) per STUNner dataplane pod. Below we use the CPU utilization for
+simplicity. 
 
-And the other factors that might boost your need for scaling are as follows:
-- smaller load on each instance, might result in better, more stable performance;
-- less calls will be affected if an application instance fails for some reason.
+Scaling STUNner *up* occurs by Kubernetes adding more pods to the STUNner dataplane deployment and
+load-balancing client requests across the running pods. This should (theoretically) never interrupt
+existing calls, but new calls should be automatically routed by the cloud load balancer to the new
+endpoint(s). Automatic scale-up means that STUNner should never become the bottleneck in the
+system. Note that in certain cases scaling STUNner up would require adding new Kubernetes nodes to
+your cluster: most modern hosted Kubernetes services provide horizontal node autoscaling out of the
+box to support this.
 
+Scaling STUNner *down*, however, is trickier. Intuitively, when a running STUNner dataplane pod is
+terminated on scale-down, all affected clients with active TURN allocations on the terminating pod
+would be disconnected. This would then require clients to go through an [ICE
+restart](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce) to
+re-connect, which may cause prolonged connection interruption and may not even be supported by all
+browsers.
 
-## Scaling STUNner
+In order to avoid client disconnects on scale-down, STUNner supports a feature called [graceful
+shutdown](https://cloud.google.com/blog/products/containers-kubernetes/kubernetes-best-practices-terminating-with-grace). This
+means that `stunnerd` pods would refuse to terminate as long as there are active TURN allocations,
+and automatically remove themselves only once all allocations are deleted or timed out. It is
+important that *terminating* pods will not be counted by the HorizontalPodAutoscaler towards the
+average CPU load, and hence would not affect autoscaling decisions. In addition, new TURN
+allocation requests would never be routed by Kubernetes to terminating `stunnerd` pods.
 
-STUNner comes with a full support for horizontal scaling. That means the number of pods can be increased and decreased according to the user's needs. 
-In case the user wants to scale the instances of the `stunner` deployment, the Kubernetes built in `HorizontalPodAutoscaler` can be used. The triggering event can be based on arbitrary metrics but it is advised to use the currently utilized amount of CPU. If so, it is important to state that the HPA [uses the requested amount of resources](https://pauldally.medium.com/horizontalpodautoscaler-uses-request-not-limit-to-determine-when-to-scale-97643d808997) to determine when to scale-up or down the number of instances.
+Graceful shutdown enables full support for autocaling STUNner without affecting active client
+connections. As usual, however, some caveats apply:
+1. Currently the max lifetime for `stunner` to remain alive is 1 hour after being deleted: this
+   means that `stunnerd` will remain active only for 1 hour after it has been deleted/scaled-down
+   even if active allocations would last longer. You can always set this by adjusting the
+   `terminationGracePeriod` on your `stunnerd` pods.
+2. STUNner pods may remain alive well after the last client connection goes away. This occurs when
+   an TURN/UDP allocation is left open by a client (spontaneous UDP client-side connection closure
+   cannot be reliably detected by the server). As the default TURN refresh lifetime is [10
+   minutes](https://www.rfc-editor.org/rfc/rfc8656#section-3.2-3), it may take 10 minutes until all
+   allocations time out, letting `stunnerd` to finally terminate.
+3. If there are active (or very recent) TURN allocations then the `stunnerd` pod may refuse to be
+   removed after a `kubectl delete`. Use `kubectl delete pod --grace-period=0 --force stunner-XXX`
+   to force removal.
 
-## Example
+### Example
 
-In this part we will walk you through a simple example on how to scale your `stunner` deployment. You might need to install the [metric-server](https://github.com/kubernetes-sigs/metrics-server#installation) in your cluster if it is not already installed.
+Below is a simple
+[HorizontalPodAutoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/)
+config for autoscaling `stunner`. The example assumes that the [Kubernetes metric
+server](https://github.com/kubernetes-sigs/metrics-server#installation) is available in the
+cluster.
 
-A simple [HorizontalPodAutoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/) config for scaling `stunner` would be:
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -53,7 +102,13 @@ spec:
         type: Utilization
         averageUtilization: 300
 ```
-Configured resources in the STUNner deployment are the following.
+
+Here, `scaleTargetRef` selects the STUNner Deployment named `stunner` as the scaling target and the
+deployment will always run at least 1 pod and at most 10 pods. Understanding how Kubernetes chooses
+the number of running pods is, however, a bit tricky.
+
+Suppose that the configured resources in the STUNner deployment are the following.
+
 ```yaml
 resources:
   limits:
@@ -64,32 +119,13 @@ resources:
     memory: 128Mi
 ```
 
-Initially there is only a single `stunner` instance in the cluster. As new calls start to come in the amount of utilized CPU is increasing.  
+Suppose that, initially, there is only a single `stunnerd` pod in the cluster. As new calls come
+in, CPU utilization is increasing. Scale out will be triggered when CPU usage of the `stunnerd` pod
+reaches 1500 millicore CPU (three times the requested CPU). If more calls come and the total CPU
+usage of the `stunnerd` pods reaches 3000 millicore, which amounts to 1500 millicore on average,
+scale out would happen again. When users leave, load will drop and the average CPU will fall under
+3000 millicore. At this point Kubernetes will automatically scale-in and remove one of the
+`stunner` instances. Recall, this would never affect existing connections thanks to graceful
+shutdown.
 
-Scale out is triggered when CPU usage of the `stunner` pod reaches 1500m (three times the requested CPU) core CPU.
 
-More calls come in and the summarized CPU usage by `stunner` pods reach 3000m core CPU, this is 1500m core on average. Scale out happens again. 
-
-As participants leave the room, the load will drop and the average CPU will fall under 3000m. Scaling in happens as the `HPA` removes one of the `stunner` instances. And so on...
-
-###  Scaling-up (out)
-
-When adding new instances to the existing `stunner` replica set we don't expect any breaking changes. The infrastructure for existing calls won't get interrupted, it stays the same as before the upscale event. Only when new user calls come in the cloud loadbalancer have an additional endpoint to choose from. This way we can achieve that STUNner is never going to be the bottleneck in the system. Obviously, if you have the needed computational power under your cluster.
-
-Scaling-up the number of instances in the `stunner` deployment should be done based on the CPU usage of the replicas. As it was mentioned in the [section Scaling STUNner](#scaling-stunner) the `HorizontalPodAutoscaler` is using the requested resources to determine when to scale up.
-
-### Scaling-down (in)
-
-When removing existing instances from the `stunner` replica set there are some things to keep in mind. What happens to the existing calls on a to-be-removed pod? Is there a way to keep them? 
-
-In worst case scenario all connections will be dropped and the pod terminates itself, thus we lost all running connections/calls on the removed (scaled down) STUNner instance. A slightly better scenario is that the [ICE restart](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/restartIce) mechanism will kick in at the client side, basically it will reset the current ICE candidates and reconnect again the same way it did initially but it takes a second or two and not even supported by all browsers. 
-
-The *default* mode of operation in STUNner is that when it gets removed it will [shutdown gracefully](#more-on-the-graceful-shutdown). This means that `stunner` pods will remain alive as long as there are active allocations via the embedded TURN server, and a pod will automatically remove itself once all allocations through it are deleted or timed out. It is important that the *terminating* pod will not be counted in by the `HorizontalPodAutoscaler` as a running replica, thus its CPU usage won't be taken into account either. Note that one can switch graceful shutdown off and then they will fall back to the mentioned ICE restarts.
-
-#### More on the graceful shutdown
-
-Note that the default TURN refresh lifetime is [10 minutes](https://www.rfc-editor.org/rfc/rfc8656#section-3.2-3) so STUNner may remain alive well after the last client goes away. This occurs when an UDP allocation is left open by a client (spontaneous UDP client-side connection closure cannot be reliably detected by the server). In such cases, after 10 mins the allocation will timeout and get deleted, which will then let `stunnerd` to terminate. 
-This feature enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down as they wish and no harm should be made to active client connections meanwhile. 
-Caveats: 
-- currently the max lifetime for `stunner` to remain alive for 1 hour after being deleted: this means that `stunner` will remain active only for 1 hour after it has been deleted/scaled-down. You can always set this in by adjusting the `terminationGracePeriod` on your `stunnerd` pods.
-- if there are active (or very recent) TURN allocations then the `stunner` pod may refuse to be removed after a kubectl delete. Use `kubectl delete pod --grace-period=0 --force -n stunner stunner-XXX` to force removal.

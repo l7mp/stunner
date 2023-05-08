@@ -58,7 +58,7 @@ modification to your existing WebRTC codebase.  STUNner implements the standard 
 API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
 style via Kubernetes manifests.
 
-See the full documentation [here](/docs/README.md).
+See the full documentation [here](https://docs.l7mp.io/en/latest).
 
 ## Table of Contents
 1. [Description](#description)
@@ -94,19 +94,19 @@ Kubernetes offering. This is achieved by STUNner acting as a gateway for ingesti
 traffic into the Kubernetes cluster, exposing a public-facing STUN/TURN server that WebRTC clients
 can connect to.
 
-STUNner can act as a STUN/TURN server that WebRTC clients can use as a scalable NAT traversal
-facility (headless model), or it can serve as a fully-fledged ingress gateway for clients to reach
-a media server deployed behind STUNner (media-plane model). This makes it possible to deploy WebRTC
-application servers and media servers into ordinary Kubernetes pods, taking advantage of
-Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure
-like any other cloud-bound workload.
+STUNner can act as a STUN/TURN server that WebRTC clients and media servers can use as a scalable
+NAT traversal facility (headless model), or it can serve as a fully-fledged ingress gateway for
+clients to reach a media server deployed behind STUNner (media-plane model). This makes it possible
+to deploy WebRTC application servers and media servers into ordinary Kubernetes pods, taking
+advantage of Kubernetes's excellent tooling to manage, scale, monitor and troubleshoot the WebRTC
+infrastructure like any other cloud-bound workload.
 
 ![STUNner media-plane deployment architecture](./docs/img/stunner_arch.svg)
 
 Don't worry about the performance implications of processing all your media through a TURN server:
 STUNner is written in [Go](https://go.dev) so it is extremely fast, it is co-located with your
 media server pool so you don't pay the round-trip time to a far-away public STUN/TURN server, and
-STUNner can be easily scaled up if needed, just like any other "normal" Kubernetes service.
+STUNner can be easily scaled up if needed just like any other "normal" Kubernetes service.
 
 ## Features
 
@@ -143,8 +143,9 @@ way.
 
 * **Easily scale your WebRTC infrastructure.** Tired of manually provisioning your WebRTC media
   servers?  STUNner lets you deploy the entire WebRTC infrastructure into ordinary Kubernetes pods,
-  thus scaling the media plane is as easy as issuing a `kubectl scale` command. STUNner itself can
-  be scaled with similar ease, completely separately from the media servers.
+  thus [scaling the media plane](docs/SCALING.md) is as easy as issuing a `kubectl scale`
+  command. Even better, use the built in Kubernetes horizontal autoscaler to *automatically* resize
+  your workload based on demand.
 
 * **Secure perimeter defense.** No need to open thousands of UDP/TCP ports on your media server for
   potentially malicious access; with STUNner *all* media is received through a single ingress port
@@ -162,9 +163,9 @@ way.
 
 STUNner comes with a [Helm](https://helm.sh) chart to fire up a fully functional STUNner-based
 WebRTC media gateway in minutes. Note that the default installation does not contain an application
-server and a media server: STUNner in itself is not a WebRTC service, it is merely an *enabler* for
-you to deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner makes sure
-that your media servers are readily reachable to WebRTC clients, despite running with a private IP
+server and a media server: STUNner is not a WebRTC service, it is merely an *enabler* for you to
+deploy your *own* WebRTC infrastructure into Kubernetes. Once installed, STUNner makes sure that
+your media servers are readily reachable to WebRTC clients, despite running with a private IP
 address inside a Kubernetes pod. See the [tutorials](#tutorials) for some ideas on how to deploy an
 actual WebRTC application behind STUNner.
 
@@ -237,9 +238,9 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
    most importantly the STUN/TURN authentication [credentials](/docs/AUTH.md). This requires loading
    a GatewayConfig custom resource into Kubernetes.
 
-   Below we set the [`plaintext` authentication](/docs/AUTH.md) mechanism for STUNner using the
-   username/password pair `user-1/pass-1` and the authentication realm `stunner.l7mp.io`. See the
-   package [docs](/docs/GATEWAY.md#gatewayconfig) for further configuration options.
+   Below example will set the authentication realm `stunner.l7mp.io` and refer STUNner to take the
+   TURN authentication credentials from the Kubernetes Secret called `stunner-auth-secret` in the
+   `stunner` namespace.
 
    ```console
    kubectl apply -f - <<EOF
@@ -250,13 +251,32 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
      namespace: stunner
    spec:
      realm: stunner.l7mp.io
-     authType: plaintext
-     userName: "user-1"
-     password: "pass-1"
+     authRef: 
+       name: stunner-auth-secret
+       namespace: stunner
    EOF
    ```
 
-   Note that these two steps are required only once per STUNner installation.
+   Setting the Secret as below will set the [`static` authentication](/docs/AUTH.md) mechanism for
+   STUNner using the username/password pair `user-1/pass-1`. See the package
+   [docs](/docs/GATEWAY.md#gatewayconfig) for further configuration options.
+
+   ```console
+   kubectl apply -f - <<EOF
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: stunner-auth-secret
+     namespace: stunner
+   type: Opaque
+   stringData:
+     type: static
+     username: user-1
+     password: pass-1
+   EOF
+   ```
+
+   Note that these steps are required only once per STUNner installation.
 
 1. At this point, we are ready to [expose STUNner](/docs/GATEWAY.md#gateway) to clients! This occurs
    by loading a
@@ -510,9 +530,9 @@ var ICE_config = {
 var pc = new RTCPeerConnection(ICE_config);
 ```
 
-Note that STUNner comes with a [small Node.js
-library](https://www.npmjs.com/package/@l7mp/stunner-auth-lib) that simplifies generating ICE
-configurations and STUNner credentials in the application server.
+Note that STUNner comes with a built-in [authentication
+service](https://github.com/l7mp/stunner-auth-service) that can be used to generate a complete ICE
+configuration for reaching STUNner through a [HTTP REST API](docs/AUTH.md).
 
 ## Tutorials
 
@@ -580,11 +600,6 @@ notable limitations at this point are as follows.
   configuration process. The [STUNner Kubernetes gateway
   operator](https://github.com/l7mp/stunner-gateway-operator) docs contain a [detailed
   list](https://github.com/l7mp/stunner-gateway-operator/README.md#caveats) on the differences.
-* STUNner supports arbitrary scale-up without dropping active calls, but *scale-down might
-  disconnect calls* established through the STUNner pods and/or media server replicas being removed
-  from the load-balancing pool. Note that this problem is
-  [universal](https://webrtchacks.com/webrtc-media-servers-in-the-cloud) in WebRTC, but we plan to
-  do something about it in a later STUNner release so stay tuned.
 * STUNner supports *multiple parallel GatewayClass hierarchies*, each deployed into a separate
   namespace with a separate GatewayClass an a separate dataplane. This mode can be useful for
   testing new STUNner versions or canary-upgrades and A/B testing of a new media server version. At
@@ -598,8 +613,10 @@ notable limitations at this point are as follows.
 * v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
 * v0.12: Security: Expose TLS/DTLS settings via the Gateway API.
 * v0.13: Observability: Prometheus + Grafana dashboard.
+* v0.15: Performance: per-allocation CPU load-balancing for UDP
+* v0.16: Management: managed STUNner dataplane.
 * v1.0: GA
-* v1.1: Performance: per-allocation CPU load-balancing for UDP and eBPF TURN acceleration.
+* v1.1: Performance: eBPF TURN acceleration.
 * v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help

@@ -4,9 +4,9 @@ STUNner is a *WebRTC media gateway for Kubernetes*. All words matter here: indee
 *WebRTC*, so it is specifically designed to help dealing with the intricacies of WebRTC protocol
 encapsulations, it is a *media gateway* so its job is to ingest WebRTC audio/video streams into a
 virtualized media plane, and it is *opinionated towards Kubernetes*, so everything around STUNner
-is designed and built to fit into the Kubernetes and the cloud-native ecosystem. That being said,
-STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but these
-deployment options are not the main focus.
+is designed and built to fit into the Kubernetes ecosystem. That being said, STUNner can easily be
+used outside of this context (e.g., as a regular STUN/TURN server), but these deployment options
+are not the main focus.
 
 ## The problem
 
@@ -26,8 +26,8 @@ then the packet will again undergo a DNAT step, and so on.
 
 The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
 protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
-describes it. Once an HTTP/TCP session is routed to a server it will remain there permanently, and
-the server does not need to re-identify the client per each packet because it has session context.
+describes it. Once an HTTP/TCP session is accepted by a server it does not need to re-identify the
+client per each received packet, because it has session context.
 
 This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
 UDP. RTP does not have anything remotely similar to an HTTP header. Consequently, the only
@@ -63,8 +63,8 @@ There are *lots* of reasons why this deployment model is less than ideal:
   Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly process. In
   addition, it becomes very difficult to provision the resource requests and limits of each media
   server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a large video-conferencing room,
-  while a `t2.xlarge` (8 vCPU/32 GB mem) is too costly for running, say, only a single 2-party
-  call. Worse yet, the decision has to be made at installation time.
+  while a `t2.xlarge` (8 vCPU/32 GB mem) is too costly for running, say, a 2-party call. Worse yet,
+  the decision has to be made at installation time.
 
 - **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
   servers to the Internet over a public IP address, and opening up all UDP ports for potentially
@@ -87,11 +87,10 @@ There are *lots* of reasons why this deployment model is less than ideal:
 
 - **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
   hosted Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP
-  address for security purposes. This then precludes the host-networking hack. But even if nodes
-  are publicly available, many Kubernetes services simply disable host-networking all together
-  (e.g., [GKE
-  Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview)) exactly
-  because it is such an intrusive hack.
+  address for security reasons. This then precludes the host-networking hack. But even if nodes are
+  publicly available, many Kubernetes services simply disable host-networking all together (e.g.,
+  [GKE Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview))
+  exactly because it is such an intrusive hack.
 
 ## Why STUNner
 

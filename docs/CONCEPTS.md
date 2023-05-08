@@ -33,16 +33,16 @@ that together describe the way media traffic should enter the cluster, including
 addresses and ports clients can use to reach STUNner, TURN credentials, forwarding rules, etc. The
 anchor of the gateway hierarchy is the GatewayClass object, and the rest of the resources form a
 complete hierarchy underneath it: the GatewayConfig describes general STUNner configuration,
-Gateways define the public IP address, port and transport protocol for each TURN server listener,
-and UDPRoutes point to the backend services client traffic should be forwarded to. See
-[here](GATEWAY.md) for a full reference.
+Gateways define the port and transport protocol for each TURN server listener, and UDPRoutes point
+to the backend services client traffic should be forwarded to. See [here](GATEWAY.md) for a full
+reference.
 
 * **Gateway operator:** The main purpose of the gateway operator is to watch gateway hierarchies
 for change and, once a custom resource is added or modified by the user, render a new dataplane
 configuration. This configuration is then mapped into the filesystem of the `stunnerd` pods running
 in the same namespace, so that each `stunnerd` instance will use the most recent configuration. The
-implementation and documentation of the STUNner's gateway operator can be found
-[here](https://github.com/l7mp/stunner-gateway-operator).
+STUNner Helm chart [automatically install](INSTALL.md) the gateway operator; more information can
+be found [here](https://github.com/l7mp/stunner-gateway-operator).
 
 * **STUNner ConfigMap:** The STUNner ConfigMap contains the running dataplane configuration. Of
 course, we could let the `stunnerd` pods themselves to watch the control plane for changes, but

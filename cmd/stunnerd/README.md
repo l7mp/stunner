@@ -22,6 +22,7 @@ the daemon can pick up the latest configuration using the watch mode.
 * [RFC 6062](https://tools.ietf.org/html/rfc6062): Traversal Using Relays around NAT (TURN)
   Extensions for TCP Allocations
 * TURN transport over UDP, TCP, TLS/TCP and DTLS/UDP.
+* TURN/UDP listener CPU scaling.
 * Two authentication modes via the long-term STUN/TURN credential mechanism: `plaintext` using a
   static username/password pair, and `longterm` with dynamically generated time-scoped credentials.
 
@@ -49,7 +50,7 @@ Alternatively, run `stunnerd` in verbose mode with the config file taken from
 `cmd/stunnerd/stunnerd.conf`. Adding the flag `-w` will enable watch mode.
 
 ```console
-$ ./stunnerd -v -w -c cmd/stunnerd/stunnerd.conf
+./stunnerd -v -w -c cmd/stunnerd/stunnerd.conf
 ```
 
 Type `./stunnerd` to see a short description of the command line arguments supported by `stunnerd`.
@@ -106,6 +107,26 @@ static:
       key: "my-key.key"
       minPort: 40000
       maxPort: 49999
+```
+
+## Advanced features
+
+### TURN/UDP listener CPU scaling
+
+STUNner can run multiple parallel readloops for TURN/UDP listeners, which allows it to scale to any
+practical number of CPUs and brings massive performance improvements on UDP workloads. This is
+achieved by creating a configurable number of UDP server sockets using the `SO_REUSEPORT` socket
+option and spawn a separate goroutine to run a parallel readloop per each listener. The kernel will
+load-balance allocations across the sockets/readloops per the IP 5-tuple, therefore the same
+allocation will always stay at the same CPU which is important for correct operations.
+
+The feature is exposed via the command line flag `--udp-thread-num=<THREAD_NUMBER>`. The below
+starts `stunnerd` watching the config file in `/etc/stunnerd/stunnerd.conf` using 32 parallel UDP
+readloops (the default is 16).
+
+``` sh
+./stunnerd -w -c /etc/stunnerd/stunnerd.conf --udp-thread-num=32
+
 ```
 
 ## License
