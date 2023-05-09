@@ -223,7 +223,7 @@ picture. Change the STUN/TURN URI in the `turncat` CLI to connect via the `tcp-l
 
 Run the benchmark again at 10kpps and watch the logs.
 ``` console
-iperf -c localhost -p 5000 -u -l 100 -b 8000000 -o /dev/null-t 10 && \
+iperf -c localhost -p 5000 -u -l 100 -b 8000000 -o /dev/null -t 10 && \
     kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}') | tail -n 1
 [  3] 0.0000-9.9365 sec  9.41 MBytes  7.94 Mbits/sec   0.085 ms 1361/100003 (1.4%) 148.261/21.098/454.266/73.704 ms 9927 pps  144 KByte 6.70
 ```
