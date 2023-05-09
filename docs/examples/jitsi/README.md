@@ -104,7 +104,7 @@ Configure STUNner to act as a STUN/TURN server to clients, and route all receive
 ```console
 git clone https://github.com/l7mp/stunner
 cd stunner
-kubectl apply -f examples/jitsi/jitsi-call-stunner.yaml
+kubectl apply -f docs/examples/jitsi/jitsi-call-stunner.yaml
 ```
 
 The relevant parts here are the STUNner [Gateway definition](../../GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../GATEWAY.md), which takes care of routing media to the pods running the Jitsi service. Also, with the GatewayConfig object we set the `authType: longterm` parameter because Prosody can't use Plaintext authentication only long term.
@@ -158,7 +158,7 @@ export STUNNERIP=$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.
 The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. In order to achieve this, first we patch the public IP address of the STUNner STUN/TURN server we have learned above into our Jitsi deployment manifest:
 
 ```console
-sed -i "s/<stunner-public-ip>/$STUNNERIP/g" examples/jitsi/jitsi-server.yaml
+sed -i "s/<stunner-public-ip>/$STUNNERIP/g" docs/examples/jitsi/jitsi-server.yaml
 ```
 
 This will make sure that Jitsi is started with STUNner as the STUN/TURN server. Note that Jitsi itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](../../DEPLOYMENT.md)); with the above configuration we are just telling Jitsi to instruct its clients to use STUNner to reach the Jitsi JVB.
@@ -166,20 +166,20 @@ This will make sure that Jitsi is started with STUNner as the STUN/TURN server. 
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
 ```console
-sed -i "s/<public-ingress-ip>/$INGRESSIP/g" examples/jitsi/jitsi-server.yaml
+sed -i "s/<public-ingress-ip>/$INGRESSIP/g" docs/examples/jitsi/jitsi-server.yaml
 ```
 
 To use the web server, the corresponding Nginx `resolver` parameter must be the Kubernetes’ DNS address.
 
 ```console
 export KUBEDNS=$(kubectl get svc kube-dns -n kube-system -o jsonpath='{.spec.clusterIP}')
-sed -i "s/<kube-dns>/$KUBEDNS/g" examples/jitsi/jitsi-server.yaml
+sed -i "s/<kube-dns>/$KUBEDNS/g" docs/examples/jitsi/jitsi-server.yaml
 ```
 
 Finally, fire up Jitsi.
 
 ```console
-kubectl apply -f examples/jitsi/jitsi-server.yaml
+kubectl apply -f docs/examples/jitsi/jitsi-server.yaml
 ```
 
 The demo installation bundle includes a lot of resources to deploy Jitsi:

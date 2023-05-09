@@ -36,7 +36,7 @@ Configure STUNner to act as a STUN server towards clients, and to let media reac
 
 ```
 git clone https://github.com/l7mp/stunner
-cd stunner/examples/neko
+cd stunner/docs/examples/neko
 kubectl apply -f stunner.yaml
 ```
 

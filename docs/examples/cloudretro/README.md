@@ -37,7 +37,7 @@ To simplify the setup, clone the STUNner git repository.
 
 ```console
 git clone https://github.com/l7mp/stunner
-cd stunner/examples/cloudretro
+cd stunner/docs/examples/cloudretro
 ```
 
 ### CloudRetro
@@ -217,9 +217,9 @@ choose workers by clicking the `w` button under `options`.
 
 As a quick test, we have recorded a game session from a client started in the European region to a
 *local* CloudRetro deployment running in the [European
-one](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_eu.mp4) and a
+one](https://github.com/l7mp/stunner/blob/main/docs/examples/cloudretro/cloudretro_eu.mp4) and a
 *remote* cluster in the [US-region
-worker](https://github.com/l7mp/stunner/blob/main/examples/cloudretro/cloudretro_us.mp4). There is
+worker](https://github.com/l7mp/stunner/blob/main/docs/examples/cloudretro/cloudretro_us.mp4). There is
 a visible improvement in the gaming experience when using a local CloudRetro worker: for the local
 cluster the latency between invoking an action and observing the corresponding action in the video
 is only 20 frames (roughly 80ms), while for a remote cluster the round-trip time is more than 48

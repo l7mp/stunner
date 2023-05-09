@@ -36,7 +36,7 @@ Set up an iperf server in the `default` Kubernetes namespace and wrap it in a Ku
 service called `iperf-server`.
 ```console
 cd stunner
-kubectl apply -f examples/simple-tunnel/iperf-server.yaml
+kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml
 ```
 
 This will start an Deployment that runs the iperf server and wraps it in a Kubernetes service
@@ -57,7 +57,7 @@ GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 
 TCP:3478, and route client connections received on the gateways to the `iperf-server`
 service.
 ```console
-kubectl apply -f examples/simple-tunnel/iperf-stunner.yaml
+kubectl apply -f docs/examples/simple-tunnel/iperf-stunner.yaml
 ```
 
 For convenience, below is a dump of the Gateway and UDPRoute resources the manifests create. Note
@@ -237,6 +237,6 @@ communications.
 
 Stop `turncat` and wipe all Kubernetes configuration.
 ```console
-kubectl delete -f examples/simple-tunnel/iperf-server.yaml
-kubectl delete -f examples/simple-tunnel/iperf-stunner.yaml
+kubectl delete -f docs/examples/simple-tunnel/iperf-server.yaml
+kubectl delete -f docs/examples/simple-tunnel/iperf-stunner.yaml
 ```
