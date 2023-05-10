@@ -28,8 +28,6 @@
     <img src="https://readthedocs.org/projects/stunner/badge/?version=latest" /></a>
   <a href="https://github.com/l7mp/stunner/actions/workflows/test.yml" alt="Tests">
     <img src="https://github.com/l7mp/stunner/actions/workflows/test.yml/badge.svg" /></a>
-  <a href="https://github.com/l7mp/stunner/actions/workflows/publish.yml" alt="Release">
-    <img src="https://github.com/l7mp/stunner/actions/workflows/publish.yml/badge.svg" /></a>
   <a href="https://coveralls.io/github/l7mp/stunner" alt="coverage">
     <img src="https://img.shields.io/coveralls/github/l7mp/stunner" /></a>
 </p>
