@@ -50,8 +50,8 @@ metadata:
   namespace: stunner
   annotations: 
     app: stunner
-    helm.sh/chart: stunner-0.14.0
-    app.kubernetes.io/version: "0.14.0"  
+    helm.sh/chart: stunner-0.15.0
+    app.kubernetes.io/version: "0.15.0"  
 spec:
   selector:
     matchLabels:

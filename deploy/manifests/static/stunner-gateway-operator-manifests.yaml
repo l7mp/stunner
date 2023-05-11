@@ -379,7 +379,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: "l7mp/stunner-gateway-operator:0.14.0"
+        image: "l7mp/stunner-gateway-operator:0.15.0"
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
