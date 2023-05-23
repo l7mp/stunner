@@ -14,7 +14,7 @@ nav:
 - 'Deployment models': 'DEPLOYMENT.md'
 - 'Concepts': 'CONCEPTS.md'
 - 'Installation': 'INSTALL.md'
-- 'Gateway API refernce': 'GATEWAY.md'
+- 'Gateway API reference': 'GATEWAY.md'
 - 'Security': 'SECURITY.md'
 - 'Authentication': 'AUTH.md'
 - 'Scaling': 'SCALING.md'
