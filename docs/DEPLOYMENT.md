@@ -76,13 +76,13 @@ servers' host candidates will have direct connectivity in the Kubernetes private
 and the ICE connectivity check will succeed. See more explanation
 [here](examples/kurento-one2one-call/README.md#what-is-going-on-here).
 
-A word of warning: when using STUNner refrain from configuring additional public STUN/TURN servers,
-apart from STUNner itself. The rules to follow in setting the [ICE server
+> **Warning**  
+Refrain from configuring additional public STUN/TURN servers, apart from STUNner itself. The rules
+to follow in setting the [ICE server
 configuration](https://github.com/l7mp/stunner#configuring-webrtc-clients) in asymmetric ICE mode
 are as below:
-
-- on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
-- on the server do *not* configure *any* STUN or TURN servers whatsoever.
+> - on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
+> - on the server do *not* configure *any* STUN or TURN servers whatsoever.
 
 Most users will want to deploy STUNner using the asymmetric ICE mode. In the rest of the docs,
 unless noted otherwise we will assume the asymmetric ICE mode with the media plane deployment
