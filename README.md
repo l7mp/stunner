@@ -338,21 +338,15 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
 > **Warning**  
 STUNner deviates somewhat from the standard rules Kubernetes uses to handle ports in Services. In
-Kubernetes each Service is associated with one or more port-protocol pairs and connections via the
+Kubernetes each Service is associated with one or more protocol-port pairs and connections via the
 Service can be made to only these specific protocol-port pairs. WebRTC media servers, however,
 usually open lots of different ports, typically one per each client connection, and it would be
 cumbersome to create a separate backend Service and UDPRoute for each port. In order to simplify
-this, STUNner will ignore the protocol-port pair specified in the backend service and allow
-connections to the backend pods via *any* protocol-port pair. This allows STUNner to use only a
-*single* backend Service to reach any port exposed on a WebRTC media server. Considering the above
-example: even if the `default/media-plane` Service was created for the TCP:80 port, STUNner will
-allow connections via any protocol-port pair, say, via UDP:10000 or any other UDP port for that
-matter. This hack remains our only viable way to support WebRTC workloads in Kubernetes until
-[support for port ranges is implemented in Kubernetes
-services](https://github.com/kubernetes/kubernetes/issues/23864). Note that this affects only the
-*internal* backend services: STUNner is still exposed *externally* via a *single* protocol-port,
-but it can demultiplex incoming client media connections to any *internal* backend ports via a
-single UDPRoute.
+this, STUNner **ignores the protocol and port specified in the backend service** and allows
+connections to the backend pods via *any* protocol-port pair. STUNner can therefore use only a
+*single* backend Service to reach any port exposed on a WebRTC media server. 
+
+> Considering the above example: even if the `default/media-plane` Service was created for the TCP:80 port, STUNner will allow connections via any protocol-port pair, say, via UDP:10000 or any other UDP port for that matter. This hack remains our only viable way to support WebRTC workloads in Kubernetes until [support for port ranges is implemented in Kubernetes services](https://github.com/kubernetes/kubernetes/issues/23864). Note that this affects only the *internal* backend services: STUNner is still exposed *externally* via a *single* protocol-port, but it can demultiplex incoming client media connections to any *internal* backend ports via a single UDPRoute.
 
 And that's all. You don't need to worry about client-side NAT traversal and WebRTC media routing
 because STUNner has you covered!  Even better, every time you change a Gateway API resource in
