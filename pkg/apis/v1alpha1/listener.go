@@ -30,9 +30,9 @@ type ListenerConfig struct {
 	// MaxRelayPort is the highest relay port assigned for the relay connections spawned by the
 	// listener.
 	MaxRelayPort int `json:"max_relay_port,omitempty"`
-	// Cert is the TLS cert.
+	// Cert is the base64-encoded TLS cert.
 	Cert string `json:"cert,omitempty"`
-	// Key is the TLS key.
+	// Key is the base64-encoded TLS key.
 	Key string `json:"key,omitempty"`
 	// Routes specifies the list of Routes allowed via a listener.
 	Routes []string `json:"routes,omitempty"`
@@ -51,6 +51,7 @@ func (req *ListenerConfig) Validate() error {
 	if err != nil {
 		return err
 	}
+	req.Protocol = proto.String() // normalize
 
 	if req.Addr == "" {
 		req.Addr = "0.0.0.0"
@@ -95,6 +96,14 @@ func (req *ListenerConfig) DeepEqual(other Config) bool {
 	return reflect.DeepEqual(req, other)
 }
 
+// DeepCopyInto copies a configuration.
+func (req *ListenerConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*ListenerConfig)
+	*ret = *req
+	ret.Routes = make([]string, len(req.Routes))
+	copy(ret.Routes, req.Routes)
+}
+
 // String stringifies the configuration.
 func (req *ListenerConfig) String() string {
 	status := []string{}
@@ -134,13 +143,13 @@ func (req *ListenerConfig) String() string {
 
 	c, k := "-", "-"
 	if req.Cert != "" {
-		c = "<SECRET"
+		c = "<SECRET>"
 	}
 	if req.Key != "" {
-		k = "<SECRET"
+		k = "<SECRET>"
 	}
 	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
-	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ", ")))
+	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ",")))
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

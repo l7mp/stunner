@@ -1,6 +1,6 @@
 #!/bin/bash
 
-USAGE="stunnercli running-config <namespace/name>"
+USAGE="stunnerctl running-config <namespace/name>"
 
 [ -z "$1" -o -z "$2" ] && echo $USAGE && exit 0
 COMMAND="$1"
@@ -26,6 +26,9 @@ running_config () {
     kubectl get cm -n $namespace $name -o jsonpath="{.data.stunnerd\.conf}" > $tmpfile
 
     local AUTH_TYPE=$($jq ".auth.type" $tmpfile)
+    [ $AUTH_TYPE == "plaintext" ] && AUTH_TYPE="static"
+    [ $AUTH_TYPE == "longterm" ]  && AUTH_TYPE="ephemeral"
+    
     local USERNAME=$($jq ".auth.credentials.username" $tmpfile)
     local PASSWORD=$($jq ".auth.credentials.password" $tmpfile)
     local SECRET=$($jq ".auth.credentials.secret" $tmpfile)

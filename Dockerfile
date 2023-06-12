@@ -1,6 +1,6 @@
 ###########
 # BUILD
-FROM golang:1.18-alpine as builder
+FROM golang:1.19-alpine as builder
 
 WORKDIR /app
 
@@ -10,12 +10,17 @@ RUN go mod download
 
 COPY *.go ./
 COPY internal/ internal/
-COPY pkg/apis/v1alpha1/ pkg/apis/v1alpha1/
+COPY pkg/ pkg/
 
 COPY cmd/stunnerd/main.go cmd/stunnerd/
 COPY cmd/stunnerd/stunnerd.conf cmd/stunnerd/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
+RUN apkArch="$(apk --print-arch)"; \
+      case "$apkArch" in \
+        aarch64) export GOARCH='arm64' ;; \
+        *) export GOARCH='amd64' ;; \
+      esac; \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
 
 ###########
 # STUNNERD

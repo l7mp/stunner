@@ -2,10 +2,6 @@ package stunner
 
 import (
 	"fmt"
-	"strings"
-
-	// "github.com/pion/logging"
-	// "github.com/pion/transport/vnet"
 
 	"github.com/l7mp/stunner/internal/object"
 
@@ -21,142 +17,157 @@ import (
 // and an error if an error has occurred during reconciliation, in which case it will rollback the
 // last working configuration (unless SuppressRollback is on).
 func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
+	return s.reconcileWithRollback(req, false)
+}
+
+func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback bool) error {
+	var errFinal error
+	new, deleted, changed := 0, 0, 0
+
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
 	s.log.Debugf("reconciling STUNner for config: %s ", req.String())
 
 	rollback := s.GetConfig()
-	restarted := []string{}
+	toBeStarted, toBeRestarted := []object.Object{}, []object.Object{}
 
 	// admin
-	adminState, err := s.adminManager.PrepareReconciliation([]v1alpha1.Config{&req.Admin})
+	adminState, err := s.adminManager.PrepareReconciliation([]v1alpha1.Config{&req.Admin}, &req)
 	if err != nil {
-		if err == object.ErrRestartRequired {
-			// singleton
-			if len(adminState.Restarted) != 1 {
-				return fmt.Errorf("internal error: cannot find restarted object for %s",
-					req.Admin.String())
-			}
-			restarted = append(restarted, adminState.Restarted[0].ObjectName())
-		} else {
-			return fmt.Errorf("error preparing reconciliation for admin config: %s",
-				err.Error())
-		}
+		return fmt.Errorf("error preparing reconciliation for admin config: %s",
+			err.Error())
 	}
+	toBeRestarted = append(toBeRestarted, adminState.ToBeRestarted...)
+	new += len(adminState.NewJobQueue)
+	changed += len(adminState.ChangedJobQueue)
+	deleted += len(adminState.DeletedJobQueue)
 
 	// auth
-	authState, err := s.authManager.PrepareReconciliation([]v1alpha1.Config{&req.Auth})
+	authState, err := s.authManager.PrepareReconciliation([]v1alpha1.Config{&req.Auth}, &req)
 	if err != nil {
-		if err == object.ErrRestartRequired {
-			// singleton
-			if len(authState.Restarted) != 1 {
-				return fmt.Errorf("internal error: cannot find restarte object for %s",
-					req.Auth.String())
-			}
-			restarted = append(restarted, authState.Restarted[0].ObjectName())
-		} else {
-			return fmt.Errorf("error preparing reconciliation for auth config: %s",
-				err.Error())
-		}
+		return fmt.Errorf("error preparing reconciliation for auth config: %s",
+			err.Error())
 	}
+	toBeRestarted = append(toBeRestarted, authState.ToBeRestarted...)
+	new += len(authState.NewJobQueue)
+	changed += len(authState.ChangedJobQueue)
+	deleted += len(authState.DeletedJobQueue)
 
 	// listener
 	lconf := make([]v1alpha1.Config, len(req.Listeners))
 	for i := range req.Listeners {
 		lconf[i] = &(req.Listeners[i])
 	}
-	listenerState, err := s.listenerManager.PrepareReconciliation(lconf)
+	listenerState, err := s.listenerManager.PrepareReconciliation(lconf, &req)
 	if err != nil {
-		if err == object.ErrRestartRequired {
-			for _, o := range listenerState.Restarted {
-				restarted = append(restarted, fmt.Sprintf("listener: %s",
-					o.ObjectName()))
-			}
-		} else {
-			return fmt.Errorf("error preparing reconciliation for listener config: %s", err.Error())
-		}
+		return fmt.Errorf("error preparing reconciliation for listener config: %s", err.Error())
 	}
+	toBeRestarted = append(toBeRestarted, listenerState.ToBeRestarted...)
+	new += len(listenerState.NewJobQueue)
+	changed += len(listenerState.ChangedJobQueue)
+	deleted += len(listenerState.DeletedJobQueue)
 
 	// cluster
 	cconf := make([]v1alpha1.Config, len(req.Clusters))
 	for i := range req.Clusters {
 		cconf[i] = &(req.Clusters[i])
 	}
-	clusterState, err := s.clusterManager.PrepareReconciliation(cconf)
+	clusterState, err := s.clusterManager.PrepareReconciliation(cconf, &req)
 	if err != nil {
-		if err == object.ErrRestartRequired {
-			for _, o := range clusterState.Restarted {
-				restarted = append(restarted, fmt.Sprintf("cluster: %s",
-					o.ObjectName()))
+		return fmt.Errorf("error preparing reconciliation for cluster config: %s", err.Error())
+	}
+	toBeRestarted = append(toBeRestarted, clusterState.ToBeRestarted...)
+	new += len(clusterState.NewJobQueue)
+	changed += len(clusterState.ChangedJobQueue)
+	deleted += len(clusterState.DeletedJobQueue)
+
+	// find all objects (listeners) to be restarted and stop each
+	if !s.dryRun {
+		if err := s.stop(toBeRestarted); err != nil {
+			s.log.Errorf("could not stop object: %s", err.Error())
+			errFinal = err
+			if !inRollback {
+				goto rollback
 			}
-		} else {
-			return fmt.Errorf("error preparing reconciliation for cluster config: %s", err.Error())
+			// failing to stop the server is not critical: suppress error and go on
 		}
 	}
 
-	s.log.Tracef("reconciliation preparation ready, restart required: %s",
-		restartStatus(restarted))
+	s.log.Tracef("reconciliation preparation ready")
 
 	// finish reconciliation
 	// admin
-	new, deleted, changed := 0, 0, 0
-	var errFinal error
-
 	err = s.adminManager.FinishReconciliation(adminState)
 	if err != nil {
 		s.log.Errorf("could not reconcile admin config: %s", err.Error())
 		errFinal = err
-		goto rollback
+		if !inRollback {
+			goto rollback
+		}
+		return errFinal
 	}
+	toBeStarted = append(toBeStarted, adminState.ToBeStarted...)
 
 	s.log.Infof("setting loglevel to %q", s.GetAdmin().LogLevel)
 	s.logger.SetLevel(s.GetAdmin().LogLevel)
-
-	new += len(adminState.NewJobQueue)
-	changed += len(adminState.ChangedJobQueue)
-	deleted += len(adminState.DeletedJobQueue)
 
 	// auth
 	err = s.authManager.FinishReconciliation(authState)
 	if err != nil {
 		s.log.Errorf("could not reconcile auth config: %s", err.Error())
 		errFinal = err
-		goto rollback
+		if !inRollback {
+			goto rollback
+		}
+		return errFinal
 	}
-
-	new += len(authState.NewJobQueue)
-	changed += len(authState.ChangedJobQueue)
-	deleted += len(authState.DeletedJobQueue)
+	toBeStarted = append(toBeStarted, authState.ToBeStarted...)
 
 	// listener
 	err = s.listenerManager.FinishReconciliation(listenerState)
 	if err != nil {
 		s.log.Errorf("could not reconcile listener config: %s", err.Error())
 		errFinal = err
-		goto rollback
+		if !inRollback {
+			goto rollback
+		}
+		return errFinal
 	}
+	toBeStarted = append(toBeStarted, listenerState.ToBeStarted...)
 
 	if len(s.listenerManager.Keys()) == 0 {
 		s.log.Warn("running with no listeners")
 	}
-
-	new += len(listenerState.NewJobQueue)
-	changed += len(listenerState.ChangedJobQueue)
-	deleted += len(listenerState.DeletedJobQueue)
 
 	// cluster
 	err = s.clusterManager.FinishReconciliation(clusterState)
 	if err != nil {
 		s.log.Errorf("could not reconcile cluster config: %s", err.Error())
 		errFinal = err
-		goto rollback
+		if !inRollback {
+			goto rollback
+		}
+		return errFinal
 	}
+	toBeStarted = append(toBeStarted, clusterState.ToBeStarted...)
 
 	if len(s.clusterManager.Keys()) == 0 {
 		s.log.Warn("running with no clusters: all traffic will be dropped")
 	}
 
-	new += len(clusterState.NewJobQueue)
-	changed += len(clusterState.ChangedJobQueue)
-	deleted += len(clusterState.DeletedJobQueue)
+	// find all objects (listeners) to be started or restarted and start each
+	if !s.dryRun {
+		if err := s.start(toBeStarted, toBeRestarted); err != nil {
+			s.log.Errorf("could not start object: %s", err.Error())
+			errFinal = err
+			if !inRollback {
+				goto rollback
+			}
+			return errFinal
+		}
+	}
 
 	// we are "ready" unless we are being shut down
 	if !s.shutdown && !s.ready {
@@ -164,13 +175,18 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 	}
 
 	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, "+
-		"deleted objects: %d, restarted objcts: %d",
-		new, changed, deleted, len(restarted))
+		"deleted objects: %d, started objects: %d, restarted objects: %d",
+		new, changed, deleted, len(toBeStarted), len(toBeRestarted))
 
 	s.log.Info(s.Status())
 
-	if len(restarted) > 0 {
-		return v1alpha1.ErrRestarted{Objects: restarted}
+	if len(toBeRestarted) > 0 {
+		names := make([]string, len(toBeRestarted))
+		for i, n := range toBeRestarted {
+			names[i] = fmt.Sprintf("%s: %s", n.ObjectType(), n.ObjectName())
+		}
+
+		return v1alpha1.ErrRestarted{Objects: names}
 	}
 
 	return nil
@@ -178,20 +194,40 @@ func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
 rollback:
 	if !s.suppressRollback {
 		s.log.Infof("rolling back to previous configuration: %s", rollback.String())
-		return s.Reconcile(*rollback)
+		return s.reconcileWithRollback(*rollback, true)
 	}
 
 	return errFinal
 }
 
-func restartStatus(rs []string) string {
-	restart := "NONE"
-	if len(rs) > 0 {
-		s := []string{}
-		for _, o := range rs {
-			s = append(s, fmt.Sprintf("[%s]", o))
+func (s *Stunner) stop(restarted []object.Object) error {
+	for _, o := range restarted {
+		switch l := o.(type) {
+		case *object.Listener:
+			if err := l.Close(); err != nil {
+				return err
+			}
+		default:
+			s.log.Errorf("internal error: stop() is not implemented for object %q",
+				o.ObjectName())
 		}
-		restart = strings.Join(s, ", ")
 	}
-	return restart
+
+	return nil
+}
+
+func (s *Stunner) start(started, restarted []object.Object) error {
+	for _, o := range append(started, restarted...) {
+		switch l := o.(type) {
+		case *object.Listener:
+			if err := s.StartServer(l); err != nil {
+				return err
+			}
+		default:
+			s.log.Errorf("internal error: start() is not implemented for object %q",
+				o.ObjectName())
+		}
+	}
+
+	return nil
 }

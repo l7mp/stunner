@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - '**.go'
+      - 'go.mod'
+      - 'go.sum'
     branches:
       - '*'
     tags-ignore:
@@ -19,7 +21,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
       - name: Download modules
         run: go mod download
       - name: Go install
@@ -33,7 +35,7 @@ jobs:
         if: success()
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Calc coverage
@@ -42,7 +44,7 @@ jobs:
       - name: Convert coverage.out to coverage.lcov
         uses: jandelgado/gcov2lcov-action@v1
       - name: Coveralls
-        uses: coverallsapp/github-action@v1.1.2
+        uses: coverallsapp/github-action@v1
         with:
           github-token: ${{ secrets.github_token }}
           path-to-lcov: coverage.lcov

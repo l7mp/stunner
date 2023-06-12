@@ -55,15 +55,15 @@ const (
 )
 
 const (
-	listenerProtocolUDPStr  = "udp"
-	listenerProtocolTCPStr  = "tcp"
-	listenerProtocolTLSStr  = "tls"
-	listenerProtocolDTLSStr = "dtls"
+	listenerProtocolUDPStr  = "UDP"
+	listenerProtocolTCPStr  = "TCP"
+	listenerProtocolTLSStr  = "TLS"
+	listenerProtocolDTLSStr = "DTLS"
 )
 
 // NewListenerProtocol parses the protocol specification
 func NewListenerProtocol(raw string) (ListenerProtocol, error) {
-	switch strings.ToLower(raw) {
+	switch strings.ToUpper(raw) {
 	case listenerProtocolUDPStr:
 		return ListenerProtocolUDP, nil
 	case listenerProtocolTCPStr:
@@ -140,13 +140,13 @@ const (
 )
 
 const (
-	clusterProtocolUDPStr = "udp"
-	clusterProtocolTCPStr = "tcp"
+	clusterProtocolUDPStr = "UDP"
+	clusterProtocolTCPStr = "TCP"
 )
 
 // NewClusterProtocol parses the protocol specification
 func NewClusterProtocol(raw string) (ClusterProtocol, error) {
-	switch strings.ToLower(raw) {
+	switch strings.ToUpper(raw) {
 	case clusterProtocolUDPStr:
 		return ClusterProtocolUDP, nil
 	case clusterProtocolTCPStr:
@@ -158,8 +158,8 @@ func NewClusterProtocol(raw string) (ClusterProtocol, error) {
 }
 
 // String returns a string representation of a cluster protocol
-func (l ClusterProtocol) String() string {
-	switch l {
+func (p ClusterProtocol) String() string {
+	switch p {
 	case ClusterProtocolUDP:
 		return clusterProtocolUDPStr
 	case ClusterProtocolTCP:

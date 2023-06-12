@@ -20,8 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/l7mp/stunner"
-	"github.com/l7mp/stunner/internal/logger"
 	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const usage = "turncat [-l|--log <level>] [-i|--insecure] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
@@ -39,6 +39,8 @@ func main() {
 	os.Args[0] = "turncat"
 	defaultDuration, _ = time.ParseDuration("1h")
 	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
+	// var user = flag.StringP("user", "u", "", "Set username. Auth fields in the TURN URI override this.")
+	// var passwd = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
 	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
 	flag.Parse()
@@ -59,7 +61,7 @@ func main() {
 	log.Debugf("Reading STUNner config from URI %q", uri)
 	config, err := getStunnerConf(uri)
 	if err != nil {
-		log.Errorf("Could not read running STUNner configuration: %s", err.Error())
+		log.Errorf("Error: %s", err.Error())
 		os.Exit(1)
 	}
 
@@ -111,9 +113,19 @@ func getStunnerConf(uri string) (*stunnerv1alpha1.StunnerConfig, error) {
 
 	switch proto {
 	case "k8s":
-		return getStunnerConfFromK8s(def)
+		conf, err := getStunnerConfFromK8s(def)
+		if err != nil {
+			return nil, fmt.Errorf("Could not read running STUNner configuration from "+
+				"Kubernetes: %w", err)
+		}
+		return conf, nil
 	case "turn":
-		return getStunnerConfFromCLI(def)
+		conf, err := getStunnerConfFromCLI(def)
+		if err != nil {
+			return nil, fmt.Errorf("Could not generate STUNner configuration from "+
+				"URI %q: %w", uri, err)
+		}
+		return conf, nil
 	default:
 		return nil, fmt.Errorf("unknown server protocol %q", def)
 	}
@@ -160,13 +172,28 @@ func getStunnerConfFromK8s(def string) (*stunnerv1alpha1.StunnerConfig, error) {
 	// remove all but the named listener
 	ls := []stunnerv1alpha1.ListenerConfig{}
 	for _, l := range conf.Listeners {
-		if l.Name == listener {
+		// parse out the listener name (as per the Gateway API) from the TURN listener-name
+		// (this is in the form: <namespace>/<gatewayname>/<listener>
+		s := strings.Split(l.Name, "/")
+		if len(s) != 3 {
+			return nil, fmt.Errorf("error parsing listener name %q, "+
+				"expecting <namespace>/<gatewayname>/<listener>",
+				l.Name)
+		}
+
+		if s[2] == listener {
 			ls = append(ls, l)
 		}
 	}
 
-	if len(ls) != 1 {
-		return nil, fmt.Errorf("cannot find listener %q in STUNner configmap", listener)
+	if len(ls) == 0 {
+		return nil, fmt.Errorf("cannot find listener %q", listener)
+	}
+
+	if len(ls) > 1 {
+		return nil, fmt.Errorf("found multiple listeners named %q: "+
+			"either disambiguate listener names or use a fully "+
+			"specified TURN server URI", listener)
 	}
 
 	conf.Listeners = []stunnerv1alpha1.ListenerConfig{{}}
@@ -255,7 +282,8 @@ func getStunnerURI(config *stunnerv1alpha1.StunnerConfig) (string, error) {
 		return "", fmt.Errorf("no protocol for listener %q", l.Name)
 	}
 
-	return fmt.Sprintf("%s://%s:%d", l.Protocol, l.PublicAddr, l.PublicPort), nil
+	return fmt.Sprintf("%s://%s:%d", strings.ToLower(l.Protocol), l.PublicAddr,
+		l.PublicPort), nil
 }
 
 func parseK8sDef(def string) (string, string, string, error) {

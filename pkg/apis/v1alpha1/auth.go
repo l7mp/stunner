@@ -23,18 +23,12 @@ func (req *AuthConfig) Validate() error {
 	if req.Type == "" {
 		req.Type = DefaultAuthType
 	}
-	if _, err := NewAuthType(req.Type); err != nil {
-		return err
-	}
-
-	if req.Realm == "" {
-		req.Realm = DefaultRealm
-	}
 
 	atype, err := NewAuthType(req.Type)
 	if err != nil {
 		return err
 	}
+	req.Type = atype.String() // normalize
 
 	switch atype {
 	case AuthTypePlainText:
@@ -54,6 +48,10 @@ func (req *AuthConfig) Validate() error {
 		return fmt.Errorf("invalid authentication type %q", req.Type)
 	}
 
+	if req.Realm == "" {
+		req.Realm = DefaultRealm
+	}
+
 	return nil
 }
 
@@ -66,6 +64,16 @@ func (req *AuthConfig) ConfigName() string {
 // DeepEqual compares two configurations.
 func (req *AuthConfig) DeepEqual(other Config) bool {
 	return reflect.DeepEqual(req, other)
+}
+
+// DeepCopyInto copies a configuration.
+func (req *AuthConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*AuthConfig)
+	*ret = *req
+	ret.Credentials = make(map[string]string, len(req.Credentials))
+	for k, v := range req.Credentials {
+		ret.Credentials[k] = v
+	}
 }
 
 // String stringifies the configuration.

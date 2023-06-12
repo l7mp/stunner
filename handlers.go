@@ -1,31 +1,19 @@
 package stunner
 
 import (
-	"crypto/hmac"
-	"crypto/sha1" //nolint:gosec,gci
-	"encoding/base64"
 	"errors"
 	"net"
-	"strconv"
-	"time"
-
-	"strings"
-
-	"github.com/pion/turn/v2"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	a12n "github.com/l7mp/stunner/pkg/authentication"
 )
-
-// time-windowed TURN auth username separator defined in
-// https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00
-const usernameSeparator = ":"
 
 // NewAuthHandler returns an authentication handler callback to be used with a TURN server for
 // authenticating clients.
-func (s *Stunner) NewAuthHandler() turn.AuthHandler {
+func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
 	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
@@ -37,48 +25,33 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
-			key := turn.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
+			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
+				auth.Log.Debug("plaintext auth request: valid username")
 				return key, true
 			}
 
+			auth.Log.Info("plaintext auth request: failed: invalid username")
 			return nil, false
 
 		case v1alpha1.AuthTypeLongTerm:
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			// find the first thing that looks like a UNIX timestamp in the username
-			// and use that for checking the time-windowed credential, drop everything
-			// else
-			var timestamp int = 0
-			for _, ts := range strings.Split(username, usernameSeparator) {
-				t, err := strconv.Atoi(ts)
-				if err == nil {
-					timestamp = t
-					break
-				}
-			}
-
-			if timestamp == 0 {
-				auth.Log.Errorf("invalid time-windowed username %q", username)
+			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
+				auth.Log.Infof("longterm auth request: failed: %s", err)
 				return nil, false
 			}
 
-			if int64(timestamp) < time.Now().Unix() {
-				auth.Log.Errorf("expired time-windowed username %q", username)
-				return nil, false
-			}
-
-			mac := hmac.New(sha1.New, []byte(auth.Secret))
-			_, err := mac.Write([]byte(username))
+			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Errorf("failed to hash username: %w", err.Error())
+				auth.Log.Infof("longterm auth request: error generating password: %s",
+					err)
 				return nil, false
 			}
-			password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-			return turn.GenerateAuthKey(username, auth.Realm, password), true
+			auth.Log.Info("longterm auth request: success")
+			return a12n.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:
 			auth.Log.Errorf("internal error: unknown authentication mode %q",
@@ -89,7 +62,7 @@ func (s *Stunner) NewAuthHandler() turn.AuthHandler {
 }
 
 // NewPermissionHandler returns a callback to handle client permission requests to access peers.
-func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandler {
+func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandler {
 	s.log.Trace("NewPermissionHandler")
 
 	return func(src net.Addr, peer net.IP) bool {
@@ -121,22 +94,6 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) turn.PermissionHandle
 	}
 }
 
-// NewHandlerFactory creates helper functions that allow a listener to generate STUN/TURN
-// authentication and permission handlers.
-func (s *Stunner) NewHandlerFactory() object.HandlerFactory {
-	return object.HandlerFactory{
-		GetRealm: func() string {
-			auth := s.GetAuth()
-			if auth == nil {
-				return ""
-			}
-			return auth.Realm
-		},
-		GetAuthHandler:       func() turn.AuthHandler { return s.NewAuthHandler() },
-		GetPermissionHandler: func(l *object.Listener) turn.PermissionHandler { return s.NewPermissionHandler(l) },
-	}
-}
-
 // NewReadinessHandler creates a helper function for checking the readiness of STUNner.
 func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
 	return func() error {
@@ -145,5 +102,15 @@ func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
 		} else {
 			return errors.New("stunnerd not ready")
 		}
+	}
+}
+
+// NewRealmHandler creates a helper function for listeners to find out the authentication realm.
+func (s *Stunner) NewRealmHandler() object.RealmHandler {
+	return func() string {
+		if s != nil {
+			return s.GetRealm()
+		}
+		return ""
 	}
 }

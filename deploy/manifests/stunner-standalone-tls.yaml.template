@@ -1,0 +1,220 @@
+# Stunner: An ingress gateway for WebRTC: TLS/DTLS in standalone mode
+---
+# STUN/TURN server config: Make sure to customize the below configurations, see the README.pm for
+# more details
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunner-config
+data:
+  # * `STUNNER_PUBLIC_ADDR` (no default): The public IP address clients can use to reach
+  #   STUNner. By default, the public IP address will be dynamically assigned by the Kubernetes
+  #   LoadBalancer service.  The Helm installation script takes care of updating the configuration
+  #   with the correct value. However, if installing from the static manifests then the external IP
+  #   must be set manually.
+  STUNNER_PUBLIC_ADDR: "A.B.C.D"
+
+  # * `STUNNER_PUBLIC_PORT` (default: 3478): The public port used by clients to reach STUNner. It
+  #   is important that applications use the public port as found in the configuration, since the
+  #   Helm installation scripts may overwrite this configuration. This occurs when the installation
+  #   falls back to a NodePort service (i.e., when STUNner fails to obtain an external IP from the
+  #   load-balancer). 
+  STUNNER_PUBLIC_PORT: "443"
+  
+  # * `STUNNER_PORT` (default: 3478): The internal port used by STUNner for communication inside
+  #   the cluster. It is safe to set this to the public port.
+  STUNNER_PORT: "443"
+
+  # * `STUNNER_REALM` (default `stunner.l7mp.io`): the REALM used to guide the user agent in
+  #   authenticating with STUNner.
+  STUNNER_REALM: "stunner.l7mp.io"
+
+  # * `STUNNER_AUTH_TYPE` (default: `plaintext`): the STUN/TURN authentication mode, either
+  #   "plaintext" over the username/password pair $STUNNER_USERNAME/$STUNNER_PASSWORD, or
+  #   "longterm", using $STUNNER_SECRET. Make sure to customize!
+  STUNNER_AUTH_TYPE: "plaintext"
+
+  # * `STUNNER_USERNAME` (default: `user`): the USERNAME attribute clients can use the authenticate
+  #    with STUNner over plain-text authentication. Make sure to customize!
+  STUNNER_USERNAME: "user1"
+
+  # * `STUNNER_PASSWORD` (default: `pass`): the password clients can use to authenticate with
+  #   STUNner over plain-text authentication. Make sure to customize!
+  STUNNER_PASSWORD: "passwd1"
+
+  # * `STUNNER_SHARED_SECRET`: the shared secret used for longterm authentication.
+  STUNNER_SHARED_SECRET: "my-shared-secret"
+
+  # * `STUNNER_DURATION` (default: `86400`, i.e., one day): the lifetime of STUNner credentials
+  # * over longterm authentication.
+  STUNNER_DURATION: "86400"
+
+  # * `STUNNER_LOGLEVEL` (default: `all:WARN`): the default log level used by the STUNner daemons.
+  STUNNER_LOGLEVEL: "all:INFO"
+
+  # * `STUNNER_MIN_PORT` (default: 10000): smallest relay transport port assigned by STUNner.
+  STUNNER_MIN_PORT: "10000"
+
+  # * `STUNNER_MAX_PORT` (default: 20000): highest relay transport port assigned by STUNner.
+  STUNNER_MAX_PORT: "20000"
+
+  STUNNER_TLS_KEY: |
+    XXXXXXX
+  STUNNER_TLS_CERT: |
+    YYYYYYY
+  
+---
+## custom static stunnerd conf for TLS/DTLS
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunnerd-conf
+data:
+  "stunnerd.conf" : |
+    version: v1alpha1
+    admin:
+      name: stunnerd
+      loglevel: $STUNNER_LOGLEVEL
+      metrics_endpoint: "http://0.0.0.0:8080/metrics"
+    auth:
+      type: $STUNNER_AUTH_TYPE
+      realm: $STUNNER_REALM
+      credentials:
+        username: $STUNNER_USERNAME
+        password: $STUNNER_PASSWORD
+        secret: $STUNNER_SHARED_SECRET
+    clusters:
+      - name: media-plane
+        type: STRICT_DNS
+        endpoints:
+          - media-plane.default.svc.cluster.local
+    listeners:
+      - name: stunner-dtls
+        public_address: "$STUNNER_PUBLIC_ADDR"
+        public_port: $STUNNER_PUBLIC_PORT
+        address: "$STUNNER_ADDR"
+        port: $STUNNER_PORT
+        protocol: dtls
+        min_port: $STUNNER_MIN_PORT
+        max_port: $STUNNER_MAX_PORT
+        key: $STUNNER_TLS_KEY
+        cert: $STUNNER_TLS_CERT
+        routes:
+          - media-plane
+      - name: stunner-tls
+        public_address: "$STUNNER_PUBLIC_ADDR"
+        public_port: $STUNNER_PUBLIC_PORT
+        address: "$STUNNER_ADDR"
+        port: $STUNNER_PORT
+        protocol: tls
+        min_port: $STUNNER_MIN_PORT
+        max_port: $STUNNER_MAX_PORT
+        key: $STUNNER_TLS_KEY
+        cert: $STUNNER_TLS_CERT
+        routes:
+          - media-plane
+  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stunner
+spec:
+  selector:
+    matchLabels:
+      app: stunner
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: stunner
+    spec:
+      containers:
+      - name: stunnerd
+        image: l7mp/stunnerd:latest
+        imagePullPolicy: Always
+        command: ["stunnerd"]
+        args: ["-c", "/etc/stunnerd/stunnerd.conf"]
+        envFrom:
+          - configMapRef:
+              name: stunner-config
+        env:
+        - name: STUNNER_ADDR  # we use the POD IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+            readOnly: true
+          - name: stunnerd-cert-volume
+            mountPath: /etc/ssl/certs            
+            readOnly: true
+      # Uncomment this if you want to deploy a sidecar container with stunner to sniff traffic
+      # - name: net-debug
+      #   image: l7mp/net-debug:latest
+      #   command: ["/bin/sh"]
+      #   args: ["-c", "while true; do echo hello; sleep 10;done"]
+      volumes:
+        - name: stunnerd-config-volume
+          configMap:
+            name: stunnerd-conf
+            optional: true
+        - name: stunnerd-cert-volume
+          secret:
+            secretName: stunner-tls
+            optional: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stunner-dtls
+  labels:
+    app: stunner
+spec:
+  ports:
+    - port: 443
+      targetPort: 443
+      protocol: UDP
+      name: stunner-dtls
+  type: LoadBalancer
+  selector:
+    app: stunner
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stunner-tls
+  labels:
+    app: stunner
+spec:
+  ports:
+    - port: 443
+      targetPort: 443
+      protocol: TCP
+      name: stunner-tls
+  type: LoadBalancer
+  selector:
+    app: stunner
+
+---
+# lock down access from the TURN server to anywhere!
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stunner-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: stunner
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: media-plane
+    ports:
+    - protocol: UDP

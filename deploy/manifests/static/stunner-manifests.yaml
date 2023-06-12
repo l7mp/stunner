@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stunner-config-watcher-serviceaccount
+  namespace: stunner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: stunner-config-watcher-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "watch", "list"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: stunner-config-watcher-clusterrolebind
+roleRef:
+  kind: ClusterRole
+  name: stunner-config-watcher-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: stunner-config-watcher-serviceaccount
+  namespace: stunner
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stunner
+  namespace: stunner
+  labels:
+    app: stunner
+spec:
+  selector:
+    app: stunner
+  ports:
+    - port: 3478
+      protocol: UDP
+      name: stunner
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stunner
+  namespace: stunner
+  annotations: 
+    app: stunner
+    helm.sh/chart: stunner-0.15.0
+    app.kubernetes.io/version: "0.15.0"  
+spec:
+  selector:
+    matchLabels:
+      app: stunner
+      app.kubernetes.io/name: stunner
+      app.kubernetes.io/instance: stunner
+      app.kubernetes.io/managed-by: Helm
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: stunner
+        app.kubernetes.io/name: stunner
+        app.kubernetes.io/instance: stunner
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: stunner-config-watcher-serviceaccount      
+      volumes:
+        - name: stunnerd-config-volume
+      terminationGracePeriodSeconds: 3600
+      hostNetwork: false
+      containers:
+      - name: stunnerd
+        image: "l7mp/stunnerd:0.15.0"
+        imagePullPolicy: IfNotPresent        
+        command: ["stunnerd"]
+        args: ["-w", "-c", "/etc/stunnerd/stunnerd.conf", "--udp-thread-num=16"]
+        env:
+          - name: STUNNER_ADDR
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+        volumeMounts:
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+            readOnly: true
+        resources:
+          limits:
+            cpu: 2
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /live
+            port: 8086
+          initialDelaySeconds: 0
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8086
+          initialDelaySeconds: 0
+          periodSeconds: 5
+        ports:
+          - name: web
+            containerPort: 8080
+      - name: config-watcher
+        image: kiwigrid/k8s-sidecar:latest
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - name: stunnerd-config-volume
+            mountPath: /etc/stunnerd
+        env:
+        - name: LABEL
+          value: stunner.l7mp.io/owned-by
+        - name: LABEL_VALUE
+          value: stunner
+        - name: FOLDER
+          value: /etc/stunnerd
+        - name: RESOURCE
+          value: configmap
+        - name: NAMESPACE
+          value: stunner
+        resources:
+          limits:
+            cpu: 500m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+---

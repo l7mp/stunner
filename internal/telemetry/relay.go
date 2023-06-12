@@ -8,7 +8,8 @@ import (
 	"net"
 
 	"github.com/pion/randutil"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/stdnet"
 )
 
 var (
@@ -47,11 +48,8 @@ type RelayAddressGenerator struct {
 	// Address is passed to Listen/ListenPacket when creating the Relay.
 	Address string
 
-	// DryRun suppresses telemetry collection.
-	DryRun bool
-
 	// Net is a pion/transport VNet, used for testing.
-	Net *vnet.Net
+	Net transport.Net
 }
 
 // Validate is called on server startup and confirms the RelayAddressGenerator is properly configured
@@ -61,7 +59,7 @@ func (r *RelayAddressGenerator) Validate() error {
 	}
 
 	if r.Net == nil {
-		r.Net = vnet.NewNet(nil)
+		r.Net, _ = stdnet.NewNet()
 	}
 
 	if r.Rand == nil {
@@ -95,9 +93,7 @@ func (r *RelayAddressGenerator) AllocatePacketConn(network string, requestedPort
 			return nil, nil, err
 		}
 
-		if !r.DryRun {
-			conn = NewPacketConn(conn, r.Name, ClusterType)
-		}
+		conn = NewPacketConn(conn, r.Name, ClusterType)
 
 		relayAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 		if !ok {
@@ -115,9 +111,7 @@ func (r *RelayAddressGenerator) AllocatePacketConn(network string, requestedPort
 			continue
 		}
 
-		if !r.DryRun {
-			conn = NewPacketConn(conn, r.Name, ClusterType)
-		}
+		conn = NewPacketConn(conn, r.Name, ClusterType)
 
 		relayAddr, ok := conn.LocalAddr().(*net.UDPAddr)
 		if !ok {

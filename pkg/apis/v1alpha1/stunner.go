@@ -2,7 +2,7 @@ package v1alpha1
 
 import (
 	"fmt"
-	"sort"
+	// "sort"
 	"strings"
 )
 
@@ -25,7 +25,7 @@ type StunnerConfig struct {
 func (req *StunnerConfig) Validate() error {
 	// ApiVersion
 	if req.ApiVersion != ApiVersion {
-		return fmt.Errorf("unsupported API version: %s", req.ApiVersion)
+		return fmt.Errorf("unsupported API version: %q", req.ApiVersion)
 	}
 
 	// validate admin
@@ -45,10 +45,10 @@ func (req *StunnerConfig) Validate() error {
 		}
 		req.Listeners[i] = l
 	}
-	// listeners are sorted by name
-	sort.Slice(req.Listeners, func(i, j int) bool {
-		return req.Listeners[i].Name < req.Listeners[j].Name
-	})
+	// // listeners are sorted by name
+	// sort.Slice(req.Listeners, func(i, j int) bool {
+	// 	return req.Listeners[i].Name < req.Listeners[j].Name
+	// })
 
 	// validate clusters
 	for i, c := range req.Clusters {
@@ -58,10 +58,10 @@ func (req *StunnerConfig) Validate() error {
 		req.Clusters[i] = c
 	}
 
-	// clusters are sorted by name
-	sort.Slice(req.Clusters, func(i, j int) bool {
-		return req.Clusters[i].Name < req.Clusters[j].Name
-	})
+	// // clusters are sorted by name
+	// sort.Slice(req.Clusters, func(i, j int) bool {
+	// 	return req.Clusters[i].Name < req.Clusters[j].Name
+	// })
 
 	return nil
 }
@@ -89,18 +89,42 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 	}
 
 	for i := range req.Listeners {
+		if i >= len(other.Listeners) {
+			return false
+		}
 		if !req.Listeners[i].DeepEqual(&other.Listeners[i]) {
 			return false
 		}
 	}
 
 	for i := range req.Clusters {
+		if i >= len(other.Clusters) {
+			return false
+		}
 		if !req.Clusters[i].DeepEqual(&other.Clusters[i]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// DeepCopyInto copies a configuration.
+func (req *StunnerConfig) DeepCopyInto(dst Config) {
+	ret := dst.(*StunnerConfig)
+	ret.ApiVersion = req.ApiVersion
+	req.Admin.DeepCopyInto(&ret.Admin)
+	req.Auth.DeepCopyInto(&ret.Auth)
+
+	ret.Listeners = make([]ListenerConfig, len(req.Listeners))
+	for i := range req.Listeners {
+		req.Listeners[i].DeepCopyInto(&ret.Listeners[i])
+	}
+
+	ret.Clusters = make([]ClusterConfig, len(req.Clusters))
+	for i := range req.Clusters {
+		req.Clusters[i].DeepCopyInto(&ret.Clusters[i])
+	}
 }
 
 // String stringifies the configuration.
@@ -123,4 +147,26 @@ func (req *StunnerConfig) String() string {
 	status = append(status, fmt.Sprintf("clusters=[%s]", strings.Join(cs, ",")))
 
 	return fmt.Sprintf("{%s}", strings.Join(status, ","))
+}
+
+// GetListenerConfig finds a Listener by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetListenerConfig(name string) (ListenerConfig, error) {
+	for _, l := range req.Listeners {
+		if l.Name == name {
+			return l, nil
+		}
+	}
+
+	return ListenerConfig{}, ErrNoSuchListener
+}
+
+// GetClusterConfig finds a Cluster by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
+	for _, c := range req.Clusters {
+		if c.Name == name {
+			return c, nil
+		}
+	}
+
+	return ClusterConfig{}, ErrNoSuchCluster
 }

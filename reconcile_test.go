@@ -4,21 +4,26 @@ import (
 	"bytes"
 	"fmt"
 	"net"
-	"strconv"
+	// "strconv"
 	"testing"
 	"time"
 
 	"github.com/pion/transport/test"
-	"github.com/pion/turn/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	a12n "github.com/l7mp/stunner/pkg/authentication"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 var _ = fmt.Sprintf("%d", 1)
+
+const (
+	dummyCert64 = "ZHVtbXktY2VydA==" // "dummy-cert"
+	dummyKey64  = "ZHVtbXkta2V5"     // "dummy-key"
+)
 
 // *****************
 // Reconciliation tests
@@ -73,7 +78,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("user",
+			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
@@ -316,7 +321,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("user",
+			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
@@ -402,7 +407,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("user",
+			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
@@ -492,7 +497,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("user",
+			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
@@ -573,7 +578,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("newuser", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("newuser",
+			assert.Equal(t, key, a12n.GenerateAuthKey("newuser",
 				v1alpha1.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
@@ -658,7 +663,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			key, ok := handler("user", v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
-			assert.Equal(t, key, turn.GenerateAuthKey("user",
+			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				v1alpha1.DefaultRealm, "newpass"), "auth handler ok")
 
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
@@ -737,20 +742,18 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Type, v1alpha1.AuthTypeLongTerm, "auth type ok")
 			assert.Equal(t, auth.Secret, "newsecret")
 
-			logger := logger.NewLoggerFactory(stunnerTestLoglevel)
-			handler := turn.NewLongTermAuthHandler("newsecret", logger.NewLogger("test-auth"))
 			duration, _ := time.ParseDuration("10h")
-			d := time.Now().Add(duration).Unix()
-			username := strconv.FormatInt(d, 10)
+			username := a12n.GenerateTimeWindowedUsername(time.Now(), duration, "dummy_user")
+			passwd, err := a12n.GetLongTermCredential(username, "newsecret")
+			assert.NoError(t, err, "GetLongTermCredential")
 
+			handler := s.NewAuthHandler()
 			key, ok := handler(username, v1alpha1.DefaultRealm,
 				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
 			assert.True(t, ok, "authHandler key ok")
 
-			key2, ok2 := handler(username, v1alpha1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
-			assert.True(t, ok2)
-			assert.Equal(t, key, key2)
+			key2 := a12n.GenerateAuthKey(username, v1alpha1.DefaultRealm, passwd)
+			assert.Equal(t, key, key2, "authHandler key matches")
 
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
 			admin := s.GetAdmin()
@@ -1102,8 +1105,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "DTLS",
-				Cert:     "dummy-cert",
-				Key:      "dummy-key",
+				Cert:     dummyCert64,
+				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
@@ -1211,8 +1214,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "TLS",
-				Cert:     "dummy-cert",
-				Key:      "dummy-key",
+				Cert:     dummyCert64,
+				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
@@ -1728,6 +1731,8 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	assert.NoError(t, err, err)
 
 	conf.Admin.LogLevel = stunnerTestLoglevel
+	conf.Admin.MetricsEndpoint = ""
+
 	log.Debug("setting up the mock DNS")
 	mockDns := resolver.NewMockResolver(map[string]([]string){
 		"stunner.l7mp.io":     []string{"1.2.3.4"},
@@ -2128,8 +2133,8 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoServerAddr:  "1.2.3.5:5678",
 		restart:         true,
 		bindSuccess:     true,
-		allocateSuccess: false,
-		echoResult:      false,
+		allocateSuccess: true,
+		echoResult:      true,
 	},
 	{
 		testName: "reverting the realm induces another server restart",

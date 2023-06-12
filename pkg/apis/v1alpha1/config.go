@@ -9,6 +9,8 @@ type Config interface {
 	ConfigName() string
 	// DeepEqual compares two configurations.
 	DeepEqual(other Config) bool
+	// DeepCopyInto copies a configuration.
+	DeepCopyInto(dst Config)
 	// String stringifies the configuration.
 	String() string
 }

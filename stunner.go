@@ -6,39 +6,18 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/vnet"
+	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v2/stdnet"
 
-	"github.com/l7mp/stunner/internal/logger"
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const DefaultLogLevel = "all:WARN"
-
-// Options defines various options for the STUNner server.
-type Options struct {
-	// DryRun suppresses sideeffects: STUNner will not initialize listener sockets and bring up
-	// the TURN server, and it will not fire up the health-check and the metrics
-	// servers. Intended for testing, default is false.
-	DryRun bool
-	// SuppressRollback controls whether to rollback to the last working configuration after a
-	// failed reconciliation request. Default is false, which means to always do a rollback.
-	SuppressRollback bool
-	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
-	// "all:TRACE" will force maximal loglevel throughout, "all:ERROR,auth:TRACE,turn:DEBUG"
-	// will suppress all logs except in the authentication subsystem and the TURN protocol
-	// logic.
-	LogLevel string
-	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
-	// testing.
-	Resolver resolver.DnsResolver
-	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
-	// emulated data-plane.
-	Net *vnet.Net
-}
 
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
@@ -46,9 +25,10 @@ type Stunner struct {
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
+	udpThreadNum                                               int
 	logger                                                     *logger.LoggerFactory
 	log                                                        logging.LeveledLogger
-	net                                                        *vnet.Net
+	net                                                        transport.Net
 	ready, shutdown                                            bool
 }
 
@@ -70,10 +50,22 @@ func NewStunner(options Options) *Stunner {
 		r = resolver.NewDnsResolver("dns-resolver", logger)
 	}
 
-	vnet := vnet.NewNet(nil)
-	if options.Net != nil {
-		log.Warn("vnet is enabled")
+	var vnet transport.Net
+	if options.Net == nil {
+		net, err := stdnet.NewNet() // defaults to native operation
+		if err != nil {
+			log.Error("could not create stdnet.NewNet")
+			return nil
+		}
+		vnet = net
+	} else {
 		vnet = options.Net
+		log.Warn("vnet is enabled")
+	}
+
+	udpThreadNum := 0
+	if options.UDPListenerThreadNum > 0 {
+		udpThreadNum = options.UDPListenerThreadNum
 	}
 
 	s := &Stunner{
@@ -83,6 +75,7 @@ func NewStunner(options Options) *Stunner {
 		suppressRollback: options.SuppressRollback,
 		dryRun:           options.DryRun,
 		resolver:         r,
+		udpThreadNum:     udpThreadNum,
 		net:              vnet,
 	}
 
@@ -91,15 +84,18 @@ func NewStunner(options Options) *Stunner {
 	s.authManager = manager.NewManager("auth-manager",
 		object.NewAuthFactory(logger), logger)
 	s.listenerManager = manager.NewManager("listener-manager",
-		object.NewListenerFactory(vnet, s.NewHandlerFactory(), s.dryRun, logger), logger)
+		object.NewListenerFactory(vnet, s.NewRealmHandler(), logger), logger)
 	s.clusterManager = manager.NewManager("cluster-manager",
 		object.NewClusterFactory(r, logger), logger)
 
 	if !s.dryRun {
 		s.resolver.Start()
 		telemetry.Init()
-		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetAciveConnections() })
+		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetActiveConnections() })
 	}
+
+	// TODO: remove this when STUNner gains self-managed dataplanes
+	s.ready = true
 
 	return s
 }
@@ -157,9 +153,37 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 	return l.(*object.Cluster)
 }
 
+// GetRealm returns the current STUN/TURN authentication realm.
+func (s *Stunner) GetRealm() string {
+	auth := s.GetAuth()
+	if auth == nil {
+		return ""
+	}
+	return auth.Realm
+}
+
 // GetLogger returns the logger factory of the running daemon. Useful for creating a sub-logger.
 func (s *Stunner) GetLogger() logging.LoggerFactory {
 	return s.logger
+}
+
+// SetLogLevel sets the loglevel.
+func (s *Stunner) SetLogLevel(levelSpec string) {
+	s.logger.SetLevel(levelSpec)
+}
+
+// GetAllocations returns the number of active allocations summed over all listeners.  It can be
+// used to drain the server before closing.
+func (s *Stunner) AllocationCount() int {
+	n := 0
+	listeners := s.listenerManager.Keys()
+	for _, name := range listeners {
+		l := s.GetListener(name)
+		if l.Server != nil {
+			n += l.Server.AllocationCount()
+		}
+	}
+	return n
 }
 
 // Status returns a short status description of the running STUNner instance.
@@ -183,8 +207,9 @@ func (s *Stunner) Status() string {
 	}
 
 	auth := s.GetAuth()
-	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s",
-		status, auth.Type.String(), auth.Realm, str)
+	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s"+
+		", active allocations: %d", status, auth.Realm, auth.Type.String(), str,
+		s.AllocationCount())
 }
 
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections
@@ -227,5 +252,5 @@ func (s *Stunner) Close() {
 	s.resolver.Close()
 }
 
-// GetAciveConnections returns the number of active downstream (listener-side) TURN allocations.
-func (s *Stunner) GetAciveConnections() float64 { return 0.0 }
+// GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
+func (s *Stunner) GetActiveConnections() float64 { return 0.0 }

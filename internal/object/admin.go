@@ -20,7 +20,7 @@ import (
 
 const DefaultAdminObjectName = "DefaultAdmin"
 
-// Admin is the main object holding STUNner administration info
+// Admin is the main object holding STUNner administration info.
 type Admin struct {
 	Name, LogLevel                       string
 	DryRun                               bool
@@ -56,15 +56,14 @@ func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging
 	return &admin, nil
 }
 
-// Inspect examines whether a configuration change on the object would require a restart. An empty
-// new-config means it is about to be deleted, an empty old-config means it is to be deleted,
-// otherwise it will be reconciled from the old configuration to the new one
-func (a *Admin) Inspect(old, new v1alpha1.Config) bool {
-	return false
+// Inspect examines whether a configuration change requires a reconciliation (returns true if it
+// does) or restart (returns ErrRestartRequired).
+func (a *Admin) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
-// request
+// request.
 func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	req, ok := conf.(*v1alpha1.AdminConfig)
 	if !ok {
@@ -80,41 +79,51 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 	a.Name = req.Name
 	a.LogLevel = req.LogLevel
 
-	// health-check server reconciliation errors are FATAL (may break Kubernetes
-	// liveness/readiness checks): return any error encountered
-	if err := a.reconcileHealthCheck(req); err != nil {
-		return err
-	}
-
 	// metrics server reconciliation errors are NOT FATAL: just warn if something goes wrong
 	// but otherwise go on with reconciliation
 	if err := a.reconcileMetrics(req); err != nil {
 		a.log.Warnf("error reconciling metrics server:", err.Error())
 	}
 
+	// health-check server reconciliation errors are FATAL (may break Kubernetes
+	// liveness/readiness checks): return any error encountered
+	if err := a.reconcileHealthCheck(req); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// Name returns the name of the object
+// ObjectName returns the name of the object.
 func (a *Admin) ObjectName() string {
-	// singleton!
 	return v1alpha1.DefaultAdminName
 }
 
-// GetConfig returns the configuration of the running object
+// ObjectType returns the type of the object.
+func (a *Admin) ObjectType() string {
+	return "admin"
+}
+
+// GetConfig returns the configuration of the running object.
 func (a *Admin) GetConfig() v1alpha1.Config {
 	a.log.Tracef("GetConfig")
+
+	// use a copy when taking the pointer: we don't want anyone downstream messing with our own
+	// copies
+	h := a.HealthCheckEndpoint
+
 	return &v1alpha1.AdminConfig{
 		Name:                a.Name,
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
-		HealthCheckEndpoint: a.HealthCheckEndpoint,
+		HealthCheckEndpoint: &h,
 	}
 }
 
-// Close closes the Admin object
+// Close closes the Admin object.
 func (a *Admin) Close() error {
 	a.log.Tracef("Close")
+
 	if a.healthCheckServer != nil {
 		if err := a.healthCheckServer.Close(); err != nil {
 			hcAddr := getHealthAddr(a.HealthCheckEndpoint)
@@ -122,6 +131,7 @@ func (a *Admin) Close() error {
 				hcAddr, err.Error())
 		}
 	}
+
 	if a.metricsServer != nil {
 		if err := a.metricsServer.Close(); err != nil {
 			mAddr, mPath := getMetricsAddr(a.MetricsEndpoint)
@@ -129,88 +139,37 @@ func (a *Admin) Close() error {
 				mAddr, mPath, a.MetricsEndpoint, err.Error())
 		}
 	}
-	return nil
-}
-
-func (a *Admin) reconcileHealthCheck(req *v1alpha1.AdminConfig) error {
-	if req.HealthCheckEndpoint != a.HealthCheckEndpoint && !a.DryRun {
-
-		hcAddr := getHealthAddr(a.HealthCheckEndpoint)
-		hcEndpoint := fmt.Sprintf("http://%s", hcAddr)
-
-		// close old server if exists
-		if a.healthCheckServer != nil {
-			a.log.Tracef("closing healthcheck server at %s", hcEndpoint)
-			if err := a.healthCheckServer.Close(); err != nil {
-				return fmt.Errorf("error stopping healthcheck server at %s: %w",
-					hcEndpoint, err)
-			}
-			a.healthCheckServer = nil
-		}
-
-		hcAddr = getHealthAddr(req.HealthCheckEndpoint)
-		hcEndpoint = fmt.Sprintf("http://%s", hcAddr)
-
-		// only start new server if necessary
-		if hcAddr == "" {
-			return nil
-		}
-
-		a.log.Tracef("starting healthcheck server at %s", hcEndpoint)
-		a.healthCheckServer = &http.Server{
-			Addr:    hcAddr,
-			Handler: a.health,
-		}
-
-		// we separate Listen() and Serve(), so that we can return errors from the listener
-		ln, err := net.Listen("tcp", hcAddr)
-		if err != nil {
-			return fmt.Errorf("cannot start healthcheck server at %s: %w",
-				hcEndpoint, err)
-		}
-
-		go func() {
-			if err := a.healthCheckServer.Serve(ln); err != nil {
-				if errors.Is(err, http.ErrServerClosed) {
-					a.log.Tracef("healthcheck server: normal shutdown")
-				} else {
-					a.log.Warnf("healthcheck server error at %s: %s",
-						hcEndpoint, err.Error())
-					a.healthCheckServer = nil
-				}
-			}
-		}()
-	}
-	a.HealthCheckEndpoint = req.HealthCheckEndpoint
 
 	return nil
 }
 
 func (a *Admin) reconcileMetrics(req *v1alpha1.AdminConfig) error {
-	if a.MetricsEndpoint != req.MetricsEndpoint && !a.DryRun {
+	a.log.Trace("reconcileMetrics")
 
+	if a.DryRun {
+		goto end
+	}
+
+	// close if: running and new endpoint is empty or differs from the old one
+	if a.metricsServer != nil && req.MetricsEndpoint != a.MetricsEndpoint {
 		mAddr, mPath := getMetricsAddr(a.MetricsEndpoint)
 		mEndpoint := fmt.Sprintf("http://%s/%s", mAddr, mPath)
 
-		// close old server if exists
-		if a.metricsServer != nil {
-			a.log.Tracef("closing metrics server at %s", mEndpoint)
-			if err := a.metricsServer.Shutdown(context.Background()); err != nil {
-				return fmt.Errorf("error stopping metrics server at %s: %w",
-					mEndpoint, err)
-			}
-			a.metricsServer = nil
-		}
+		a.log.Tracef("closing metrics server at %s", mEndpoint)
 
-		// only start new server if necessary
-		if req.MetricsEndpoint == "" {
-			return nil
+		if err := a.metricsServer.Shutdown(context.Background()); err != nil {
+			return fmt.Errorf("error stopping metrics server at %s: %w",
+				mEndpoint, err)
 		}
+		a.metricsServer = nil
+	}
 
+	// start if: new endpoint differs from the old one
+	if req.MetricsEndpoint != a.MetricsEndpoint && req.MetricsEndpoint != "" {
 		a.log.Tracef("starting metrics server at %s", req.MetricsEndpoint)
 
-		mAddr, mPath = getMetricsAddr(req.MetricsEndpoint)
-		mEndpoint = fmt.Sprintf("http://%s/%s", mAddr, mPath)
+		mAddr, mPath := getMetricsAddr(req.MetricsEndpoint)
+		mEndpoint := fmt.Sprintf("http://%s/%s", mAddr, mPath)
 
 		mux := http.NewServeMux()
 		mux.Handle(mPath, promhttp.Handler())
@@ -238,7 +197,78 @@ func (a *Admin) reconcileMetrics(req *v1alpha1.AdminConfig) error {
 			}
 		}()
 	}
+
+end:
 	a.MetricsEndpoint = req.MetricsEndpoint
+
+	return nil
+}
+
+// req MUST be validated!
+func (a *Admin) reconcileHealthCheck(req *v1alpha1.AdminConfig) error {
+	a.log.Trace("reconcileHealthCheck")
+
+	// if req is validated then either
+	// (1) *req.HealthCheckEndpoint="", which means caller does not want healthchecking, or
+	// (2) *req.HealthCheckEndpoint=default | what is specified by the caller
+	if req.HealthCheckEndpoint == nil {
+		return fmt.Errorf("internal error: processing unvalidated AdminConfig: %#v", req)
+	}
+
+	if a.DryRun {
+		goto end
+	}
+
+	// close if: running and new endpoint is empty or differs from the old one
+	if a.healthCheckServer != nil && *req.HealthCheckEndpoint != a.HealthCheckEndpoint {
+		hcAddr := getHealthAddr(a.HealthCheckEndpoint)
+		hcEndpoint := fmt.Sprintf("http://%s", hcAddr)
+
+		a.log.Tracef("closing healthCheck server at %s", hcEndpoint)
+
+		if err := a.healthCheckServer.Close(); err != nil {
+			return fmt.Errorf("error stopping healthCheck server at %s: %w",
+				hcEndpoint, err)
+		}
+		a.healthCheckServer = nil
+	}
+
+	// start if: new endpoint differs from the old one
+	if *req.HealthCheckEndpoint != a.HealthCheckEndpoint && *req.HealthCheckEndpoint != "" {
+		hcAddr := getHealthAddr(*req.HealthCheckEndpoint)
+		hcEndpoint := fmt.Sprintf("http://%s", hcAddr)
+
+		a.log.Tracef("starting healthcheck server at %s", hcEndpoint)
+		a.healthCheckServer = &http.Server{
+			Addr:    hcAddr,
+			Handler: a.health,
+		}
+
+		// we separate Listen() and Serve(), so that we can return errors from the listener
+		ln, err := net.Listen("tcp", hcAddr)
+		if err != nil {
+			return fmt.Errorf("cannot start healthcheck server at %s: %w",
+				hcEndpoint, err)
+		}
+
+		go func() {
+			if err := a.healthCheckServer.Serve(ln); err != nil {
+				if errors.Is(err, http.ErrServerClosed) {
+					a.log.Tracef("healthcheck server: normal shutdown")
+				} else {
+					a.log.Warnf("healthcheck server error at %s: %s",
+						hcEndpoint, err.Error())
+					a.healthCheckServer = nil
+				}
+			}
+		}()
+	}
+
+end:
+	a.HealthCheckEndpoint = ""
+	if req.HealthCheckEndpoint != nil {
+		a.HealthCheckEndpoint = *req.HealthCheckEndpoint
+	}
 
 	return nil
 }
