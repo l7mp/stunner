@@ -19,13 +19,13 @@ The recommended way to install LiveKit into Kubernetes is deploying the media se
 
 The figure below shows LiveKit deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, LiveKit is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for LiveKit, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-![STUNner LiveKit intergration deployment architecture](../../img/stunner_livekit.svg)
+![STUNner LiveKit integration deployment architecture](../../img/stunner_livekit.svg)
 
 In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), the [LiveKit server](https://github.com/livekit/livekit) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the LiveKit server pool to clients.
 
 ## Installation
 
-Let's start with a disclaimer. The LiveKit client example browser must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. Unfottunately, self-signed TLS certs [will not work](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer), so we have to come up with a way to provide our clients with a valid TLS cert. This will have the unfortunate consequence that the majority of the below installation guide will be about securing client connections to LiveKit over TLS; as it turns out, once HTTPS is correctly working integrating LiveKit with STUNner is very simple.
+Let's start with a disclaimer. The LiveKit client example browser must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. Unfortunately, self-signed TLS certs [will not work](https://docs.livekit.io/deploy/#domain,-ssl-certificates,-and-load-balancer), so we have to come up with a way to provide our clients with a valid TLS cert. This will have the unfortunate consequence that the majority of the below installation guide will be about securing client connections to LiveKit over TLS; as it turns out, once HTTPS is correctly working integrating LiveKit with STUNner is very simple.
 
 In the below example, STUNner will be installed into the identically named namespace, while LiveKit and the Ingress gateway will live in the default namespace.
 
@@ -224,7 +224,7 @@ To obtain a valid token, install the [livekit-cli](https://github.com/livekit/li
 
 ```console
 livekit-cli create-token \
-    --api-key access_token --api-secret secret \
+    --api-key access_token --api-secret secretsecretsecretsecretsecretsecret \
     --join --room room --identity user1 \
     --valid-for 24h
 ```
