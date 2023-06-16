@@ -164,7 +164,7 @@ metadata:
 spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
-    - name: tcp-listener
+    - name: udp-listener
       port: 3478
       protocol: UDP
     - name: tls-listener
