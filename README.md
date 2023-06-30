@@ -609,7 +609,7 @@ notable limitations at this point are as follows.
   deviates from the prescribed behavior in some cases, all in the name of simplifying the
   configuration process. The [STUNner Kubernetes gateway
   operator](https://github.com/l7mp/stunner-gateway-operator) docs contain a [detailed
-  list](https://github.com/l7mp/stunner-gateway-operator/README.md#caveats) on the differences.
+  list](https://github.com/l7mp/stunner-gateway-operator#caveats) on the differences.
 * STUNner supports *multiple parallel GatewayClass hierarchies*, each deployed into a separate
   namespace with a separate GatewayClass an a separate dataplane. This mode can be useful for
   testing new STUNner versions or canary-upgrades and A/B testing of a new media server version. At
