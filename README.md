@@ -171,7 +171,7 @@ With a minimal understanding of WebRTC and Kubernetes, deploying STUNner should 
 minutes.
 
 * [Customize STUNner and deploy it](#installation) into your Kubernetes cluster.
-* Optionally [deploy a WebRTC media server](examples/kurento-one2one-call).
+* Optionally [deploy a WebRTC media server](docs/examples/kurento-one2one-call).
 * [Set STUNner as the ICE server](#configuring-webrtc-clients) in your WebRTC clients.
 * ...
 * Profit!!
@@ -551,45 +551,45 @@ applications into Kubernetes.
 
 ### Basics
 
-* [Opening a UDP tunnel via STUNner](/examples/simple-tunnel/README.md): This introductory tutorial
+* [Opening a UDP tunnel via STUNner](/docs/examples/simple-tunnel/README.md): This introductory tutorial
   shows how to tunnel an external connection via STUNner to a UDP service deployed into
   Kubernetes. The demo can be used to quickly check and benchmark a STUNner installation.
 
 ### Headless deployment mode
 
-* [Direct one to one video call via STUNner](/examples/direct-one2one-call/README.md): This
+* [Direct one to one video call via STUNner](/docs/examples/direct-one2one-call/README.md): This
   tutorial showcases STUNner acting as a TURN server for two WebRTC clients to establish
   connections between themselves, without the mediation of a media server.
 
 ### Media-plane deployment model
 
-* [One to one video call with Kurento](/examples/kurento-one2one-call/README.md): This tutorial
+* [One to one video call with Kurento](/docs/examples/kurento-one2one-call/README.md): This tutorial
   shows how to use STUNner to connect WebRTC clients to a media server deployed into Kubernetes
   behind STUNner in the [media-plane deployment model](/docs/DEPLOYMENT.md). All this happens
   *without* modifying the media server code in any way, just by adding 5-10 lines of
   straightforward JavaScript to configure clients to use STUNner as the TURN server.
-* [Magic mirror with Kurento](/examples/kurento-magic-mirror/README.md): This tutorial has been
+* [Magic mirror with Kurento](/docs/examples/kurento-magic-mirror/README.md): This tutorial has been
   adopted from the [Kurento](https://www.kurento.org) [magic
   mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
   demo, deploying a basic WebRTC loopback server behind STUNner with some media processing
   added. In particular, the application uses computer vision and augmented reality techniques to
   add a funny hat on top of faces.
-* [Video-conferencing with LiveKit](/examples/livekit/README.md): This tutorial helps you deploy
+* [Video-conferencing with LiveKit](/docs/examples/livekit/README.md): This tutorial helps you deploy
   the [LiveKit](https://livekit.io) WebRTC media server behind STUNner. The docs also show how to
   obtain a valid TLS certificate to secure your signaling connections, courtesy of the
   [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
-* [Video-conferencing with Jitsi](/examples/jitsi/README.md): This tutorial helps you deploy a
+* [Video-conferencing with Jitsi](/docs/examples/jitsi/README.md): This tutorial helps you deploy a
   fully fledged [Jitsi](https://jitsi.org) video-conferencing service into Kubernetes behind
   STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
   connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
-* [Cloud-gaming with Cloudretro](/examples/cloudretro/README.md): This tutorial lets you play Super
+* [Cloud-gaming with Cloudretro](/docs/examples/cloudretro/README.md): This tutorial lets you play Super
   Mario or Street Fighter in your browser, courtesy of the amazing
   [CloudRetro](https://cloudretro.io) project and, of course, STUNner. The demo also presents a
   simple multi-cluster setup, where clients can reach the game-servers in their geographical
   locality to minimize latency.
-* [Remote desktop access with Neko](/examples/neko/README.md): This demo showcases STUNner
+* [Remote desktop access with Neko](/docs/examples/neko/README.md): This demo showcases STUNner
   providing an ingress gateway service to a remote desktop application. We use
   [neko.io](https://neko.m1k1o.net) to run a browser in a secure container inside the Kubernetes
   cluster, and stream the desktop to clients via STUNner.
