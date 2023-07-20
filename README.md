@@ -625,8 +625,8 @@ notable limitations at this point are as follows.
 * v0.13: Observability: Prometheus + Grafana dashboard.
 * v0.15: Performance: per-allocation CPU load-balancing for UDP
 * v0.16: Management: managed STUNner dataplane.
+* v0.17: Performance: eBPF TURN acceleration.
 * v1.0: GA
-* v1.1: Performance: eBPF TURN acceleration.
 * v2.0: Service mesh: adaptive scaling & resiliency
 
 ## Help
