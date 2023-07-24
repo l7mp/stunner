@@ -73,9 +73,10 @@ metadata:
   name: livekit-server
 data:
   config.yaml: |
+    # access_token must be at least 32 chars long
     keys:
-      access_token: secret
-    log_level: debug
+      access_token: secretsecretsecretsecretsecretsecret
+    log_level: info
     port: 7880
     redis:
       address: redis.default.svc:6379
@@ -103,7 +104,7 @@ metadata:
   labels:
     app.kubernetes.io/name: livekit-server
     app.kubernetes.io/instance: livekit
-    app.kubernetes.io/version: "v1.1.2"
+    app.kubernetes.io/version: "v1.4.2"
 spec:
   type: LoadBalancer
   ports:
@@ -126,7 +127,7 @@ metadata:
   labels:
     app.kubernetes.io/name: livekit-server
     app.kubernetes.io/instance: livekit
-    app.kubernetes.io/version: "v1.1.2"
+    app.kubernetes.io/version: "v1.4.2"
 spec:
   replicas: 1
   selector:
@@ -146,8 +147,9 @@ spec:
       terminationGracePeriodSeconds: 18000 # 5 hours
       containers:
         - name: livekit-server
-          image: "livekit/livekit-server:v1.1.2"
+          image: "livekit/livekit-server:v1.4.2"
           imagePullPolicy: IfNotPresent
+          args: ["--disable-strict-config"]
           env:
             - name: LIVEKIT_CONFIG
               valueFrom:
