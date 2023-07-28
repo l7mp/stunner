@@ -148,6 +148,7 @@ Below is a quick reference of the most important fields of the Gateway [`spec`](
 | :--- | :---: | :--- | :---: |
 | `gatewayClassName` | `string` | The name of the GatewayClass that provides the root of the hierarchy the Gateway is attached to. | Yes |
 | `listeners` | `list` | The list of TURN listeners. | Yes |
+| `addresses` | `list` | The list of manually hinted external IP addresses for the rendered service (only the first one is used). | No |
 
 Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a
 `tls` configuration is required for TLS and DTLS listeners.
@@ -162,7 +163,20 @@ Each TURN `listener` is defined by a unique name, a transport protocol and a por
 
 For TLS/DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key.
 
-STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP services, TCP and TLS listeners are exposed as TCP.
+STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to
+clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be
+assigned a single externally reachable IP address. If you want multiple TURN listeners on different
+public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP
+services, TCP and TLS listeners are exposed as TCP.
+
+Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway, will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+> **Warning**  
+Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated, thus will be ignored if the cloud-provider or your Kubernetes install does not support the feature. Also the `externalIPs` field is denied by some cloud-providers and will fail the resource creation. Be thorough when using this feature.
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `type` | `string` | Type of the address. Currently we only support IPAddress. | Yes |
+| `value` | `string` | Address that should be bound to the Gateway's service. | Yes |
 
 Mixed multi-protocol Gateways are supported: this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. By default, the STUNner gateway-operator disables the use of mixed-protocol LBs for compatibility reasons. However, it can be enabled by annotating a Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair. The below Gateway will expose both ports with their respective protocols.
 
