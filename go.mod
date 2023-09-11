@@ -19,6 +19,8 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.1.2
+	github.com/gorilla/websocket v1.5.0
 	github.com/heptiolabs/healthcheck v0.0.0-20211123025425-613501dd5deb
 	github.com/pion/randutil v0.1.0
 	github.com/pion/transport v0.14.1

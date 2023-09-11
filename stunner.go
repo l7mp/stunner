@@ -3,8 +3,10 @@ package stunner
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v2"
 	"github.com/pion/transport/v2/stdnet"
@@ -19,8 +21,11 @@ import (
 
 const DefaultLogLevel = "all:WARN"
 
+var DefaultInstanceId = fmt.Sprintf("stunnerd-%s", uuid.New().String())
+
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
+	id                                                         string
 	version                                                    string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
 	suppressRollback, dryRun                                   bool
@@ -68,7 +73,17 @@ func NewStunner(options Options) *Stunner {
 		udpThreadNum = options.UDPListenerThreadNum
 	}
 
+	id := options.Id
+	if id == "" {
+		if h, err := os.Hostname(); err != nil {
+			id = DefaultInstanceId
+		} else {
+			id = h
+		}
+	}
+
 	s := &Stunner{
+		id:               id,
 		version:          v1alpha1.ApiVersion,
 		logger:           logger,
 		log:              log,
@@ -98,6 +113,11 @@ func NewStunner(options Options) *Stunner {
 	s.ready = true
 
 	return s
+}
+
+// GetId returns the id of the current stunnerd instance.
+func (s *Stunner) GetId() string {
+	return s.id
 }
 
 // GetVersion returns the STUNner API version.

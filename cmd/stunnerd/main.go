@@ -1,8 +1,8 @@
 package main
 
 import (
-	// "fmt"
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,13 +17,16 @@ import (
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
 
 const (
-	defaultLoglevel  = "all:INFO"
-	confUpdatePeriod = 1 * time.Second
+	defaultLoglevel = "all:INFO"
+	// environment for the config poller
+	// defaultDiscoveryAddress = "ws://localhost:13478/api/v1/config/watch"
+	envVarName      = "STUNNER_NAME"
+	envVarNamespace = "STUNNER_NAMESPACE"
 )
 
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", "Config file.")
+	var config = flag.StringP("config", "c", "", "Config origin. If starts with ws or http then it is considered as the URL of a config discivery server which is polled for config, otherwise considered as a file from which to read the config.")
 	var level = flag.StringP("log", "l", "", "Log level (default: all:INFO).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
 	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
@@ -37,12 +40,22 @@ func main() {
 		// verbose mode on, override any loglevel
 		logLevel = "all:DEBUG"
 	}
+
 	if *level != "" {
 		// loglevel set on the comman line, use that one instead
 		logLevel = *level
 	}
 
+	// default id is hostname
+	var id string
+	name, ok1 := os.LookupEnv(envVarName)
+	namespace, ok2 := os.LookupEnv(envVarNamespace)
+	if ok1 && ok2 {
+		id = fmt.Sprintf("%s/%s", namespace, name)
+	}
+
 	st := stunner.NewStunner(stunner.Options{
+		Id:                   id,
 		LogLevel:             logLevel,
 		DryRun:               *dryRun,
 		UDPListenerThreadNum: *udpThreadNum,
@@ -51,10 +64,12 @@ func main() {
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
+	log.Infof("starting stunnerd instance %q", id)
+
 	conf := make(chan v1alpha1.StunnerConfig, 1)
 	defer close(conf)
 
-	var cancelWatcher context.CancelFunc
+	var cancelConfigLoader context.CancelFunc
 	if *config == "" && flag.NArg() == 1 {
 		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
@@ -68,9 +83,9 @@ func main() {
 		conf <- *c
 
 	} else if *config != "" && !*watch {
-		log.Infof("loading configuration from config file %q", *config)
+		log.Infof("loading configuration from origin %q", *config)
 
-		c, err := stunner.LoadConfig(*config)
+		c, err := st.LoadConfig(*config)
 		if err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
@@ -79,27 +94,14 @@ func main() {
 		conf <- *c
 
 	} else if *config != "" && *watch {
-		log.Infof("watching configuration file at %q", *config)
-
-		// init stunnerd with an empty config: this bootstraps it with the default
-		// resources (above all, starts the health-checker)
-		initConf := stunner.NewZeroConfig()
-		log.Debug("bootstrapping with zero reconciliation")
-		if err := st.Reconcile(*initConf); err != nil {
-			log.Errorf("could not reconcile initial configuratoin: %s", err.Error())
-			os.Exit(1)
-		}
+		log.Infof("watching configuration at origin %q", *config)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		cancelWatcher = cancel
+		cancelConfigLoader = cancel
 
-		if err := stunner.WatchConfig(ctx, stunner.Watcher{
-			ConfigFile:    *config,
-			ConfigChannel: conf,
-			Logger:        st.GetLogger(),
-		}); err != nil {
-			log.Errorf("could not create config file watcher: %s", err.Error())
+		if err := st.WatchConfig(ctx, *config, conf); err != nil {
+			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
 		}
 	} else {
@@ -107,13 +109,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	sigint := make(chan os.Signal, 1)
-	defer close(sigint)
-	signal.Notify(sigint, syscall.SIGINT)
-
 	sigterm := make(chan os.Signal, 1)
 	defer close(sigterm)
-	signal.Notify(sigterm, syscall.SIGTERM)
+	signal.Notify(sigterm, syscall.SIGTERM, syscall.SIGINT)
 
 	exit := make(chan bool, 1)
 	defer close(exit)
@@ -124,18 +122,14 @@ func main() {
 			log.Info("normal exit on graceful shutdown")
 			os.Exit(0)
 
-		case <-sigint:
-			log.Info("normal exit")
-			os.Exit(0)
-
 		case <-sigterm:
-			log.Info("caught SIGTERM: performing a graceful shutdown")
+			log.Info("performing a graceful shutdown")
 			st.Shutdown()
 
-			// cancel the config watcher
-			if cancelWatcher != nil {
-				log.Info("canceling config watcher")
-				cancelWatcher()
+			if cancelConfigLoader != nil {
+				log.Info("canceling config loader")
+				cancelConfigLoader()
+				cancelConfigLoader = nil
 			}
 
 			go func() {

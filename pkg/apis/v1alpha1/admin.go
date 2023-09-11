@@ -82,6 +82,9 @@ func (req *AdminConfig) DeepCopyInto(dst Config) {
 // String stringifies the configuration.
 func (req *AdminConfig) String() string {
 	status := []string{}
+	if req.Name != "" {
+		status = append(status, fmt.Sprintf("name=%q", req.Name))
+	}
 	if req.LogLevel != "" {
 		status = append(status, fmt.Sprintf("logLevel=%q", req.LogLevel))
 	}

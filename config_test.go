@@ -1,10 +1,9 @@
 package stunner
 
 import (
+	"context"
 	"fmt"
 	"net"
-	// "reflect"
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -149,11 +149,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err = WatchConfig(ctx, Watcher{
-		ConfigFile:    file,
-		ConfigChannel: conf,
-		Logger:        loggerFactory,
-	})
+	err = stunner.WatchConfig(ctx, file, conf)
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
@@ -186,8 +182,14 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// wait a bit so that the watcher has time to react
 	time.Sleep(50 * time.Millisecond)
 
-	// read back result
-	c2 := <-conf
+	// first read should yield a zeroconfig
+	c2, ok := <-conf
+	assert.True(t, ok, "zeroconfig emitted")
+	checkZeroConfig(t, &c2, stunner.GetId())
+
+	// second read yields the real config
+	c2, ok = <-conf
+	assert.True(t, ok, "config emitted")
 	checkDefaultConfig(t, &c2, "UDP")
 
 	log.Debug("write a wrong config file (WatchConfig does not validate)")
@@ -243,4 +245,8 @@ func checkDefaultConfig(t *testing.T, c *v1alpha1.StunnerConfig, proto string) {
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
 	assert.Len(t, c.Clusters[0].Endpoints, 1, "cluster endpoint len")
 	assert.Equal(t, "0.0.0.0/0", c.Clusters[0].Endpoints[0], "endpoint")
+}
+
+func checkZeroConfig(t *testing.T, c *v1alpha1.StunnerConfig, id string) {
+	assert.True(t, c.DeepEqual(cdsclient.ZeroConfig(id)), "zeroconfig ok")
 }
