@@ -7,12 +7,10 @@ spec:
   image: l7mp/stunnerd:dev
   imagePullPolicy: Always
   command:
-    - stunnerd
+    - "stunnerd"
   args:
-    - -w
-    - -c
-    - /etc/stunnerd/stunnerd.conf
-    - --udp-thread-num=1
+    - "-w"
+    - "--udp-thread-num=1"
   hostNetwork: false
   resources:
     limits:

@@ -20,14 +20,17 @@ const (
 	defaultLoglevel = "all:INFO"
 	// environment for the config poller
 	// defaultDiscoveryAddress = "ws://localhost:13478/api/v1/config/watch"
-	envVarName      = "STUNNER_NAME"
-	envVarNamespace = "STUNNER_NAMESPACE"
+	envVarName         = "STUNNER_NAME"
+	envVarNamespace    = "STUNNER_NAMESPACE"
+	envVarId           = "STUNNER_ID"
+	envVarConfigOrigin = "STUNNER_CONFIG_ORIGIN"
 )
 
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", "Config origin. If starts with ws or http then it is considered as the URL of a config discivery server which is polled for config, otherwise considered as a file from which to read the config.")
-	var level = flag.StringP("log", "l", "", "Log level (default: all:INFO).")
+	var config = flag.StringP("config", "c", "", "Config origin, either a valid URL to the CDS server or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: none).")
+	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO).")
+	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <hostname>).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
 	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
 		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0).")
@@ -37,25 +40,30 @@ func main() {
 
 	logLevel := defaultLoglevel
 	if *verbose {
-		// verbose mode on, override any loglevel
 		logLevel = "all:DEBUG"
 	}
 
 	if *level != "" {
-		// loglevel set on the comman line, use that one instead
 		logLevel = *level
 	}
 
-	// default id is hostname
-	var id string
-	name, ok1 := os.LookupEnv(envVarName)
-	namespace, ok2 := os.LookupEnv(envVarNamespace)
-	if ok1 && ok2 {
-		id = fmt.Sprintf("%s/%s", namespace, name)
+	if *config == "" {
+		origin, ok := os.LookupEnv(envVarConfigOrigin)
+		if ok {
+			*config = origin
+		}
+	}
+
+	if *id == "" {
+		name, ok1 := os.LookupEnv(envVarName)
+		namespace, ok2 := os.LookupEnv(envVarNamespace)
+		if ok1 && ok2 {
+			*id = fmt.Sprintf("%s/%s", namespace, name)
+		}
 	}
 
 	st := stunner.NewStunner(stunner.Options{
-		Id:                   id,
+		Id:                   *id,
 		LogLevel:             logLevel,
 		DryRun:               *dryRun,
 		UDPListenerThreadNum: *udpThreadNum,
@@ -64,7 +72,7 @@ func main() {
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
-	log.Infof("starting stunnerd instance %q", id)
+	log.Infof("starting stunnerd instance %q", *id)
 
 	conf := make(chan v1alpha1.StunnerConfig, 1)
 	defer close(conf)
