@@ -1,4 +1,4 @@
-name: Run End-to-End Test
+name: Run End-to-End Test (dev)
 
 on:
   workflow_dispatch:
