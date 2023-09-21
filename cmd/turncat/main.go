@@ -282,8 +282,7 @@ func getStunnerURI(config *stunnerv1alpha1.StunnerConfig) (string, error) {
 		return "", fmt.Errorf("no protocol for listener %q", l.Name)
 	}
 
-	return fmt.Sprintf("%s://%s:%d", strings.ToLower(l.Protocol), l.PublicAddr,
-		l.PublicPort), nil
+	return stunner.GetStandardURLFromListener(&l)
 }
 
 func parseK8sDef(def string) (string, string, string, error) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,8 +36,8 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 	for _, conf := range []string{
 		"turn://user1:passwd1@1.2.3.4:3478?transport=udp",
-		"udp://user1:passwd1@1.2.3.4:3478?transport=udp",
-		"udp://user1:passwd1@1.2.3.4:3478",
+		"turn://user1:passwd1@1.2.3.4?transport=udp",
+		"turn://user1:passwd1@1.2.3.4:3478",
 	} {
 		testName := fmt.Sprintf("TestStunner_NewDefaultConfig_URI:%s", conf)
 		t.Run(testName, func(t *testing.T) {
@@ -231,6 +232,59 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	checkDefaultConfig(t, &c4, "TURN-TCP")
 
 	stunner.Close()
+}
+
+func TestStunnerURIParser(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	for _, conf := range []struct {
+		uri string
+		su  StunnerUri
+	}{
+		// udp
+		{"turn://user1:passwd1@1.2.3.4:3478?transport=udp", StunnerUri{"turn-udp", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turn://user1:passwd1@1.2.3.4?transport=udp", StunnerUri{"turn-udp", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turn://user1:passwd1@1.2.3.4:3478", StunnerUri{"turn-udp", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		// tcp
+		{"turn://user1:passwd1@1.2.3.4:3478?transport=tcp", StunnerUri{"turn-tcp", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turn://user1:passwd1@1.2.3.4?transport=tcp", StunnerUri{"turn-tcp", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		// tls - old style
+		{"turn://user1:passwd1@1.2.3.4:3478?transport=tls", StunnerUri{"turn-tls", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turn://user1:passwd1@1.2.3.4?transport=tls", StunnerUri{"turn-tls", "1.2.3.4", "user1", "passwd1", 443, nil}},
+		// tls - RFC style
+		{"turns://user1:passwd1@1.2.3.4:3478?transport=tcp", StunnerUri{"turn-tls", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turns://user1:passwd1@1.2.3.4?transport=tcp", StunnerUri{"turn-tls", "1.2.3.4", "user1", "passwd1", 443, nil}},
+		// dtls - old style
+		{"turn://user1:passwd1@1.2.3.4:3478?transport=dtls", StunnerUri{"turn-dtls", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turn://user1:passwd1@1.2.3.4?transport=dtls", StunnerUri{"turn-dtls", "1.2.3.4", "user1", "passwd1", 443, nil}},
+		// dtls - RFC style
+		{"turns://user1:passwd1@1.2.3.4:3478?transport=udp", StunnerUri{"turn-dtls", "1.2.3.4", "user1", "passwd1", 3478, nil}},
+		{"turns://user1:passwd1@1.2.3.4?transport=udp", StunnerUri{"turn-dtls", "1.2.3.4", "user1", "passwd1", 443, nil}},
+		// no cred
+		{"turn://1.2.3.4:3478?transport=udp", StunnerUri{"turn-udp", "1.2.3.4", "", "", 3478, nil}},
+		{"turn://1.2.3.4?transport=udp", StunnerUri{"turn-udp", "1.2.3.4", "", "", 3478, nil}},
+		{"turn://1.2.3.4", StunnerUri{"turn-udp", "1.2.3.4", "", "", 3478, nil}},
+	} {
+		testName := fmt.Sprintf("TestStunnerURIParser:%s", conf.uri)
+		t.Run(testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", testName)
+			u, err := ParseUri(conf.uri)
+			assert.NoError(t, err, "URI parser")
+			assert.Equal(t, strings.ToLower(conf.su.Protocol), strings.ToLower(u.Protocol), "uri protocol")
+			assert.Equal(t, conf.su.Address, u.Address, "uri address")
+			assert.Equal(t, conf.su.Username, u.Username, "uri username")
+			assert.Equal(t, conf.su.Password, u.Password, "uri password")
+			assert.Equal(t, conf.su.Port, u.Port, "uri port")
+		})
+	}
 }
 
 func checkDefaultConfig(t *testing.T, c *v1alpha1.StunnerConfig, proto string) {

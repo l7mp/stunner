@@ -51,9 +51,6 @@ func ParseUri(uri string) (*StunnerUri, error) {
 	}
 	s.Protocol = proto
 
-	port, _ := strconv.Atoi(u.Port())
-	s.Port = port
-
 	switch strings.ToLower(proto) {
 	case "udp", "udp4", "udp6", "dtls", "turn-udp", "turn-dtls":
 		a, err := net.ResolveUDPAddr("udp", s.Address+":"+u.Port())
@@ -83,46 +80,43 @@ func ParseUri(uri string) (*StunnerUri, error) {
 		return nil, fmt.Errorf("invalid protocol: %s", proto)
 	}
 
+	defaultPort := 3478
+	if strings.ToLower(proto) == "turn-tls" || strings.ToLower(proto) == "turn-dtls" {
+		defaultPort = 443
+	}
+
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		port = defaultPort
+	}
+	s.Port = port
+
 	return &s, nil
 }
 
-// GetUriFromListener returns a standard TURN URI from a listener config
-func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
-	proto, err := v1alpha1.NewListenerProtocol(req.Protocol)
+func (u *StunnerUri) String() string {
+	req := v1alpha1.ListenerConfig{
+		Protocol:   u.Protocol,
+		PublicAddr: u.Address,
+		PublicPort: u.Port,
+	}
+
+	uri, err := GetStandardURLFromListener(&req)
 	if err != nil {
-		return "", err
+		return ""
 	}
 
-	service, protocol := "", ""
-	switch proto {
-	case v1alpha1.ListenerProtocolTURNUDP:
-		service = "turn"
-		protocol = "udp"
-	case v1alpha1.ListenerProtocolTURNTCP:
-		service = "turn"
-		protocol = "tcp"
-	case v1alpha1.ListenerProtocolTURNDTLS:
-		service = "turns"
-		protocol = "udp"
-	case v1alpha1.ListenerProtocolTURNTLS:
-		service = "turns"
-		protocol = "tcp"
-	}
+	return uri
+}
 
-	addr := req.PublicAddr
-	if addr == "" {
-		// fallback to server addr
-		addr = req.Addr
-	}
+// GetUriFromListener returns a standard TURN URI as per RFC7065from a listener config.
+func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
+	return req.GetListenerURI(true)
+}
 
-	port := req.PublicPort
-	if port == 0 {
-		// fallback to server addr
-		port = req.Port
-	}
-
-	uri := fmt.Sprintf("%s:%s:%d?transport=%s", service, addr, port, protocol)
-	return uri, nil
+// GetStandardURLFromListener returns a standard URL (that can be parsed using net/url) from a listener config.
+func GetStandardURLFromListener(req *v1alpha1.ListenerConfig) (string, error) {
+	return req.GetListenerURI(false)
 }
 
 // GetUriFromListener returns a standard TURN URI from a listener config
@@ -160,13 +154,13 @@ func getStunnerProtoForURI(u *url.URL) (string, error) {
 	}
 
 	// using RFC7065 compatible URIs
-	if scheme == "turn" || proto == "udp" {
+	if scheme == "turn" && proto == "udp" {
 		return "TURN-UDP", nil
-	} else if scheme == "turn" || proto == "tcp" {
+	} else if scheme == "turn" && proto == "tcp" {
 		return "TURN-TCP", nil
-	} else if scheme == "turns" || proto == "udp" {
+	} else if scheme == "turns" && proto == "udp" {
 		return "TURN-DTLS", nil
-	} else if scheme == "turns" || proto == "tcp" {
+	} else if scheme == "turns" && proto == "tcp" {
 		return "TURN-TLS", nil
 	}
 

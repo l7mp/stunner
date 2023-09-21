@@ -114,16 +114,6 @@ func (req *ListenerConfig) String() string {
 		n = req.Name
 	}
 
-	pr, a, p := "udp", "-", "-"
-	if req.Protocol != "" {
-		pr = strings.ToLower(req.Protocol)
-	}
-	if req.Addr != "" {
-		a = req.Addr
-	}
-	if req.Port != 0 {
-		p = fmt.Sprintf("%d", req.Port)
-	}
 	min, max := 0, 65535
 	if req.MinRelayPort != 0 {
 		min = req.MinRelayPort
@@ -131,9 +121,10 @@ func (req *ListenerConfig) String() string {
 	if req.MaxRelayPort != 0 {
 		max = req.MaxRelayPort
 	}
-	status = append(status, fmt.Sprintf("%s://%s:%s<%d-%d>", pr, a, p, min, max))
+	uri, _ := req.GetListenerURI(false) //nolint:errcheck
+	status = append(status, fmt.Sprintf("%s<%d-%d>", uri, min, max))
 
-	a, p = "-", "-"
+	a, p := "-", "-"
 	if req.PublicAddr != "" {
 		a = req.PublicAddr
 	}
@@ -153,4 +144,48 @@ func (req *ListenerConfig) String() string {
 	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ",")))
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
+}
+
+// GetListenerURI is a helper that can output two types of Listener URIs: one with :// after the scheme or one with only : (as per RFC7065).
+func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
+	proto, err := NewListenerProtocol(req.Protocol)
+	if err != nil {
+		return "", err
+	}
+
+	service, protocol := "", ""
+	switch proto {
+	case ListenerProtocolTURNUDP:
+		service = "turn"
+		protocol = "udp"
+	case ListenerProtocolTURNTCP:
+		service = "turn"
+		protocol = "tcp"
+	case ListenerProtocolTURNDTLS:
+		service = "turns"
+		protocol = "udp"
+	case ListenerProtocolTURNTLS:
+		service = "turns"
+		protocol = "tcp"
+	}
+
+	addr := req.PublicAddr
+	if addr == "" {
+		// fallback to server addr
+		addr = req.Addr
+	}
+
+	port := req.PublicPort
+	if port == 0 {
+		// fallback to server addr
+		port = req.Port
+	}
+
+	var uri string
+	if rfc7065 {
+		uri = fmt.Sprintf("%s:%s:%d?transport=%s", service, addr, port, protocol)
+	} else {
+		uri = fmt.Sprintf("%s://%s:%d?transport=%s", service, addr, port, protocol)
+	}
+	return uri, nil
 }
