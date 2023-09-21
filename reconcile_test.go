@@ -87,7 +87,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -330,7 +330,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -416,7 +416,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -506,7 +506,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -592,7 +592,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -677,7 +677,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -766,7 +766,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -816,7 +816,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:         "default-listener",
-				Protocol:     "tcp",
+				Protocol:     "turn-tcp",
 				Addr:         "127.0.0.2",
 				Port:         12345,
 				MinRelayPort: 10,
@@ -842,7 +842,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 12345, "listener port ok")
 			assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -898,7 +898,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:         "newlistener",
-				Protocol:     "tcp",
+				Protocol:     "turn-tcp",
 				Addr:         "127.0.0.2",
 				Port:         1,
 				MinRelayPort: 10,
@@ -923,7 +923,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
 			assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -972,7 +972,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:         "newlistener",
-				Protocol:     "tls",
+				Protocol:     "turn-tls",
 				Addr:         "127.0.0.2",
 				Port:         1,
 				MinRelayPort: 10,
@@ -1007,7 +1007,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Routes: []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
-				Protocol:     "tcp",
+				Protocol:     "turn-tcp",
 				Addr:         "127.0.0.2",
 				Port:         1,
 				MinRelayPort: 10,
@@ -1028,7 +1028,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolUDP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, v1alpha1.DefaultPort, "listener port ok")
 			assert.Equal(t, l.MinPort, v1alpha1.DefaultMinRelayPort, "listener minport ok")
@@ -1063,7 +1063,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
 			assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -1104,13 +1104,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
-				Protocol: "DTLS",
+				Protocol: "TURN-DTLS",
 				Cert:     dummyCert64,
 				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
-				Protocol:     "tcp",
+				Protocol:     "turn-tcp",
 				Addr:         "127.0.0.2",
 				Port:         1,
 				MinRelayPort: 10,
@@ -1135,7 +1135,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolDTLS, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNDTLS, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
 			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
@@ -1172,7 +1172,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
 			assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -1213,13 +1213,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
-				Protocol: "TLS",
+				Protocol: "TURN-TLS",
 				Cert:     dummyCert64,
 				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
 				Name:         "newlistener",
-				Protocol:     "tcp",
+				Protocol:     "turn-tcp",
 				Addr:         "127.0.0.2",
 				Port:         1,
 				MinRelayPort: 10,
@@ -1244,7 +1244,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTLS, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTLS, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
 			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
@@ -1281,7 +1281,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTCP, "listener proto ok")
+			assert.Equal(t, l.Proto, v1alpha1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
 			assert.Equal(t, l.MinPort, 10, "listener minport ok")
@@ -1656,7 +1656,6 @@ func TestStunnerReconcile(t *testing.T) {
 			log.Debug("creating a stunnerd")
 			conf, err := NewDefaultConfig("turn://user:pass@127.0.0.1:3478")
 			assert.NoError(t, err, err)
-
 			conf.Admin.LogLevel = stunnerTestLoglevel
 
 			log.Debug("creating a stunnerd")
@@ -1826,7 +1825,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3480,
 				Routes: []string{
@@ -1856,7 +1855,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3480,
 				Routes: []string{
@@ -1891,7 +1890,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -1899,7 +1898,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3480,
 				Routes: []string{
@@ -1934,7 +1933,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -1942,7 +1941,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -1977,7 +1976,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -1985,7 +1984,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2020,7 +2019,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2028,7 +2027,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2064,7 +2063,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2072,7 +2071,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2108,7 +2107,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2116,7 +2115,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2152,7 +2151,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2160,7 +2159,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2195,7 +2194,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2204,7 +2203,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2243,7 +2242,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2252,7 +2251,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2286,7 +2285,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2295,7 +2294,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				},
 			}, {
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3479,
 				Routes: []string{
@@ -2334,7 +2333,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2373,7 +2372,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2414,7 +2413,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2450,7 +2449,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2485,7 +2484,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2522,7 +2521,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2557,7 +2556,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -2623,7 +2622,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
 					Name:     "default-listener",
-					Protocol: "udp",
+					Protocol: "turn-udp",
 					Addr:     "1.2.3.4",
 					Port:     3478,
 					Routes: []string{
@@ -2659,7 +2658,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
 					Name:     "default-listener",
-					Protocol: "tcp",
+					Protocol: "turn-tcp",
 					Addr:     "1.2.3.4",
 					Port:     3478,
 					Routes: []string{

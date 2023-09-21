@@ -47,18 +47,26 @@ func (a AuthType) String() string {
 type ListenerProtocol int
 
 const (
-	ListenerProtocolUDP ListenerProtocol = iota + 1
+	ListenerProtocolUnknown ListenerProtocol = iota
+	ListenerProtocolUDP
 	ListenerProtocolTCP
 	ListenerProtocolTLS
 	ListenerProtocolDTLS
-	ListenerProtocolUnknown
+	ListenerProtocolTURNUDP
+	ListenerProtocolTURNTCP
+	ListenerProtocolTURNTLS
+	ListenerProtocolTURNDTLS
 )
 
 const (
-	listenerProtocolUDPStr  = "UDP"
-	listenerProtocolTCPStr  = "TCP"
-	listenerProtocolTLSStr  = "TLS"
-	listenerProtocolDTLSStr = "DTLS"
+	listenerProtocolUDPStr      = "UDP"
+	listenerProtocolTCPStr      = "TCP"
+	listenerProtocolTLSStr      = "TLS"
+	listenerProtocolDTLSStr     = "DTLS"
+	listenerProtocolTURNUDPStr  = "TURN-UDP"
+	listenerProtocolTURNTCPStr  = "TURN-TCP"
+	listenerProtocolTURNTLSStr  = "TURN-TLS"
+	listenerProtocolTURNDTLSStr = "TURN-DTLS"
 )
 
 // NewListenerProtocol parses the protocol specification
@@ -72,6 +80,14 @@ func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 		return ListenerProtocolTLS, nil
 	case listenerProtocolDTLSStr:
 		return ListenerProtocolDTLS, nil
+	case listenerProtocolTURNUDPStr:
+		return ListenerProtocolTURNUDP, nil
+	case listenerProtocolTURNTCPStr:
+		return ListenerProtocolTURNTCP, nil
+	case listenerProtocolTURNTLSStr:
+		return ListenerProtocolTURNTLS, nil
+	case listenerProtocolTURNDTLSStr:
+		return ListenerProtocolTURNDTLS, nil
 	default:
 		return ListenerProtocol(ListenerProtocolUnknown),
 			fmt.Errorf("unknown listener protocol: \"%s\"", raw)
@@ -89,6 +105,14 @@ func (l ListenerProtocol) String() string {
 		return listenerProtocolTLSStr
 	case ListenerProtocolDTLS:
 		return listenerProtocolDTLSStr
+	case ListenerProtocolTURNUDP:
+		return listenerProtocolTURNUDPStr
+	case ListenerProtocolTURNTCP:
+		return listenerProtocolTURNTCPStr
+	case ListenerProtocolTURNTLS:
+		return listenerProtocolTURNTLSStr
+	case ListenerProtocolTURNDTLS:
+		return listenerProtocolTURNDTLSStr
 	default:
 		return "<unknown>"
 	}

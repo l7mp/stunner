@@ -62,7 +62,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
@@ -89,7 +89,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
@@ -119,7 +119,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
@@ -151,7 +151,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
@@ -183,7 +183,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},

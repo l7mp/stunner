@@ -3,6 +3,7 @@ package stunner
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ import (
 
 var turncatTestLoglevel string = "all:ERROR"
 
-//var turncatTestLoglevel string = "all:TRACE"
+// var turncatTestLoglevel string = "all:TRACE"
 
 var sharedSecret = "my-secret"
 var defaultDuration = "10m"
@@ -38,7 +39,7 @@ type turncatEchoTestConfig struct {
 	// client
 	lconn net.Conn
 	// peer
-	peer          *StunnerUri
+	peer          net.Addr
 	loggerFactory logging.LoggerFactory
 }
 
@@ -46,8 +47,7 @@ func turncatEchoTest(conf turncatEchoTestConfig) {
 	t := conf.t
 	log := conf.loggerFactory.NewLogger("test")
 
-	peerAddr := fmt.Sprintf("%s:%d", conf.peer.Address, conf.peer.Port)
-	echoConn, err := net.ListenPacket("udp4", peerAddr)
+	echoConn, err := net.ListenPacket(conf.peer.Network(), conf.peer.String())
 	assert.NoError(t, err, "cannot allocate echo server connection")
 
 	go func() {
@@ -115,7 +115,8 @@ func TestTurncatPlaintext(t *testing.T) {
 	err := stunner.Reconcile(v1alpha1.StunnerConfig{
 		ApiVersion: "v1alpha1",
 		Admin: v1alpha1.AdminConfig{
-			LogLevel: turncatTestLoglevel,
+			LogLevel:        turncatTestLoglevel,
+			MetricsEndpoint: "",
 		},
 		Auth: v1alpha1.AuthConfig{
 			Type: "plaintext",
@@ -126,13 +127,13 @@ func TestTurncatPlaintext(t *testing.T) {
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
 			Name:     "udp-listener-23478",
-			Protocol: "udp",
+			Protocol: "turn-udp",
 			Addr:     "127.0.0.1",
 			Port:     23478,
 			Routes:   []string{"allow-any"},
 		}, {
 			Name:     "tcp-listener-23478",
-			Protocol: "tcp",
+			Protocol: "turn-tcp",
 			Addr:     "127.0.0.1",
 			Port:     23478,
 			Routes:   []string{"allow-any"},
@@ -178,35 +179,32 @@ func TestTurncatPlaintext(t *testing.T) {
 	}
 
 	for _, c := range testTurncatConfigs {
-		listener, err := ParseUri(c.ListenerAddr)
+		listener, err := url.Parse(c.ListenerAddr)
 		assert.NoError(t, err, "cannot parse turncat listener URI")
 
 		server, err := ParseUri(c.ServerAddr)
 		assert.NoError(t, err, "cannot parse server URI")
 
 		testName := fmt.Sprintf("TestTurncat_NewTurncat_Plaintext_client:%s_server:%s",
-			listener.Protocol, server.Protocol)
+			listener.Scheme, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
-			peer, err := ParseUri(c.PeerAddr)
-			assert.NoError(t, err, "cannot parse peer URI")
 
 			log.Debug("creating turncat relay")
 			turncat, err := NewTurncat(&c)
 			assert.NoError(t, err, "cannot create turncat relay")
 
-			lconn, err := net.Dial(listener.Protocol,
-				fmt.Sprintf("%s:%d", listener.Address, listener.Port))
+			lconn, err := net.Dial(turncat.listenerAddr.Network(), turncat.listenerAddr.String())
 			assert.NoError(t, err, "cannot create client socket")
 
-			if strings.HasPrefix(listener.Protocol, "tcp") {
+			if strings.HasPrefix(turncat.listenerAddr.Network(), "tcp") {
 				// prevent "addess already in use" errors: close sends RST
 				assert.NoError(t, lconn.(*net.TCPConn).SetLinger(0),
 					"cannnot set TCP linger")
 			}
 
-			testConfig := turncatEchoTestConfig{t, stunner, lconn, peer, logger}
+			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logger}
 			turncatEchoTest(testConfig)
 
 			turncat.Close()
@@ -243,13 +241,13 @@ func TestTurncatLongterm(t *testing.T) {
 		},
 		Listeners: []v1alpha1.ListenerConfig{{
 			Name:     "udp-listener-23478",
-			Protocol: "udp",
+			Protocol: "turn-udp",
 			Addr:     "127.0.0.1",
 			Port:     23478,
 			Routes:   []string{"allow-any"},
 		}, {
 			Name:     "tcp-listener-23478",
-			Protocol: "tcp",
+			Protocol: "turn-tcp",
 			Addr:     "127.0.0.1",
 			Port:     23478,
 			Routes:   []string{"allow-any"},
@@ -295,35 +293,32 @@ func TestTurncatLongterm(t *testing.T) {
 	}
 
 	for _, c := range testTurncatConfigs {
-		listener, err := ParseUri(c.ListenerAddr)
+		listener, err := url.Parse(c.ListenerAddr)
 		assert.NoError(t, err, "cannot parse turncat listener URI")
 
 		server, err := ParseUri(c.ServerAddr)
 		assert.NoError(t, err, "cannot parse server URI")
 
 		testName := fmt.Sprintf("TestTurncat_NewTurncat_Longterm_client:%s_server:%s",
-			listener.Protocol, server.Protocol)
+			listener.Scheme, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
-			peer, err := ParseUri(c.PeerAddr)
-			assert.NoError(t, err, "cannot parse peer URI")
 
 			log.Debug("creating turncat relay")
 			turncat, err := NewTurncat(&c)
 			assert.NoError(t, err, "cannot create turncat relay")
 
-			lconn, err := net.Dial(listener.Protocol,
-				fmt.Sprintf("%s:%d", listener.Address, listener.Port))
+			lconn, err := net.Dial(turncat.listenerAddr.Network(), turncat.listenerAddr.String())
 			assert.NoError(t, err, "cannot create client socket")
 
-			if strings.HasPrefix(listener.Protocol, "tcp") {
+			if strings.HasPrefix(turncat.listenerAddr.Network(), "tcp") {
 				// prevent "addess already in use" errors: close sends RST
 				assert.NoError(t, lconn.(*net.TCPConn).SetLinger(0),
 					"cannnot set TCP linger")
 			}
 
-			testConfig := turncatEchoTestConfig{t, stunner, lconn, peer, logger}
+			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logger}
 			turncatEchoTest(testConfig)
 
 			turncat.Close()

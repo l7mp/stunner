@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -78,8 +79,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	log.Tracef("Resolving TURN server address: %s", config.ServerAddr)
 	server, sErr := ParseUri(config.ServerAddr)
 	if sErr != nil {
-		return nil, fmt.Errorf("error resolving server address %s: %s",
-			config.ServerAddr, sErr.Error())
+		return nil, fmt.Errorf("error resolving server address %s: %w", config.ServerAddr, sErr)
 	}
 	if server.Address == "" || server.Port == 0 {
 		return nil, fmt.Errorf("error resolving TURN server address %s: empty address (\"%s\") "+
@@ -87,26 +87,21 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	}
 
 	log.Tracef("Resolving listener address: %s", config.ListenerAddr)
-	listener, lErr := ParseUri(config.ListenerAddr)
+	listener, lErr := url.Parse(config.ListenerAddr)
 	if lErr != nil {
-		return nil, fmt.Errorf("error resolving listener address %s: %s",
-			config.ListenerAddr, lErr.Error())
+		return nil, fmt.Errorf("error parsing listener address %q: %w", config.ListenerAddr, lErr)
 	}
-	if listener.Port == 0 {
-		return nil, fmt.Errorf("error resolving listener address %s: invalid port (%d)",
-			config.ListenerAddr, listener.Port)
-	}
+	listenerProtocol := strings.ToLower(listener.Scheme)
 
 	log.Tracef("Resolving peer address: %s", config.PeerAddr)
-	peer, pErr := ParseUri(config.PeerAddr)
+	peer, pErr := url.Parse(config.PeerAddr)
 	if pErr != nil {
-		return nil, fmt.Errorf("error resolving peer address %s: %s",
-			config.PeerAddr, pErr.Error())
+		return nil, fmt.Errorf("error parsing peer address %q: %w", config.PeerAddr, pErr)
 	}
-	if peer.Address == "" || peer.Port == 0 || !strings.HasPrefix(peer.Protocol, "udp") {
-		return nil, fmt.Errorf("error resolving peer address %s: invalid protocol (\"%s\"), "+
-			"empty address (\"%s\") or invalid port (%d)", config.PeerAddr,
-			peer.Protocol, peer.Address, peer.Port)
+	// default to UDP
+	peerAddress, err := net.ResolveUDPAddr("udp", peer.Host)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving peer address %q: %w", config.PeerAddr, err)
 	}
 
 	if config.Realm == "" {
@@ -119,34 +114,45 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	var listenerConn interface{}
 	listenerConf := &net.ListenConfig{Control: reuseAddr}
 
-	switch listener.Protocol {
+	var listenerAddress net.Addr
+	switch listenerProtocol {
 	case "file":
 		listenerConn = util.NewFileConn(os.Stdin)
-	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
-		l, err := listenerConf.ListenPacket(context.Background(), listener.Addr.Network(),
-			listener.Addr.String())
+	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6", "turn-udp", "turn-dtls":
+		addr, err := net.ResolveUDPAddr("udp", listener.Host)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
+		}
+
+		l, err := listenerConf.ListenPacket(context.Background(), addr.Network(), addr.String())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create listening client packet socket at %s: %s",
 				config.ListenerAddr, err)
 		}
+		listenerAddress = addr
 		listenerConn = l
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
-		l, err := listenerConf.Listen(context.Background(), listener.Addr.Network(), listener.Addr.String())
+	case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "turn-tcp", "turn-tls":
+		addr, err := net.ResolveTCPAddr("tcp", listener.Host)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
+		}
+
+		l, err := listenerConf.Listen(context.Background(), addr.Network(), addr.String())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create listening client socket at %s: %s",
 				config.ListenerAddr, err)
 		}
+		listenerAddress = addr
 		listenerConn = l
 	default:
-		return nil, fmt.Errorf("unknown client protocol %s for client %s",
-			listener.Addr.Network(), config.ListenerAddr)
+		return nil, fmt.Errorf("unknown client protocol %s", listenerProtocol)
 	}
 
 	t := &Turncat{
-		listenerAddr:  listener.Addr,
+		listenerAddr:  listenerAddress,
 		serverAddr:    server.Addr,
 		serverProto:   server.Protocol,
-		peerAddr:      peer.Addr,
+		peerAddr:      peerAddress,
 		listenerConn:  listenerConn,
 		connTrack:     make(map[string]*connection),
 		lock:          new(sync.Mutex),
@@ -157,7 +163,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		log:           log,
 	}
 
-	switch t.listenerAddr.Network() {
+	switch listenerAddress.Network() {
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		// client connection is a packet conn, write our own Listen/Accept loop for UDP
 		// main loop: for every new packet we create a new connection and connect it back to the client
@@ -169,12 +175,14 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		// client connection is file
 		go t.runListenFile()
 	default:
-		t.log.Errorf("internal error: unknown client protocol %s for client %s:%s",
-			t.listenerAddr.Network(), t.listenerAddr.Network(), t.listenerAddr.String())
+		t.log.Errorf("internal error: unknown client protocol %q for client %s:%s",
+			listenerAddress.Network(), listenerAddress.Network(), listenerAddress.String())
 	}
 
-	log.Infof("Turncat client listening on %s, TURN server: %s, peer: %s",
-		config.ListenerAddr, config.ServerAddr, config.PeerAddr)
+	log.Infof("Turncat client listening on %s:%s, TURN server: %s, peer: %s:%s",
+		listenerAddress.Network(), listenerAddress.String(),
+		config.ServerAddr,
+		peerAddress.Network(), peerAddress.String())
 
 	return t, nil
 }
@@ -219,8 +227,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	conn.clientAddr = clientAddr
 	conn.clientConn = clientConn
 
-	t.log.Tracef("Setting up TURN client to server %s:%s",
-		t.serverAddr.Network(), t.serverAddr.String())
+	t.log.Tracef("Setting up TURN client to server %s:%s", t.serverAddr.Network(), t.serverAddr.String())
 
 	user, passwd, errAuth := t.authGen()
 	if errAuth != nil {
@@ -230,22 +237,22 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	// connection for the TURN client
 	var turnConn net.PacketConn
-	switch t.serverProto {
-	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
+	switch strings.ToLower(t.serverProto) {
+	case "turn-udp":
 		t, err := net.ListenPacket(t.serverAddr.Network(), "0.0.0.0:0")
 		if err != nil {
 			return nil, fmt.Errorf("cannot allocate TURN listening packet socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = t
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
+	case "turn-tcp":
 		c, err := net.Dial(t.serverAddr.Network(), t.serverAddr.String())
 		if err != nil {
 			return nil, fmt.Errorf("cannot allocate TURN socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(c)
-	case "tls":
+	case "turn-tls":
 		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 		// assert.NoError(t, err, "cannot create certificate for TLS client socket")
 		c, err := tls.Dial("tcp", t.serverAddr.String(), &tls.Config{
@@ -257,7 +264,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(c)
-	case "dtls":
+	case "turn-dtls":
 		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 		// assert.NoError(t, err, "cannot create certificate for DTLS client socket")
 		udpAddr, _ := net.ResolveUDPAddr("udp", t.serverAddr.String())
@@ -270,8 +277,8 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 		}
 		turnConn = turn.NewSTUNConn(conn)
 	default:
-		return nil, fmt.Errorf("unknown TURN server protocol %s for client %s:%s",
-			t.serverAddr.Network(), clientAddr.Network(), clientAddr.String())
+		return nil, fmt.Errorf("unknown TURN server protocol %q for client %s:%s",
+			t.serverProto, clientAddr.Network(), clientAddr.String())
 	}
 
 	turnClient, err := turn.NewClient(&turn.ClientConfig{
@@ -450,8 +457,7 @@ func (t *Turncat) runListenPacket() {
 			conn, err := t.newConnection(clientConn)
 			if err != nil {
 				t.lock.Unlock()
-				t.log.Warnf("relay setup failed for client %s, dropping client connection",
-					caddr)
+				t.log.Warnf("relay setup failed for client %s: %s", caddr, err.Error())
 				continue
 			}
 

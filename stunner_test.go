@@ -282,7 +282,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "udp",
-				Protocol:   "udp",
+				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -311,7 +311,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "udp",
-				Protocol:   "udp",
+				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -341,7 +341,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "tcp",
-				Protocol:   "tcp",
+				Protocol:   "turn-tcp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -370,7 +370,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "tcp",
-				Protocol:   "tcp",
+				Protocol:   "turn-tcp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -400,7 +400,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "tls",
-				Protocol:   "tls",
+				Protocol:   "turn-tls",
 				Addr:       "127.0.0.1",
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
@@ -431,7 +431,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "tls",
-				Protocol:   "tls",
+				Protocol:   "turn-tls",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -463,7 +463,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "dtls",
-				Protocol:   "dtls",
+				Protocol:   "turn-dtls",
 				Addr:       "127.0.0.1",
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
@@ -493,7 +493,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	// 	},
 	// 	Listeners: []v1alpha1.ListenerConfig{{
 	// 		Name:     "dtls",
-	// 		Protocol: "dtls",
+	// 		Protocol: "turn-dtls",
 	// 		Addr:     "127.0.0.1",
 	// 		Port:     23478,
 	// 		Routes:   []string{"allow-any"},
@@ -576,14 +576,14 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 			log.Debug("creating a client")
 			var lconn net.PacketConn
 			switch proto {
-			case "udp":
-				lconn, err = net.ListenPacket("udp4", "0.0.0.0:0")
+			case "turn-udp":
+				lconn, err = net.ListenPacket("udp", "0.0.0.0:0")
 				assert.NoError(t, err, "cannot create UDP client socket")
-			case "tcp":
+			case "turn-tcp":
 				conn, cErr := net.Dial("tcp", stunnerAddr)
 				assert.NoError(t, cErr, "cannot create TCP client socket")
 				lconn = turn.NewSTUNConn(conn)
-			case "tls":
+			case "turn-tls":
 				cer, err := tls.X509KeyPair(certPem, keyPem)
 				assert.NoError(t, err, "cannot create certificate for TLS client socket")
 				conn, err := tls.Dial("tcp", stunnerAddr, &tls.Config{
@@ -593,7 +593,7 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 				})
 				assert.NoError(t, err, "cannot create TLS client socket")
 				lconn = turn.NewSTUNConn(conn)
-			case "dtls":
+			case "turn-dtls":
 				cer, err := tls.X509KeyPair(certPem, keyPem)
 				assert.NoError(t, err, "cannot create certificate for DTLS client socket")
 				// for some reason dtls.Listen requires a UDPAddr and not an addr string
@@ -668,7 +668,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"echo-server-cluster"},
@@ -700,7 +700,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -733,7 +733,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -767,7 +767,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -801,7 +801,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -842,7 +842,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -883,7 +883,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -921,7 +921,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -958,7 +958,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -992,7 +992,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -1026,7 +1026,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{
@@ -1061,7 +1061,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes: []string{

@@ -72,7 +72,8 @@ func (req *ListenerConfig) Validate() error {
 		}
 	}
 
-	if proto == ListenerProtocolTLS || proto == ListenerProtocolDTLS {
+	if proto == ListenerProtocolTURNTLS || proto == ListenerProtocolTURNDTLS ||
+		proto == ListenerProtocolTLS || proto == ListenerProtocolDTLS {
 		if req.Cert == "" {
 			return fmt.Errorf("empty TLS cert for %s listener", proto.String())
 		}
@@ -115,7 +116,7 @@ func (req *ListenerConfig) String() string {
 
 	pr, a, p := "udp", "-", "-"
 	if req.Protocol != "" {
-		pr = req.Protocol
+		pr = strings.ToLower(req.Protocol)
 	}
 	if req.Addr != "" {
 		a = req.Addr

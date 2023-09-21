@@ -49,7 +49,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			// patch in the loglevel
 			c.Admin.LogLevel = stunnerTestLoglevel
 
-			checkDefaultConfig(t, c, "UDP")
+			checkDefaultConfig(t, c, "TURN-UDP")
 
 			// patch in the vnet
 			log.Debug("building virtual network")
@@ -104,7 +104,7 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	// patch in the loglevel
 	c.Admin.LogLevel = stunnerTestLoglevel
 
-	checkDefaultConfig(t, c, "UDP")
+	checkDefaultConfig(t, c, "TURN-UDP")
 
 	file, err2 := yaml.Marshal(c)
 	assert.NoError(t, err2, "marschal config fike")
@@ -190,7 +190,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// second read yields the real config
 	c2, ok = <-conf
 	assert.True(t, ok, "config emitted")
-	checkDefaultConfig(t, &c2, "UDP")
+	checkDefaultConfig(t, &c2, "TURN-UDP")
 
 	log.Debug("write a wrong config file (WatchConfig does not validate)")
 	c2.Listeners[0].Protocol = "dummy"
@@ -213,7 +213,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	checkDefaultConfig(t, &c3, "dummy")
 
 	log.Debug("update the config file and check")
-	c3.Listeners[0].Protocol = "TCP"
+	c3.Listeners[0].Protocol = "TURN-TCP"
 	y, err = yaml.Marshal(c3)
 	assert.NoError(t, err, "marshal config file")
 	err = f.Truncate(0)
@@ -228,7 +228,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 	// read back result
 	c4 := <-conf
-	checkDefaultConfig(t, &c4, "TCP")
+	checkDefaultConfig(t, &c4, "TURN-TCP")
 
 	stunner.Close()
 }

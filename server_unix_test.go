@@ -33,7 +33,7 @@ var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 			},
 			Listeners: []v1alpha1.ListenerConfig{{
 				Name:       "udp",
-				Protocol:   "udp",
+				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
@@ -127,7 +127,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	log.Debug("creating a turncat client")
 	stunnerURI := fmt.Sprintf("turn://127.0.0.1:23478?transport=%s", proto)
 	clientProto := "tcp"
-	if proto == "udp" || proto == "dtls" {
+	if proto == "turn-udp" || proto == "turn-dtls" {
 		clientProto = "udp"
 	}
 	testTurncatConfig := TurncatConfig{
@@ -196,7 +196,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 func BenchmarkUDPServer(b *testing.B) {
 	for i := 1; i <= 4; i++ {
 		b.Run(fmt.Sprintf("udp:thread_num=%d", i), func(b *testing.B) {
-			RunBenchmarkServer(b, "udp", i)
+			RunBenchmarkServer(b, "turn-udp", i)
 		})
 	}
 }
@@ -205,7 +205,7 @@ func BenchmarkUDPServer(b *testing.B) {
 // threads. Setup: `client --tcp--> turncat --tcp--> stunner --udp--> sink`
 func BenchmarkTCPServer(b *testing.B) {
 	b.Run("tcp", func(b *testing.B) {
-		RunBenchmarkServer(b, "tcp", 0)
+		RunBenchmarkServer(b, "turn-tcp", 0)
 	})
 }
 
@@ -213,7 +213,7 @@ func BenchmarkTCPServer(b *testing.B) {
 // threads. Setup: `client --tcp--> turncat --tls--> stunner --udp--> sink`
 func BenchmarkTLSServer(b *testing.B) {
 	b.Run("tls", func(b *testing.B) {
-		RunBenchmarkServer(b, "tls", 0)
+		RunBenchmarkServer(b, "turn-tls", 0)
 	})
 }
 
@@ -221,6 +221,6 @@ func BenchmarkTLSServer(b *testing.B) {
 // threads. Setup: `client --udp--> turncat --dtls--> stunner --udp--> sink`
 func BenchmarkDTLSServer(b *testing.B) {
 	b.Run("dtls", func(b *testing.B) {
-		RunBenchmarkServer(b, "dtls", 0)
+		RunBenchmarkServer(b, "turn-dtls", 0)
 	})
 }

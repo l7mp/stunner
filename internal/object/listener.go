@@ -138,7 +138,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	l.Addr = ipAddr
 	l.rawAddr = req.Addr
 	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
-	if proto == v1alpha1.ListenerProtocolTLS || proto == v1alpha1.ListenerProtocolDTLS {
+	if proto == v1alpha1.ListenerProtocolTURNTLS || proto == v1alpha1.ListenerProtocolTURNDTLS {
 		cert, err := base64.StdEncoding.DecodeString(req.Cert)
 		if err != nil {
 			return fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
@@ -204,7 +204,7 @@ func (l *Listener) Close() error {
 
 	for _, c := range l.Conns {
 		switch l.Proto {
-		case v1alpha1.ListenerProtocolUDP:
+		case v1alpha1.ListenerProtocolTURNUDP:
 			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
 
 			conn, ok := c.(turn.PacketConnConfig)
@@ -216,7 +216,7 @@ func (l *Listener) Close() error {
 			if err := conn.PacketConn.Close(); err != nil && !util.IsClosedErr(err) {
 				return err
 			}
-		case v1alpha1.ListenerProtocolTCP, v1alpha1.ListenerProtocolTLS, v1alpha1.ListenerProtocolDTLS:
+		case v1alpha1.ListenerProtocolTURNTCP, v1alpha1.ListenerProtocolTURNTLS, v1alpha1.ListenerProtocolTURNDTLS:
 			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
 
 			conn, ok := c.(turn.ListenerConfig)
