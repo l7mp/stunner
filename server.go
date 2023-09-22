@@ -22,10 +22,11 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
 
+	// listen on all IPs, relay to the listener address
 	relay := &telemetry.RelayAddressGenerator{
 		Name:         l.Name,
 		RelayAddress: l.Addr,
-		Address:      l.Addr.String(),
+		Address:      "0.0.0.0",
 		MinPort:      uint16(l.MinPort),
 		MaxPort:      uint16(l.MaxPort),
 		Net:          l.Net,
@@ -33,7 +34,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 	permissionHandler := s.NewPermissionHandler(l)
 
-	addr := fmt.Sprintf("%s:%d", l.Addr.String(), l.Port)
+	addr := fmt.Sprintf("0.0.0.0:%d", l.Port)
 
 	switch l.Proto {
 	case v1alpha1.ListenerProtocolTURNUDP:
@@ -115,7 +116,10 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		// for some reason dtls.Listen requires a UDPAddr and not an addr string
-		udpAddr := &net.UDPAddr{IP: l.Addr, Port: l.Port}
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to parse DTLS listener address %s: %s", addr, err)
+		}
 		dtlsListener, err := dtls.Listen("udp", udpAddr, &dtls.Config{
 			Certificates: []tls.Certificate{cer},
 			// ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,

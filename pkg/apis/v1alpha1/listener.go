@@ -121,8 +121,7 @@ func (req *ListenerConfig) String() string {
 	if req.MaxRelayPort != 0 {
 		max = req.MaxRelayPort
 	}
-	uri, _ := req.GetListenerURI(false) //nolint:errcheck
-	status = append(status, fmt.Sprintf("%s<%d-%d>", uri, min, max))
+	status = append(status, fmt.Sprintf("turn://0.0.0.0:%d<%d-%d>", req.Port, min, max))
 
 	a, p := "-", "-"
 	if req.PublicAddr != "" {

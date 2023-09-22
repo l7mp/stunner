@@ -2643,8 +2643,9 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 			echoResult:      true,
 		},
 		{
-			// tcp will fail on vnet: must rollback for the test to succeed
-			testName: "reconcile listener with a changed protocol",
+			// this will trigger an error at a later stage of reconciliation that the
+			// validation phase cannot catch and cause a rollback
+			testName: "reconcile listener with an invalid TLS cert/key",
 			config: v1alpha1.StunnerConfig{
 				ApiVersion: "v1alpha1",
 				Admin: v1alpha1.AdminConfig{
@@ -2658,9 +2659,11 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				},
 				Listeners: []v1alpha1.ListenerConfig{{
 					Name:     "default-listener",
-					Protocol: "turn-tcp",
+					Protocol: "turn-tls",
 					Addr:     "1.2.3.4",
 					Port:     3478,
+					Key:      "ZHVtbXkK", // base64: dummy
+					Cert:     "ZHVtbXkK", // base64: dummy
 					Routes: []string{
 						"echo-server-cluster",
 					},
