@@ -131,7 +131,8 @@ func main() {
 			os.Exit(0)
 
 		case <-sigterm:
-			log.Info("performing a graceful shutdown")
+			log.Infof("performing a graceful shutdown with %d active connections",
+				st.AllocationCount())
 			st.Shutdown()
 
 			if cancelConfigLoader != nil {
