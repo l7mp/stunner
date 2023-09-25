@@ -34,7 +34,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
@@ -47,7 +47,7 @@ spec:
   listeners:
     - name: tcp-listener
       port: 3478
-      protocol: TCP
+      protocol: TURN-TCP
 
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2

@@ -230,7 +230,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 ```
 
 For later convenience we also create a TCP Gateway that runs on port TCP:3478.
@@ -292,13 +292,13 @@ STUN/TURN password:             pass-1
 Listener 1
         Name:   udp-listener
         Listener:       udp-listener
-        Protocol:       UDP
+        Protocol:       TURN-UDP
         Public address: 34.118.82.225
         Public port:    3478
 Listener 2
         Name:   tcp-listener
         Listener:       tcp-listener
-        Protocol:       TCP
+        Protocol:       TURN-TCP
         Public address: 34.118.89.139
         Public port:    3478
 ```
@@ -310,7 +310,7 @@ STUNner. Learn the external IP address Kubernetes assigned to the LoadBalancer s
 application server.
 
 ``` console
-export WEBRTC_SERVER_IP=$(kubectl get service -n stunner webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export WEBRTC_SERVER_IP=$(kubectl get service webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 Then, open `https://${WEBRTC_SERVER_IP}:8443` in your browser, accept the self-signed TLS certificate,
