@@ -87,6 +87,10 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	}
 
 	log.Tracef("Resolving listener address: %s", config.ListenerAddr)
+	// special case the "-" client address
+	if config.ListenerAddr == "-" {
+		config.ListenerAddr = "file://stdin"
+	}
 	listener, lErr := url.Parse(config.ListenerAddr)
 	if lErr != nil {
 		return nil, fmt.Errorf("error parsing listener address %q: %w", config.ListenerAddr, lErr)
@@ -118,7 +122,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	switch listenerProtocol {
 	case "file":
 		listenerConn = util.NewFileConn(os.Stdin)
-	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6", "turn-udp", "turn-dtls":
+	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		addr, err := net.ResolveUDPAddr("udp", listener.Host)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
@@ -131,7 +135,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		}
 		listenerAddress = addr
 		listenerConn = l
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "turn-tcp", "turn-tls":
+	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
 		addr, err := net.ResolveTCPAddr("tcp", listener.Host)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
@@ -163,7 +167,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		log:           log,
 	}
 
-	switch listenerAddress.Network() {
+	switch listenerProtocol {
 	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
 		// client connection is a packet conn, write our own Listen/Accept loop for UDP
 		// main loop: for every new packet we create a new connection and connect it back to the client
@@ -179,9 +183,8 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 			listenerAddress.Network(), listenerAddress.Network(), listenerAddress.String())
 	}
 
-	log.Infof("Turncat client listening on %s:%s, TURN server: %s, peer: %s:%s",
-		listenerAddress.Network(), listenerAddress.String(),
-		config.ServerAddr,
+	log.Infof("Turncat client listening on %s, TURN server: %s, peer: %s:%s",
+		config.ListenerAddr, config.ServerAddr,
 		peerAddress.Network(), peerAddress.String())
 
 	return t, nil
