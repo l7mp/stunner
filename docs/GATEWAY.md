@@ -239,6 +239,48 @@ Below is a quick reference of the most important fields of the UDPRoute [`spec`]
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
+## StaticService
+
+When the target backend of a UDPRoute is running *inside* Kubernetes then the backend is always a proper Kubernetes Service. However, when the target is deployed *outside* Kubernetes then there is no Kubernetes Service that could be configured as a backend. This is particularly important when STUNner is used as a public TURN service. The StaticService resource provides a way to assign a routable IP address range to a UDPRoute for these cases.
+
+The below StaticService represents a hypothetical Kubernetes Service backing a set of pods with IP
+addresses in the range `192.0.2.0/24` or `198.51.100.0/24`.
+
+```yaml
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: StaticService
+metadata:
+  name: static-svc
+  namespace: stunner
+spec:
+  prefixes:
+    - "192.0.2.0/24"
+    - "198.51.100.0/24"
+```
+
+Assigning this StaticService to a UDPRoute will make sure allows access to *any* IP address in the specified ranges.
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: media-plane-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - group: stunner.l7mp.io
+          kind: StaticService
+          name: static-svc
+```
+
+The StaticService `spec.prefixes` must be a list of proper IPv4 prefixes: any IP address in any of the listed prefixes will be whitelisted. Use the single prefix `0.0.0.0/0` to provide wildcard access via an UDPRoute.
+
+> **Warning**  
+Never use StaticServices to access Services running *inside* Kubernetes, this may open up an unintended backdoor to your cluster. Use StaticServices only with *external* target backends.
+
 ## Status
 
 Most Kubernetes resources contain a `status` subresource that describes the current state of the resource, supplied and updated by the Kubernetes system and its components. The Kubernetes control plane continually and actively manages every object's actual state to match the desired state you supplied and updates the status field to indicate whether any error was encountered during the reconciliation process.

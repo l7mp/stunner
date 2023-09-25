@@ -144,16 +144,10 @@ spec:
         - namespace: media-plane
 ```
 
-To avoid potential misuse, STUNner disables open wildcard access to the entire cluster. (Note that
-in the [standalone mode](OBSOLETE.md) the user can still explicitly create an open `stunnerd`
-cluster, but this is discouraged).
+> **Note**  
+To avoid potential misuse, STUNner disables open wildcard access to the entire cluster unless explicitly requested to do so by a [specifying an open StaticService as a backend](GATEWAY.md#staticservice).
 
-For hardened deployments, it is possible to add a second level of isolation between STUNner and the
-rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will
-essentially implement a firewall, blocking all access from the source to the target workload except
-the services explicitly whitelisted by the user. The below example allows access from STUNner to
-*any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port
-range `[10000:20000]`, but nothing else.
+For hardened deployments, it is possible to add a second level of isolation between STUNner and the rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will essentially implement a firewall, blocking all access from the source to the target workload except the services explicitly whitelisted by the user. The below example allows access from STUNner to *any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port range `[10000:20000]`, but nothing else.
 
 ```yaml
 apiVersion: networking.k8s.io/v1
