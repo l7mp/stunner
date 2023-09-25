@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/test"
+	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 

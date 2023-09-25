@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/pion/dtls/v2"
-	"github.com/pion/turn/v2"
+	"github.com/pion/turn/v3"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/telemetry"

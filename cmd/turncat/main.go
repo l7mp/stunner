@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2"
+	"github.com/pion/turn/v3"
 	flag "github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v3"
 )
 
 type FileConnAddr struct {

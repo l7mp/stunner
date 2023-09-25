@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/test"
-	"github.com/pion/turn/v2"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/turn/v3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/pkg/logger"

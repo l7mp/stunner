@@ -13,11 +13,11 @@ import (
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v2"
-	"github.com/pion/transport/v2/stdnet"
-	"github.com/pion/transport/v2/test"
-	"github.com/pion/transport/v2/vnet"
-	"github.com/pion/turn/v2"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/stdnet"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/turn/v3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/resolver"

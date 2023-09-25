@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/dtls/v2"
 	"github.com/pion/logging"
-	"github.com/pion/turn/v2"
+	"github.com/pion/turn/v3"
 
 	"github.com/l7mp/stunner/internal/util"
 	"github.com/l7mp/stunner/pkg/apis/v1alpha1"

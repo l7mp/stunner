@@ -3,7 +3,7 @@
 package util
 
 import (
-	"github.com/pion/transport/v2"
+	"github.com/pion/transport/v3"
 )
 
 // NewPacketConnPool creates a new packet connection pool which is fixed to a single connection,

@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/pion/transport/v2"
-	"github.com/pion/transport/v2/stdnet"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/stdnet"
 )
 
 // unixPacketConPool implements socketpools for unix with full support for SO_REUSEPORT
