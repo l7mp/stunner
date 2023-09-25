@@ -5,8 +5,7 @@ STUNner is a *WebRTC media gateway for Kubernetes*. All words matter here: indee
 encapsulations, it is a *media gateway* so its job is to ingest WebRTC audio/video streams into a
 virtualized media plane, and it is *opinionated towards Kubernetes*, so everything around STUNner
 is designed and built to fit into the Kubernetes ecosystem. That being said, STUNner can easily be
-used outside of this context (e.g., as a regular STUN/TURN server), but these deployment options
-are not the main focus.
+used outside of this context (e.g., as a regular STUN/TURN server), but this is not the main focus.
 
 ## The problem
 
@@ -20,7 +19,7 @@ private IP address and the network dataplane applies several rounds of Network A
 (NAT) steps to ingest media traffic into this private pod network. Most cloud load-balancers apply
 a DNAT step to route packets to a node and then an SNAT step to put the packet to the private pod
 network, so that by the time a media packet reaches a pod essentially all header fields in the [IP
-5-tuple](https://www.techopedia.com/definition/28190/5-tuple) are modified, except the destination
+5-tuple](https://www.techopedia.com/definition/28190/5-tuple) are modified except the destination
 port. Then, if any pod sends the packet over to another pod via a Kubernetes service load-balancer
 then the packet will again undergo a DNAT step, and so on.
 
@@ -68,7 +67,7 @@ There are *lots* of reasons why this deployment model is less than ideal:
 
 - **It is a security nightmare.** Given today's operational reality, exposing a fleet of media
   servers to the Internet over a public IP address, and opening up all UDP ports for potentially
-  malicious access, is an adventurous undertaking, to say the least. Wouldn't it be nice to hide
+  malicious access, is an adventurous undertaking to say the least. Wouldn't it be nice to hide
   your media servers behind a secure perimeter defense mechanism and lock down *all* uncontrolled
   access and nefarious business by running it over a private IP?
 

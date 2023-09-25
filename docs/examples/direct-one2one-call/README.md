@@ -220,7 +220,7 @@ The most important component in the STUNner configuration is the TURN Gateway: t
 public TURN server on the UDP port 3478 through which clients will connect to each other.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: udp-gateway

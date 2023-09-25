@@ -65,7 +65,7 @@ that the UDPRoute specifies the `iperf-server` service as the `backendRef`, whic
 STUNner will forward the client connections received in any of the Gateways to the iperf server.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -75,10 +75,10 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: tcp-gateway
@@ -88,7 +88,7 @@ spec:
   listeners:
     - name: tcp-listener
       port: 3478
-      protocol: TCP
+      protocol: TURN-TCP
 
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2

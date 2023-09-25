@@ -71,7 +71,7 @@ prerequisites for this:
 2. the target service *must* be wrapped with a UDPRoute
 3. the attacker *must* know at least one pod address or the ClusterIP for the targeted service.
 
-Should any of these prerequisites miss, STUNner will block access to the target service.
+Should any of these prerequisites fail, STUNner will block access to the target service.
 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
@@ -90,7 +90,7 @@ spec:
 ```
 
 Repeat the above `dig` command to query the Kubernetes DNS service again and observe how the query
-times out. This demonstrates that a properly locked down STUNner installation blocks all accesses
+times out. This demonstrates that a properly locked down STUNner installation blocks all access
 outside of the backend services explicitly opened up via a UDPRoute.
 
 ## Locking down STUNner
@@ -102,7 +102,7 @@ services exposed via STUNner.
 STUNner's basic security model is as follows:
 
 > In a properly configured deployment, STUNner provides the same level of security as a media
-server pool exposed to the Internet over public IP addresses, protected by a firewall that admits
+server pool exposed to the Internet over a public IP address, protected by a firewall that admits
 only UDP access. A malicious attacker, even possessing a valid TURN credential, can reach only the
 media servers deployed behind STUNner, but no other services.
 
@@ -196,7 +196,4 @@ though: remember, none of these private IP addresses can be reached externally. 
 can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE
 mode](DEPLOYMENT.md#symmetric-ice-mode).
 
-Nevertheless, if worried about information exposure then STUNner may not be the best option at the
-moment. In later releases, we plan to implement a feature to obscure the transport relay connection
-addresses returned by STUNner, which would lock down external scanning attempts. Feel free to open
-an issue if you think this limitation is a blocker for you.
+Nevertheless, if worried about information exposure then STUNner may not be the best option at the moment. In later releases, we plan to implement a feature to obscure the relay transport addresses returned by STUNner. Please file an issue if you think this limitation is a blocker for your use case.

@@ -8,7 +8,7 @@ The main unit of the control plane configuration is the *gateway hierarchy*. Her
 
 ![Gateway hierarchy](img/gateway_api.svg)
 
-In general, the scope of a gateway hierarchy is a single namespace, but this is not strictly enforced: e.g., the GatewayClass is [cluster-scoped](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions) so it is outside the namespace, GatewayClasses can refer to GatewayConfigs across namespaces, Routes can attach to Gateways across a namespace boundary (if the Gateway allows this), etc. Still, it is a good practice to keep all control plane configuration, plus the actual dataplane pods, in a single namespace as much as possible.
+In general, the scope of a gateway hierarchy is a single namespace, but this is not strictly enforced: e.g., the GatewayClass is [cluster-scoped](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions) so it is outside the namespace, GatewayClasses can refer to GatewayConfigs across namespaces, Routes can attach to Gateways across a namespace boundary (if the Gateway [allows](https://gateway-api.sigs.k8s.io/guides/multiple-ns) this), etc. Still, it is a good practice to keep all control plane configuration, plus the actual dataplane pods, in a single namespace as much as possible.
 
 ## GatewayClass
 
@@ -17,7 +17,7 @@ The GatewayClass resource provides the root of the gateway hierarchy. GatewayCla
 Below is a sample GatewayClass resource. Each GatewayClass must specify a controller that will manage the Gateway objects created under the hierarchy; this must be set to `stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In addition, a GatewayClass can refer to further implementation-specific configuration via a `parametersRef`; in the case of STUNner this will always be a GatewayConfig object (see [below](#gatewayconfig)).
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
@@ -31,7 +31,7 @@ spec:
   description: "STUNner is a WebRTC ingress gateway for Kubernetes"
 ```
 
-Below is a quick reference of the most important fields of the GatewayClass [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects)
+Below is a quick reference of the most important fields of the GatewayClass [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects).
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
@@ -66,7 +66,7 @@ Below is a quick reference of the most important fields of the GatewayConfig [`s
 | :--- | :---: | :--- | :---: |
 | `stunnerConfig` | `string` | The name of the ConfigMap into which the operator renders the `stunnerd` running configuration. Default: `stunnerd-config`. | No |
 | `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
-| `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and `-`, and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
+| `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authRef` | `reference` | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`. | No |
 | `username` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
@@ -86,10 +86,10 @@ Except the TURN authentication realm, all GatewayConfig resources are safe for m
 
 Gateways describe the STUN/TURN server listeners exposed to clients.
 
-The below Gateway will configure STUNner to open a STUN/TURN listener on the UDP port 3478 and automatically expose it on a public IP address and port by creating a [LoadBalancer service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer). The name and namespace of the automatically provisioned service are the same as those of the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port changes).
+The below Gateway will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and automatically expose it on a public IP address and port by creating a [LoadBalancer service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer). The name and namespace of the automatically provisioned service are the same as those of the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port changes).
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -99,13 +99,13 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 ```
 
-The below more complex example defines two TURN listeners: a UDP listener at port 3478 that accepts routes from any namespace, and a TLS/TCP listener at port 443 that accepts routes from all namespaces labeled as `app:dev`.
+The below more complex example defines two TURN listeners: a TURN listener at the UDP:3478 port that accepts routes from any namespace, and a TURN listener at port TLS/TCP:443 that accepts routes from all namespaces labeled as `app:dev`.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: complex-gateway
@@ -121,13 +121,13 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
       allowedRoutes:
         namespaces:
           from: All
     - name: tls-listener
       port: 443
-      protocol: TLS
+      protocol: TURN-TLS
       tls:
         mode: Terminate
         certificateRefs:
@@ -151,37 +151,34 @@ Below is a quick reference of the most important fields of the Gateway [`spec`](
 | `addresses` | `list` | The list of manually hinted external IP addresses for the rendered service (only the first one is used). | No |
 
 Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a
-`tls` configuration is required for TLS and DTLS listeners.
+`tls` configuration is required for TURN-TLS and TURN-DTLS listeners.
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `name` | `string` | Name of the TURN listener. | Yes |
 | `port` | `int` | Network port for the TURN listener. | Yes |
-| `protocol` | `string` | Transport protocol for the TURN listener. Either UDP, TCP, TLS or DTLS. | Yes |
-| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TLS/DTLS) |
+| `protocol` | `string` | Transport protocol for the TURN listener. Either TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS. | Yes |
+| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TURN-TLS/TURN-DTLS) |
 | `allowedRoutes.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes), either `All`, `Selector`, or `Same` (default is `Same`) | No | 
 
-For TLS/DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key.
+For TURN-TLS/TURN-DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key.
 
-STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to
-clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be
-assigned a single externally reachable IP address. If you want multiple TURN listeners on different
-public IPs, create multiple Gateways. TURN listeners on UDP and DTLS protocols are exposed as UDP
-services, TCP and TLS listeners are exposed as TCP.
+STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN over UDP and TURN over DTLS listeners are exposed as UDP services, TURN-TCP and TURN-TLS listeners are exposed as TCP.
 
-Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway, will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+
+| Field   | Type     | Description                                                   | Required |
+|:--------|:--------:|:--------------------------------------------------------------|:--------:|
+| `type`  | `string` | Type of the address. Currently only `IPAddress` is supported. | Yes      |
+| `value` | `string` | Address that should be bound to the Gateway's service.        | Yes      |
+
 > **Warning**  
-Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated, thus will be ignored if the cloud-provider or your Kubernetes install does not support the feature. Also the `externalIPs` field is denied by some cloud-providers and will fail the resource creation. Be thorough when using this feature.
+Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if the cloud-provider or your Kubernetes install do not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
 
-| Field | Type | Description | Required |
-| :--- | :---: | :--- | :---: |
-| `type` | `string` | Type of the address. Currently we only support IPAddress. | Yes |
-| `value` | `string` | Address that should be bound to the Gateway's service. | Yes |
-
-Mixed multi-protocol Gateways are supported: this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. By default, the STUNner gateway-operator disables the use of mixed-protocol LBs for compatibility reasons. However, it can be enabled by annotating a Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair. The below Gateway will expose both ports with their respective protocols.
+Mixed multi-protocol Gateways are supported: this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. The below Gateway will expose both ports with their respective protocols.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: mixed-protocol-gateway
@@ -192,20 +189,20 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
     - name: tcp-listener
       port: 3479
-      protocol: TCP
+      protocol: TURN-TCP
 ```
 
 > **Warning**  
-> Note that the mixed-protocol LB feature might not be supported in your Kubernetes version.
+> Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature for compatibility reasons. You can re-enable mixed-protocol LBs by annotating your Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair.
 
-STUNner implements two ways to customize the automatically created Service, both involving setting certain [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to the Service. First, if any annotation is set in the GatewayConfig `loadBalancerServiceAnnotations` object then those will be copied verbatim into the Service. Note that `loadBalancerServiceAnnotations` affect *all* LoadBalancer Services created by STUNner. Second, Service annotations can be customized on a per-Gateway basis as well by adding the annotations to Gateway resources. STUNner then copies all annotations from the Gateway verbatim into the Service, overwriting the annotations specified in the GatewayConfig on conflict. This is useful to, e.g., specify health-check settings for the Kubernetes load-balancer controller. The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. Value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
+STUNner implements two ways to customize the automatically created Service, both involving adding certain [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to the Service. First, if any annotation is set in the GatewayConfig `loadBalancerServiceAnnotations` field then those will be copied verbatim into the Service. Note that `loadBalancerServiceAnnotations` affect *all* LoadBalancer Services created by STUNner under the current Gateway hierarchy. Second, Service annotations can be customized on a per-Gateway basis as well by adding the annotations to Gateway resources. STUNner then copies all annotations from the Gateway verbatim into the Service, overwriting the annotations specified in the GatewayConfig on conflict. This is useful to, e.g., specify health-check settings for the Kubernetes load-balancer controller. The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
 
 > **Warning**  
 Gateway resources are *not* safe for modification. This means that certain changes to a Gateway will restart the underlying TURN server listener, causing all active client sessions to terminate.  The particular rules are as follows:
-> - adding or removing a listener will start/stop *only* the TURN server to be started/stopped, without affecting the rest of the listeners;
+> - adding or removing a listener will start/stop *only* the TURN listener to be started/stopped, without affecting the rest of the listeners on the same Gateway;
 > - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
 > - changing the TURN authentication realm will restart *all* TURN listeners.
 

@@ -57,33 +57,32 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | :--- | :--- | :--- | :--- |
 | `stunner_listener_connections` | Number of *active* downstream connections at a listener. | gauge | `name=<listener-name>` |
 | `stunner_listener_connections_total` | Number of downstream connections at a listener. | counter | `name=<listener-name>` |
-| `stunner_listener_packets_total` | Number of datagrams sent or received at a listener. Unreliable for listeners running on a connection-oriented a protocol (TCP/TLS).  | counter | `direction=<rx\|tx>`, `name=<listener-name>`|
+| `stunner_listener_packets_total` | Number of datagrams sent or received at a listener. Unreliable for listeners running on a connection-oriented transport protocol (TCP/TLS).  | counter | `direction=<rx\|tx>`, `name=<listener-name>`|
 | `stunner_listener_bytes_total` | Number of bytes sent or received at a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 | `stunner_cluster_connections` | Number of *active* upstream connections on behalf of a listener. | gauge | `name=<listener-name>` |
 | `stunner_cluster_connections_total` | Number of upstream connections on behalf of a listener. | counter | `name=<listener-name>` |
-| `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends on behalf of a listener.  Unreliable for clusters running on a connection-oriented a protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<listener-name>` |
+| `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends on behalf of a listener.  Unreliable for clusters running on a connection-oriented transport  protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 | `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends on behalf of a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
 
 ## Integration with Prometheus and Grafana
 
-Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a ready-to-use Prometheus and Grafana stack. See [Installation](#installation) for installation steps. Metrics visualization requires user input on configuring the plots. Refer to [Configuration and Usage](#configuration-and-usage) for details.
+Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a way to [install](#installation) a ready-to-use Prometheus and Grafana stack. In addition, metrics visualization requires [user input](#configuration-and-usage) on configuring the plots; see below.
 
 ### Installation
 
 A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm repo. To use this chart, the installation steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana stack with helm.
 
-1. **Configure STUNner to expose the metrics**
+1. Install STUNner with Prometheus support:
 
-- Deploy STUNner with monitoring enabled to enable the monitoring port of STUNner pods
-```console
-helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
-```
+   ```console
+   helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
+   ```
 
-- [Expose the STUNner metrics-collection server in the GatewayConfig](#configuration)
+2. Configure STUNner to expose the metrics by [exposing the STUNner metrics-collection server in the GatewayConfig](#configuration).
 
-2. **Install the Prometheus+Grafana stack with a helm chart**
+3. Install the Prometheus+Grafana stack with a helm chart. 
 
-This helm chart creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: installs Prometheus along with the prometheus-operator, and Grafana; configures PodMonitor for monitoring STUNner pods, and sets up Prometheus as a datasource for Grafana.
+   The below creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: Prometheus, along with the prometheus-operator, is installed for metrics scarping, Grafana is set up for visualization, and the Prometheus is configured as a datasource for Grafana.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
@@ -91,7 +90,6 @@ helm repo update
 
 helm install prometheus stunner/stunner-prometheus
 ```
-
 
 ### Configuration and Usage
 
@@ -115,11 +113,11 @@ Click on *Add panel* (1), then *Add a new panel* (2):
 
 The *Add a new panel* will open the panel configuration. The configuration steps are the following.
 
-1. Set the datasource: **prometheus**
+1. Set the datasource: **prometheus**.
 2. Choose a metric. In this example, this is the `stunner_listener_connections`.
-3. Click on *Run queries* (this will update the figure)
+3. Click on *Run queries* (this will update the figure).
 4. Fine-tune plot parameters. For example, set the title.
-5. Click *Apply*
+5. Click *Apply*.
 
 ![Grafana Panel Configuration](img/grafana-add-panel-config_0.png)
 
@@ -128,7 +126,6 @@ The expected outcome is a new panel on the dashboard showing the `stunner_listen
 Below is an example dashboard with data collected from the [simple-tunnel](examples/simple-tunnel/README.md) example:
 
 ![Grafana Dashboard with the New Panel](img/grafana-add-panel-dashboard_1.png)
-
 
 ### Troubleshooting
 
@@ -141,8 +138,8 @@ The dashboard enables checking running Prometheus configuration and testing the 
 
 For example, to observe the `stunner_listener_connections` metric on the Prometheus dashboard:
 
-1. Write `stunner_listener_connections` to the marked field (next to the looking glass icon)
-2. Click on the `Execute` button
+1. Write `stunner_listener_connections` to the marked field (next to the looking glass icon).
+2. Click on the `Execute` button.
 3. Switch to `Graph` view tab.
 
 ![Prometheus Dashboard](img/prometheus-dashboard.png)

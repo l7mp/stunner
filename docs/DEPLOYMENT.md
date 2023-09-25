@@ -1,14 +1,14 @@
 # Deployment models
 
-STUNner can be deployed in many combinations to support a wide range of operational
+STUNner can be deployed in many different ways, supporting a wide range of operational
 requirements. First, it supports multiple [architectural models](#architectural-models) where it
 can act either as a simple headless STUN/TURN server or a fully fledged ingress gateway in front of
 an entire Kubernetes-based media server pool. Second, when STUNner is configured as an ingress
 gateway then there are multiple [ICE models](#ice-models), based on whether only the client
 connects via STUNner or both clients and media servers use STUNner to set up the media-plane
-connection. Third, STUNner can run in one of two [control plane models](#control-plane-models),
+connection. Third, STUNner can run in one of several [control plane models](#control-plane-models),
 based on whether the user manually supplies STUNner configuration or there is a separate STUNner
-control plane that automatically reconciles the dataplane state based on a high-level [declarative
+control plane that automatically reconciles the dataplane based on a high-level [declarative
 API](https://gateway-api.sigs.k8s.io).
 
 ## Architectural models
@@ -84,9 +84,8 @@ are as below:
 > - on the client, set STUNner as the *only* TURN server and configure *no* STUN servers, whereas
 > - on the server do *not* configure *any* STUN or TURN servers whatsoever.
 
-Most users will want to deploy STUNner using the asymmetric ICE mode. In the rest of the docs,
-unless noted otherwise we will assume the asymmetric ICE mode with the media plane deployment
-model.
+Most users will want to deploy STUNner using the asymmetric ICE mode. In the rest of the docs we
+assume the asymmetric ICE mode with the media plane deployment model, unless noted otherwise.
 
 > **Warning**  
 Deviating from the above rules *might* work in certain cases, but may have uncanny and
@@ -130,13 +129,18 @@ you from adopting STUNner.
 
 ## Control plane models
 
-STUNner can run in one of two modes: in the default mode STUNner configuration is controlled by a
-*gateway-operator* component based on high-level intent encoded in [Kubernetes Gateway API
-resources](https://gateway-api.sigs.k8s.io), while in the *standalone model* the user configures
-STUNner manually. The standalone mode provides perfect control over the way STUNner ingests media,
-but at the same time it requires users to deal with the subtleties of internal STUNner APIs that
-are subject to change between subsequent releases. As of v0.14, STUNner's operator-ful mode is
-feature complete and the standalone model is considered obsolete. If still interested,
-comprehensive documentation for the standalone can be found [here](OBSOLETE.md), but this mode
-is no longer supported.
+STUNner can run in one of several modes. 
 
+In the default mode STUNner configuration is controlled by a *gateway-operator* component based on
+high-level intent encoded in [Kubernetes Gateway API resources](https://gateway-api.sigs.k8s.io),
+while in the *standalone model* the user configures STUNner manually. The standalone mode provides
+perfect control over the way STUNner ingests media, but at the same time it requires users to deal
+with the subtleties of internal STUNner APIs that are subject to change between subsequent
+releases. As of v0.16, STUNner's operator-ful mode is feature complete and the standalone model is
+considered obsolete. If still interested, comprehensive documentation for the standalone can be
+found [here](OBSOLETE.md), but this mode is no longer supported.
+
+In addition, STUNner supports two dataplane provisioning modes. In the *legacy* mode the dataplane
+is supposed to be deployed by the user manually (by installing the `stunner/stunner` Helm chart
+into the target namespaces) while in the *managed* mode the dataplane pods are provisioned by the
+gateway operator automatically. As of STUNner v0.16.0, the default is the *legacy* dataplane mode.

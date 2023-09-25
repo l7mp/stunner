@@ -1,10 +1,6 @@
 # Authentication
 
-STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into the Kubernetes cluster,
-which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides
-comprehensive security. In particular, STUNner provides message integrity and, if configured with
-the TLS/TCP or DTLS/UDP listeners, complete confidentiality. To complete the CIA triad, this guide
-shows how to configure user authentication with STUNner.
+STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into the Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner.
 
 ## The long-term credential mechanism
 
@@ -47,7 +43,7 @@ The intended authentication workflow in STUNner is as follows.
    recent dataplane configuration. This makes sure that whenever you modify the STUNner Gateway API
    configuration (say, switch from `static` authentication to `ephemeral`), your clients will
    always receive an ICE config that reflects these changes (that is, the username/password pair
-   will provide a time-windowed credential).
+   will provide a time-windowed ephemeral credential).
    
    For instance, the below will query the STUnner auth service, which is by default available at
    the URL `http://stunner-auth.stunner-system:8088`, for a valid ICE config.
@@ -69,10 +65,10 @@ The intended authentication workflow in STUNner is as follows.
    }
    ```
 
-   Use the below to specify the lifetime of the generated credential to one hour (`ttl`, only makes sense when
-   STUNner uses `ephemeral` authentication credentials) for a user named `my-user`, and you want
-   the user to enter your cluster via the STUNner Gateway called `my-gateway` deployed into the
-   `my-namespace` namespace.
+   Use the below to generate a valid STUNner credential for a user called `my-user` with a lifetime
+   of one hour (`ttl`, only makes sense when STUNner uses `ephemeral` authentication
+   credentials). In addition, we select the Gateway called `my-gateway` deployed into the
+   `my-namespace` namespace on which we intend to receive WebRTC media from the user:
 
    ```console
    curl "http://stunner-auth.stunner-system:8088/ice?service=turn?ttl=3600&username=my-user&namespace=my-namespace&gateway=my-gateway"
@@ -88,7 +84,7 @@ The intended authentication workflow in STUNner is as follows.
    [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection)
    to use the above ICE server configuration in order to use STUNner as the default TURN service.
 
-   ```javascript
+   ```
    var iceConfig = <obtain ICE configuration sent by the application server>
    var pc = new RTCPeerConnection(iceConfig);
    ```
@@ -96,9 +92,10 @@ The intended authentication workflow in STUNner is as follows.
 ## Static authentication
 
 In STUNner, `static` authentication is the simplest and least secure authentication mode, basically
-corresponding to a traditional "log-in" username and password pair given to users. STUNner accepts
-(and sometimes reports) the alias `plaintext` to mean the `static` authentication mode; the use of
-`plaintext` is deprecated and will be removed in a later release.
+corresponding to a traditional "log-in" username and password pair given to users. 
+
+> **Note**  
+STUNner accepts (and sometimes reports) the alias `plaintext` to mean the `static` authentication mode; the use of `plaintext` is deprecated and will be removed in a later release.
 
 When STUNner is configured to use `static` authentication only a single username/password pair is
 used for *all* clients. This makes configuration easy; e.g., the ICE server configuration can be
@@ -109,7 +106,7 @@ credentials, see below).
 
 The first step of configuring STUNner for the `static` authentication mode is to create a
 Kubernetes Secret to hold the username/password pair. The below will set the username to `my-user`
-and the password to `my-password`. Note that if no `type` is set then STUNner defaults to `static`
+and the password to `my-password`. If no `type` is set then STUNner defaults to `static`
 authentication.
 
 ```console
@@ -146,9 +143,8 @@ kubectl -n stunner edit secret stunner-auth-secret
 
 > **Warning**  
 Modifying STUNner's credentials goes *without* restarting the TURN server but may affect existing
-sessions, in that existing sessions will not be able to refresh the active TURN allocation with the
-old credentials.  The application server may also need to be restarted to learn the new TURN
-credentials.
+sessions, in that active sessions will not be able to refresh the TURN allocation established with
+the old credentials.
 
 ## Ephemeral authentication
 
@@ -158,10 +154,12 @@ with a pre-configured lifetime and, once the lifetime expires, the credential ca
 authenticate (or refresh) with STUNner any more. This authentication mode is more secure since
 credentials are not shared between clients and come with a limited lifetime. Configuring
 `ephemeral` authentication may be more complex though, since credentials must be dynamically
-generated for each session and properly returned to clients. STUNner accepts (and sometimes
-reports) the alias `longterm` to mean the `ephemeral` authentication mode; the use of `longterm` is
-deprecated and will be removed in a later release. Note also that the alias `timewindowed` is also
-accepted.
+generated for each session and properly returned to clients. 
+
+> **Note**  
+STUNner accepts (and sometimes reports) the alias `longterm` to mean the `ephemeral` authentication
+mode; the use of `longterm` is deprecated and will be removed in a later release. The alias
+`timewindowed` is also accepted.
 
 To implement this mode, STUNner adopts the [quasi-standard time-windowed TURN authentication
 credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00). In this
@@ -178,8 +176,8 @@ The advantage of this mechanism is that it is enough to know the shared secret f
 able to check the validity of a credential. 
 
 > **Warning**  
-The user-id is used only for the integrity check but STUNner in no way checks whether it identifies
-a valid user-id in the system.
+The user-id is to ensure that the password generated per user-id is unique, but STUNner in no way
+checks whether it identifies a valid user-id in the system.
 
 In order to switch from `static` mode to `ephemeral` authentication, it is enough to update the
 Secret that holds the credentials. The below will set the shared secret `my-shared-secret` for the

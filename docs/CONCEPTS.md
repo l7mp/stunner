@@ -4,7 +4,7 @@ In this guide we describe STUNner's architecture and the most important componen
 
 ## Architecture
 
-A STUNner installation consists of two parts, a *control plane* and a *dataplane*. The control plane consists of declarative policies specifying the way STUNner should route WebRTC media traffic to the media servers, plus a gateway operator that renders the high-level policies into an actual dataplane configuration. The dataplane in turn comprises one or more `stunnerd` pods, responsible for actually ingesting media traffic into the cluster through a STUN/TURN server. Since the TURN service underlying STUNner is agnostic to NATs, STUNner can inject clients' media traffic into the private Kubernetes pod network, addressing all NAT traversal steps (client-side and server-side) in a single go.
+A STUNner installation consists of two parts, a *control plane* and a *dataplane*. The control plane consists of declarative policies specifying the way STUNner should route WebRTC media traffic to the media servers, plus a gateway operator that renders the high-level policies into an actual dataplane configuration. The dataplane in turn comprises one or more `stunnerd` pods, responsible for actually ingesting media traffic into the cluster through a STUN/TURN server. 
 
 ![STUNner architecture](img/stunner_arch_big.svg)
 

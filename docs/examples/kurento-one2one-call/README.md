@@ -345,7 +345,7 @@ STUNner. Learn the external IP address Kubernetes assigned to the LoadBalancer s
 application server.
 
 ``` console
-export WEBRTC_SERVER_IP=$(kubectl get service -n stunner webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export WEBRTC_SERVER_IP=$(kubectl get service webrtc-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 Then, open `https://${WEBRTC_SERVER_IP}:8443` in your browser, accept the self-signed TLS certificate,

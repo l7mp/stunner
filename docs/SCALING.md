@@ -65,7 +65,7 @@ connections. As usual, however, some caveats apply:
    even if active allocations would last longer. You can always set this by adjusting the
    `terminationGracePeriod` on your `stunnerd` pods.
 2. STUNner pods may remain alive well after the last client connection goes away. This occurs when
-   an TURN/UDP allocation is left open by a client (spontaneous UDP client-side connection closure
+   an TURN-UDP allocation is left open by a client (spontaneous UDP client-side connection closure
    cannot be reliably detected by the server). As the default TURN refresh lifetime is [10
    minutes](https://www.rfc-editor.org/rfc/rfc8656#section-3.2-3), it may take 10 minutes until all
    allocations time out, letting `stunnerd` to finally terminate.
