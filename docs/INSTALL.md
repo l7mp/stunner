@@ -73,3 +73,41 @@ it at your own risk: we do not promise any stability for STUNner installed from 
 helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
 helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
 ```
+
+## Managed mode
+
+From v0.16.0 STUNner provides a new way to provision dataplane pods that is called the *managed mode*. In the traditional operational model (called the *legacy mode*), the user was responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart [possibly multiple times](#parallel-deployments). In the managed mode the operator *automatically* provisions the necessary dataplanes by creating a separate `stunnerd` Deployment per each Gateway, plus the usual LoadBalancer service to expose it. This substantially simplifies operations and removes lot of manual and repetitive work.
+
+To install the gateway operator using the new manged mode, start with a clean Kubernetes cluster and install the `stunner-gateway-operator` Helm chart, setting the flag `stunnerGatewayOperator.dataplane.mode` to `managed`. Observe that we do not install the `stunner` Helm chart separately; the operator will readily create the `stunnerd` pods as needed.
+
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
+    --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=managed
+```
+
+The `stunnerd` pods created by the operator can be customized using the Dataplane CR: for instance you can specify the `stunnerd` container image version to be used as the dataplane, provision resources for each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec). All gateways will use the `default` Dataplane; you can override this by creating a new Dataplane CR and setting the name in the [`spec.dataplane` field](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator@v0.15.2/api/v1alpha1#GatewayConfigSpec) of the corresponding GatewayConfig.
+
+```console
+kubectl get dataplanes.stunner.l7mp.io default -o yaml
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: Dataplane
+metadata:
+  name: default
+spec:
+  args:
+  - -w
+  - --udp-thread-num=16
+  command:
+  - stunnerd
+  hostNetwork: false
+  image: l7mp/stunnerd:latest
+  imagePullPolicy: Always
+  resources:
+    limits:
+      cpu: 2
+      memory: 512Mi
+    requests:
+      cpu: 500m
+      memory: 128Mi
+  terminationGracePeriodSeconds: 3600
+```
