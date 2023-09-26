@@ -169,7 +169,7 @@ This will make sure that LiveKit is started with STUNner as the STUN/TURN server
 
 ``` console
 cd stunner
-cmd/stunnerctl/stunnerctl running-config default/stunnerd-config
+cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
 STUN/TURN authentication type:  plaintext
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
