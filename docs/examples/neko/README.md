@@ -39,7 +39,7 @@ kubectl apply -f stunner.yaml
 ```
 
 > **Warning**
-> In case of [managed mode](/docs/INSTALL.md#managed-mode), update the `neko-plane` UDPRoute by replacing `stunner` in backendRefs with the generated deployment, e.g., `udp-gateway`.
+> In case of [managed mode](/docs/INSTALL.md), update the `neko-plane` UDPRoute by replacing `stunner` in backendRefs with the generated deployment, e.g., `udp-gateway`.
 
 This will expose STUNner on a public IP on UDP port 3478. A Kubernetes `LoadBalancer` assigns an
 ephemeral public IP address to the service, so first we need to learn the external IP.
