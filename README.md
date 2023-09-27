@@ -56,7 +56,7 @@ modification to your existing WebRTC codebase.  STUNner implements the standard 
 API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
 style via Kubernetes manifests.
 
-See the full documentation [here](https://docs.l7mp.io/en/latest).
+See the full documentation [here](https://docs.l7mp.io).
 
 ## Table of Contents
 1. [Description](#description)
@@ -594,7 +594,8 @@ applications into Kubernetes.
 
 ## Documentation
 
-See the full documentation [here](/docs/README.md).
+The documentation of the stable release can be found [here](https://docs.l7mp.io). The
+documentation for the latest development release can be found [here](/docs/README.md).
 
 ## Caveats
 
