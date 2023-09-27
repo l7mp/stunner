@@ -1,0 +1,91 @@
+name: Run End-to-End Test [legacy] (dev)
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 11 * * 1'
+
+jobs:
+  e2e_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Download modules
+        run: go mod download
+      - name: Go install
+        run: go install
+      - name: Build turncat
+        run: CGO_ENABLED=0 go build -ldflags="-w -s" -o turncat cmd/turncat/main.go
+
+      - name: Start minikube
+        uses: medyagh/setup-minikube@master
+        with:
+          driver: docker
+          container-runtime: containerd
+          wait: all
+          cache: false
+
+      - name: Start minikube tunnel
+        run: minikube tunnel &>mktunnel.log &
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.11.3
+
+      - name: Install STUNner
+        run: |
+          helm repo add stunner https://l7mp.io/stunner
+          helm repo update
+          helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner
+          helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
+
+      - name: Deploy iperf server
+        run: kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml
+
+      - name: Configure STUNner
+        run: |
+          kubectl apply -f docs/examples/simple-tunnel/iperf-stunner.yaml
+          sleep 75
+
+      - name: Install iperf client
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install iperf
+
+      - name: Wait for LoadBalancer IP
+        run: |
+          while [[ -z $(kubectl get svc udp-gateway -n stunner -o jsonpath="{.status.loadBalancer.ingress[0].ip}") ]]; do echo "Waiting for LoadBalancer IP"; sleep 2; done
+          kubectl get all -A
+
+      - name: Start turncat
+        run: |
+          ./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>turncat.log &
+          sleep 1
+
+      - name: Run iperf client
+        run: |
+          iperf -c 127.0.0.1 -p 5000 -u -l 100 -b 5M -t 5 | tee iperf.log
+
+      - name: Show logs
+        run: |
+          echo "* IPERF"
+          echo "** Client"
+          cat iperf.log
+          echo "** Server"
+          kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}')
+          echo "* MINIKUBE TUNNEL"
+          cat mktunnel.log
+          echo "* TURNCAT"
+          cat turncat.log
+          echo "* STUNNER"
+          kubectl logs -n stunner $(kubectl get pods -n stunner -l app=stunner -o jsonpath='{.items[0].metadata.name}')
+
+      - name: Check iperf conectivity
+        run: grep "Server Report" iperf.log
