@@ -1,4 +1,4 @@
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
@@ -24,7 +24,7 @@ spec:
   password: "pass-1"
 
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -34,7 +34,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -48,4 +48,6 @@ spec:
   rules:
     - backendRefs:
         - name: neko-udp
+          namespace: default
+        - name: stunner
           namespace: default

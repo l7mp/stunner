@@ -9,7 +9,7 @@ However, integrating Neko into Kubernetes is far from trivial.
 In this demo you will learn the following steps to:
 
 - integrate a typical WebRTC application server to be used with STUNner,
-- deploy the Neko into Kubernetes behind STUNner,
+- deploy Neko into Kubernetes behind STUNner,
 
 ## Installation
 
@@ -19,9 +19,7 @@ Consult the [STUNner installation and configuration guide](../../INSTALL.md) to 
 
 ### Quick installation
 
-The simplest way to deploy the demo is to clone the [STUNner git
-repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](neko.yaml) packaged with STUNner.
+The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](neko.yaml) packaged with STUNner.
 
 Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
 
@@ -34,31 +32,34 @@ helm install stunner stunner/stunner
 
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
-```
+```console
 git clone https://github.com/l7mp/stunner
 cd stunner/docs/examples/neko
 kubectl apply -f stunner.yaml
 ```
 
+> **Warning**
+> In case of [managed mode](../../INSTALL.md#managed-mode), update the `neko-plane` UDPRoute by replacing `stunner` in backendRefs with the generated deployment, e.g., `udp-gateway`.
+
 This will expose STUNner on a public IP on UDP port 3478. A Kubernetes `LoadBalancer` assigns an
 ephemeral public IP address to the service, so first we need to learn the external IP.
 
-```
+```console
 kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 STUNNERIP=$(kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
-NOTE: this IP should be accessible from your browser. If that "public IP" is behind a NAT, you can overwrite it with the actual
-public IP that routes to the service by hand (e.g. `STUNNERIP=<your public IP>`).
+> **Note**
+> This IP should be accessible from your browser. If that "public IP" is behind a NAT, you can overwrite it with the actual public IP that routes to the service by hand (e.g. `STUNNERIP=<your public IP>`).
 
 We need to give this public IP the Neko configuration in the `NEKO_ICESERVERS` environment variable, inside the `json` content (basically this will tell you browser to use STUNner as a STUN/TURN server).
 You can do that by hand, or by this fancy `sed` command:
-```
+```console
 sed -i "s/1.1.1.1/$STUNNERIP/g" neko.yaml
 ```
 
 Now apply the Neko manifests:
-```
+```console
 kubectl apply -f neko.yaml
 kubectl get pods
 ```
