@@ -51,22 +51,7 @@ jobs:
       - name: Configure STUNner
         run: |
           kubectl apply -f docs/examples/simple-tunnel/iperf-stunner.yaml
-          sleep 5
-          echo "apiVersion: stunner.l7mp.io/v1alpha1" > dataplane.yaml
-          echo "kind: Dataplane" >> dataplane.yaml
-          echo "metadata:" >> dataplane.yaml
-          echo "  name: default" >> dataplane.yaml
-          echo "spec:" >> dataplane.yaml
-          echo "  image: l7mp/stunnerd:dev" >> dataplane.yaml
-          echo "  command:" >> dataplane.yaml
-          echo "    - stunnerd" >> dataplane.yaml
-          echo "  args:" >> dataplane.yaml
-          echo "    - -w" >> dataplane.yaml
-          echo "    - --udp-thread-num=16" >> dataplane.yaml
-          cat dataplane.yaml
-          kubectl apply -f dataplane.yaml
-          rm dataplane.yaml
-          sleep 35
+          sleep 75
 
       - name: Install iperf client
         run: |
