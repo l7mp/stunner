@@ -209,3 +209,11 @@ In case you changed something additionally in the STUNner configuration during d
   - `iceServerUser` is the username used for authentication in STUNner
   - `iceServerPass` is the credential used for authentication in STUNner
 
+
+## Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
+
+## Acknowledgments
+
+This demo is adopted from [damhau/mediasoup-demo-docker](https://github.com/damhau/mediasoup-demo-docker). Huge thanks to @damhau for the great demo!
