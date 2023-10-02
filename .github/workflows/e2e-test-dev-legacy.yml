@@ -65,13 +65,13 @@ jobs:
           for n in {1..60}; do [[ ! -z $(kubectl get svc udp-gateway -n stunner -o jsonpath="{.status.loadBalancer.ingress[0].ip}") ]] && break; echo "Waiting for LoadBalancer IP"; sleep 2; done
           echo "* wait for the deployment"
           kubectl get all -A
-          kubectl wait -n stunner --for=condition=Available deployment udp-gateway --timeout 5m
+          kubectl wait -n stunner --for=condition=Available deployment stunner --timeout 5m
           echo "* EVERYTHING UP"
           kubectl get all -A
 
       - name: Start turncat
         run: |
-          ./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>turncat.log &
+          ./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>turncat.log &
           sleep 1
 
       - name: Run iperf client
