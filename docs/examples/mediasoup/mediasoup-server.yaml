@@ -1,0 +1,111 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: mediasoup-server
+  name: mediasoup-server
+  namespace: mediasoup
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mediasoup-server
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mediasoup-server
+    spec:
+      containers:
+      - env:
+        - name: PROTOO_LISTEN_PORT
+          value: "443"
+        - name: MEDIASOUP_ANNOUNCED_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        image: l7mp/mediasoup-demo-docker:latest
+        imagePullPolicy: IfNotPresent
+        name: mediasoup-server
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mediasoup-server
+  namespace: mediasoup
+spec:
+  ports:
+  - name: https-443
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector:
+    app.kubernetes.io/name: mediasoup-server
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$arg_roomId"
+  name: mediasoup-server
+  namespace: mediasoup
+spec:
+  rules:
+  - host: mediasoup-ingressserviceip.nip.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: mediasoup-server
+            port:
+              number: 443
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - mediasoup-ingressserviceip.nip.io
+    secretName: mediasoup-demo-tls
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  generation: 1
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: info@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-secret-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
