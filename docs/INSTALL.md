@@ -94,14 +94,14 @@ kind: Dataplane
 metadata:
   name: default
 spec:
+  image: l7mp/stunnerd:latest
+  imagePullPolicy: Always
+  command:
+  - stunnerd
   args:
   - -w
   - --udp-thread-num=16
-  command:
-  - stunnerd
   hostNetwork: false
-  image: l7mp/stunnerd:latest
-  imagePullPolicy: Always
   resources:
     limits:
       cpu: 2
