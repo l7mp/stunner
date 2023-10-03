@@ -582,6 +582,11 @@ applications into Kubernetes.
   STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
   connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
+* [Video-conferencing with mediasoup](/docs/examples/mediasoup/README.md): This tutorial helps you deploy
+  the [mediasoup](https://mediasoup.org/) WebRTC media server behind STUNner. The docs also show how to
+  obtain a valid TLS certificate to secure your signaling connections, courtesy of the
+  [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
+  Encrypt](https://letsencrypt.org).
 * [Cloud-gaming with Cloudretro](/docs/examples/cloudretro/README.md): This tutorial lets you play Super
   Mario or Street Fighter in your browser, courtesy of the amazing
   [CloudRetro](https://cloudretro.io) project and, of course, STUNner. The demo also presents a
