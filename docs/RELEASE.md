@@ -4,6 +4,8 @@ Let the new version be vX.Y.Z.
 
 ## STUNner
 
+- remove the doc disclaimers ("this doc is for the dev version, see RTD for stable docs") from the
+  README.md and docs/README.md
 - write release notes for vX.Y.Z
 - `git pull`
 - `go mod tidy`
