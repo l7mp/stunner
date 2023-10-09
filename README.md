@@ -32,7 +32,7 @@
     <img src="https://img.shields.io/coveralls/github/l7mp/stunner" /></a>
 </p>
 
-*Note: The below documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io).*
+*Note: The below documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
 
 # STUNner: A Kubernetes media gateway for WebRTC
 
@@ -57,8 +57,6 @@ running in Kubernetes, maintaining full browser compatibility and requiring mini
 modification to your existing WebRTC codebase.  STUNner implements the standard [Kubernetes Gateway
 API](https://gateway-api.sigs.k8s.io) so you can configure it in the familiar YAML-engineering
 style via Kubernetes manifests.
-
-See the full documentation [here](https://docs.l7mp.io).
 
 ## Table of Contents
 1. [Description](#description)
@@ -601,7 +599,7 @@ applications into Kubernetes.
 
 ## Documentation
 
-The documentation of the stable release can be found [here](https://docs.l7mp.io). The
+The documentation of the stable release can be found [here](https://docs.l7mp.io/en/stable). The
 documentation for the latest development release can be found [here](/docs/README.md).
 
 ## Caveats
