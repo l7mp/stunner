@@ -9,7 +9,7 @@ theme:
   name: readthedocs
   highlightjs: true
 nav:
-- 'README.md'
+- 'STUNner documentation': 'README.md'
 - 'Why STUNner': 'WHY.md'
 - 'Deployment models': 'DEPLOYMENT.md'
 - 'Concepts': 'CONCEPTS.md'
