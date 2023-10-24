@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run tests
-        uses: ./.github/workflows/test.yml
+        uses: ./.github/workflows/test
 
   push_to_registry:
     name: Push Docker image to DockerHub
