@@ -50,6 +50,18 @@ metadata:
   name: stunner-gateway-operator-manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
   - configmaps
@@ -70,9 +82,11 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - endpoints
-  - nodes
-  - secrets
+  - deployments/finalizers
+  - deployments/status
+  - endpoints/status
+  - nodes/status
+  - services/status
   verbs:
   - get
   - list
@@ -80,11 +94,14 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - endpoints/status
-  - nodes/status
-  - services/status
+  - endpoints
+  - namespaces
+  - nodes
+  - secrets
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:
@@ -121,7 +138,9 @@ rules:
 - apiGroups:
   - stunner.l7mp.io
   resources:
+  - dataplanes
   - gatewayconfigs
+  - staticservices
   verbs:
   - get
   - list
@@ -131,7 +150,9 @@ rules:
 - apiGroups:
   - stunner.l7mp.io
   resources:
+  - dataplanes/finalizers
   - gatewayconfigs/finalizers
+  - staticservices/finalizers
   verbs:
   - update
 ---
@@ -306,10 +327,12 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: stunner-auth-server
-          image: l7mp/stunner-auth-server:dev
+          image: "l7mp/stunner-auth-server:0.16.0"
           imagePullPolicy: Always
           command: [ "./manager" ]
-          args: ["-zap-log-level","10", "-port", "8088"]
+          args:
+          -  --zap-log-level=10
+          -  --port=8088
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -334,6 +357,10 @@ spec:
             requests:
               cpu: 10m
               memory: 64Mi
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        []
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -366,34 +393,53 @@ spec:
         - containerPort: 8443
           name: https
           protocol: TCP
+        - containerPort: 13478
+          name: cds
+          protocol: TCP
         resources:
           limits:
-            cpu: 500m
-            memory: 128Mi
+            cpu: 1000m
+            memory: 256Mi
           requests:
-            cpu: 5m
-            memory: 64Mi
+            cpu: 250m
+            memory: 128Mi
       - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=127.0.0.1:8080
-        - --leader-elect
+        -  --health-probe-bind-address=:8081
+        -  --metrics-bind-address=127.0.0.1:8080
+        -  --leader-elect
+        -  --zap-log-level=info
+        -  --dataplane-mode=legacy
         command:
         - /manager
-        image: "l7mp/stunner-gateway-operator:0.15.0"
+        env:
+        - name: STUNNER_GATEWAY_OPERATOR_ADDRESS
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        image: "l7mp/stunner-gateway-operator:0.16.0"
         imagePullPolicy: IfNotPresent
         livenessProbe:
+          failureThreshold: 3
           httpGet:
             path: /healthz
             port: 8081
+            scheme: HTTP
           initialDelaySeconds: 15
           periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
         name: manager
         readinessProbe:
+          failureThreshold: 3
           httpGet:
             path: /readyz
             port: 8081
+            scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
         resources:
           limits:
             cpu: 1000m
@@ -406,6 +452,7 @@ spec:
       securityContext:
         runAsNonRoot: true
       serviceAccountName: stunner-gateway-operator-controller-manager
+      serviceAccount: stunner-gateway-operator-controller-manager
       terminationGracePeriodSeconds: 10
       nodeSelector:
         kubernetes.io/os: linux
