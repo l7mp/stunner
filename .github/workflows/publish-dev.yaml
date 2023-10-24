@@ -14,19 +14,7 @@ on:
 jobs:
   run_tests:
     name: Run tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Download modules
-        run: go mod download
-      - name: Go install
-        run: go install
-      - name: Test
-        run: go test -v -covermode=count
+    use: l7mp/stunner/.github/workflows/test.yml@main
 
   push_to_registry:
     name: Push Docker image to DockerHub
