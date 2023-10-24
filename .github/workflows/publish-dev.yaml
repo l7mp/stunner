@@ -14,7 +14,7 @@ on:
 jobs:
   run_tests:
     name: Run tests
-    use: l7mp/stunner/.github/workflows/test.yml@main
+    uses: l7mp/stunner/.github/workflows/test.yml@main
 
   push_to_registry:
     name: Push Docker image to DockerHub
