@@ -26,4 +26,4 @@ jobs:
       - name: Run linters
         uses: golangci/golangci-lint-action@v3
         with:
-          args: --timeout 3m --issues-exit-code=0
+          args: --timeout 5m
