@@ -12,8 +12,19 @@ on:
       - 'main'
 
 jobs:
+  run_tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: ./.github/workflows/test.yml
+
   push_to_registry:
     name: Push Docker image to DockerHub
+    needs: run_tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,7 +60,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   push_chart:
-    name: Push helm charts to the
+    name: Push helm charts to the repo
+    needs: push_to_registry
     runs-on: ubuntu-latest
     steps:
       - name: Triggering release workflow in the stunner-helm repo

@@ -6,8 +6,19 @@ on:
       - 'v[0-9]+.[0-9]+.0'
 
 jobs:
+  run_tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: ./.github/workflows/test.yml
+
   push_to_registry:
     name: Push Docker image to DockerHub
+    needs: run_tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -45,9 +56,9 @@ jobs:
 
   push_chart:
     name: Push charts to the web
+    needs: push_to_registry
     runs-on: ubuntu-latest
     steps:
-
       - name: Get version
         id: vars
         run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
