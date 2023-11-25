@@ -327,6 +327,7 @@ var loggerTests = []loggerTestCase{
 	},
 }
 
+//nolint:golint,unused
 func (lf *LoggerFactory) len() int {
 	b, ok := lf.Writer.(*bytes.Buffer)
 	if !ok {
@@ -345,6 +346,7 @@ func (lf *LoggerFactory) lenr() int {
 	return l
 }
 
+//nolint:golint,unused
 func (lf *LoggerFactory) reset() {
 	b, ok := lf.Writer.(*bytes.Buffer)
 	if !ok {
