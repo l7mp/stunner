@@ -168,8 +168,8 @@ func main() {
 				if e, ok := err.(v1alpha1.ErrRestarted); ok {
 					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
-					log.Errorf("could not reconcile new configuration: %s, "+
-						"rolling back to last running config", err.Error())
+					log.Errorf("could not reconcile new configuration "+
+						"(running configuration unchanged): %s", err.Error())
 				}
 			}
 		}
