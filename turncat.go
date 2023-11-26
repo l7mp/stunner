@@ -15,7 +15,7 @@ import (
 	"github.com/pion/turn/v3"
 
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 const UDP_PACKET_SIZE = 1500
@@ -109,7 +109,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	}
 
 	if config.Realm == "" {
-		config.Realm = v1alpha1.DefaultRealm
+		config.Realm = stnrv1.DefaultRealm
 	}
 
 	// a global listener connection for the local tunnel endpoint

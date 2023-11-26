@@ -1,5 +1,5 @@
-// Package v1alpha1 is the v1alpha1 version of the STUNner API.
-package v1alpha1
+// Package v1 is the v1 version of the STUNner API.
+package v1
 
 // Config is the main interface for STUNner configuration objects
 type Config interface {

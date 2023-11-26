@@ -13,13 +13,13 @@ import (
 	"github.com/pion/turn/v3"
 
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Listener implements a STUNner listener.
 type Listener struct {
 	Name, Realm            string
-	Proto                  v1alpha1.ListenerProtocol
+	Proto                  stnrv1.ListenerProtocol
 	Addr                   net.IP
 	Port, MinPort, MaxPort int
 	rawAddr                string // net.IP.String() may rewrite the string representation
@@ -34,10 +34,10 @@ type Listener struct {
 }
 
 // NewListener creates a new listener. Requires a server restart (returns ErrRestartRequired)
-func NewListener(conf v1alpha1.Config, net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) (Object, error) {
-	req, ok := conf.(*v1alpha1.ListenerConfig)
+func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) (Object, error) {
+	req, ok := conf.(*stnrv1.ListenerConfig)
 	if !ok {
-		return nil, v1alpha1.ErrInvalidConf
+		return nil, stnrv1.ErrInvalidConf
 	}
 
 	// make sure req.Name is correct
@@ -65,20 +65,20 @@ func NewListener(conf v1alpha1.Config, net transport.Net, realmHandler RealmHand
 
 // Inspect examines whether a configuration change requires a reconciliation (returns true if it
 // does) or restart (returns ErrRestartRequired).
-func (l *Listener) Inspect(old, new, full v1alpha1.Config) (bool, error) {
-	req, ok := new.(*v1alpha1.ListenerConfig)
+func (l *Listener) Inspect(old, new, full stnrv1.Config) (bool, error) {
+	req, ok := new.(*stnrv1.ListenerConfig)
 	if !ok {
-		return false, v1alpha1.ErrInvalidConf
+		return false, stnrv1.ErrInvalidConf
 	}
 
-	stunnerConf, ok := full.(*v1alpha1.StunnerConfig)
+	stunnerConf, ok := full.(*stnrv1.StunnerConfig)
 	if !ok {
-		return false, v1alpha1.ErrInvalidConf
+		return false, stnrv1.ErrInvalidConf
 	}
 
 	changed := !old.DeepEqual(req)
 
-	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
+	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
 	cert, err := base64.StdEncoding.DecodeString(req.Cert)
 	if err != nil {
 		return false, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
@@ -112,10 +112,10 @@ func (l *Listener) Inspect(old, new, full v1alpha1.Config) (bool, error) {
 }
 
 // Reconcile updates a listener.
-func (l *Listener) Reconcile(conf v1alpha1.Config) error {
-	req, ok := conf.(*v1alpha1.ListenerConfig)
+func (l *Listener) Reconcile(conf stnrv1.Config) error {
+	req, ok := conf.(*stnrv1.ListenerConfig)
 	if !ok {
-		return v1alpha1.ErrInvalidConf
+		return stnrv1.ErrInvalidConf
 	}
 
 	l.log.Tracef("Reconcile: %s", req.String())
@@ -124,7 +124,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 		return err
 	}
 
-	proto, _ := v1alpha1.NewListenerProtocol(req.Protocol)
+	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
 	ipAddr := net.ParseIP(req.Addr)
 	// special-case "localhost"
 	if ipAddr == nil && req.Addr == "localhost" {
@@ -138,7 +138,7 @@ func (l *Listener) Reconcile(conf v1alpha1.Config) error {
 	l.Addr = ipAddr
 	l.rawAddr = req.Addr
 	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
-	if proto == v1alpha1.ListenerProtocolTURNTLS || proto == v1alpha1.ListenerProtocolTURNDTLS {
+	if proto == stnrv1.ListenerProtocolTURNTLS || proto == stnrv1.ListenerProtocolTURNDTLS {
 		cert, err := base64.StdEncoding.DecodeString(req.Cert)
 		if err != nil {
 			return fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
@@ -176,11 +176,11 @@ func (l *Listener) ObjectType() string {
 }
 
 // GetConfig returns the configuration of the running listener.
-func (l *Listener) GetConfig() v1alpha1.Config {
+func (l *Listener) GetConfig() stnrv1.Config {
 	// must be sorted!
 	sort.Strings(l.Routes)
 
-	c := &v1alpha1.ListenerConfig{
+	c := &stnrv1.ListenerConfig{
 		Name:         l.Name,
 		Protocol:     l.Proto.String(),
 		Addr:         l.rawAddr,
@@ -204,7 +204,7 @@ func (l *Listener) Close() error {
 
 	for _, c := range l.Conns {
 		switch l.Proto {
-		case v1alpha1.ListenerProtocolTURNUDP:
+		case stnrv1.ListenerProtocolTURNUDP:
 			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
 
 			conn, ok := c.(turn.PacketConnConfig)
@@ -216,7 +216,7 @@ func (l *Listener) Close() error {
 			if err := conn.PacketConn.Close(); err != nil && !util.IsClosedErr(err) {
 				return err
 			}
-		case v1alpha1.ListenerProtocolTURNTCP, v1alpha1.ListenerProtocolTURNTLS, v1alpha1.ListenerProtocolTURNDTLS:
+		case stnrv1.ListenerProtocolTURNTCP, stnrv1.ListenerProtocolTURNTLS, stnrv1.ListenerProtocolTURNDTLS:
 			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
 
 			conn, ok := c.(turn.ListenerConfig)
@@ -263,7 +263,7 @@ func NewListenerFactory(net transport.Net, realmHandler RealmHandler, logger log
 
 // New can produce a new Listener object from the given configuration. A nil config will create an
 // empty listener object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *ListenerFactory) New(conf v1alpha1.Config) (Object, error) {
+func (f *ListenerFactory) New(conf stnrv1.Config) (Object, error) {
 	if conf == nil {
 		return &Listener{}, nil
 	}

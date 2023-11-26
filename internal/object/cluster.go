@@ -10,14 +10,14 @@ import (
 
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Listener implements a STUNner cluster
 type Cluster struct {
 	Name      string
-	Type      v1alpha1.ClusterType
-	Protocol  v1alpha1.ClusterProtocol
+	Type      stnrv1.ClusterType
+	Protocol  stnrv1.ClusterProtocol
 	Endpoints []net.IPNet
 	Domains   []string
 	Resolver  resolver.DnsResolver // for strict DNS
@@ -26,10 +26,10 @@ type Cluster struct {
 }
 
 // NewCluster creates a new cluster.
-func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
-	req, ok := conf.(*v1alpha1.ClusterConfig)
+func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
+	req, ok := conf.(*stnrv1.ClusterConfig)
 	if !ok {
-		return nil, v1alpha1.ErrInvalidConf
+		return nil, stnrv1.ErrInvalidConf
 	}
 
 	// make sure req.Name is correct
@@ -46,7 +46,7 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logg
 		log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
 	}
 
-	c.log.Tracef("NewCluster: %sv", req.String())
+	c.log.Tracef("NewCluster: %s", req.String())
 
 	if err := c.Reconcile(req); err != nil && err != ErrRestartRequired {
 		return nil, err
@@ -57,15 +57,15 @@ func NewCluster(conf v1alpha1.Config, resolver resolver.DnsResolver, logger logg
 
 // Inspect examines whether a configuration change requires a reconciliation (returns true if it
 // does) or restart (returns ErrRestartRequired).
-func (c *Cluster) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+func (c *Cluster) Inspect(old, new, full stnrv1.Config) (bool, error) {
 	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration.
-func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
-	req, ok := conf.(*v1alpha1.ClusterConfig)
+func (c *Cluster) Reconcile(conf stnrv1.Config) error {
+	req, ok := conf.(*stnrv1.ClusterConfig)
 	if !ok {
-		return v1alpha1.ErrInvalidConf
+		return stnrv1.ErrInvalidConf
 	}
 
 	if err := req.Validate(); err != nil {
@@ -73,11 +73,11 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 	}
 
 	c.log.Tracef("Reconcile: %s", req.String())
-	c.Type, _ = v1alpha1.NewClusterType(req.Type)
-	c.Protocol, _ = v1alpha1.NewClusterProtocol(req.Protocol)
+	c.Type, _ = stnrv1.NewClusterType(req.Type)
+	c.Protocol, _ = stnrv1.NewClusterProtocol(req.Protocol)
 
 	switch c.Type {
-	case v1alpha1.ClusterTypeStatic:
+	case stnrv1.ClusterTypeStatic:
 		// remove existing endpoints and start anew
 		c.Endpoints = c.Endpoints[:0]
 		for _, e := range req.Endpoints {
@@ -111,7 +111,7 @@ func (c *Cluster) Reconcile(conf v1alpha1.Config) error {
 
 			c.Endpoints = append(c.Endpoints, *n2)
 		}
-	case v1alpha1.ClusterTypeStrictDNS:
+	case stnrv1.ClusterTypeStrictDNS:
 		if c.Resolver == nil {
 			return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
 		}
@@ -145,21 +145,21 @@ func (c *Cluster) ObjectType() string {
 }
 
 // GetConfig returns the configuration of the running cluster.
-func (c *Cluster) GetConfig() v1alpha1.Config {
-	conf := v1alpha1.ClusterConfig{
+func (c *Cluster) GetConfig() stnrv1.Config {
+	conf := stnrv1.ClusterConfig{
 		Name:     c.Name,
 		Protocol: c.Protocol.String(),
 		Type:     c.Type.String(),
 	}
 
 	switch c.Type {
-	case v1alpha1.ClusterTypeStatic:
+	case stnrv1.ClusterTypeStatic:
 		conf.Endpoints = make([]string, len(c.Endpoints))
 		for i, e := range c.Endpoints {
 			// e.String() adds a /32 at the end of IPs, remove
 			conf.Endpoints[i] = strings.TrimRight(e.String(), "/32")
 		}
-	case v1alpha1.ClusterTypeStrictDNS:
+	case stnrv1.ClusterTypeStrictDNS:
 		conf.Endpoints = make([]string, len(c.Domains))
 		copy(conf.Endpoints, c.Domains)
 		conf.Endpoints = sort.StringSlice(conf.Endpoints)
@@ -173,9 +173,9 @@ func (c *Cluster) Close() error {
 	c.log.Trace("closing cluster")
 
 	switch c.Type {
-	case v1alpha1.ClusterTypeStatic:
+	case stnrv1.ClusterTypeStatic:
 		// do nothing
-	case v1alpha1.ClusterTypeStrictDNS:
+	case stnrv1.ClusterTypeStrictDNS:
 		for _, d := range c.Domains {
 			c.Resolver.Unregister(d)
 		}
@@ -190,7 +190,7 @@ func (c *Cluster) Route(peer net.IP) bool {
 		peer.String())
 
 	switch c.Type {
-	case v1alpha1.ClusterTypeStatic:
+	case stnrv1.ClusterTypeStatic:
 		// endpoints are IPNets
 		for _, e := range c.Endpoints {
 			c.log.Tracef("considering endpoint %q", e)
@@ -199,7 +199,7 @@ func (c *Cluster) Route(peer net.IP) bool {
 			}
 		}
 
-	case v1alpha1.ClusterTypeStrictDNS:
+	case stnrv1.ClusterTypeStrictDNS:
 		// endpoints are obtained from the DNS
 		c.log.Tracef("running STRICT_DNS cluster with domains: [%s]", strings.Join(c.Domains, ", "))
 
@@ -237,7 +237,7 @@ func NewClusterFactory(resolver resolver.DnsResolver, logger logging.LoggerFacto
 
 // New can produce a new Cluster object from the given configuration. A nil config will create an
 // empty cluster object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *ClusterFactory) New(conf v1alpha1.Config) (Object, error) {
+func (f *ClusterFactory) New(conf stnrv1.Config) (Object, error) {
 	if conf == nil {
 		return &Cluster{}, nil
 	}

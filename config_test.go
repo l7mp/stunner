@@ -2,18 +2,21 @@ package stunner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/yaml"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -110,7 +113,7 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	file, err2 := yaml.Marshal(c)
 	assert.NoError(t, err2, "marschal config fike")
 
-	newConf := &v1alpha1.StunnerConfig{}
+	newConf := &stnrv1.StunnerConfig{}
 	err = yaml.Unmarshal(file, newConf)
 	assert.NoError(t, err, "unmarschal config from file")
 
@@ -136,7 +139,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	log.Debug("creating a temp file for config")
 	f, err := os.CreateTemp("", "stunner_conf_*.yaml")
 	assert.NoError(t, err, "creating temp config file")
-	// we just need the filename for now so we remove the fle first
+	// we just need the filename for now so we remove the file first
 	file := f.Name()
 	assert.NoError(t, os.Remove(file), "removing temp config file")
 
@@ -144,12 +147,13 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
 
 	log.Debug("starting watcher")
-	conf := make(chan v1alpha1.StunnerConfig, 1)
+	conf := make(chan stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	err = stunner.WatchConfig(ctx, file, conf)
 	assert.NoError(t, err, "creating config watcher")
 
@@ -180,8 +184,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	// wait a bit so that the watcher has time to react
-	time.Sleep(50 * time.Millisecond)
+	// // wait a bit so that the watcher has time to react
+	// time.Sleep(50 * time.Millisecond)
 
 	// first read should yield a zeroconfig
 	c2, ok := <-conf
@@ -194,6 +198,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	checkDefaultConfig(t, &c2, "TURN-UDP")
 
 	log.Debug("write a wrong config file (WatchConfig does not validate)")
+
 	c2.Listeners[0].Protocol = "dummy"
 	y, err = yaml.Marshal(c2)
 	assert.NoError(t, err, "marshal config file")
@@ -206,9 +211,6 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 	// this makes sure that we do not share anything with ConfigWatch
 	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
-
-	// wait a bit so that the watcher has time to react
-	time.Sleep(50 * time.Millisecond)
 
 	c3 := <-conf
 	checkDefaultConfig(t, &c3, "dummy")
@@ -224,12 +226,242 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	// wait a bit so that the watcher has time to react
-	time.Sleep(50 * time.Millisecond)
-
-	// read back result
 	c4 := <-conf
 	checkDefaultConfig(t, &c4, "TURN-TCP")
+
+	stunner.Close()
+}
+
+const (
+	testConfigV1   = `{"version":"v1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"static","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
+	testConfigV1A1 = `{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
+)
+
+// test with v1alpha1 and v1
+func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test-watcher")
+
+	testName := "TestStunnerConfigFileWatcher"
+	log.Debugf("-------------- Running test: %s -------------", testName)
+
+	log.Debug("creating a temp file for config")
+	f, err := os.CreateTemp("", "stunner_conf_*.yaml")
+	assert.NoError(t, err, "creating temp config file")
+	// we just need the filename for now so we remove the file first
+	file := f.Name()
+	assert.NoError(t, os.Remove(file), "removing temp config file")
+
+	log.Debug("creating a stunnerd")
+	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+
+	log.Debug("starting watcher")
+	conf := make(chan stnrv1.StunnerConfig, 1)
+	defer close(conf)
+
+	log.Debug("init watcher with nonexistent config file")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err = stunner.WatchConfig(ctx, file, conf)
+	assert.NoError(t, err, "creating config watcher")
+
+	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
+	time.Sleep(50 * time.Millisecond)
+
+	log.Debug("write v1 config and check")
+
+	// recreate the temp file and write config
+	f, err = os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
+	assert.NoError(t, err, "recreate temp config file")
+	defer os.Remove(file)
+
+	err = f.Truncate(0)
+	assert.NoError(t, err, "truncate temp file")
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err, "seek temp file")
+	_, err = f.WriteString(testConfigV1)
+	assert.NoError(t, err, "write config to temp file")
+
+	// first read should yield a zeroconfig
+	c2, ok := <-conf
+	assert.True(t, ok, "zeroconfig emitted")
+	checkZeroConfig(t, &c2, stunner.GetId())
+
+	// second read yields the real config
+	c2, ok = <-conf
+	assert.True(t, ok, "config emitted")
+
+	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
+	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
+	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
+	assert.Len(t, c2.Listeners, 1, "listeners len")
+	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
+	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
+	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
+	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
+	assert.Len(t, c2.Clusters, 1, "clusters len")
+	assert.Equal(t, "echo-server-cluster", c2.Clusters[0].Name, "cluster name")
+	assert.Equal(t, "STATIC", c2.Clusters[0].Type, "cluster proto")
+	assert.Len(t, c2.Clusters[0].Endpoints, 1, "endpoints len")
+	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
+
+	err = f.Truncate(0)
+	assert.NoError(t, err, "truncate temp file")
+	_, err = f.Seek(0, 0)
+	assert.NoError(t, err, "seek temp file")
+	_, err = f.WriteString(testConfigV1A1)
+	assert.NoError(t, err, "write config to temp file")
+
+	c2, ok = <-conf
+	assert.True(t, ok, "config emitted")
+
+	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
+	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
+	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
+	assert.Len(t, c2.Listeners, 1, "listeners len")
+	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
+	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
+	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
+	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
+	assert.Len(t, c2.Clusters, 1, "clusters len")
+	assert.Equal(t, "echo-server-cluster", c2.Clusters[0].Name, "cluster name")
+	assert.Equal(t, "STATIC", c2.Clusters[0].Type, "cluster proto")
+	assert.Len(t, c2.Clusters[0].Endpoints, 1, "endpoints len")
+	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
+
+	stunner.Close()
+}
+
+func TestStunnerConfigPollerMultiVersion(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test-poller")
+
+	testName := "TestStunnerConfigPoller"
+	log.Debugf("-------------- Running test: %s -------------", testName)
+
+	log.Debug("creating a mock CDS server")
+	addr := "localhost:13478"
+	origin := "ws://" + addr
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := &http.Server{Addr: addr}
+	defer s.Close()
+
+	http.HandleFunc("/api/v1/config/watch",
+		func(w http.ResponseWriter, req *http.Request) {
+			upgrader := websocket.Upgrader{
+				ReadBufferSize:  1024,
+				WriteBufferSize: 1024,
+			}
+
+			conn, err := upgrader.Upgrade(w, req, nil)
+			assert.NoError(t, err, "upgrade HTTP connection")
+			defer func() { _ = conn.Close() }()
+
+			// for the pong handler: conn.Close() will kill this
+			go func() {
+				for {
+					_, _, err := conn.ReadMessage()
+					if err != nil {
+						return
+					}
+				}
+			}()
+
+			conn.SetPingHandler(func(string) error {
+				return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
+			})
+
+			// send initial config
+			z := cdsclient.ZeroConfig("tester")
+			j, err := json.Marshal(z)
+			assert.NoError(t, err, "json marshal zeroconfig")
+			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, j), "write zeroconfig")
+
+			// send v1config
+			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, []byte(testConfigV1)), "write config v1")
+
+			// send v1config
+			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, []byte(testConfigV1A1)), "write config v1alpha1")
+
+			select {
+			case <-ctx.Done():
+			case <-req.Context().Done():
+			}
+
+			conn.Close()
+		})
+
+	// serve
+	go func() {
+		_ = s.ListenAndServe()
+	}()
+
+	// wait a bit so that the server has time to setup
+	time.Sleep(50 * time.Millisecond)
+
+	log.Debug("creating a stunnerd")
+	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+
+	log.Debug("starting watcher")
+	conf := make(chan stnrv1.StunnerConfig, 1)
+	defer close(conf)
+
+	log.Debug("init config poller")
+	assert.NoError(t, stunner.WatchConfig(ctx, origin, conf), "creating config poller")
+
+	// first read should yield a zeroconfig
+	c2, ok := <-conf
+	assert.True(t, ok, "zeroconfig emitted")
+	checkZeroConfig(t, &c2, "tester")
+
+	// second read yields a v1 config
+	c2, ok = <-conf
+	assert.True(t, ok, "config emitted")
+
+	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
+	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
+	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
+	assert.Len(t, c2.Listeners, 1, "listeners len")
+	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
+	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
+	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
+	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
+	assert.Len(t, c2.Clusters, 1, "clusters len")
+	assert.Equal(t, "echo-server-cluster", c2.Clusters[0].Name, "cluster name")
+	assert.Equal(t, "STATIC", c2.Clusters[0].Type, "cluster proto")
+	assert.Len(t, c2.Clusters[0].Endpoints, 1, "endpoints len")
+	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
+
+	// thrird read yields a v1alpha1 config
+	c2, ok = <-conf
+	assert.True(t, ok, "config emitted")
+
+	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
+	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
+	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
+	assert.Len(t, c2.Listeners, 1, "listeners len")
+	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
+	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
+	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
+	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
+	assert.Len(t, c2.Clusters, 1, "clusters len")
+	assert.Equal(t, "echo-server-cluster", c2.Clusters[0].Name, "cluster name")
+	assert.Equal(t, "STATIC", c2.Clusters[0].Type, "cluster proto")
+	assert.Len(t, c2.Clusters[0].Endpoints, 1, "endpoints len")
+	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
 
 	stunner.Close()
 }
@@ -287,8 +519,8 @@ func TestStunnerURIParser(t *testing.T) {
 	}
 }
 
-func checkDefaultConfig(t *testing.T, c *v1alpha1.StunnerConfig, proto string) {
-	assert.Equal(t, "plaintext", c.Auth.Type, "auth-type")
+func checkDefaultConfig(t *testing.T, c *stnrv1.StunnerConfig, proto string) {
+	assert.Equal(t, "static", c.Auth.Type, "auth-type")
 	assert.Equal(t, "user1", c.Auth.Credentials["username"], "username")
 	assert.Equal(t, "passwd1", c.Auth.Credentials["password"], "passwd")
 	assert.Len(t, c.Listeners, 1, "listeners len")
@@ -301,6 +533,6 @@ func checkDefaultConfig(t *testing.T, c *v1alpha1.StunnerConfig, proto string) {
 	assert.Equal(t, "0.0.0.0/0", c.Clusters[0].Endpoints[0], "endpoint")
 }
 
-func checkZeroConfig(t *testing.T, c *v1alpha1.StunnerConfig, id string) {
+func checkZeroConfig(t *testing.T, c *stnrv1.StunnerConfig, id string) {
 	assert.True(t, c.DeepEqual(cdsclient.ZeroConfig(id)), "zeroconfig ok")
 }

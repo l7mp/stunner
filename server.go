@@ -11,7 +11,7 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Start will start the TURN server that belongs to  a listener.
@@ -37,7 +37,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", l.Port)
 
 	switch l.Proto {
-	case v1alpha1.ListenerProtocolTURNUDP:
+	case stnrv1.ListenerProtocolTURNUDP:
 		socketPool := util.NewPacketConnPool(l.Net, s.udpThreadNum)
 
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
@@ -59,7 +59,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 			pConns = append(pConns, conn)
 		}
 
-	case v1alpha1.ListenerProtocolTURNTCP:
+	case stnrv1.ListenerProtocolTURNTCP:
 		s.log.Debugf("setting up TCP listener at %s", addr)
 
 		tcpListener, err := net.Listen("tcp", addr)
@@ -79,7 +79,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		l.Conns = append(l.Conns, conn)
 
 		// cannot test this on vnet, no TLS in vnet.Net
-	case v1alpha1.ListenerProtocolTURNTLS:
+	case stnrv1.ListenerProtocolTURNTLS:
 		s.log.Debugf("setting up TLS/TCP listener at %s", addr)
 
 		cer, err := tls.X509KeyPair(l.Cert, l.Key)
@@ -106,7 +106,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		lConns = append(lConns, conn)
 		l.Conns = append(l.Conns, conn)
 
-	case v1alpha1.ListenerProtocolTURNDTLS:
+	case stnrv1.ListenerProtocolTURNDTLS:
 		s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
 
 		cer, err := tls.X509KeyPair(l.Cert, l.Key)

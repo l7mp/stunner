@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/l7mp/stunner"
-	stunnerv1alpha1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -103,7 +103,7 @@ func main() {
 	t.Close()
 }
 
-func getStunnerConf(uri string) (*stunnerv1alpha1.StunnerConfig, error) {
+func getStunnerConf(uri string) (*stnrv1.StunnerConfig, error) {
 	s := strings.Split(uri, "://")
 	if len(s) < 2 {
 		return nil, fmt.Errorf("cannot parse server URI")
@@ -131,7 +131,7 @@ func getStunnerConf(uri string) (*stunnerv1alpha1.StunnerConfig, error) {
 	}
 }
 
-func getStunnerConfFromK8s(def string) (*stunnerv1alpha1.StunnerConfig, error) {
+func getStunnerConfFromK8s(def string) (*stnrv1.StunnerConfig, error) {
 	namespace, name, listener, err := parseK8sDef(def)
 	if err != nil {
 		return nil, err
@@ -164,13 +164,13 @@ func getStunnerConfFromK8s(def string) (*stunnerv1alpha1.StunnerConfig, error) {
 			defaultStunnerdConfigfileName)
 	}
 
-	conf := stunnerv1alpha1.StunnerConfig{}
+	conf := stnrv1.StunnerConfig{}
 	if err := json.Unmarshal([]byte(jsonConf), &conf); err != nil {
 		return nil, err
 	}
 
 	// remove all but the named listener
-	ls := []stunnerv1alpha1.ListenerConfig{}
+	ls := []stnrv1.ListenerConfig{}
 	for _, l := range conf.Listeners {
 		// parse out the listener name (as per the Gateway API) from the TURN listener-name
 		// (this is in the form: <namespace>/<gatewayname>/<listener>
@@ -196,13 +196,13 @@ func getStunnerConfFromK8s(def string) (*stunnerv1alpha1.StunnerConfig, error) {
 			"specified TURN server URI", listener)
 	}
 
-	conf.Listeners = []stunnerv1alpha1.ListenerConfig{{}}
+	conf.Listeners = []stnrv1.ListenerConfig{{}}
 	copy(conf.Listeners, ls)
 
 	return &conf, nil
 }
 
-func getStunnerConfFromCLI(def string) (*stunnerv1alpha1.StunnerConfig, error) {
+func getStunnerConfFromCLI(def string) (*stnrv1.StunnerConfig, error) {
 	uri := fmt.Sprintf("turn://%s", def)
 
 	conf, err := stunner.NewDefaultConfig(uri)
@@ -225,15 +225,15 @@ func getStunnerConfFromCLI(def string) (*stunnerv1alpha1.StunnerConfig, error) {
 	return conf, nil
 }
 
-func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
+func getAuth(config *stnrv1.StunnerConfig) (stunner.AuthGen, error) {
 	auth := config.Auth
-	atype, err := stunnerv1alpha1.NewAuthType(auth.Type)
+	atype, err := stnrv1.NewAuthType(auth.Type)
 	if err != nil {
 		return nil, err
 	}
 
 	switch atype {
-	case stunnerv1alpha1.AuthTypeLongTerm:
+	case stnrv1.AuthTypeEphemeral:
 		s, found := auth.Credentials["secret"]
 		if !found {
 			return nil, fmt.Errorf("cannot find shared secret for %s authentication",
@@ -243,7 +243,7 @@ func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
 			return turn.GenerateLongTermCredentials(s, defaultDuration)
 		}, nil
 
-	case stunnerv1alpha1.AuthTypePlainText:
+	case stnrv1.AuthTypeStatic:
 		u, found := auth.Credentials["username"]
 		if !found {
 			return nil, fmt.Errorf("cannot find username for %s authentication",
@@ -264,7 +264,7 @@ func getAuth(config *stunnerv1alpha1.StunnerConfig) (stunner.AuthGen, error) {
 	}
 }
 
-func getStunnerURI(config *stunnerv1alpha1.StunnerConfig) (string, error) {
+func getStunnerURI(config *stnrv1.StunnerConfig) (string, error) {
 	// we should have only a single listener at this point
 	if len(config.Listeners) != 1 {
 		return "", fmt.Errorf("cannot find listener in STUNner configuration: %s",

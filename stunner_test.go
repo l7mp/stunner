@@ -3,6 +3,7 @@ package stunner
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,13 +24,15 @@ import (
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/pkg/logger"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	stnrv1a1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
+	cfgclient "github.com/l7mp/stunner/pkg/config/client"
 )
 
 var stunnerTestLoglevel string = "all:ERROR"
 
-// var stunnerTestLoglevel string = v1alpha1.DefaultLogLevel
+// var stunnerTestLoglevel string = stnrv1.DefaultLogLevel
 // var stunnerTestLoglevel string = "all:INFO"
 // var stunnerTestLoglevel string = "all:TRACE"
 // var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
@@ -261,26 +264,26 @@ func buildVNet(logger logging.LoggerFactory) (*VNet, error) {
  *********************************************/
 
 type TestStunnerConfigCase struct {
-	config v1alpha1.StunnerConfig
+	config stnrv1.StunnerConfig
 	uri    string
 }
 
 var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// udp, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
@@ -289,7 +292,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -297,19 +300,19 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turn:1.2.3.4:3478?transport=udp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// udp, longterm
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
@@ -318,7 +321,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -326,20 +329,20 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turn:1.2.3.4:3478?transport=udp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// tcp, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "plaintext",
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "turn-tcp",
 				Addr:       "127.0.0.1",
@@ -348,7 +351,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -356,19 +359,19 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turn:1.2.3.4:3478?transport=tcp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// tcp, longterm
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "turn-tcp",
 				Addr:       "127.0.0.1",
@@ -377,7 +380,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -385,20 +388,20 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turn:1.2.3.4:3478?transport=tcp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// tls, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "plaintext",
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "tls",
 				Protocol:   "turn-tls",
 				Addr:       "127.0.0.1",
@@ -409,7 +412,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Key:        keyPem64,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -417,19 +420,19 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turns:1.2.3.4:3478?transport=tcp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// tls, longterm
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "tls",
 				Protocol:   "turn-tls",
 				Addr:       "127.0.0.1",
@@ -440,7 +443,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Key:        keyPem64,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -448,20 +451,20 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		uri: "turns:1.2.3.4:3478?transport=tcp",
 	},
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// dtls, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "dtls",
 				Protocol:   "turn-dtls",
 				Addr:       "127.0.0.1",
@@ -472,7 +475,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Key:        keyPem64,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -481,24 +484,24 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	// // dtls, longterm
 	// {
-	// 	ApiVersion: "v1alpha1",
-	// 	Admin: v1alpha1.AdminConfig{
+	// 	ApiVersion: stnrv1.ApiVersion,
+	// 	Admin: stnrv1.AdminConfig{
 	// 		LogLevel: stunnerTestLoglevel,
 	// 	},
-	// 	Auth: v1alpha1.AuthConfig{
+	// 	Auth: stnrv1.AuthConfig{
 	// 		Type: "longterm",
 	// 		Credentials: map[string]string{
 	// 			"secret": "my-secret",
 	// 		},
 	// 	},
-	// 	Listeners: []v1alpha1.ListenerConfig{{
+	// 	Listeners: []stnrv1.ListenerConfig{{
 	// 		Name:     "dtls",
 	// 		Protocol: "turn-dtls",
 	// 		Addr:     "127.0.0.1",
 	// 		Port:     23478,
 	// 		Routes:   []string{"allow-any"},
 	// 	}},
-	// 	Clusters: []v1alpha1.ClusterConfig{{
+	// 	Clusters: []stnrv1.ClusterConfig{{
 	// 		Name:      "allow-any",
 	// 		Endpoints: []string{"0.0.0.0/0"},
 	// 	}},
@@ -559,10 +562,10 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 
 			var u, p string
 			switch auth {
-			case "plaintext":
+			case "plaintext", "static":
 				u = "user1"
 				p = "passwd1"
-			case "longterm":
+			case "longterm", "ephemeral":
 				u = a12n.GenerateTimeWindowedUsername(time.Now(), time.Minute, "")
 				p2, err := a12n.GetLongTermCredential(u, "my-secret")
 				assert.NoError(t, err, err)
@@ -640,13 +643,13 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 // *****************
 //
 //	type StunnerClusterConfig struct {
-//	        config v1alpha1.StunnerConfig
+//	        config stnrv1.StunnerConfig
 //	        echoServerAddr string
 //	        result bool
 //	}
 type StunnerTestClusterConfig struct {
 	testName       string
-	config         v1alpha1.StunnerConfig
+	config         stnrv1.StunnerConfig
 	echoServerAddr string
 	result         bool
 }
@@ -654,26 +657,26 @@ type StunnerTestClusterConfig struct {
 var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	{
 		testName: "open ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"echo-server-cluster"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -686,19 +689,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "default cluster type static ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -707,7 +710,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Endpoints: []string{
 					"1.2.3.5",
@@ -719,19 +722,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -740,7 +743,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -753,19 +756,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint with wrong peer addr: fail",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -774,7 +777,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -787,19 +790,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint with multiple routes ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -809,7 +812,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"dummy_cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -828,19 +831,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint with multiple routes and wrong peer addr fail",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -850,7 +853,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -869,19 +872,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint with multiple ips ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -890,7 +893,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -907,19 +910,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "static endpoint with multiple ips with wrong peer addr fail",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -928,7 +931,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STATIC",
 				Endpoints: []string{
@@ -944,19 +947,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "strict_dns ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -965,7 +968,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STRICT_DNS",
 				Endpoints: []string{
@@ -978,19 +981,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "strict_dns cluster and wrong peer addr fail",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -999,7 +1002,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STRICT_DNS",
 				Endpoints: []string{
@@ -1012,19 +1015,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "strict_dns cluster with multiple domains ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -1033,7 +1036,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "echo-server-cluster",
 				Type: "STRICT_DNS",
 				Endpoints: []string{
@@ -1047,19 +1050,19 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 	},
 	{
 		testName: "multiple strict_dns clusters ok",
-		config: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
@@ -1069,7 +1072,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name: "stunner-cluster",
 				Type: "STRICT_DNS",
 				Endpoints: []string{
@@ -1128,10 +1131,10 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			var u, p string
 			auth := c.config.Auth.Type
 			switch auth {
-			case "plaintext":
+			case "plaintext", "static":
 				u = "user1"
 				p = "passwd1"
-			case "longterm":
+			case "longterm", "ephemeral":
 				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
 				assert.NoError(t, err, err)
 			default:
@@ -1279,17 +1282,17 @@ func TestStunnerLifecycle(t *testing.T) {
 	assert.Error(t, err, "no default readiness check for empty server")
 
 	log.Debug("starting stunnerd with an empty stunner config")
-	conf := v1alpha1.StunnerConfig{
-		ApiVersion: v1alpha1.ApiVersion,
-		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
-		Auth: v1alpha1.AuthConfig{
+	conf := stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
+		Auth: stnrv1.AuthConfig{
 			Credentials: map[string]string{
 				"username": "user-1",
 				"password": "pass-1",
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{},
-		Clusters:  []v1alpha1.ClusterConfig{},
+		Listeners: []stnrv1.ListenerConfig{},
+		Clusters:  []stnrv1.ClusterConfig{},
 	}
 
 	log.Debug("reconciling empty server")
@@ -1328,7 +1331,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 			port := u.Port()
 			if port == "" {
-				port = strconv.Itoa(v1alpha1.DefaultHealthCheckPort)
+				port = strconv.Itoa(stnrv1.DefaultHealthCheckPort)
 			}
 
 			hc := fmt.Sprintf("http://%s:%s", addr, port)
@@ -1450,17 +1453,17 @@ func TestStunnerMetrics(t *testing.T) {
 	// assert.False(t, s.IsReady(), "empty server not ready")
 
 	log.Debug("starting stunnerd with an empty stunner config")
-	conf := v1alpha1.StunnerConfig{
-		ApiVersion: v1alpha1.ApiVersion,
-		Admin:      v1alpha1.AdminConfig{LogLevel: stunnerTestLoglevel},
-		Auth: v1alpha1.AuthConfig{
+	conf := stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
+		Auth: stnrv1.AuthConfig{
 			Credentials: map[string]string{
 				"username": "user-1",
 				"password": "pass-1",
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{},
-		Clusters:  []v1alpha1.ClusterConfig{},
+		Listeners: []stnrv1.ListenerConfig{},
+		Clusters:  []stnrv1.ClusterConfig{},
 	}
 
 	log.Debug("reconciling empty server")
@@ -1489,7 +1492,7 @@ func TestStunnerMetrics(t *testing.T) {
 
 			port := u.Port()
 			if port == "" {
-				port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
+				port = strconv.Itoa(stnrv1.DefaultMetricsPort)
 			}
 
 			path := u.EscapedPath()
@@ -1529,4 +1532,149 @@ func doLivenessCheck(uri string) (bool, error) {
 
 func doReadinessCheck(uri string) (bool, error) {
 	return doHttp(uri + "/ready")
+}
+
+// *****************
+// v1alpha1 API compatibility tests
+// *****************
+type TestConfigV1Alpha1 struct {
+	testName       string
+	config         []byte
+	echoServerAddr string
+	result         bool
+}
+
+var testConfigsV1Alpha1 = []TestConfigV1Alpha1{
+	{
+		testName:       "open ok",
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"plaintext","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`),
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName:       "default cluster type static ok",
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"plaintext","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","endpoints":["1.2.3.5"]}]}`),
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName:       "static endpoint ok",
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"plaintext","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`),
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName:       "static endpoint with multiple routes ok",
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"plaintext","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster","dummy_cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]},{"name":"dummy_cluster","type":"STATIC","endpoints":["9.8.7.6"]}]}`),
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName:       "longterm endpoint with multiple routes ok",
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"secret":"my-secret"}},"listeners":[{"name":"udp","protocol":"turn-udp","public_address":"1.2.3.4","public_port":3478,"address":"127.0.0.1","port":3478,"routes":["allow-any"]}],"clusters":[{"name":"allow-any","endpoints":["0.0.0.0/0"]}]}`),
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+}
+
+func TestStunnerConfigV1Alpha1(t *testing.T) {
+	lim := test.TimeOut(time.Second * 60)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	for _, c := range testConfigsV1Alpha1 {
+		t.Run(c.testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.testName)
+
+			// patch in the vnet
+			log.Debug("building virtual network")
+			v, err := buildVNet(loggerFactory)
+			assert.NoError(t, err, err)
+
+			log.Debug("creating a stunnerd")
+			stunner := NewStunner(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Net:              v.podnet,
+			})
+
+			log.Debug("parsing config to v1alpha1 format")
+			a := stnrv1a1.StunnerConfig{}
+			assert.NoError(t, json.Unmarshal(c.config, &a), "parsing config file to v1alpha1 format")
+
+			assert.Equal(t, stnrv1a1.ApiVersion, a.ApiVersion, "version")
+			assert.Equal(t, "all:ERROR", a.Admin.LogLevel, "loglevel")
+			// expect the old names
+			assert.True(t, a.Auth.Type == "plaintext" || a.Auth.Type == "longterm", "loglevel")
+			assert.Len(t, a.Listeners, 1, "listeners len")
+			assert.Equal(t, "udp", a.Listeners[0].Name, "listener name")
+			assert.Equal(t, "turn-udp", a.Listeners[0].Protocol, "listener proto")
+			assert.Equal(t, 3478, a.Listeners[0].Port, "listener port")
+			assert.True(t, len(a.Clusters) > 0, "clusters len")
+
+			log.Debug("conveting config to v1 format")
+			a = stnrv1a1.StunnerConfig{}
+			assert.NoError(t, json.Unmarshal(c.config, &a), "parsing config file to v1alpha1 format")
+			config, err := stnrv1a1.ConvertToV1(&a)
+			assert.NoError(t, err, "convert load v1alpha1 config to v1")
+
+			assert.Equal(t, stnrv1.ApiVersion, config.ApiVersion, "version")
+			assert.Equal(t, "all:ERROR", config.Admin.LogLevel, "loglevel")
+			// expect the new names
+			assert.True(t, config.Auth.Type == "static" || config.Auth.Type == "ephemeral", "loglevel")
+			assert.Len(t, config.Listeners, 1, "listeners len")
+			assert.Equal(t, "udp", config.Listeners[0].Name, "listener name")
+			assert.Equal(t, "turn-udp", config.Listeners[0].Protocol, "listener proto")
+			assert.Equal(t, 3478, config.Listeners[0].Port, "listener port")
+			assert.True(t, len(config.Clusters) > 0, "clusters len")
+
+			log.Debug("parsing config directly to v1 format")
+			config, err = cfgclient.ParseConfig(c.config)
+			assert.NoError(t, err, "load v1alpha1 config ")
+
+			assert.Equal(t, stnrv1.ApiVersion, config.ApiVersion, "version")
+			assert.Equal(t, "all:ERROR", config.Admin.LogLevel, "loglevel")
+			// expect the new names
+			assert.True(t, config.Auth.Type == "static" || config.Auth.Type == "ephemeral", "loglevel")
+			assert.Len(t, config.Listeners, 1, "listeners len")
+			assert.Equal(t, "udp", config.Listeners[0].Name, "listener name")
+			assert.Equal(t, "turn-udp", config.Listeners[0].Protocol, "listener proto")
+			assert.Equal(t, 3478, config.Listeners[0].Port, "listener port")
+			assert.True(t, len(config.Clusters) > 0, "clusters len")
+
+			log.Debug("starting stunnerd")
+			assert.NoError(t, stunner.Reconcile(*config), "starting server")
+
+			var u, p string
+			auth := config.Auth.Type
+			switch auth {
+			case "plaintext", "static":
+				u = "user1"
+				p = "passwd1"
+			case "longterm", "ephemeral":
+				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
+				assert.NoError(t, err, err)
+			default:
+				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
+			}
+
+			log.Debug("creating a client")
+			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+			assert.NoError(t, err, "cannot create client listening socket")
+
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
+				c.echoServerAddr, true, true, c.result, loggerFactory}
+			stunnerEchoTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
+		})
+	}
 }

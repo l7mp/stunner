@@ -1,4 +1,4 @@
-package configdiscoveryclient
+package client
 
 import (
 	"context"
@@ -13,10 +13,11 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/pion/logging"
-
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
+
+var errFileTruncated = errors.New("zero-length config file")
 
 var (
 	// Time
@@ -37,10 +38,10 @@ var (
 // receiver side.
 type Client interface {
 	// Load grabs a new configuration from the config client.
-	Load() (*v1alpha1.StunnerConfig, error)
-	// Watch listens to new configurations and returns them on the channel ch. ctx cancels the
-	// watcher.
-	Watch(ctx context.Context, ch chan<- v1alpha1.StunnerConfig) error
+	Load() (*stnrv1.StunnerConfig, error)
+	// Watch listens to new configurations and returns them on the channel ch. The context ctx
+	// cancels the watcher.
+	Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
 	fmt.Stringer
 }
 
@@ -84,10 +85,14 @@ func (w *configFileClient) String() string {
 	return fmt.Sprintf("config client using file %q", w.configFile)
 }
 
-func (w *configFileClient) Load() (*v1alpha1.StunnerConfig, error) {
+func (w *configFileClient) Load() (*stnrv1.StunnerConfig, error) {
 	b, err := os.ReadFile(w.configFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not read config file %q: %s", w.configFile, err.Error())
+	}
+
+	if len(b) == 0 {
+		return nil, errFileTruncated
 	}
 
 	return ParseConfig(b)
@@ -95,7 +100,7 @@ func (w *configFileClient) Load() (*v1alpha1.StunnerConfig, error) {
 
 // WatchConfig watches a configuration file for changes. If no file exists at the given path,
 // WatchConfig will periodically retry until the file appears.
-func (w *configFileClient) Watch(ctx context.Context, ch chan<- v1alpha1.StunnerConfig) error {
+func (w *configFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
 	if w.configFile == "" {
 		return errors.New("uninitialized config file path")
 	}
@@ -117,10 +122,121 @@ func (w *configFileClient) Watch(ctx context.Context, ch chan<- v1alpha1.Stunner
 				return
 			}
 		}
-
 	}()
 
 	return nil
+}
+
+// configWatcher watches the config file and emits new configs on the specified channel. Returns
+// true if further action is needed (tryWatchConfig is to be started) or false on normal exit.
+func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.StunnerConfig) bool {
+	w.log.Tracef("configWatcher")
+
+	// create a new watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return true
+	}
+	defer watcher.Close()
+
+	config := w.configFile
+	if err := watcher.Add(config); err != nil {
+		w.log.Debugf("could not add watcher for config file %q: %s", config, err.Error())
+		return true
+	}
+
+	// emit an initial config
+	c, err := w.Load()
+	if err != nil {
+		w.log.Warnf("cannot load config file: %s", err.Error())
+		return true
+	}
+
+	// send a deepcopy over the channel
+	confCopy := stnrv1.StunnerConfig{}
+	c.DeepCopyInto(&confCopy)
+
+	w.log.Debugf("initial config file successfully loaded from %q: %s", config, confCopy.String())
+
+	ch <- confCopy
+
+	// save deepcopy so that we can filter repeated events
+	prev := stnrv1.StunnerConfig{}
+	c.DeepCopyInto(&prev)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+
+		case e, ok := <-watcher.Events:
+			if !ok {
+				w.log.Debug("config watcher event handler received invalid event")
+				return true
+			}
+
+			w.log.Debugf("received watcher event: %s", e.String())
+
+			if e.Has(fsnotify.Remove) {
+				w.log.Warnf("config file deleted %q, disabling watcher", e.Op.String())
+
+				if err := watcher.Remove(config); err != nil {
+					w.log.Debugf("could not remove config file %q watcher: %s",
+						config, err.Error())
+				}
+
+				return true
+			}
+
+			if !e.Has(fsnotify.Write) {
+				w.log.Debugf("unhandled notify op on config file %q (ignoring): %s",
+					e.Name, e.Op.String())
+				continue
+			}
+
+			w.log.Debugf("loading configuration file: %s", config)
+			c, err := w.Load()
+			if err != nil {
+				if errors.Is(err, errFileTruncated) {
+					w.log.Debugf("ignoring: %s", err.Error())
+					continue
+				}
+				w.log.Warnf("error loading config file: %s", err.Error())
+				return true
+			}
+
+			// suppress repeated events
+			if c.DeepEqual(&prev) {
+				w.log.Debugf("ignoring recurrent notify event for the same config file")
+				continue
+			}
+
+			confCopy := stnrv1.StunnerConfig{}
+			c.DeepCopyInto(&confCopy)
+
+			w.log.Debugf("config file successfully loaded from %q: %s", config, confCopy.String())
+
+			ch <- confCopy
+
+			// save deepcopy so that we can filter repeated events
+			c.DeepCopyInto(&prev)
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				w.log.Debugf("config watcher error handler received invalid error")
+				return true
+			}
+
+			w.log.Debugf("watcher error, deactivating watcher: %s", err.Error())
+
+			if err := watcher.Remove(config); err != nil {
+				w.log.Debugf("could not remove config file %q watcher: %s",
+					config, err.Error())
+			}
+
+			return true
+		}
+	}
 }
 
 // tryWatchConfig runs a timer to look for the config file at the given path and returns it
@@ -159,112 +275,6 @@ func (w *configFileClient) tryWatchConfig(ctx context.Context) bool {
 	}
 }
 
-// configWatcher watches the config file and emits new configs on the specified channel. Returns
-// true if further action is needed (tryWatchConfig is to be started) or false on normal exit.
-func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- v1alpha1.StunnerConfig) bool {
-	w.log.Tracef("configWatcher")
-
-	// create a new watcher
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return true
-	}
-	defer watcher.Close()
-
-	config := w.configFile
-	if err := watcher.Add(config); err != nil {
-		w.log.Debugf("could not add watcher for config file %q: %s", config, err.Error())
-		return true
-	}
-
-	// emit an initial config
-	c, err := w.Load()
-	if err != nil {
-		w.log.Warnf("cannot load config file: %s", err.Error())
-		return true
-	}
-
-	w.log.Debugf("config file successfully loaded from %q", config)
-
-	// send a deepcopy over the channel
-	copy := v1alpha1.StunnerConfig{}
-	c.DeepCopyInto(&copy)
-	ch <- copy
-
-	// save deepcopy so that we can filter repeated events
-	prev := v1alpha1.StunnerConfig{}
-	c.DeepCopyInto(&prev)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return false
-
-		case e, ok := <-watcher.Events:
-			if !ok {
-				w.log.Debug("config watcher event handler received invalid event")
-				return true
-			}
-
-			w.log.Debugf("received watcher event: %s", e.String())
-
-			if e.Has(fsnotify.Remove) {
-				w.log.Warnf("config file deleted %q, disabling watcher", e.Op.String())
-
-				if err := watcher.Remove(config); err != nil {
-					w.log.Debugf("could not remove config file %q watcher: %s",
-						config, err.Error())
-				}
-
-				return true
-			}
-
-			if !e.Has(fsnotify.Write) {
-				w.log.Debugf("unhandled notify op on config file %q (ignoring): %s",
-					e.Name, e.Op.String())
-				continue
-			}
-
-			w.log.Debugf("loading configuration file: %s", config)
-			c, err := w.Load()
-			if err != nil {
-				w.log.Warnf("error loading config file: %s", err.Error())
-				return true
-			}
-
-			// suppress repeated events
-			if c.DeepEqual(&prev) {
-				w.log.Debugf("ignoring recurrent notify event for the same config file")
-				continue
-			}
-
-			w.log.Debugf("config file successfully loaded from %q", config)
-
-			copy := v1alpha1.StunnerConfig{}
-			c.DeepCopyInto(&copy)
-			ch <- copy
-
-			// save deepcopy so that we can filter repeated events
-			c.DeepCopyInto(&prev)
-
-		case err, ok := <-watcher.Errors:
-			if !ok {
-				w.log.Debugf("config watcher error handler received invalid error")
-				return true
-			}
-
-			w.log.Debugf("watcher error, deactivating watcher: %s", err.Error())
-
-			if err := watcher.Remove(config); err != nil {
-				w.log.Debugf("could not remove config file %q watcher: %s",
-					config, err.Error())
-			}
-
-			return true
-		}
-	}
-}
-
 // configDiscoveryClient is the the implementation of the config discovery service.
 type configDiscoveryClient struct {
 	// serverAddress is the URL of the config discovery server.
@@ -281,7 +291,7 @@ func (p *configDiscoveryClient) String() string {
 	return fmt.Sprintf("config discovery service using server %q", p.serverAddress)
 }
 
-func (p *configDiscoveryClient) Load() (*v1alpha1.StunnerConfig, error) {
+func (p *configDiscoveryClient) Load() (*stnrv1.StunnerConfig, error) {
 	location, _, err := getConfigDiscoveryLocation(p.serverAddress, p.id, false)
 	if err != nil {
 		return nil, err
@@ -304,8 +314,7 @@ func (p *configDiscoveryClient) Load() (*v1alpha1.StunnerConfig, error) {
 	}
 
 	if len(body) == 0 {
-		// empty config: this is an error for the config loader
-		return nil, errors.New("empty config received")
+		return nil, errFileTruncated
 	}
 
 	// fmt.Println("++++++++++++++++++++")
@@ -314,10 +323,10 @@ func (p *configDiscoveryClient) Load() (*v1alpha1.StunnerConfig, error) {
 	return ParseConfig(body)
 }
 
-// Watch polls a config discovery server for a configuration file by sending a config request
-// and then waits for the server to push a valid `StunnerConfig`. Use the `context` to cancel the
+// Watch polls a config discovery server for a configuration file by sending a config request and
+// then waits for the server to push a valid `StunnerConfig`. Use the `context` to cancel the
 // watcher.
-func (p *configDiscoveryClient) Watch(ctx context.Context, ch chan<- v1alpha1.StunnerConfig) error {
+func (p *configDiscoveryClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
 	_, _, err := getConfigDiscoveryLocation(p.serverAddress, p.id, true)
 	if err != nil {
 		return err
@@ -345,7 +354,7 @@ func (p *configDiscoveryClient) Watch(ctx context.Context, ch chan<- v1alpha1.St
 	return nil
 }
 
-func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- v1alpha1.StunnerConfig) error {
+func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
 	p.log.Tracef("configPoller: trying to open connection to config discovery server at %q", p.serverAddress)
 
 	location, origin, _ := getConfigDiscoveryLocation(p.serverAddress, p.id, true)
@@ -362,8 +371,8 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- v1al
 	defer conn.Close()
 
 	// pinger
-	resCh := make(chan v1alpha1.StunnerConfig)
-	errCh := make(chan error)
+	resCh := make(chan stnrv1.StunnerConfig, 16)
+	errCh := make(chan error, 1)
 
 	pingTicker := time.NewTicker(PingPeriod)
 	closePinger := make(chan any)
@@ -418,13 +427,14 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- v1al
 				return
 			}
 
-			// fmt.Println("++++++++++++++++++++")
-			// fmt.Println(n)
-			// fmt.Println("++++++++++++++++++++")
-			// fmt.Println(msg)
-			// fmt.Println("++++++++++++++++++++")
+			if len(msg) == 0 {
+				p.log.Warn("ignoring zero-length config config fil")
+				continue
+			}
 
-			// msg = bytes.TrimRight(msg, "\x00")
+			// fmt.Println("++++++++++++++++++++")
+			// fmt.Println(string(msg))
+			// fmt.Println("++++++++++++++++++++")
 
 			c, err := ParseConfig(msg)
 			if err != nil {
@@ -433,12 +443,12 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- v1al
 				continue
 			}
 
-			p.log.Debugf("new config received: %s", c.String())
+			confCopy := stnrv1.StunnerConfig{}
+			c.DeepCopyInto(&confCopy)
 
-			copy := v1alpha1.StunnerConfig{}
-			c.DeepCopyInto(&copy)
+			p.log.Debugf("new config received from %q: %s", p.serverAddress, confCopy.String())
 
-			resCh <- copy
+			resCh <- confCopy
 		}
 	}()
 
@@ -448,14 +458,18 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- v1al
 		case <-ctx.Done():
 			// cancel: normal return
 			closePinger <- struct{}{}
+
 			return nil
 		case err := <-errCh:
 			// error: return it
 			closePinger <- struct{}{}
+
 			return err
 		case conf := <-resCh:
 			// new config: pass it along and move on
+			p.log.Debugf("new config available: %s", conf.String())
 			ch <- conf
+
 			continue
 		}
 	}

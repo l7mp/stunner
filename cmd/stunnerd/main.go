@@ -11,7 +11,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/l7mp/stunner"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
@@ -74,7 +74,7 @@ func main() {
 
 	log.Infof("starting stunnerd instance %q", *id)
 
-	conf := make(chan v1alpha1.StunnerConfig, 1)
+	conf := make(chan stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
@@ -108,6 +108,7 @@ func main() {
 		defer cancel()
 		cancelConfigLoader = cancel
 
+		// Watch closes the channel
 		if err := st.WatchConfig(ctx, *config, conf); err != nil {
 			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
@@ -131,7 +132,7 @@ func main() {
 			os.Exit(0)
 
 		case <-sigterm:
-			log.Infof("performing a graceful shutdown with %d active connections",
+			log.Infof("performing a graceful shutdown with %d active connection(s)",
 				st.AllocationCount())
 			st.Shutdown()
 
@@ -165,7 +166,7 @@ func main() {
 			err := st.Reconcile(c)
 			log.Trace("reconciliation ready")
 			if err != nil {
-				if e, ok := err.(v1alpha1.ErrRestarted); ok {
+				if e, ok := err.(stnrv1.ErrRestarted); ok {
 					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
 					log.Errorf("could not reconcile new configuration "+

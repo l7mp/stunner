@@ -8,14 +8,13 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	// "time"
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	health "github.com/heptiolabs/healthcheck"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 const DefaultAdminObjectName = "DefaultAdmin"
@@ -31,10 +30,10 @@ type Admin struct {
 }
 
 // NewAdmin creates a new Admin object.
-func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging.LoggerFactory) (Object, error) {
-	req, ok := conf.(*v1alpha1.AdminConfig)
+func NewAdmin(conf stnrv1.Config, dryRun bool, rc health.Check, logger logging.LoggerFactory) (Object, error) {
+	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
-		return nil, v1alpha1.ErrInvalidConf
+		return nil, stnrv1.ErrInvalidConf
 	}
 
 	admin := Admin{
@@ -58,16 +57,16 @@ func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging
 
 // Inspect examines whether a configuration change requires a reconciliation (returns true if it
 // does) or restart (returns ErrRestartRequired).
-func (a *Admin) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+func (a *Admin) Inspect(old, new, full stnrv1.Config) (bool, error) {
 	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
 // request.
-func (a *Admin) Reconcile(conf v1alpha1.Config) error {
-	req, ok := conf.(*v1alpha1.AdminConfig)
+func (a *Admin) Reconcile(conf stnrv1.Config) error {
+	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
-		return v1alpha1.ErrInvalidConf
+		return stnrv1.ErrInvalidConf
 	}
 
 	if err := req.Validate(); err != nil {
@@ -96,7 +95,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 // ObjectName returns the name of the object.
 func (a *Admin) ObjectName() string {
-	return v1alpha1.DefaultAdminName
+	return stnrv1.DefaultAdminName
 }
 
 // ObjectType returns the type of the object.
@@ -105,14 +104,14 @@ func (a *Admin) ObjectType() string {
 }
 
 // GetConfig returns the configuration of the running object.
-func (a *Admin) GetConfig() v1alpha1.Config {
+func (a *Admin) GetConfig() stnrv1.Config {
 	a.log.Tracef("GetConfig")
 
 	// use a copy when taking the pointer: we don't want anyone downstream messing with our own
 	// copies
 	h := a.HealthCheckEndpoint
 
-	return &v1alpha1.AdminConfig{
+	return &stnrv1.AdminConfig{
 		Name:                a.Name,
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
@@ -143,7 +142,7 @@ func (a *Admin) Close() error {
 	return nil
 }
 
-func (a *Admin) reconcileMetrics(req *v1alpha1.AdminConfig) error {
+func (a *Admin) reconcileMetrics(req *stnrv1.AdminConfig) error {
 	a.log.Trace("reconcileMetrics")
 
 	if a.DryRun {
@@ -205,7 +204,7 @@ end:
 }
 
 // req MUST be validated!
-func (a *Admin) reconcileHealthCheck(req *v1alpha1.AdminConfig) error {
+func (a *Admin) reconcileHealthCheck(req *stnrv1.AdminConfig) error {
 	a.log.Trace("reconcileHealthCheck")
 
 	// if req is validated then either
@@ -287,7 +286,7 @@ func NewAdminFactory(dryRun bool, rc health.Check, logger logging.LoggerFactory)
 
 // New can produce a new Admin object from the given configuration. A nil config will create an
 // empty admin object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
+func (f *AdminFactory) New(conf stnrv1.Config) (Object, error) {
 	if conf == nil {
 		return &Admin{}, nil
 	}
@@ -315,7 +314,7 @@ func getHealthAddr(e string) string {
 
 	port := u.Port()
 	if port == "" {
-		port = fmt.Sprintf("%d", v1alpha1.DefaultHealthCheckPort)
+		port = fmt.Sprintf("%d", stnrv1.DefaultHealthCheckPort)
 	}
 
 	return addr + ":" + port
@@ -341,7 +340,7 @@ func getMetricsAddr(e string) (string, string) {
 
 	port := u.Port()
 	if port == "" {
-		port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
+		port = strconv.Itoa(stnrv1.DefaultMetricsPort)
 	}
 	addr = addr + ":" + port
 

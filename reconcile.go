@@ -4,23 +4,22 @@ import (
 	"fmt"
 
 	"github.com/l7mp/stunner/internal/object"
-
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Reconcile handles updates to the STUNner configuration. Some updates are destructive: in this
 // case the returned error contains the names of the objects (usually, listeners) that were
 // restarted during reconciliation (see the documentation of the corresponding STUNner objects for
 // when STUNner may restart after a reconciliation). Reconcile returns nil no objects were
-// restarted, v1alpha1.ErrRestarted to indicate that a shutdown-restart cycle was performed for at
+// restarted, v1.ErrRestarted to indicate that a shutdown-restart cycle was performed for at
 // least one internal object (usually, a listener) for the new config (unless DryRun is enabled),
 // and an error if an error has occurred during reconciliation, in which case it will rollback the
 // last working configuration (unless SuppressRollback is on).
-func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
+func (s *Stunner) Reconcile(req stnrv1.StunnerConfig) error {
 	return s.reconcileWithRollback(req, false)
 }
 
-func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback bool) error {
+func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback bool) error {
 	var errFinal error
 	new, deleted, changed := 0, 0, 0
 
@@ -34,7 +33,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	toBeStarted, toBeRestarted := []object.Object{}, []object.Object{}
 
 	// admin
-	adminState, err := s.adminManager.PrepareReconciliation([]v1alpha1.Config{&req.Admin}, &req)
+	adminState, err := s.adminManager.PrepareReconciliation([]stnrv1.Config{&req.Admin}, &req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for admin config: %s",
 			err.Error())
@@ -45,7 +44,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(adminState.DeletedJobQueue)
 
 	// auth
-	authState, err := s.authManager.PrepareReconciliation([]v1alpha1.Config{&req.Auth}, &req)
+	authState, err := s.authManager.PrepareReconciliation([]stnrv1.Config{&req.Auth}, &req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for auth config: %s",
 			err.Error())
@@ -56,7 +55,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(authState.DeletedJobQueue)
 
 	// listener
-	lconf := make([]v1alpha1.Config, len(req.Listeners))
+	lconf := make([]stnrv1.Config, len(req.Listeners))
 	for i := range req.Listeners {
 		lconf[i] = &(req.Listeners[i])
 	}
@@ -70,7 +69,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(listenerState.DeletedJobQueue)
 
 	// cluster
-	cconf := make([]v1alpha1.Config, len(req.Clusters))
+	cconf := make([]stnrv1.Config, len(req.Clusters))
 	for i := range req.Clusters {
 		cconf[i] = &(req.Clusters[i])
 	}
@@ -186,7 +185,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 			names[i] = fmt.Sprintf("%s: %s", n.ObjectType(), n.ObjectName())
 		}
 
-		return v1alpha1.ErrRestarted{Objects: names}
+		return stnrv1.ErrRestarted{Objects: names}
 	}
 
 	return nil

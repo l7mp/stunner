@@ -1,26 +1,11 @@
 package v1alpha1
 
-import (
-	"errors"
-	"fmt"
-	"strings"
-)
+import stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 
 var (
-	ErrInvalidConf    = errors.New("invalid configuration")
-	ErrNoSuchListener = errors.New("no such listener")
-	ErrNoSuchCluster  = errors.New("no such cluster")
-	// ErrInvalidRoute   = errors.New("invalid route")
+	ErrInvalidConf    = stnrv1.ErrInvalidConf
+	ErrNoSuchListener = stnrv1.ErrNoSuchListener
+	ErrNoSuchCluster  = stnrv1.ErrNoSuchCluster
 )
 
-type ErrRestarted struct {
-	Objects []string
-}
-
-func (e ErrRestarted) Error() string {
-	s := []string{}
-	for _, o := range e.Objects {
-		s = append(s, fmt.Sprintf("[%s]", o))
-	}
-	return fmt.Sprintf("restarted: %s", strings.Join(s, ", "))
-}
+type ErrRestarted = stnrv1.ErrRestarted

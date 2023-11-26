@@ -15,7 +15,7 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/telemetry"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -84,7 +84,7 @@ func NewStunner(options Options) *Stunner {
 
 	s := &Stunner{
 		id:               id,
-		version:          v1alpha1.ApiVersion,
+		version:          stnrv1.ApiVersion,
 		logger:           logger,
 		log:              log,
 		suppressRollback: options.SuppressRollback,
@@ -139,7 +139,7 @@ func (s *Stunner) Shutdown() {
 
 // GetAdmin returns the admin object underlying STUNner.
 func (s *Stunner) GetAdmin() *object.Admin {
-	a, found := s.adminManager.Get(v1alpha1.DefaultAdminName)
+	a, found := s.adminManager.Get(stnrv1.DefaultAdminName)
 	if !found {
 		panic("internal error: no Admin found")
 	}
@@ -148,7 +148,7 @@ func (s *Stunner) GetAdmin() *object.Admin {
 
 // GetAuth returns the authenitation object underlying STUNner.
 func (s *Stunner) GetAuth() *object.Auth {
-	a, found := s.authManager.Get(v1alpha1.DefaultAuthName)
+	a, found := s.authManager.Get(stnrv1.DefaultAuthName)
 	if !found {
 		panic("internal error: no Auth found")
 	}

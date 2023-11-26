@@ -7,7 +7,7 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
 )
 
@@ -21,7 +21,7 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 		auth := s.GetAuth()
 
 		switch auth.Type {
-		case v1alpha1.AuthTypePlainText:
+		case stnrv1.AuthTypeStatic:
 			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
@@ -34,7 +34,7 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 			auth.Log.Info("plaintext auth request: failed: invalid username")
 			return nil, false
 
-		case v1alpha1.AuthTypeLongTerm:
+		case stnrv1.AuthTypeEphemeral:
 			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 

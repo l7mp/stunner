@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
-
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -18,20 +17,20 @@ const clientNum = 20
 // multithreaded UDP tests
 var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// udp, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
@@ -40,7 +39,7 @@ var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -69,19 +68,19 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	})
 
 	log.Debug("starting stunnerd")
-	err := stunner.Reconcile(v1alpha1.StunnerConfig{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
+	err := stunner.Reconcile(stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Auth: v1alpha1.AuthConfig{
+		Auth: stnrv1.AuthConfig{
 			Type: "plaintext",
 			Credentials: map[string]string{
 				"username": "user1",
 				"password": "passwd1",
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
+		Listeners: []stnrv1.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: proto,
 			Addr:     "127.0.0.1",
@@ -90,7 +89,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 			Key:      keyPem64,
 			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []v1alpha1.ClusterConfig{{
+		Clusters: []stnrv1.ClusterConfig{{
 			Name:      "allow-any",
 			Endpoints: []string{"0.0.0.0/0"},
 		}},

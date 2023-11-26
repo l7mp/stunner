@@ -13,9 +13,8 @@ import (
 	"github.com/pion/turn/v3"
 	"github.com/stretchr/testify/assert"
 
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
-
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
 )
 
 var turncatTestLoglevel string = "all:ERROR"
@@ -112,20 +111,20 @@ func TestTurncatPlaintext(t *testing.T) {
 		SuppressRollback: true,
 	})
 
-	err := stunner.Reconcile(v1alpha1.StunnerConfig{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
+	err := stunner.Reconcile(stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
 			LogLevel:        turncatTestLoglevel,
 			MetricsEndpoint: "",
 		},
-		Auth: v1alpha1.AuthConfig{
+		Auth: stnrv1.AuthConfig{
 			Type: "plaintext",
 			Credentials: map[string]string{
 				"username": "user1",
 				"password": "passwd1",
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
+		Listeners: []stnrv1.ListenerConfig{{
 			Name:     "udp-listener-23478",
 			Protocol: "turn-udp",
 			Addr:     "127.0.0.1",
@@ -138,7 +137,7 @@ func TestTurncatPlaintext(t *testing.T) {
 			Port:     23478,
 			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []v1alpha1.ClusterConfig{{
+		Clusters: []stnrv1.ClusterConfig{{
 			Name:      "allow-any",
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
@@ -228,18 +227,18 @@ func TestTurncatLongterm(t *testing.T) {
 		LogLevel:         turncatTestLoglevel,
 		SuppressRollback: true,
 	})
-	err := stunner.Reconcile(v1alpha1.StunnerConfig{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
+	err := stunner.Reconcile(stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
 			LogLevel: turncatTestLoglevel,
 		},
-		Auth: v1alpha1.AuthConfig{
+		Auth: stnrv1.AuthConfig{
 			Type: "longterm",
 			Credentials: map[string]string{
 				"secret": sharedSecret,
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
+		Listeners: []stnrv1.ListenerConfig{{
 			Name:     "udp-listener-23478",
 			Protocol: "turn-udp",
 			Addr:     "127.0.0.1",
@@ -252,7 +251,7 @@ func TestTurncatLongterm(t *testing.T) {
 			Port:     23478,
 			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []v1alpha1.ClusterConfig{{
+		Clusters: []stnrv1.ClusterConfig{{
 			Name:      "allow-any",
 			Endpoints: []string{"0.0.0.0/0"},
 		}},

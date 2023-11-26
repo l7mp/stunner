@@ -9,7 +9,7 @@ import (
 	"github.com/pion/transport/v3"
 
 	"github.com/l7mp/stunner/internal/resolver"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	cds "github.com/l7mp/stunner/pkg/config/client"
 )
 
@@ -48,7 +48,7 @@ type Options struct {
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
 // username/password pair `user:pass`. Health-checks and metric scarping are disabled.
-func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
+func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid URI '%s': %s", uri, err)
@@ -59,29 +59,29 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 	}
 
 	h := ""
-	c := &v1alpha1.StunnerConfig{
-		ApiVersion: v1alpha1.ApiVersion,
-		Admin: v1alpha1.AdminConfig{
-			LogLevel: v1alpha1.DefaultLogLevel,
+	c := &stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
+			LogLevel: stnrv1.DefaultLogLevel,
 			// MetricsEndpoint: "http://:8088",
 			HealthCheckEndpoint: &h,
 		},
-		Auth: v1alpha1.AuthConfig{
+		Auth: stnrv1.AuthConfig{
 			Type:  "plaintext",
-			Realm: v1alpha1.DefaultRealm,
+			Realm: stnrv1.DefaultRealm,
 			Credentials: map[string]string{
 				"username": u.Username,
 				"password": u.Password,
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
+		Listeners: []stnrv1.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: u.Protocol,
 			Addr:     u.Address,
 			Port:     u.Port,
 			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []v1alpha1.ClusterConfig{{
+		Clusters: []stnrv1.ClusterConfig{{
 			Name:      "allow-any",
 			Type:      "STATIC",
 			Endpoints: []string{"0.0.0.0/0"},
@@ -106,45 +106,45 @@ func NewDefaultConfig(uri string) (*v1alpha1.StunnerConfig, error) {
 }
 
 // GetConfig returns the configuration of the running STUNner daemon.
-func (s *Stunner) GetConfig() *v1alpha1.StunnerConfig {
+func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 	s.log.Tracef("GetConfig")
 
 	// singletons, but we want to avoid panics when GetConfig is called on an uninitialized
 	// STUNner object
-	adminConf := v1alpha1.AdminConfig{}
+	adminConf := stnrv1.AdminConfig{}
 	if len(s.adminManager.Keys()) > 0 {
-		adminConf = *s.GetAdmin().GetConfig().(*v1alpha1.AdminConfig)
+		adminConf = *s.GetAdmin().GetConfig().(*stnrv1.AdminConfig)
 	}
 
-	authConf := v1alpha1.AuthConfig{}
+	authConf := stnrv1.AuthConfig{}
 	if len(s.authManager.Keys()) > 0 {
-		authConf = *s.GetAuth().GetConfig().(*v1alpha1.AuthConfig)
+		authConf = *s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
 	}
 
 	listeners := s.listenerManager.Keys()
 	clusters := s.clusterManager.Keys()
 
-	c := v1alpha1.StunnerConfig{
+	c := stnrv1.StunnerConfig{
 		ApiVersion: s.version,
 		Admin:      adminConf,
 		Auth:       authConf,
-		Listeners:  make([]v1alpha1.ListenerConfig, len(listeners)),
-		Clusters:   make([]v1alpha1.ClusterConfig, len(clusters)),
+		Listeners:  make([]stnrv1.ListenerConfig, len(listeners)),
+		Clusters:   make([]stnrv1.ClusterConfig, len(clusters)),
 	}
 
 	for i, name := range listeners {
-		c.Listeners[i] = *s.GetListener(name).GetConfig().(*v1alpha1.ListenerConfig)
+		c.Listeners[i] = *s.GetListener(name).GetConfig().(*stnrv1.ListenerConfig)
 	}
 
 	for i, name := range clusters {
-		c.Clusters[i] = *s.GetCluster(name).GetConfig().(*v1alpha1.ClusterConfig)
+		c.Clusters[i] = *s.GetCluster(name).GetConfig().(*stnrv1.ClusterConfig)
 	}
 
 	return &c
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around ConfigOrigin.Load.
-func (s *Stunner) LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
+func (s *Stunner) LoadConfig(config string) (*stnrv1.StunnerConfig, error) {
 	client, err := cds.NewClient(config, s.id, s.logger)
 	if err != nil {
 		return nil, err
@@ -154,8 +154,8 @@ func (s *Stunner) LoadConfig(config string) (*v1alpha1.StunnerConfig, error) {
 }
 
 // WatchConfig watches a configuration from an origin. This is a shim wrapper around ConfigOrigin.Watch.
-func (s *Stunner) WatchConfig(ctx context.Context, config string, ch chan<- v1alpha1.StunnerConfig) error {
-	client, err := cds.NewClient(config, s.id, s.logger)
+func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- stnrv1.StunnerConfig) error {
+	client, err := cds.NewClient(origin, s.id, s.logger)
 	if err != nil {
 		return err
 	}

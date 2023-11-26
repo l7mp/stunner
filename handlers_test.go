@@ -14,7 +14,7 @@ import (
 	"github.com/pion/turn/v3"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -39,7 +39,7 @@ func longTermCredentials(username string, sharedSecret string) (string, error) {
 
 type StunnerTestAuthWithVnet struct {
 	testName   string
-	conf       v1alpha1.StunnerConfig
+	conf       stnrv1.StunnerConfig
 	authCred   func() (string, string)
 	clientAddr string
 }
@@ -48,26 +48,26 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	{
 		testName:   "plaintext",
 		clientAddr: "1.1.1.1",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -76,25 +76,25 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "longterm - plain timestamp in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -106,25 +106,25 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "longterm - timestamp:userid in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -138,25 +138,25 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "longterm - userid:timestamp in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -170,25 +170,25 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "longterm - userid:timestamp:ramdom-crap in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "longterm",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},

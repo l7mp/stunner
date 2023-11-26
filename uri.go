@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -95,7 +95,7 @@ func ParseUri(uri string) (*StunnerUri, error) {
 }
 
 func (u *StunnerUri) String() string {
-	req := v1alpha1.ListenerConfig{
+	req := stnrv1.ListenerConfig{
 		Protocol:   u.Protocol,
 		PublicAddr: u.Address,
 		PublicPort: u.Port,
@@ -110,17 +110,17 @@ func (u *StunnerUri) String() string {
 }
 
 // GetUriFromListener returns a standard TURN URI as per RFC7065from a listener config.
-func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
+func GetUriFromListener(req *stnrv1.ListenerConfig) (string, error) {
 	return req.GetListenerURI(true)
 }
 
 // GetStandardURLFromListener returns a standard URL (that can be parsed using net/url) from a listener config.
-func GetStandardURLFromListener(req *v1alpha1.ListenerConfig) (string, error) {
+func GetStandardURLFromListener(req *stnrv1.ListenerConfig) (string, error) {
 	return req.GetListenerURI(false)
 }
 
 // GetUriFromListener returns a standard TURN URI from a listener config
-func GetTurnUris(req *v1alpha1.StunnerConfig) ([]string, error) {
+func GetTurnUris(req *stnrv1.StunnerConfig) ([]string, error) {
 	ret := []string{}
 	for i := range req.Listeners {
 		uri, err := GetUriFromListener(&req.Listeners[i])
