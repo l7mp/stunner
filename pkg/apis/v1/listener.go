@@ -9,26 +9,30 @@ import (
 
 // ListenerConfig specifies a server socket on which STUN/TURN connections will be served.
 type ListenerConfig struct {
-	// Name is the name of the listener.
+	// Name of the listener.
 	Name string `json:"name,omitempty"`
-	// Protocol is the transport protocol used by the listener ("UDP", "TCP", "TLS",
-	// "DTLS"). The application-layer protocol on top of the transport protocol is always
-	// STUN/TURN.
+	// Protocol is the transport protocol ("UDP", "TCP", "TLS", "DTLS") or the complete L4/L7
+	// protocol stack ("TURN-UDP", "TURN-TCP", "TURN-TLS", "TURN-DTLS") used by the listener.
+	// The application-layer protocol on top of the transport protocol is always TURN, so "UDP"
+	// and "TURN-UDP" are equivalent (and so on for the other protocols). Default is
+	// "TURN-UDP".
 	Protocol string `json:"protocol,omitempty"`
 	// PublicAddr is the Internet-facing public IP address for the listener (ignored by
 	// STUNner).
 	PublicAddr string `json:"public_address,omitempty"`
 	// PublicPort is the Internet-facing public port for the listener (ignored by STUNner).
 	PublicPort int `json:"public_port,omitempty"`
-	// Addr is the IP address for the listener.
+	// Addr is the IP address for the listener. Default is localhost.
 	Addr string `json:"address,omitempty"`
-	// Port is the port for the listener.
+	// Port is the port for the listener. Default is the standard TURN port (3478).
 	Port int `json:"port,omitempty"`
-	// MinRelayPort is the smallest relay port assigned for the relay connections spawned by
-	// the listener.
+	// MinRelayPort is the lowest peer target port admitted on the listener (inclusive). The
+	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
+	// relay connections created via the listener. Default is 1.
 	MinRelayPort int `json:"min_relay_port,omitempty"`
-	// MaxRelayPort is the highest relay port assigned for the relay connections spawned by the
-	// listener.
+	// MaxRelayPort is the highest peer target port admitted on the listener (inclusive). The
+	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
+	// relay connections created via the listener. Default is 65535.
 	MaxRelayPort int `json:"max_relay_port,omitempty"`
 	// Cert is the base64-encoded TLS cert.
 	Cert string `json:"cert,omitempty"`
@@ -44,6 +48,7 @@ func (req *ListenerConfig) Validate() error {
 		return fmt.Errorf("missing name in listener configuration: %s", req.String())
 	}
 
+	// Normalize
 	if req.Protocol == "" {
 		req.Protocol = DefaultProtocol
 	}
@@ -51,7 +56,7 @@ func (req *ListenerConfig) Validate() error {
 	if err != nil {
 		return err
 	}
-	req.Protocol = proto.String() // normalize
+	req.Protocol = proto.String()
 
 	if req.Addr == "" {
 		req.Addr = "0.0.0.0"
@@ -70,6 +75,10 @@ func (req *ListenerConfig) Validate() error {
 		if p <= 0 || p > 65535 {
 			return fmt.Errorf("invalid port: %d", p)
 		}
+	}
+	if req.MinRelayPort > req.MaxRelayPort {
+		return fmt.Errorf("invalid relay port range: min port (%d) <= max port (%d) must hold",
+			req.MinRelayPort, req.MaxRelayPort)
 	}
 
 	if proto == ListenerProtocolTURNTLS || proto == ListenerProtocolTURNDTLS ||
@@ -91,9 +100,8 @@ func (req *ListenerConfig) ConfigName() string {
 	return req.Name
 }
 
-// DeepEqual compares two configurations.
+// DeepEqual compares two configurations. Routes must be sorted in both configs!
 func (req *ListenerConfig) DeepEqual(other Config) bool {
-	// routes must be sorted in both configs!
 	return reflect.DeepEqual(req, other)
 }
 
@@ -145,7 +153,8 @@ func (req *ListenerConfig) String() string {
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }
 
-// GetListenerURI is a helper that can output two types of Listener URIs: one with :// after the scheme or one with only : (as per RFC7065).
+// GetListenerURI is a helper that can output two types of Listener URIs: one with "://" after the
+// scheme or one with only ":" (as per RFC7065).
 func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 	proto, err := NewListenerProtocol(req.Protocol)
 	if err != nil {
@@ -170,13 +179,13 @@ func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 
 	addr := req.PublicAddr
 	if addr == "" {
-		// fallback to server addr
+		// Fallback to server addr
 		addr = req.Addr
 	}
 
 	port := req.PublicPort
 	if port == 0 {
-		// fallback to server addr
+		// Fallback to server addr
 		port = req.Port
 	}
 

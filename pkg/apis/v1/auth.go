@@ -6,15 +6,17 @@ import (
 	"strings"
 )
 
-// Auth defines the specification of the STUN/TURN authentication mechanism used by STUNner.
+// Auth specifies the STUN/TURN authentication mechanism used by STUNner.
 type AuthConfig struct {
-	// Type is the type of the STUN/TURN authentication mechanism ("plaintext" or "longterm").
+	// Type of the STUN/TURN authentication mechanism ("static" or "ephemeral"). The deprecated
+	// type name "plaintext" is accepted for "static" and the deprecated type name "longterm"
+	// is accepted for "ephemeral" for compatibility with older versions.
 	Type string `json:"type,omitempty"`
 	// Realm defines the STUN/TURN authentication realm.
 	Realm string `json:"realm,omitempty"`
-	// Credentials specifies the authententication credentials: for "plaintext" at least the
-	// keys "username" and "password" must be set, for "longterm" the key "secret" will hold
-	// the shared authentication secret.
+	// Credentials specifies the authententication credentials: for "static" at least the keys
+	// "username" and "password" must be set, for "ephemeral" the key "secret" specifying the
+	// shared authentication secret must be set.
 	Credentials map[string]string `json:"credentials"`
 }
 
@@ -24,11 +26,12 @@ func (req *AuthConfig) Validate() error {
 		req.Type = DefaultAuthType
 	}
 
+	// Normalize
 	atype, err := NewAuthType(req.Type)
 	if err != nil {
 		return err
 	}
-	req.Type = atype.String() // normalize
+	req.Type = atype.String()
 
 	switch atype {
 	case AuthTypeStatic:
@@ -57,7 +60,7 @@ func (req *AuthConfig) Validate() error {
 
 // Name returns the name of the object to be configured.
 func (req *AuthConfig) ConfigName() string {
-	// singleton!
+	// Singleton!
 	return DefaultAuthName
 }
 

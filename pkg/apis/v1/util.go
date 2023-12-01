@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// AuthType species the type of the STUN/TURN authentication mechanism used by STUNner
+// AuthType species the type of the STUN/TURN authentication mechanism used by STUNner.
 type AuthType int
 
 const (
@@ -23,7 +23,7 @@ const (
 	authTypeLongTermStr  = "longterm"
 )
 
-// NewAuthType parses the authentication mechanism specification
+// NewAuthType parses the authentication mechanism specification.
 func NewAuthType(raw string) (AuthType, error) {
 	switch raw {
 	case authTypeStaticStr, authTypePlainTextStr:
@@ -35,7 +35,7 @@ func NewAuthType(raw string) (AuthType, error) {
 	}
 }
 
-// String returns a string representation for the authentication mechanism
+// String returns a string representation for the authentication mechanism.
 func (a AuthType) String() string {
 	switch a {
 	case AuthTypeStatic:
@@ -47,7 +47,7 @@ func (a AuthType) String() string {
 	}
 }
 
-// ListenerProtocol specifies the network protocol for a listener
+// ListenerProtocol specifies the network protocol for a listener.
 type ListenerProtocol int
 
 const (
@@ -73,7 +73,7 @@ const (
 	listenerProtocolTURNDTLSStr = "TURN-DTLS"
 )
 
-// NewListenerProtocol parses the protocol specification
+// NewListenerProtocol parses the protocol specification.
 func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 	switch strings.ToUpper(raw) {
 	case listenerProtocolUDPStr:
@@ -98,7 +98,7 @@ func NewListenerProtocol(raw string) (ListenerProtocol, error) {
 	}
 }
 
-// String returns a string representation of a listener protocol
+// String returns a string representation of a listener protocol.
 func (l ListenerProtocol) String() string {
 	switch l {
 	case ListenerProtocolUDP:
@@ -122,7 +122,7 @@ func (l ListenerProtocol) String() string {
 	}
 }
 
-// ClusterType specifies the cluster address resolution policy
+// ClusterType specifies the cluster address resolution policy.
 type ClusterType int
 
 const (
@@ -158,7 +158,7 @@ func (l ClusterType) String() string {
 	}
 }
 
-// ClusterProtocol specifies the network protocol for a cluster
+// ClusterProtocol specifies the network protocol for a cluster.
 type ClusterProtocol int
 
 const (
@@ -172,7 +172,7 @@ const (
 	clusterProtocolTCPStr = "TCP"
 )
 
-// NewClusterProtocol parses the protocol specification
+// NewClusterProtocol parses the protocol specification.
 func NewClusterProtocol(raw string) (ClusterProtocol, error) {
 	switch strings.ToUpper(raw) {
 	case clusterProtocolUDPStr:
@@ -185,7 +185,7 @@ func NewClusterProtocol(raw string) (ClusterProtocol, error) {
 	}
 }
 
-// String returns a string representation of a cluster protocol
+// String returns a string representation of a cluster protocol.
 func (p ClusterProtocol) String() string {
 	switch p {
 	case ClusterProtocolUDP:

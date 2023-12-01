@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// StunnerConfig specifies the configuration of the the STUnner daemon.
+// StunnerConfig specifies the configuration for the STUnner daemon.
 type StunnerConfig struct {
-	// ApiVersion is the version of the STUNner API implemented.
+	// ApiVersion is the version of the STUNner API implemented. Must be set to "v1".
 	ApiVersion string `json:"version"`
 	// AdminConfig holds administrative configuration.
 	Admin AdminConfig `json:"admin,omitempty"`
@@ -28,40 +28,27 @@ func (req *StunnerConfig) Validate() error {
 		return fmt.Errorf("unsupported API version: %q", req.ApiVersion)
 	}
 
-	// validate admin
 	if err := req.Admin.Validate(); err != nil {
 		return err
 	}
 
-	// validate auth
 	if err := req.Auth.Validate(); err != nil {
 		return err
 	}
 
-	// validate listeners
 	for i, l := range req.Listeners {
 		if err := l.Validate(); err != nil {
 			return err
 		}
 		req.Listeners[i] = l
 	}
-	// // listeners are sorted by name
-	// sort.Slice(req.Listeners, func(i, j int) bool {
-	// 	return req.Listeners[i].Name < req.Listeners[j].Name
-	// })
 
-	// validate clusters
 	for i, c := range req.Clusters {
 		if err := c.Validate(); err != nil {
 			return err
 		}
 		req.Clusters[i] = c
 	}
-
-	// // clusters are sorted by name
-	// sort.Slice(req.Clusters, func(i, j int) bool {
-	// 	return req.Clusters[i].Name < req.Clusters[j].Name
-	// })
 
 	return nil
 }

@@ -1,7 +1,7 @@
 // Package v1 is the v1 version of the STUNner API.
 package v1
 
-// Config is the main interface for STUNner configuration objects
+// Config is the main interface for STUNner configuration objects.
 type Config interface {
 	// Validate checks a configuration and injects defaults.
 	Validate() error

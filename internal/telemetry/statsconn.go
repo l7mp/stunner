@@ -74,7 +74,7 @@ type PacketConn struct {
 	connType ConnType
 }
 
-// NewPacketConn allocates a stats conn that knows its name and type.
+// NewPacketConn decorates a PacketConnn with metric reporting.
 func NewPacketConn(c net.PacketConn, n string, t ConnType) *PacketConn {
 	AddConnection(n, t)
 	return &PacketConn{PacketConn: c, name: n, connType: t}

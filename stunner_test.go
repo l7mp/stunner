@@ -154,8 +154,10 @@ func stunnerEchoTest(conf echoTestConfig) {
 					_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
 					assert.NoError(t, err, err)
 
-					_, from, err2 := conn.ReadFrom(buf)
+					n, from, err2 := conn.ReadFrom(buf)
 					assert.NoError(t, err2, err2)
+					assert.Equal(t, n, len("Hello"), "message OK")
+					assert.Equal(t, []byte("Hello"), buf[:n], "message OK")
 
 					// verify the message was received from the relay address
 					assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
@@ -166,7 +168,7 @@ func stunnerEchoTest(conf echoTestConfig) {
 			} else {
 				// should fail
 				_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-				assert.Errorf(t, err, "got error message %s", err.Error())
+				assert.Errorf(t, err, "got error message %s", err)
 			}
 			assert.NoError(t, conn.Close(), "cannot close relay connection")
 			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
@@ -174,7 +176,6 @@ func stunnerEchoTest(conf echoTestConfig) {
 	}
 	time.Sleep(150 * time.Millisecond)
 	client.Close()
-
 }
 
 // *****************
@@ -1155,6 +1156,332 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			assert.NoError(t, v.Close(), "cannot close VNet")
 		})
 	}
+}
+
+// *****************
+// Port range filtering tests with VNet
+// *****************
+var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
+	// port range filtering
+	{
+		testName: "static endpoint with peer address in the admitted port range ok",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:         "udp",
+				Protocol:     "turn-udp",
+				Addr:         "1.2.3.4",
+				Port:         3478,
+				MinRelayPort: 5670,
+				MaxRelayPort: 5680,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint with peer address matching singleton admitted port ok",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:         "udp",
+				Protocol:     "turn-udp",
+				Addr:         "1.2.3.4",
+				Port:         3478,
+				MinRelayPort: 5678,
+				MaxRelayPort: 5678,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+	},
+	{
+		testName: "static endpoint with peer address in rejected port range fails",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:         "udp",
+				Protocol:     "turn-udp",
+				Addr:         "1.2.3.4",
+				Port:         3478,
+				MinRelayPort: 1,
+				MaxRelayPort: 5677,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+	},
+	{
+		testName: "static endpoint with peer address in rejected singleton port fails",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "plaintext",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:         "udp",
+				Protocol:     "turn-udp",
+				Addr:         "1.2.3.4",
+				Port:         3478,
+				MinRelayPort: 5677,
+				MaxRelayPort: 5677,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name: "echo-server-cluster",
+				Type: "STATIC",
+				Endpoints: []string{
+					"1.2.3.5",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+	},
+}
+
+func TestStunnerPortRangeWithVNet(t *testing.T) {
+	lim := test.TimeOut(time.Second * 60)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	// log rate-limiter settings
+	LogRateLimit = 2
+	LogBurst = 1
+
+	for _, c := range testPortRangeConfigsWithVNet {
+		t.Run(c.testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", c.testName)
+
+			// patch in the vnet
+			log.Debug("building virtual network")
+			v, err := buildVNet(loggerFactory)
+			assert.NoError(t, err, err)
+
+			log.Debug("setting up the mock DNS")
+			mockDns := resolver.NewMockResolver(map[string]([]string){
+				"stunner.l7mp.io":     []string{"1.2.3.4"},
+				"echo-server.l7mp.io": []string{"1.2.3.5"},
+				"dummy.l7mp.io":       []string{"1.2.3.10"},
+			}, loggerFactory)
+
+			log.Debug("creating a stunnerd")
+			stunner := NewStunner(Options{
+				LogLevel:         stunnerTestLoglevel,
+				SuppressRollback: true,
+				Resolver:         mockDns,
+				Net:              v.podnet,
+			})
+
+			log.Debug("starting stunnerd")
+			assert.NoError(t, stunner.Reconcile(c.config), "starting server")
+
+			var u, p string
+			auth := c.config.Auth.Type
+			switch auth {
+			case "plaintext", "static":
+				u = "user1"
+				p = "passwd1"
+			case "longterm", "ephemeral":
+				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
+				assert.NoError(t, err, err)
+			default:
+				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
+			}
+
+			log.Debug("creating a client")
+			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
+			assert.NoError(t, err, "cannot create client listening socket")
+
+			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
+				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
+				c.echoServerAddr, true, true, c.result, loggerFactory}
+			stunnerEchoFloodTest(testConfig)
+
+			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
+			stunner.Close()
+			assert.NoError(t, v.Close(), "cannot close VNet")
+		})
+	}
+}
+
+func stunnerEchoFloodTest(conf echoTestConfig) {
+	t := conf.t
+	log := conf.loggerFactory.NewLogger("test")
+
+	client, err := turn.NewClient(&turn.ClientConfig{
+		STUNServerAddr: conf.stunnerAddr,
+		TURNServerAddr: conf.stunnerAddr,
+		Username:       conf.user,
+		Password:       conf.pass,
+		Conn:           conf.lconn,
+		Net:            conf.wan,
+		LoggerFactory:  conf.loggerFactory,
+	})
+
+	assert.NoError(t, err, "cannot create TURN client")
+	assert.NoError(t, client.Listen(), "cannot listen on TURN client")
+	defer client.Close()
+
+	log.Debug("sending a binding request")
+	// reflAddr, err := bindingRequestWithTimeout(client, 10000 * time.Millisecond)
+	reflAddr, err := client.SendBindingRequest()
+	if conf.bindSuccess == false {
+		assert.Error(t, err, "binding request failed")
+	} else {
+		assert.NoError(t, err, "binding request ok")
+		log.Debugf("mapped-address: %v", reflAddr.String())
+		udpAddr := reflAddr.(*net.UDPAddr)
+
+		// The mapped-address should have IP address that was assigned to the LAN router.
+		assert.True(t, udpAddr.IP.Equal(conf.natAddr), "wrong srfx address")
+
+		log.Debug("sending an allocate request")
+		conn, err := client.Allocate()
+		if conf.allocateSuccess == false {
+			assert.Error(t, err, err)
+		} else {
+			assert.NoError(t, err, err)
+
+			// log.Debugf("laddr: %s", conn.LocalAddr().String())
+
+			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
+			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
+			assert.NoError(t, err, "creating echo socket")
+
+			// assert.NotNil(t, err, "echo socket not nil")
+
+			go func() {
+				buf := make([]byte, 1600)
+				for {
+					n, from, err2 := echoConn.ReadFrom(buf)
+					if err2 != nil {
+						break
+					}
+
+					// verify the message was received from the relay address
+					assert.Equal(t, conn.LocalAddr().String(), from.String(),
+						"message should be received from the relay address")
+					assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
+
+					// echo the data
+					_, err2 = echoConn.WriteTo(buf[:n], from)
+					assert.NoError(t, err2, err2)
+				}
+			}()
+
+			buf := make([]byte, 1600)
+			if conf.echoSuccess == true {
+				for i := 0; i < 500; i++ {
+					log.Debug("sending \"Hello\"")
+					_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+					assert.NoError(t, err, err)
+
+					n, from, err2 := conn.ReadFrom(buf)
+					assert.NoError(t, err2, err2)
+					assert.Equal(t, n, len("Hello"), "message OK")
+					assert.Equal(t, []byte("Hello"), buf[:n], "message OK")
+
+					// verify the message was received from the relay address
+					assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
+						"message should be received from the relay address")
+
+					time.Sleep(2 * time.Millisecond)
+				}
+			} else {
+				// should fail but it does not: client does not get feedback on
+				// server-side port filtering
+				for i := 0; i < 500; i++ {
+					log.Debug("sending \"Hello\"")
+					_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+					assert.NoError(t, err, err)
+
+					// read should time out
+					assert.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Millisecond)), "read deafline")
+					_, _, err2 := conn.ReadFrom(buf)
+					assert.Error(t, err2, "deadline exceeded")
+				}
+			}
+			assert.NoError(t, conn.Close(), "cannot close relay connection")
+			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
+		}
+	}
+	time.Sleep(150 * time.Millisecond)
+	client.Close()
 }
 
 /********************************************

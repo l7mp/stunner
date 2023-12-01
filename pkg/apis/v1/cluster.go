@@ -7,17 +7,18 @@ import (
 	"strings"
 )
 
-// ClusterConfig specifies a set of upstream peers STUNner can open transport relay connections
-// to. There are two address resolution policies. In STATIC clusters the allowed peer IP addresses
-// are explicitly listed in the endpoint list. In STRICT_DNS clusters the endpoints are assumed to
-// be proper DNS domain names. STUNner will resolve each domain name in the background and admits a
-// new connection only if the peer address matches one of the IP addresses returned by the DNS
-// resolver for one of the endpoints. STRICT_DNS clusters are best used with headless Kubernetes
-// services.
+// ClusterConfig specifies a set of upstream peers to which STUNner can open transport relay
+// connections. There are two address resolution policies. In STATIC clusters the allowed peer IP
+// addresses are explicitly listed in the endpoint list. In STRICT_DNS clusters the endpoints are
+// assumed to be proper DNS domain names: STUNner will resolve each domain name in the background
+// and admit a new connection only if the peer address matches one of the IP addresses returned by
+// the DNS resolver for one of the endpoints. STRICT_DNS clusters are best used with headless
+// Kubernetes services.
 type ClusterConfig struct {
-	// Name is the name of the cluster.
+	// Name of the cluster. Name is mandatory.
 	Name string `json:"name"`
-	// Type specifies the cluster address resolution policy, either STATIC or STRICT_DNS.
+	// Type specifies the cluster address resolution policy, either STATIC or
+	// STRICT_DNS. Default is "STATIC".
 	Type string `json:"type,omitempty"`
 	// Protocol specifies the protocol to be used with the cluster, either UDP (default) or TCP
 	// (not implemented yet).
@@ -32,6 +33,7 @@ func (req *ClusterConfig) Validate() error {
 		return fmt.Errorf("missing name in cluster configuration: %s", req.String())
 	}
 
+	// Normalize
 	if req.Type == "" {
 		req.Type = DefaultClusterType
 	}
@@ -39,8 +41,9 @@ func (req *ClusterConfig) Validate() error {
 	if err != nil {
 		return err
 	}
-	req.Type = t.String() // normalize
+	req.Type = t.String()
 
+	// Normalize
 	if req.Protocol == "" {
 		req.Protocol = DefaultClusterProtocol
 	}
@@ -48,7 +51,7 @@ func (req *ClusterConfig) Validate() error {
 	if err != nil {
 		return err
 	}
-	req.Protocol = p.String() // normalize
+	req.Protocol = p.String()
 
 	sort.Strings(req.Endpoints)
 	return nil

@@ -8,14 +8,17 @@ import (
 
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 )
 
 const testScope = "dummy-scope"
 
+var logBuffer = &bytes.Buffer{}
+
 type loggerTestCase struct {
 	name, defaultLogLevel, scopeLogLevel string
-	prep                                 func(lf *LoggerFactory)
-	tester                               func(t *testing.T, lf *LoggerFactory)
+	prep                                 func(lf LoggerFactory)
+	tester                               func(t *testing.T, lf LoggerFactory)
 }
 
 var loggerTests = []loggerTestCase{
@@ -23,354 +26,301 @@ var loggerTests = []loggerTestCase{
 		name:            "default-loglevel",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
+
+			log := lf.NewLogger(testScope)
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Error", level, "dummy scope: level")
 
-			// resuse logger
-			ld := lf.NewLogger(testScope)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
-
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-disable-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "DISABLE",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Disabled", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-error-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "ERROR",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Error", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-warn-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "WARN",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Warn", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-info-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "INFO",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Info", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-debug-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "DEBUG",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Debug", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "default-loglevel-trace-scope",
 		defaultLogLevel: "", // default is ERROR
 		scopeLogLevel:   "TRACE",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Trace", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "override-loglevel-trace-scope",
 		defaultLogLevel: "all:TRACE",
 		scopeLogLevel:   "ERROR",
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Trace", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Error", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "complex-loglevel-1",
 		defaultLogLevel: "all:TRACE",
 		scopeLogLevel:   "TRACE",
-		prep: func(lf *LoggerFactory) {
+		prep: func(lf LoggerFactory) {
 			lf.SetLevel("all:TRACE,dummy-scope:ERROR")
 		},
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
 			assert.Equal(t, "Trace", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Error", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			log := lf.NewLogger(testScope)
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
 	{
 		name:            "complex-loglevel-2",
 		defaultLogLevel: "all:TRACE",
 		scopeLogLevel:   "TRACE",
-		prep: func(lf *LoggerFactory) {
-			lf.SetLevel("dummy-scope:DEBUG,nonExistentScope:TRACE,dummy-scope:ERROR,all:TRACE")
+		prep: func(lf LoggerFactory) {
+			lf.SetLevel("dummy-scope:DEBUG,nonExistentScope:TRACE,dummy-scope:ERROR,all:error,some-other-scope:TRACE")
 		},
-		tester: func(t *testing.T, lf *LoggerFactory) {
+		tester: func(t *testing.T, lf LoggerFactory) {
 			level := lf.GetLevel("all")
-			assert.Equal(t, "Trace", level, "default scope: level")
+			assert.Equal(t, "Error", level, "default scope: level")
 
 			level = lf.GetLevel(testScope)
 			assert.Equal(t, "Error", level, "dummy scope: level")
 
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+			level = lf.GetLevel("some-other-scope")
+			assert.Equal(t, "Trace", level, "other scope: level")
 
-			ld.Error("dummy")
-			assert.Containsf(t, lf.readr(), "dummy", "ERROR for level %s", level)
+			log := lf.NewLogger(testScope)
 
-			ld.Warn("dummy")
-			assert.Zerof(t, lf.lenr(), "WARN for level %s", level)
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
 
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "INFO for level %s", level)
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "WARN for level %s", level)
 
-			ld.Debug("dummy")
-			assert.Zerof(t, lf.lenr(), "DEBUG for level %s", level)
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "INFO for level %s", level)
 
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "TRACE for level %s", level)
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "DEBUG for level %s", level)
+
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
-}
-
-//nolint:golint,unused
-func (lf *LoggerFactory) len() int {
-	b, ok := lf.Writer.(*bytes.Buffer)
-	if !ok {
-		panic("not a test logger factory")
-	}
-	return b.Len()
-}
-
-func (lf *LoggerFactory) lenr() int {
-	b, ok := lf.Writer.(*bytes.Buffer)
-	if !ok {
-		panic("not a test logger factory")
-	}
-	l := b.Len()
-	b.Reset()
-	return l
-}
-
-//nolint:golint,unused
-func (lf *LoggerFactory) reset() {
-	b, ok := lf.Writer.(*bytes.Buffer)
-	if !ok {
-		panic("not a test logger factory")
-	}
-	b.Reset()
-}
-
-func (lf *LoggerFactory) read() string {
-	b, ok := lf.Writer.(*bytes.Buffer)
-	if !ok {
-		panic("not a test logger factory")
-	}
-	return b.String()
-}
-
-func (lf *LoggerFactory) readr() string {
-	b, ok := lf.Writer.(*bytes.Buffer)
-	if !ok {
-		panic("not a test logger factory")
-	}
-	ret := b.String()
-	b.Reset()
-	return ret
 }
 
 func TestLogger(t *testing.T) {
@@ -386,7 +336,8 @@ func TestLogger(t *testing.T) {
 
 			// create
 			loggerFactory := NewLoggerFactory(c.defaultLogLevel)
-			loggerFactory.Writer = &bytes.Buffer{}
+			loggerFactory.Writer = logBuffer
+			logreset()
 
 			// create logger
 			_ = loggerFactory.NewLogger(testScope)
@@ -397,10 +348,6 @@ func TestLogger(t *testing.T) {
 				c.prep(loggerFactory)
 			}
 
-			// t.Logf("%#v", loggerFactory)
-			// t.Logf("%#v", loggerFactory.ScopeLevels)
-			// t.Logf("%#v", logger)
-
 			// test
 			c.tester(t, loggerFactory)
 		})
@@ -410,218 +357,149 @@ func TestLogger(t *testing.T) {
 // rate-limiter tests
 
 type rateLimiterLoggerTestCase struct {
-	name          string
-	addSuppressed bool
-	period        time.Duration
-	burst         int
-	prep          func(lf *LoggerFactory)
-	tester        func(t *testing.T, lf *LoggerFactory)
+	name, level string
+	limit       rate.Limit
+	burst       int
+	prep        func(lf LoggerFactory)
+	tester      func(t *testing.T, lf LoggerFactory)
 }
 
 var rateLimitedLoggerTests = []rateLimiterLoggerTestCase{
 	{
-		name:          "rate-limited-logger-default",
-		addSuppressed: true,
-		period:        10 * time.Millisecond,
-		burst:         1,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+		name:  "rate-limited-logger-default",
+		limit: 1.0,
+		burst: 1,
+		tester: func(t *testing.T, lf LoggerFactory) {
+			level := lf.GetLevel(testScope)
+			assert.Equal(t, "Error", level, "other scope: level")
+
+			log := lf.NewLogger(testScope)
 
 			// only first call should succeed
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// wait until we get another token
-			time.Sleep(15 * time.Millisecond)
-
-			ld.Info("dummy")
-			assert.Contains(t, lf.read(), "dummy")
-			assert.Contains(t, lf.readr(), "suppressed 2 log")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
 		},
 	},
 	{
-		name:          "rate-limited-logger-suppressed-shown",
-		addSuppressed: true,
-		period:        10 * time.Millisecond,
-		burst:         1,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+		name:  "rate-limited-logger-burst-2",
+		level: "all:INFO",
+		limit: 100.0,
+		burst: 2,
+		tester: func(t *testing.T, lf LoggerFactory) {
+			level := lf.GetLevel(testScope)
+			assert.Equal(t, "Info", level, "scope: level")
+
+			log := lf.NewLogger(testScope)
 
 			// first call should succeed
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+
+			// wait until we get another token
+			time.Sleep(25 * time.Millisecond)
+
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+		},
+	},
+	{
+		name:  "rate-limited-logger-burst-4",
+		level: "all:INFO",
+		limit: 100.0,
+		burst: 4,
+		tester: func(t *testing.T, lf LoggerFactory) {
+			level := lf.GetLevel(testScope)
+			assert.Equal(t, "Info", level, "scope: level")
+
+			log := lf.NewLogger(testScope)
+
+			// only first 4 calls should succeed
+			log.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
 
 			// wait until we get another token
 			time.Sleep(15 * time.Millisecond)
 
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			// no "suppressed" message should appear
-			assert.NotContains(t, lf.readr(), "suppressed 2 log")
-
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-		},
-	},
-	{
-		name:          "rate-limited-logger-suppressed-supressed",
-		addSuppressed: false,
-		period:        10 * time.Millisecond,
-		burst:         1,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
-
-			// only first call should succeed
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// wait until we get another token
-			time.Sleep(15 * time.Millisecond)
-
-			ld.Info("dummy")
-			assert.Contains(t, lf.read(), "dummy")
-			assert.NotContains(t, lf.readr(), "suppressed 2 log")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-		},
-	},
-	{
-		name:          "rate-limited-logger-burst-3",
-		addSuppressed: true,
-		period:        10 * time.Millisecond,
-		burst:         3,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
-
-			// only first 3 calls should succeed
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// wait until we get another token
-			time.Sleep(13 * time.Millisecond)
-
-			ld.Info("dummy")
-			assert.Contains(t, lf.read(), "dummy")
-			assert.Contains(t, lf.readr(), "suppressed 2 log")
+			log.Info("dummy")
+			assert.Contains(t, logread(), "dummy")
+			assert.Contains(t, logreadr(), "suppressed 2 log")
 			// consumed all tokens: these should be suppressed
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
 		},
 	},
 	{
-		name:          "rate-limited-logger-independent",
-		addSuppressed: true,
-		period:        10 * time.Millisecond,
-		burst:         1,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
+		name:  "rate-limited-logger-global-rate-limit",
+		level: "all:INFO",
+		limit: 100.0,
+		burst: 1,
+		tester: func(t *testing.T, lf LoggerFactory) {
+			level := lf.GetLevel(testScope)
+			assert.Equal(t, "Info", level, "scope: level")
+
+			log := lf.NewLogger(testScope)
 
 			// only first call should succeed
-			ld.Info("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// rate-limiters should be independent
-			ld.Error("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
 
 			// wait until we get another token
 			time.Sleep(15 * time.Millisecond)
 
-			ld.Info("dummy")
-			assert.Contains(t, lf.read(), "dummy")
-			assert.Contains(t, lf.readr(), "suppressed 2 log")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Info("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			ld.Error("dummy")
-			assert.Contains(t, lf.read(), "dummy")
-			assert.Contains(t, lf.readr(), "suppressed 2 log")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-		},
-	},
-	{
-		name:          "rate-limited-logger-inactive-loggers-not-counted",
-		addSuppressed: true,
-		period:        10 * time.Millisecond,
-		burst:         1,
-		tester: func(t *testing.T, lf *LoggerFactory) {
-			// reuse logger
-			ld := lf.NewLogger(testScope)
-
-			// Trace is inactive: no log
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "inactive")
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// wait until we would get another token
-			time.Sleep(15 * time.Millisecond)
-
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "inactive")
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Trace("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-
-			// increase loglevel
-			lf.SetLevel(fmt.Sprintf("%s:TRACE", testScope))
-			ld.Error("dummy")
-			assert.Contains(t, lf.readr(), "dummy")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
-			ld.Error("dummy")
-			assert.Zerof(t, lf.lenr(), "suppressed")
+			log.Error("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Error("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Warn("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Debug("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
 		},
 	},
 }
@@ -638,11 +516,9 @@ func TestRateLimitedLogger(t *testing.T) {
 			// t.Logf("-------------- Running test: %s -------------", c.name)
 
 			// create
-			loggerFactory := NewLoggerFactory("all:INFO")
-			loggerFactory.Writer = &bytes.Buffer{}
-
-			// create ratee-limiter logger
-			_ = loggerFactory.NewRateLimitedLogger(testScope, c.period, c.burst, c.addSuppressed)
+			loggerFactory := NewLoggerFactory(c.level).WithRateLimiter(c.limit, c.burst)
+			loggerFactory.Writer = logBuffer
+			logreset()
 
 			// prepare
 			if c.prep != nil {
@@ -657,4 +533,30 @@ func TestRateLimitedLogger(t *testing.T) {
 			c.tester(t, loggerFactory)
 		})
 	}
+}
+
+//nolint:golint,unused
+func loglen() int {
+	return logBuffer.Len()
+}
+
+func loglenr() int {
+	l := logBuffer.Len()
+	logBuffer.Reset()
+	return l
+}
+
+//nolint:golint,unused
+func logreset() {
+	logBuffer.Reset()
+}
+
+func logread() string {
+	return logBuffer.String()
+}
+
+func logreadr() string {
+	ret := logBuffer.String()
+	logBuffer.Reset()
+	return ret
 }

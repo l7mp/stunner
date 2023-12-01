@@ -31,7 +31,7 @@ type Stunner struct {
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
 	udpThreadNum                                               int
-	logger                                                     *logger.LoggerFactory
+	logger                                                     *logger.LeveledLoggerFactory
 	log                                                        logging.LeveledLogger
 	net                                                        transport.Net
 	ready, shutdown                                            bool
