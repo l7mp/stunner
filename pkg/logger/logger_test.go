@@ -321,6 +321,44 @@ var loggerTests = []loggerTestCase{
 			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
 		},
 	},
+	{
+		name:            "set-loglevel-for-newly-created-logger",
+		defaultLogLevel: "all:TRACE",
+		scopeLogLevel:   "TRACE",
+		prep: func(lf LoggerFactory) {
+			lf.SetLevel("all:error,new-scope:DEBUG")
+		},
+		tester: func(t *testing.T, lf LoggerFactory) {
+			level := lf.GetLevel("all")
+			assert.Equal(t, "Error", level, "default scope: level")
+
+			level = lf.GetLevel(testScope)
+			assert.Equal(t, "Error", level, "dummy scope: level")
+
+			level = lf.GetLevel("new-scope")
+			assert.Equal(t, "Debug", level, "new scope: level")
+
+			log := lf.NewLogger("new-scope")
+
+			level = lf.GetLevel("new-scope")
+			assert.Equal(t, "Debug", level, "new scope: level")
+
+			log.Error("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "ERROR for level %s", level)
+
+			log.Warn("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "WARN for level %s", level)
+
+			log.Info("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "INFO for level %s", level)
+
+			log.Debug("dummy")
+			assert.Containsf(t, logreadr(), "dummy", "DEBUG for level %s", level)
+
+			log.Trace("dummy")
+			assert.Zerof(t, loglenr(), "TRACE for level %s", level)
+		},
+	},
 }
 
 func TestLogger(t *testing.T) {

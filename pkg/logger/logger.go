@@ -145,7 +145,6 @@ func (f *RateLimitedLoggerFactory) NewLogger(scope string) logging.LeveledLogger
 	// disable rate-limiting logging at lower loglevels
 	l := f.DefaultLogLevel
 
-	// this will never happen: loggers are always created with the default loglevel
 	scopeLevel, found := f.ScopeLevels[scope]
 	if found {
 		l = scopeLevel
@@ -184,7 +183,13 @@ func (f *LeveledLoggerFactory) newLogger(scope string, limit rate.Limit, burst i
 		return logger
 	}
 
-	l := NewRateLimitedLoggerForScope(scope, f.DefaultLogLevel, f.Writer, limit, burst)
+	logLevel := f.DefaultLogLevel
+	scopeLevel, found := f.ScopeLevels[scope]
+	if found {
+		logLevel = scopeLevel
+	}
+
+	l := NewRateLimitedLoggerForScope(scope, logLevel, f.Writer, limit, burst)
 
 	l.DefaultLeveledLogger.
 		WithTraceLogger(log.New(l.RateLimitedWriter, fmt.Sprintf("%s TRACE: ", scope), defaultFlags)).
