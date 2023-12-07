@@ -10,7 +10,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/resolver"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
-	cds "github.com/l7mp/stunner/pkg/config/client"
+	"github.com/l7mp/stunner/pkg/config/client"
 )
 
 // Options defines various options for the STUNner server.
@@ -145,7 +145,7 @@ func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around ConfigOrigin.Load.
 func (s *Stunner) LoadConfig(config string) (*stnrv1.StunnerConfig, error) {
-	client, err := cds.NewClient(config, s.id, s.logger)
+	client, err := client.New(config, s.id, s.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (s *Stunner) LoadConfig(config string) (*stnrv1.StunnerConfig, error) {
 
 // WatchConfig watches a configuration from an origin. This is a shim wrapper around ConfigOrigin.Watch.
 func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- stnrv1.StunnerConfig) error {
-	client, err := cds.NewClient(origin, s.id, s.logger)
+	client, err := client.New(origin, s.id, s.logger)
 	if err != nil {
 		return err
 	}

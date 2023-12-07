@@ -17,3 +17,6 @@ const DefaultAuthName = "default-auth-config"
 
 const DefaultMetricsPort int = 8080
 const DefaultHealthCheckPort int = 8086
+
+// DefaultConfigDiscoveryAddress is the default URI at which config discovery requests are served.
+const DefaultConfigDiscoveryAddress = "0.0.0.0:13478"

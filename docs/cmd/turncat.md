@@ -20,7 +20,7 @@ go build -o turncat cmd/turncat/main.go
 
 Listen to client connections on the UDP listener `127.0.0.1:5000` and tunnel the received packets
 through the TURN server located at `192.0.2.1:3478` to the UDP server located at
-`192.0.2.2:53`. Use the longterm STUN/TURN credential mechanism to authenticate with the TURN
+`192.0.2.2:53`. Use the `static` STUN/TURN credential mechanism to authenticate with the TURN
 server and set the user/passwd to `test/test`:
 
 ```console

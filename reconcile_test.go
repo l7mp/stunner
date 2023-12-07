@@ -543,7 +543,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	},
 	/// auth
 	{
-		name: "reconcile-test: reconcile plaintextauth name",
+		name: "reconcile-test: reconcile staticauth name",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
@@ -628,7 +628,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 	},
 	{
-		name: "reconcile-test: reconcile plaintext auth passwd",
+		name: "reconcile-test: reconcile static auth passwd",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
@@ -713,14 +713,14 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 	},
 	{
-		name: "reconcile-test: reconcile longterm auth",
+		name: "reconcile-test: reconcile ephemeral auth",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "newsecret",
 				},
@@ -1963,7 +1963,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		testName: "changing plaintext credentials to a wrong passwd",
+		testName: "changing static credentials to a wrong passwd",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
@@ -2006,7 +2006,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      false,
 	},
 	{
-		testName: "changing auth to longterm credentials errs",
+		testName: "changing auth to ephemeral credentials errs",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
@@ -2049,7 +2049,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      false,
 	},
 	{
-		testName: "reverting good plaintext credentials ok",
+		testName: "reverting good static credentials ok",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{

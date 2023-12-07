@@ -22,35 +22,35 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 
 		switch auth.Type {
 		case stnrv1.AuthTypeStatic:
-			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
+			auth.Log.Infof("static auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
 			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
-				auth.Log.Debug("plaintext auth request: valid username")
+				auth.Log.Debug("static auth request: valid username")
 				return key, true
 			}
 
-			auth.Log.Info("plaintext auth request: failed: invalid username")
+			auth.Log.Info("static auth request: failed: invalid username")
 			return nil, false
 
 		case stnrv1.AuthTypeEphemeral:
-			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
+			auth.Log.Infof("ephemeral auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
 			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
-				auth.Log.Infof("longterm auth request: failed: %s", err)
+				auth.Log.Infof("ephemeral auth request: failed: %s", err)
 				return nil, false
 			}
 
 			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Infof("longterm auth request: error generating password: %s",
+				auth.Log.Infof("ephemeral auth request: error generating password: %s",
 					err)
 				return nil, false
 			}
 
-			auth.Log.Info("longterm auth request: success")
+			auth.Log.Info("ephemeral auth request: success")
 			return a12n.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:

@@ -21,7 +21,7 @@ import (
 
 const DefaultLogLevel = "all:WARN"
 
-var DefaultInstanceId = fmt.Sprintf("stunnerd-%s", uuid.New().String())
+var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {

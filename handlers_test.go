@@ -46,7 +46,7 @@ type StunnerTestAuthWithVnet struct {
 
 var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	{
-		testName:   "plaintext",
+		testName:   "static",
 		clientAddr: "1.1.1.1",
 		conf: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
@@ -54,7 +54,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -75,14 +75,14 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		authCred: func() (string, string) { return "user1", "passwd1" },
 	},
 	{
-		testName: "longterm - plain timestamp in username",
+		testName: "ephemeral - plain timestamp in username",
 		conf: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -105,14 +105,14 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - timestamp:userid in username",
+		testName: "ephemeral - timestamp:userid in username",
 		conf: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -137,14 +137,14 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - userid:timestamp in username",
+		testName: "ephemeral - userid:timestamp in username",
 		conf: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -169,14 +169,14 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - userid:timestamp:ramdom-crap in username",
+		testName: "ephemeral - userid:timestamp:ramdom-crap in username",
 		conf: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},

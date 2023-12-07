@@ -16,14 +16,15 @@ type ConfigSkeleton struct {
 	ApiVersion string `json:"version"`
 }
 
-// ZeroConfig builds a zero configuration useful for bootstrapping STUNner. It starts with
-// plaintext authentication and opens no listeners and clusters.
+// ZeroConfig builds a zero configuration useful for bootstrapping STUNner. The minimal config
+// defaults to static authentication with a dummy username and password and opens no listeners or
+// clusters.
 func ZeroConfig(id string) *stnrv1.StunnerConfig {
 	return &stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin:      stnrv1.AdminConfig{Name: id},
 		Auth: stnrv1.AuthConfig{
-			Type:  "plaintext",
+			Type:  "static",
 			Realm: stnrv1.DefaultRealm,
 			Credentials: map[string]string{
 				"username": "dummy-username",

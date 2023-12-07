@@ -12,8 +12,8 @@ import (
 	"github.com/pion/logging"
 )
 
-// configFileClient is the implementation of the Client interface for config files.
-type configFileClient struct {
+// ConfigFileClient is the implementation of the Client interface for config files.
+type ConfigFileClient struct {
 	// configFile specifies the config file name to watch.
 	configFile string
 	// id is the name of the stunnerd instance.
@@ -22,11 +22,20 @@ type configFileClient struct {
 	log logging.LeveledLogger
 }
 
-func (w *configFileClient) String() string {
+func NewConfigFileClient(origin, id string, logger logging.LeveledLogger) (Client, error) {
+	return &ConfigFileClient{
+		configFile: origin,
+		id:         id,
+		log:        logger,
+	}, nil
+
+}
+
+func (w *ConfigFileClient) String() string {
 	return fmt.Sprintf("config client using file %q", w.configFile)
 }
 
-func (w *configFileClient) Load() (*stnrv1.StunnerConfig, error) {
+func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 	b, err := os.ReadFile(w.configFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not read config file %q: %s", w.configFile, err.Error())
@@ -41,7 +50,7 @@ func (w *configFileClient) Load() (*stnrv1.StunnerConfig, error) {
 
 // WatchConfig watches a configuration file for changes. If no file exists at the given path,
 // WatchConfig will periodically retry until the file appears.
-func (w *configFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
 	if w.configFile == "" {
 		return errors.New("uninitialized config file path")
 	}
@@ -55,7 +64,10 @@ func (w *configFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerCo
 	go func() {
 		for {
 			// try to watch
-			if !w.configWatcher(ctx, ch) {
+			if err := w.Poll(ctx, ch); err != nil {
+				w.log.Warnf("error loading config file %q: %s",
+					w.configFile, err.Error())
+			} else {
 				return
 			}
 
@@ -68,29 +80,27 @@ func (w *configFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerCo
 	return nil
 }
 
-// configWatcher watches the config file and emits new configs on the specified channel. Returns
-// true if further action is needed (tryWatchConfig is to be started) or false on normal exit.
-func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.StunnerConfig) bool {
+// Poll watches the config file and emits new configs on the specified channel. Returns an error if
+// further action is needed (tryWatchConfig is to be started) or nil on normal exit.
+func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
 	w.log.Tracef("configWatcher")
 
 	// create a new watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return true
+		return err
 	}
 	defer watcher.Close()
 
 	config := w.configFile
 	if err := watcher.Add(config); err != nil {
-		w.log.Debugf("could not add watcher for config file %q: %s", config, err.Error())
-		return true
+		return err
 	}
 
 	// emit an initial config
 	c, err := w.Load()
 	if err != nil {
-		w.log.Warnf("cannot load config file: %s", err.Error())
-		return true
+		return err
 	}
 
 	// send a deepcopy over the channel
@@ -108,25 +118,22 @@ func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.S
 	for {
 		select {
 		case <-ctx.Done():
-			return false
+			return nil
 
 		case e, ok := <-watcher.Events:
 			if !ok {
-				w.log.Debug("config watcher event handler received invalid event")
-				return true
+				return errors.New("config watcher event handler received invalid event")
 			}
 
 			w.log.Debugf("received watcher event: %s", e.String())
 
 			if e.Has(fsnotify.Remove) {
-				w.log.Warnf("config file deleted %q, disabling watcher", e.Op.String())
-
 				if err := watcher.Remove(config); err != nil {
 					w.log.Debugf("could not remove config file %q watcher: %s",
 						config, err.Error())
 				}
 
-				return true
+				return fmt.Errorf("config file deleted %q, disabling watcher", e.Op.String())
 			}
 
 			if !e.Has(fsnotify.Write) {
@@ -142,8 +149,7 @@ func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.S
 					w.log.Debugf("ignoring: %s", err.Error())
 					continue
 				}
-				w.log.Warnf("error loading config file: %s", err.Error())
-				return true
+				return err
 			}
 
 			// suppress repeated events
@@ -164,18 +170,15 @@ func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.S
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				w.log.Debugf("config watcher error handler received invalid error")
-				return true
+				return errors.New("config watcher error handler received invalid error")
 			}
-
-			w.log.Debugf("watcher error, deactivating watcher: %s", err.Error())
 
 			if err := watcher.Remove(config); err != nil {
 				w.log.Debugf("could not remove config file %q watcher: %s",
 					config, err.Error())
 			}
 
-			return true
+			return fmt.Errorf("watcher error, deactivating watcher: %w", err)
 		}
 	}
 }
@@ -183,7 +186,7 @@ func (w *configFileClient) configWatcher(ctx context.Context, ch chan<- stnrv1.S
 // tryWatchConfig runs a timer to look for the config file at the given path and returns it
 // immediately once found. Returns true if further action is needed (configWatcher has to be
 // started) or false on normal exit.
-func (w *configFileClient) tryWatchConfig(ctx context.Context) bool {
+func (w *ConfigFileClient) tryWatchConfig(ctx context.Context) bool {
 	w.log.Tracef("tryWatchConfig")
 	config := w.configFile
 

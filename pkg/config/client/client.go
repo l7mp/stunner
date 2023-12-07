@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -15,17 +14,17 @@ import (
 var errFileTruncated = errors.New("zero-length config file")
 
 var (
-	// Time
-	RetryPeriod = 1 * time.Second
-
-	// Time allowed to write a message to the CDS server.
-	WriteWait = 2 * time.Second
+	// Send pings to the CDS server with this period. Must be less than PongWait.
+	PingPeriod = 5 * time.Second
 
 	// Time allowed to read the next pong message from the CDS server.
 	PongWait = 8 * time.Second
 
-	// Send pings to the CDS server with this period. Must be less than PongWait.
-	PingPeriod = 5 * time.Second
+	// Time allowed to write a message to the CDS server.
+	WriteWait = 2 * time.Second
+
+	// Period for retrying failed CDS connections.
+	RetryPeriod = 1 * time.Second
 )
 
 // Client represents a generic config client. Currently supported config providers: http, ws, or
@@ -34,34 +33,33 @@ var (
 type Client interface {
 	// Load grabs a new configuration from the config client.
 	Load() (*stnrv1.StunnerConfig, error)
-	// Watch listens to new configurations and returns them on the channel ch. The context ctx
-	// cancels the watcher.
+	// Watch grabs new configs from a config origin (config file or CDS server) and returns
+	// them on the channel. The context cancels the watcher. If the origin is not available
+	// watch will retry.
 	Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
+	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
+	Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
 	fmt.Stringer
 }
 
-// GetConfig returns the configuration of the running STUNner daemon.
-func NewClient(origin string, id string, logger logging.LoggerFactory) (Client, error) {
-	u, err := url.Parse(origin)
+func New(origin string, id string, logger logging.LoggerFactory) (Client, error) {
+	u, err := getURI(origin)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse config origin address %q: %w", origin, err)
+		return nil, fmt.Errorf("could not parse config origin URI %q: %w", origin, err)
 	}
 
-	var client Client
 	switch strings.ToLower(u.Scheme) {
 	case "http", "ws", "https", "wss":
-		client = &configDiscoveryClient{
-			serverAddress: origin,
-			id:            id,
-			log:           logger.NewLogger("config-poller"),
+		client, err := NewCDSClient(u.String(), id, logger.NewLogger("cds-client"))
+		if err != nil {
+			return nil, err
 		}
+		return client, nil
 	default:
-		client = &configFileClient{
-			configFile: origin,
-			id:         id,
-			log:        logger.NewLogger("config-watcher"),
+		client, err := NewConfigFileClient(origin, id, logger.NewLogger("config-file-client"))
+		if err != nil {
+			return nil, err
 		}
+		return client, nil
 	}
-
-	return client, nil
 }

@@ -62,21 +62,21 @@ to go.
 
 Using the below configuration, `stunnerd` will open 4 STUNner listeners: two for accepting
 unencrypted connections at UDP/3478 and TCP/3478, and two for encrypted connections at TLS/TCP/3479
-and DTLS/UDP/3479. For easier debugging, the port for the transport relay connections opened by
-`stunnerd` will be taken from [10000:19999] for the UDP listener, [20000:29999] for the TCP
-listener, etc.  The daemon will use `longterm` authentication, with the shared secret read from the
-environment variable `$STUNNER_SHARED_SECRET` during initialization. The relay address is taken
-from the `$STUNNER_ADDR` environment variable.
+and DTLS/UDP/3479. Transport relay connections opened by `stunnerd` will be restricted to peer
+ports in the range [10000:19999] for the UDP listener, [20000:29999] for the TCP listener, etc.
+The daemon will use `ephemeral` authentication, with the shared secret read from the environment
+variable `$STUNNER_SHARED_SECRET` during initialization. The relay address is taken from the
+`$STUNNER_ADDR` environment variable.
 
 ``` yaml
-version: v1alpha1
+version: v1
 admin:
   name: my-stunnerd
   logLevel: all:DEBUG
   realm: "my-realm.example.com"
 static:
   auth:
-    type: longterm
+    type: ephemeral
     credentials:
       secret: $STUNNER_SHARED_SECRET
   listeners:

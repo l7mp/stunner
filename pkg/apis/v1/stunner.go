@@ -36,18 +36,26 @@ func (req *StunnerConfig) Validate() error {
 		return err
 	}
 
-	for i, l := range req.Listeners {
-		if err := l.Validate(); err != nil {
-			return err
+	if req.Listeners == nil {
+		req.Listeners = []ListenerConfig{}
+	} else {
+		for i, l := range req.Listeners {
+			if err := l.Validate(); err != nil {
+				return err
+			}
+			req.Listeners[i] = l
 		}
-		req.Listeners[i] = l
 	}
 
-	for i, c := range req.Clusters {
-		if err := c.Validate(); err != nil {
-			return err
+	if req.Clusters == nil {
+		req.Clusters = []ClusterConfig{}
+	} else {
+		for i, c := range req.Clusters {
+			if err := c.Validate(); err != nil {
+				return err
+			}
+			req.Clusters[i] = c
 		}
-		req.Clusters[i] = c
 	}
 
 	return nil

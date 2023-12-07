@@ -23,8 +23,9 @@ the daemon can pick up the latest configuration using the watch mode.
   Extensions for TCP Allocations
 * TURN transport over UDP, TCP, TLS/TCP and DTLS/UDP.
 * TURN/UDP listener CPU scaling.
-* Two authentication modes via the long-term STUN/TURN credential mechanism: `plaintext` using a
-  static username/password pair, and `longterm` with dynamically generated time-scoped credentials.
+* Two authentication modes via the long-term STUN/TURN credential mechanism: `static` using a
+  static username/password pair, and `ephemeral` with dynamically generated time-scoped
+  credentials.
 
 ## Getting Started
 
@@ -77,7 +78,7 @@ admin:
   realm: "my-realm.example.com"
 static:
   auth:
-    type: longterm
+    type: ephemeral
     credentials:
       secret: $STUNNER_SHARED_SECRET
   listeners:

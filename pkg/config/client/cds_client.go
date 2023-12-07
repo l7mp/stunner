@@ -1,11 +1,11 @@
+//go:generate go run github.com/deepmap/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../api/stunner_openapi.yaml
 package client
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,72 +13,50 @@ import (
 	"github.com/pion/logging"
 )
 
-// configDiscoveryClient is the the implementation of the config discovery service.
-type configDiscoveryClient struct {
-	// serverAddress is the URL of the config discovery server.
-	serverAddress string
-	// Id is the name of the stunnerd instance that is used to bootstrap the connection
-	// poller. Set to namespace/name of the pod when using the stunner gateway operator for
-	// config discovery.
-	id string
-	// Log is a leveled logger used to report progress.
-	log logging.LeveledLogger
+// CDSClient is a client for the config discovery service that knows how to poll configs for a
+// specific gateway. Use the CDSAPI to access the general CDS client set.
+type CDSClient struct {
+	CDSAPI
+	addr, id string
 }
 
-func (p *configDiscoveryClient) String() string {
-	return fmt.Sprintf("config discovery service using server %q", p.serverAddress)
-}
+func NewCDSClient(addr, id string, logger logging.LeveledLogger) (Client, error) {
+	ps := strings.Split(id, "/")
+	if len(ps) != 2 {
+		return nil, fmt.Errorf("invalid id: %q", id)
+	}
 
-func (p *configDiscoveryClient) Load() (*stnrv1.StunnerConfig, error) {
-	location, _, err := getConfigDiscoveryLocation(p.serverAddress, p.id, false)
+	client, err := NewConfigNamespaceNameAPI(addr, ps[0], ps[1], logger)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := http.Get(location)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("invalid HTTP response status: %s", resp.Status)
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(body) == 0 {
-		return nil, errFileTruncated
-	}
-
-	// fmt.Println("++++++++++++++++++++")
-	// fmt.Println(string(body))
-
-	return ParseConfig(body)
+	return &CDSClient{CDSAPI: client, addr: addr, id: id}, nil
 }
 
-// Watch polls a config discovery server for a configuration file by sending a config request and
-// then waits for the server to push a valid `StunnerConfig`. Use the `context` to cancel the
-// watcher.
-func (p *configDiscoveryClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
-	_, _, err := getConfigDiscoveryLocation(p.serverAddress, p.id, true)
+func (p *CDSClient) String() string {
+	return fmt.Sprintf("config discovery client %q: using server %s", p.id, p.addr)
+}
+
+func (p *CDSClient) Load() (*stnrv1.StunnerConfig, error) {
+	configs, err := p.CDSAPI.Get(context.Background())
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if len(configs) != 1 {
+		return nil, fmt.Errorf("expected exactly one config, got %d", len(configs))
 	}
 
-	// Note: we do not emit an initial config but rather wait for the CDS server to send one,
-	// so that pod will not be able to bootstrap the healthchecker and keep on restarting until
-	// it finds the CDS server
+	return configs[0], nil
+}
 
+func watch(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
 	go func() {
 		for {
 			// try to watch
-			if err := p.configPoller(ctx, ch); err != nil {
-				p.log.Errorf("config file discovery service: %s", err.Error())
+			if err := poll(ctx, a, ch); err != nil {
+				_, wsuri := a.Endpoint()
+				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
 			} else {
 				// context got cancelled
 				return
@@ -92,26 +70,19 @@ func (p *configDiscoveryClient) Watch(ctx context.Context, ch chan<- stnrv1.Stun
 	return nil
 }
 
-func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
-	p.log.Tracef("configPoller: trying to open connection to config discovery server at %q", p.serverAddress)
+func poll(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
+	_, url := a.Endpoint()
+	a.Tracef("poll: trying to open connection to CDS server at %s", url)
 
-	location, origin, _ := getConfigDiscoveryLocation(p.serverAddress, p.id, true)
-	header := http.Header{}
-	header.Set("origin", origin)
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, location, header)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, makeHeader(url))
 	if err != nil {
 		return err
 	}
+	defer conn.Close() // this will close the poller goroutine
 
-	p.log.Infof("connection sucessfully opened to config discovery server at %q", location)
+	a.Infof("connection successfully opened to config discovery server at %s", url)
 
-	// this will close the poller goroutine
-	defer conn.Close()
-
-	// pinger
-	resCh := make(chan stnrv1.StunnerConfig, 16)
 	errCh := make(chan error, 1)
-
 	pingTicker := time.NewTicker(PingPeriod)
 	closePinger := make(chan any)
 	defer close(closePinger)
@@ -129,8 +100,7 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnr
 					return
 				}
 			case <-closePinger:
-				p.log.Tracef("closing ping handler to config discovery server at %q at client %q",
-					location, p.id)
+				a.Tracef("closing ping handler to config discovery server at %q", url)
 				return
 			}
 		}
@@ -138,14 +108,13 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnr
 
 	// poller
 	go func() {
-		defer close(resCh)
 		defer close(errCh)
 
 		// the next pong must arrive within the PongWait period
 		conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 		// reinit the deadline when we get a pong
 		conn.SetPongHandler(func(string) error {
-			// p.log.Tracef("++++ PONG ++++ from CDS server %q at client %q", location, p.id)
+			// a.Tracef("Got PONG from server %q", url)
 			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 			return nil
 		})
@@ -166,7 +135,7 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnr
 			}
 
 			if len(msg) == 0 {
-				p.log.Warn("ignoring zero-length config config fil")
+				a.Warn("ignoring zero-length config")
 				continue
 			}
 
@@ -177,16 +146,16 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnr
 			c, err := ParseConfig(msg)
 			if err != nil {
 				// assume it is a YAML/JSON syntax error: report and ignore
-				p.log.Warnf("could not parse config: %s", err.Error())
+				a.Warnf("could not parse config: %s", err.Error())
 				continue
 			}
 
 			confCopy := stnrv1.StunnerConfig{}
 			c.DeepCopyInto(&confCopy)
 
-			p.log.Debugf("new config received from %q: %s", p.serverAddress, confCopy.String())
+			a.Debugf("new config received from %q: %q", url, confCopy.String())
 
-			resCh <- confCopy
+			ch <- confCopy
 		}
 	}()
 
@@ -196,57 +165,22 @@ func (p *configDiscoveryClient) configPoller(ctx context.Context, ch chan<- stnr
 		case <-ctx.Done():
 			// cancel: normal return
 			closePinger <- struct{}{}
-
 			return nil
 		case err := <-errCh:
 			// error: return it
 			closePinger <- struct{}{}
-
 			return err
-		case conf := <-resCh:
-			// new config: pass it along and move on
-			p.log.Debugf("new config available: %s", conf.String())
-			ch <- conf
-
-			continue
 		}
 	}
 }
 
-// getConfigLocation returns a valid URL from config server address, either for a single HTTP GET
-// to query the config discovery server for a single config file or a websocket URL and client for
-// polling config file updates
-func getConfigDiscoveryLocation(addr, id string, ws bool) (string, string, error) {
-	u, err := url.Parse(addr)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid config discovery server URL %q: %w", addr, err)
-	}
-
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return "", "", fmt.Errorf("invalid config discovery query server URL %q: %w", addr, err)
-	}
-
-	// add our id as a query parameter
-	q.Set("id", id)
-	u.RawQuery = q.Encode()
-
-	// TODO: share between server and client
-	u.Path = "/api/v1/config"
-	if ws {
-		u.Scheme = "ws"
-		u.Path = u.Path + "/watch"
-	} else {
-		u.Scheme = "http"
-	}
-
-	// target URL
-	location := u.String()
-
-	// client
-	u.Scheme = "http"
-	u.RawQuery = ""
-	client := u.String()
-
-	return location, client, nil
+// creates an origin header
+func makeHeader(uri string) http.Header {
+	header := http.Header{}
+	url, _ := getURI(uri) //nolint:errcheck
+	origin := *url
+	origin.Scheme = "http"
+	origin.Path = ""
+	header.Set("origin", origin.String())
+	return header
 }

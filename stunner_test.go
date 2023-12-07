@@ -272,13 +272,13 @@ type TestStunnerConfigCase struct {
 var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	{
 		config: stnrv1.StunnerConfig{
-			// udp, plaintext
+			// udp, static
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -302,13 +302,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// udp, longterm
+			// udp, ephemeral
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -331,7 +331,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// tcp, plaintext
+			// tcp, static
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
@@ -361,13 +361,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// tcp, longterm
+			// tcp, ephemeral
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -390,7 +390,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// tls, plaintext
+			// tls, static
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
@@ -422,13 +422,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// tls, longterm
+			// tls, ephemeral
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "longterm",
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
@@ -453,13 +453,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
-			// dtls, plaintext
+			// dtls, static
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -483,14 +483,14 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		},
 		uri: "turns:1.2.3.4:3478?transport=udp",
 	},
-	// // dtls, longterm
+	// // dtls, ephemeral
 	// {
 	// 	ApiVersion: stnrv1.ApiVersion,
 	// 	Admin: stnrv1.AdminConfig{
 	// 		LogLevel: stunnerTestLoglevel,
 	// 	},
 	// 	Auth: stnrv1.AuthConfig{
-	// 		Type: "longterm",
+	// 		Type: "ephemeral",
 	// 		Credentials: map[string]string{
 	// 			"secret": "my-secret",
 	// 		},
@@ -664,7 +664,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -696,7 +696,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -729,7 +729,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -763,7 +763,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -797,7 +797,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -838,7 +838,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -879,7 +879,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -917,7 +917,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -954,7 +954,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -988,7 +988,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1022,7 +1022,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1057,7 +1057,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1171,7 +1171,7 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1207,7 +1207,7 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1243,7 +1243,7 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -1279,7 +1279,7 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auth: stnrv1.AuthConfig{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",

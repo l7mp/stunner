@@ -22,7 +22,6 @@ const (
 	// defaultDiscoveryAddress = "ws://localhost:13478/api/v1/config/watch"
 	envVarName         = "STUNNER_NAME"
 	envVarNamespace    = "STUNNER_NAMESPACE"
-	envVarId           = "STUNNER_ID"
 	envVarConfigOrigin = "STUNNER_CONFIG_ORIGIN"
 )
 

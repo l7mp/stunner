@@ -233,8 +233,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 }
 
 const (
-	testConfigV1   = `{"version":"v1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"static","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
-	testConfigV1A1 = `{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
+	testConfigV1   = `{"version":"v1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"static","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
+	testConfigV1A1 = `{"version":"v1alpha1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
 )
 
 // test with v1alpha1 and v1
@@ -357,7 +357,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	s := &http.Server{Addr: addr}
 	defer s.Close()
 
-	http.HandleFunc("/api/v1/config/watch",
+	http.HandleFunc("/api/v1/configs/ns1/tester",
 		func(w http.ResponseWriter, req *http.Request) {
 			upgrader := websocket.Upgrader{
 				ReadBufferSize:  1024,
@@ -383,7 +383,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 			})
 
 			// send initial config
-			z := cdsclient.ZeroConfig("tester")
+			z := cdsclient.ZeroConfig("ns1/tester")
 			j, err := json.Marshal(z)
 			assert.NoError(t, err, "json marshal zeroconfig")
 			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, j), "write zeroconfig")
@@ -411,7 +411,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel, Id: "ns1/tester"})
 
 	log.Debug("starting watcher")
 	conf := make(chan stnrv1.StunnerConfig, 1)
@@ -423,7 +423,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	// first read should yield a zeroconfig
 	c2, ok := <-conf
 	assert.True(t, ok, "zeroconfig emitted")
-	checkZeroConfig(t, &c2, "tester")
+	checkZeroConfig(t, &c2, "ns1/tester")
 
 	// second read yields a v1 config
 	c2, ok = <-conf

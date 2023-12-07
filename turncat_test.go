@@ -233,7 +233,7 @@ func TestTurncatLongterm(t *testing.T) {
 			LogLevel: turncatTestLoglevel,
 		},
 		Auth: stnrv1.AuthConfig{
-			Type: "longterm",
+			Type: "ephemeral",
 			Credentials: map[string]string{
 				"secret": sharedSecret,
 			},
@@ -298,7 +298,7 @@ func TestTurncatLongterm(t *testing.T) {
 		server, err := ParseUri(c.ServerAddr)
 		assert.NoError(t, err, "cannot parse server URI")
 
-		testName := fmt.Sprintf("TestTurncat_NewTurncat_Longterm_client:%s_server:%s",
+		testName := fmt.Sprintf("TestTurncat_NewTurncat_Ephemeral_client:%s_server:%s",
 			listener.Scheme, server.Protocol)
 
 		t.Run(testName, func(t *testing.T) {
