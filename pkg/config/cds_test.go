@@ -12,15 +12,16 @@ import (
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client"
+	"github.com/l7mp/stunner/pkg/config/server"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-var testerLogLevel = zapcore.Level(-4)
+// var testerLogLevel = zapcore.Level(-4)
+// var testerLogLevel = zapcore.DebugLevel
+var testerLogLevel = zapcore.ErrorLevel
 
-//var testerLogLevel = zapcore.DebugLevel
-//var testerLogLevel = zapcore.ErrorLevel
-
-const stunnerLogLevel = "all:TRACE"
+// const stunnerLogLevel = "all:TRACE"
+const stunnerLogLevel = "all:ERROR"
 
 func init() {
 	// setup a fast pinger so that we get a timely error notification
@@ -46,9 +47,9 @@ func TestServerLoad(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	server := New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(ctx)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
 
 	time.Sleep(20 * time.Millisecond)
@@ -75,18 +76,18 @@ func TestServerLoad(t *testing.T) {
 
 	c1 := testConfig("ns1/gw1", "realm1")
 	c2 := testConfig("ns1/gw2", "realm1")
-	err = server.UpdateConfig([]Config{c1, c2})
+	err = srv.UpdateConfig([]server.Config{c1, c2})
 	assert.NoError(t, err, "update")
 
-	cs := server.configs.Snapshot()
+	cs := srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
-	sc1 := server.configs.Get("ns1/gw1")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 := server.configs.Get("ns1/gw2")
+	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
-	sc3 := server.configs.Get("ns1/gw3")
+	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
 
 	testLog.Debug("load: config ok")
@@ -101,10 +102,10 @@ func TestServerLoad(t *testing.T) {
 	assert.Nil(t, c, "conf")
 
 	testLog.Debug("remove 2 configs")
-	err = server.UpdateConfig([]Config{})
+	err = srv.UpdateConfig([]server.Config{})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 0, "snapshot len")
 
 	testLog.Debug("load: no result")
@@ -132,9 +133,9 @@ func TestServerPoll(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	server := New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(ctx)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
 
 	time.Sleep(20 * time.Millisecond)
@@ -178,18 +179,18 @@ func TestServerPoll(t *testing.T) {
 	testLog.Debug("poll: one result")
 	c1 := testConfig("ns1/gw1", "realm1")
 	c2 := testConfig("ns1/gw2", "realm1")
-	err = server.UpdateConfig([]Config{c1, c2})
+	err = srv.UpdateConfig([]server.Config{c1, c2})
 	assert.NoError(t, err, "update")
 
-	cs := server.configs.Snapshot()
+	cs := srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
-	sc1 := server.configs.Get("ns1/gw1")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 := server.configs.Get("ns1/gw2")
+	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
-	sc3 := server.configs.Get("ns1/gw3")
+	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
 
 	// poll should have fed the configs to the channels
@@ -203,10 +204,10 @@ func TestServerPoll(t *testing.T) {
 	assert.Nil(t, s, "config 3")
 
 	testLog.Debug("remove 2 configs")
-	err = server.UpdateConfig([]Config{})
+	err = srv.UpdateConfig([]server.Config{})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 0, "snapshot len")
 
 	testLog.Debug("poll: zeroconfig")
@@ -232,9 +233,9 @@ func TestServerWatch(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	server := New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(serverCtx)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
@@ -272,18 +273,18 @@ func TestServerWatch(t *testing.T) {
 	testLog.Debug("poll: one result")
 	c1 := testConfig("ns1/gw1", "realm1")
 	c2 := testConfig("ns1/gw2", "realm1")
-	err = server.UpdateConfig([]Config{c1, c2})
+	err = srv.UpdateConfig([]server.Config{c1, c2})
 	assert.NoError(t, err, "update")
 
-	cs := server.configs.Snapshot()
+	cs := srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
-	sc1 := server.configs.Get("ns1/gw1")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 := server.configs.Get("ns1/gw2")
+	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc3 := server.configs.Get("ns1/gw3")
+	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
 
 	// poll should have fed the configs to the channels
@@ -299,18 +300,18 @@ func TestServerWatch(t *testing.T) {
 	testLog.Debug("update: conf 1 and conf 3")
 	c1 = testConfig("ns1/gw1", "realm-new")
 	c3 := testConfig("ns1/gw3", "realm3")
-	err = server.UpdateConfig([]Config{c1, c2, c3})
+	err = srv.UpdateConfig([]server.Config{c1, c2, c3})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 3, "snapshot len")
-	sc1 = server.configs.Get("ns1/gw1")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
-	sc2 = server.configs.Get("ns1/gw2")
+	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
-	sc3 = server.configs.Get("ns1/gw3")
+	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
@@ -330,11 +331,11 @@ func TestServerWatch(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	server = New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(serverCtx)
+	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
-	err = server.UpdateConfig([]Config{c1, c2, c3})
+	err = srv.UpdateConfig([]server.Config{c1, c2, c3})
 	assert.NoError(t, err, "update")
 
 	// obtain the initial configs: this may take a while
@@ -349,17 +350,17 @@ func TestServerWatch(t *testing.T) {
 	assert.True(t, s.DeepEqual(sc3), "deepeq 3")
 
 	testLog.Debug("remove 1 config (the 2nd)")
-	err = server.UpdateConfig([]Config{c1, c3})
+	err = srv.UpdateConfig([]server.Config{c1, c3})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
-	sc1 = server.configs.Get("ns1/gw1")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
-	sc2 = server.configs.Get("ns1/gw2")
+	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.Nil(t, sc2, "get 2")
-	sc3 = server.configs.Get("ns1/gw3")
+	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
@@ -371,10 +372,10 @@ func TestServerWatch(t *testing.T) {
 	assert.Nil(t, s, "config 3")
 
 	testLog.Debug("remove remaining 2 configs")
-	err = server.UpdateConfig([]Config{})
+	err = srv.UpdateConfig([]server.Config{})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 0, "snapshot len")
 
 	testLog.Debug("poll: no config")
@@ -401,9 +402,9 @@ func TestServerAPI(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	server := New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(serverCtx)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
@@ -452,15 +453,15 @@ func TestServerAPI(t *testing.T) {
 	testLog.Debug("poll: one result")
 	c1 := testConfig("ns1/gw1", "realm1")
 	c2 := testConfig("ns2/gw1", "realm1")
-	err = server.UpdateConfig([]Config{c1, c2})
+	err = srv.UpdateConfig([]server.Config{c1, c2})
 	assert.NoError(t, err, "update")
 
-	cs := server.configs.Snapshot()
+	cs := srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
-	sc1 := server.configs.Get("ns1/gw1")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	assert.NotNil(t, sc1, "get 1")
-	sc2 := server.configs.Get("ns2/gw1")
+	sc2 := srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 
@@ -535,18 +536,18 @@ func TestServerAPI(t *testing.T) {
 	testLog.Debug("update: conf 1 and conf 3")
 	c1 = testConfig("ns1/gw1", "realm-new")
 	c3 := testConfig("ns1/gw2", "realm3")
-	err = server.UpdateConfig([]Config{c1, c2, c3})
+	err = srv.UpdateConfig([]server.Config{c1, c2, c3})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 3, "snapshot len")
-	sc1 = server.configs.Get("ns1/gw1")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 = server.configs.Get("ns2/gw1")
+	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
-	sc3 := server.configs.Get("ns1/gw2")
+	sc3 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
@@ -629,22 +630,22 @@ func TestServerAPI(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	server = New(stnrv1.DefaultConfigDiscoveryAddress, log)
-	assert.NotNil(t, server, "server")
-	err = server.Start(serverCtx)
+	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
-	err = server.UpdateConfig([]Config{c1, c2, c3})
+	err = srv.UpdateConfig([]server.Config{c1, c2, c3})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 3, "snapshot len")
-	sc1 = server.configs.Get("ns1/gw1")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 = server.configs.Get("ns2/gw1")
+	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
-	sc3 = server.configs.Get("ns1/gw2")
+	sc3 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
@@ -733,18 +734,18 @@ func TestServerAPI(t *testing.T) {
 	testLog.Debug("update: conf 1, remove conf 3, and add conf 4")
 	c1 = testConfig("ns1/gw1", "realm-newer")
 	c4 := testConfig("ns3/gw1", "realm4")
-	err = server.UpdateConfig([]Config{c1, c2, c4})
+	err = srv.UpdateConfig([]server.Config{c1, c2, c4})
 	assert.NoError(t, err, "update")
 
-	cs = server.configs.Snapshot()
+	cs = srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 3, "snapshot len")
-	sc1 = server.configs.Get("ns1/gw1")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
-	sc2 = server.configs.Get("ns2/gw1")
+	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
-	sc4 := server.configs.Get("ns3/gw1")
+	sc4 := srv.GetConfigStore().Get("ns3/gw1")
 	assert.NotNil(t, sc3, "get 3")
 	assert.True(t, c4.Config.DeepEqual(sc4), "deepeq")
 
@@ -810,12 +811,82 @@ func TestServerAPI(t *testing.T) {
 	assert.True(t, s.DeepEqual(sc1), "deepeq")
 }
 
+func TestClientReconnect(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	defer serverCancel()
+
+	testLog.Debug("create server")
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
+	assert.NoError(t, err, "start")
+
+	testLog.Debug("create client")
+	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	assert.NoError(t, err, "client 1")
+
+	testLog.Debug("watch: no result")
+	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	defer close(ch1)
+
+	clientCtx, clientCancel := context.WithCancel(context.Background())
+	defer clientCancel()
+	err = client1.Watch(clientCtx, ch1)
+	assert.NoError(t, err, "client 1 watch")
+
+	s := watchConfig(ch1, 150*time.Millisecond)
+	assert.Nil(t, s, "config 1")
+
+	testLog.Debug("update")
+	c1 := testConfig("ns1/gw1", "realm1")
+	err = srv.UpdateConfig([]server.Config{c1})
+	assert.NoError(t, err, "update")
+
+	cs := srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 1, "snapshot len")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
+	assert.NotNil(t, sc1, "get 1")
+	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
+
+	// poll should have fed the config to the channels
+	s = watchConfig(ch1, 500*time.Millisecond)
+	assert.NotNil(t, s, "config 1")
+	assert.True(t, s.DeepEqual(sc1), "deepeq 1")
+
+	log.Info("killing the connection of the watcher", "id", "ns1/gw1")
+	conns := srv.GetConnTrack()
+	assert.NotNil(t, conns)
+	snapshot := conns.Snapshot()
+	assert.Len(t, snapshot, 1)
+	connId := snapshot[0].Id()
+	srv.RemoveClient(connId)
+
+	// after 2 pong-waits, client should have reconnected
+	time.Sleep(client.RetryPeriod)
+	time.Sleep(client.RetryPeriod)
+
+	// watcher should receive its config
+	s = watchConfig(ch1, 1500*time.Millisecond)
+	assert.NotNil(t, s, "config 1")
+	assert.True(t, s.DeepEqual(sc1), "deepeq 1")
+}
+
 // only differ in id and realm
-func testConfig(id, realm string) Config {
+func testConfig(id, realm string) server.Config {
 	c := client.ZeroConfig(id)
 	c.Auth.Realm = realm
 
-	return Config{id, c}
+	return server.Config{Id: id, Config: c}
 }
 
 // wait for some configurable time for a watch element

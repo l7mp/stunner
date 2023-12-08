@@ -17,6 +17,7 @@ import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
+// Server is a generic config discovery server implementation.
 type Server struct {
 	*http.Server
 	addr     string
@@ -26,6 +27,7 @@ type Server struct {
 	log      logr.Logger
 }
 
+// New creates a new config discovery server instance for the specified address.
 func New(addr string, logger logr.Logger) *Server {
 	if addr == "" {
 		addr = stnrv1.DefaultConfigDiscoveryAddress
@@ -41,12 +43,12 @@ func New(addr string, logger logr.Logger) *Server {
 	return cds
 }
 
+// Start let the config discovery server listen to new client connections.
 func (s *Server) Start(ctx context.Context) error {
 	r := mux.NewRouter()
 	api.HandlerFromMux(s, r)
 	s.Server = &http.Server{Addr: s.addr, Handler: r}
 
-	// serve
 	go func() {
 		s.log.Info("Starting CDS server", "address", s.addr)
 
@@ -61,7 +63,6 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	// listen to config update events and cancel requests
 	go func() {
 		defer close(s.configCh)
 		defer s.Close()
@@ -89,8 +90,28 @@ func (s *Server) Close() {
 	}
 }
 
+// GetConfigChannel returns the channel that can be used to add configs to the server's config
+// store. Use Update to specify more configs at once.
 func (s *Server) GetConfigChannel() chan Config {
 	return s.configCh
+}
+
+// GetConfigStore returns the dataplane configs stores in the server.
+func (s *Server) GetConfigStore() *ConfigStore {
+	return s.configs
+}
+
+// GetConnTrack returns the client connection tracking table of the server.
+func (s *Server) GetConnTrack() *ConnTrack {
+	return s.conns
+}
+
+// RemoveClient forcefully closes a client connection. This is used mainly for testing.
+func (s *Server) RemoveClient(id string) {
+	if c := s.conns.Get(id); c != nil {
+		s.log.V(1).Info("forcefully removing client connection", "client", id)
+		s.closeConn(c)
+	}
 }
 
 func (s *Server) handleReq(w http.ResponseWriter, r *http.Request, endpoint string, responder ResponseGen) {
@@ -98,8 +119,8 @@ func (s *Server) handleReq(w http.ResponseWriter, r *http.Request, endpoint stri
 
 	response, err := responder()
 	if err != nil {
-		s.log.Error(err, "error generating client response", "api", endpoint,
-			"client", r.RemoteAddr, "code", err.Code)
+		s.log.Info("client config not found", "api", endpoint, "client", r.RemoteAddr,
+			"code", err.Code, "message", err.Message)
 		sendServerErrorRaw(w, err)
 	}
 

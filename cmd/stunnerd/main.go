@@ -12,6 +12,7 @@ import (
 
 	"github.com/l7mp/stunner"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 )
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
@@ -101,8 +102,11 @@ func main() {
 		conf <- *c
 
 	} else if *config != "" && *watch {
-		log.Infof("watching configuration at origin %q", *config)
+		log.Info("bootstrapping with minimal config")
+		z := cdsclient.ZeroConfig(st.GetId())
+		conf <- *z
 
+		log.Infof("watching configuration at origin %q", *config)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cancelConfigLoader = cancel
