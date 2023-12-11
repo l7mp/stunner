@@ -80,7 +80,7 @@ func (r *RelayAddressGenerator) Validate() error {
 // returned to the client in the allocation response.
 func (r *RelayAddressGenerator) AllocatePacketConn(network string, requestedPort int) (net.PacketConn, net.Addr, error) {
 	if requestedPort <= 1 || requestedPort > 2<<16-1 {
-		// Let the OS to automatically assign a port
+		// let the OS automatically assign a port
 		requestedPort = 0
 	}
 

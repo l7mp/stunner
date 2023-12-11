@@ -196,25 +196,27 @@ func (s *Server) broadcastConfig(e Config) {
 
 	for _, conn := range s.conns.Snapshot() {
 		if conn.Filter(e.Id) {
-			if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
-				s.log.Error(err, "error sending config update",
-					"client", conn.Id())
-				s.closeConn(conn)
-			}
+			s.sendJSONConfig(conn, json)
 		}
 	}
 }
 
-// iterate through all connections and send response if needed
 func (s *Server) sendConfig(conn *Conn, e Config) {
 	json, err := json.Marshal(e.Config)
 	if err != nil {
 		s.log.Error(err, "error JSON marshaling config", "event", e.String())
 		return
 	}
+
+	s.sendJSONConfig(conn, json)
+}
+
+func (s *Server) sendJSONConfig(conn *Conn, json []byte) {
+	s.log.V(2).Info("sending configuration to client", "client", conn.Id(),
+		"config", string(json))
+
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
-		s.log.Error(err, "error sending config update",
-			"client", conn.Id())
+		s.log.Error(err, "error sending config update", "client", conn.Id())
 		s.closeConn(conn)
 	}
 }

@@ -387,6 +387,94 @@ func TestServerWatch(t *testing.T) {
 	assert.Nil(t, s, "config")
 }
 
+// config already available when watcher joins
+func TestServerWatchBootstrap(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	defer serverCancel()
+
+	testLog.Debug("create server")
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
+	assert.NoError(t, err, "start")
+
+	testLog.Debug("create client")
+	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	assert.NoError(t, err, "client 1")
+
+	testLog.Debug("bootstrap")
+	c1 := testConfig("ns1/gw1", "realm1")
+	c2 := testConfig("ns1/gw2", "realm1")
+	err = srv.UpdateConfig([]server.Config{c1, c2})
+	assert.NoError(t, err, "update")
+
+	cs := srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 2, "snapshot len")
+	sc1 := srv.GetConfigStore().Get("ns1/gw1")
+	assert.NotNil(t, sc1, "get 1")
+	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
+	sc2 := srv.GetConfigStore().Get("ns1/gw2")
+	assert.NotNil(t, sc2, "get 2")
+	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
+	sc3 := srv.GetConfigStore().Get("ns1/gw3")
+	assert.Nil(t, sc3, "get 3")
+
+	testLog.Debug("watch: 1 result")
+	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	defer close(ch1)
+
+	clientCtx, clientCancel := context.WithCancel(context.Background())
+	defer clientCancel()
+	err = client1.Watch(clientCtx, ch1)
+	assert.NoError(t, err, "client 1 watch")
+
+	s := watchConfig(ch1, 1500*time.Millisecond)
+	assert.NotNil(t, s, "config 1")
+	assert.True(t, s.DeepEqual(sc1), "deepeq 1")
+	// only 1 config
+	s = watchConfig(ch1, 150*time.Millisecond)
+	assert.Nil(t, s, "config 1")
+
+	testLog.Debug("update: conf 1 and conf 2")
+	c1 = testConfig("ns1/gw1", "realm-new")
+	c2 = testConfig("ns1/gw2", "realm3")
+	err = srv.UpdateConfig([]server.Config{c1, c2})
+	assert.NoError(t, err, "update")
+
+	cs = srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 2, "snapshot len")
+	sc1 = srv.GetConfigStore().Get("ns1/gw1")
+	assert.NotNil(t, sc1, "get 1")
+	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
+	sc2 = srv.GetConfigStore().Get("ns1/gw2")
+	assert.NotNil(t, sc2, "get 2")
+	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
+
+	s = watchConfig(ch1, 500*time.Millisecond)
+	assert.NotNil(t, s, "config 1")
+	assert.True(t, s.DeepEqual(sc1), "deepeq 1")
+
+	testLog.Debug("remove 2 configs")
+	err = srv.UpdateConfig([]server.Config{})
+	assert.NoError(t, err, "update")
+
+	cs = srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 0, "snapshot len")
+
+	testLog.Debug("poll: no config")
+	s = watchConfig(ch1, 10*time.Millisecond)
+}
+
 // test APIs
 func TestServerAPI(t *testing.T) {
 	zc := zap.NewProductionConfig()

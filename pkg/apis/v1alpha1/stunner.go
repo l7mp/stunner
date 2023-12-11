@@ -191,7 +191,7 @@ func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
 	return ClusterConfig{}, ErrNoSuchCluster
 }
 
-// GetClusterConfig finds a Cluster by name in a StunnerConfig or returns an error.
+// ConvertToV1 upgrades a v1alpha1 StunnerConfig to a v1.
 func ConvertToV1(sv1a1 *StunnerConfig) (*stnrv1.StunnerConfig, error) {
 	sv1 := stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,

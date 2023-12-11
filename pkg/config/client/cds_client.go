@@ -161,14 +161,19 @@ func poll(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
 
 	// wait fo cancel
 	for {
+		defer func() {
+			a.Infof("closing connection for client %s", conn.RemoteAddr().String())
+			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+			conn.Close()
+			closePinger <- struct{}{}
+		}()
+
 		select {
 		case <-ctx.Done():
 			// cancel: normal return
-			closePinger <- struct{}{}
 			return nil
 		case err := <-errCh:
 			// error: return it
-			closePinger <- struct{}{}
 			return err
 		}
 	}
