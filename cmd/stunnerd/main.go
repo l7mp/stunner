@@ -18,17 +18,16 @@ import (
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
 
 const (
-	defaultLoglevel = "all:INFO"
-	// environment for the config poller
-	// defaultDiscoveryAddress = "ws://localhost:13478/api/v1/config/watch"
-	envVarName         = "STUNNER_NAME"
-	envVarNamespace    = "STUNNER_NAMESPACE"
-	envVarConfigOrigin = "STUNNER_CONFIG_ORIGIN"
+	defaultLoglevel               = "all:INFO"
+	defaultConfigDiscoveryAddress = "http://localhost:13478"
+	envVarName                    = "STUNNER_NAME"
+	envVarNamespace               = "STUNNER_NAMESPACE"
+	envVarConfigOrigin            = "STUNNER_CONFIG_ORIGIN"
 )
 
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", "Config origin, either a valid URL to the CDS server or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: none).")
+	var config = flag.StringP("config", "c", "", fmt.Sprintf("Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: %s).", defaultConfigDiscoveryAddress))
 	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO).")
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <hostname>).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
@@ -47,11 +46,12 @@ func main() {
 		logLevel = *level
 	}
 
-	if *config == "" {
-		origin, ok := os.LookupEnv(envVarConfigOrigin)
-		if ok {
-			*config = origin
-		}
+	configOrigin := defaultConfigDiscoveryAddress
+	if origin, ok := os.LookupEnv(envVarConfigOrigin); ok {
+		configOrigin = origin
+	}
+	if *config != "" {
+		configOrigin = *config
 	}
 
 	if *id == "" {
@@ -78,7 +78,7 @@ func main() {
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
-	if *config == "" && flag.NArg() == 1 {
+	if configOrigin == "" && flag.NArg() == 1 {
 		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
 
@@ -90,10 +90,10 @@ func main() {
 
 		conf <- *c
 
-	} else if *config != "" && !*watch {
-		log.Infof("loading configuration from origin %q", *config)
+	} else if configOrigin != "" && !*watch {
+		log.Infof("loading configuration from origin %q", configOrigin)
 
-		c, err := st.LoadConfig(*config)
+		c, err := st.LoadConfig(configOrigin)
 		if err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
@@ -101,18 +101,18 @@ func main() {
 
 		conf <- *c
 
-	} else if *config != "" && *watch {
+	} else if configOrigin != "" && *watch {
 		log.Info("bootstrapping with minimal config")
 		z := cdsclient.ZeroConfig(st.GetId())
 		conf <- *z
 
-		log.Infof("watching configuration at origin %q", *config)
+		log.Infof("watching configuration at origin %q", configOrigin)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cancelConfigLoader = cancel
 
 		// Watch closes the channel
-		if err := st.WatchConfig(ctx, *config, conf); err != nil {
+		if err := st.WatchConfig(ctx, configOrigin, conf); err != nil {
 			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
 		}
