@@ -23,6 +23,14 @@ type ClusterConfig struct {
 	// Protocol specifies the protocol to be used with the cluster, either UDP (default) or TCP
 	// (not implemented yet).
 	Protocol string `json:"protocol,omitempty"`
+	// MinRelayPort is the lowest peer target port admitted on the cluster (inclusive). The
+	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
+	// relay connections created via the cluster. Default is 1.
+	MinRelayPort int `json:"min_relay_port,omitempty"`
+	// MaxRelayPort is the highest peer target port admitted on the cluster (inclusive). The
+	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
+	// relay connections created via the cluster. Default is 65535.
+	MaxRelayPort int `json:"max_relay_port,omitempty"`
 	// Endpoints specifies the peers that can be reached via this cluster.
 	Endpoints []string `json:"endpoints,omitempty"`
 }
@@ -52,6 +60,22 @@ func (req *ClusterConfig) Validate() error {
 		return err
 	}
 	req.Protocol = p.String()
+
+	if req.MinRelayPort == 0 {
+		req.MinRelayPort = DefaultMinRelayPort
+	}
+	if req.MaxRelayPort == 0 {
+		req.MaxRelayPort = DefaultMaxRelayPort
+	}
+	for _, p := range []int{req.MinRelayPort, req.MaxRelayPort} {
+		if p <= 0 || p > 65535 {
+			return fmt.Errorf("invalid port: %d", p)
+		}
+	}
+	if req.MinRelayPort > req.MaxRelayPort {
+		return fmt.Errorf("invalid relay port range: min port (%d) <= max port (%d) must hold",
+			req.MinRelayPort, req.MaxRelayPort)
+	}
 
 	sort.Strings(req.Endpoints)
 	return nil
@@ -92,8 +116,15 @@ func (req *ClusterConfig) String() string {
 		status = append(status, fmt.Sprintf("protocol=%q", req.Protocol))
 	}
 
+	min, max := 0, 65535
+	if req.MinRelayPort != 0 {
+		min = req.MinRelayPort
+	}
+	if req.MaxRelayPort != 0 {
+		max = req.MaxRelayPort
+	}
 	status = append(status, fmt.Sprintf("endpoints=[%s]",
 		strings.Join(req.Endpoints, ",")))
 
-	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
+	return fmt.Sprintf("%q:{%s}<%d-%d>", n, strings.Join(status, ","), min, max)
 }

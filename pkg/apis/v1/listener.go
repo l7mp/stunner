@@ -26,14 +26,6 @@ type ListenerConfig struct {
 	Addr string `json:"address,omitempty"`
 	// Port is the port for the listener. Default is the standard TURN port (3478).
 	Port int `json:"port,omitempty"`
-	// MinRelayPort is the lowest peer target port admitted on the listener (inclusive). The
-	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
-	// relay connections created via the listener. Default is 1.
-	MinRelayPort int `json:"min_relay_port,omitempty"`
-	// MaxRelayPort is the highest peer target port admitted on the listener (inclusive). The
-	// interval [MinRelayPort:MaxRelayPort] specifies the port range reachable on the transport
-	// relay connections created via the listener. Default is 65535.
-	MaxRelayPort int `json:"max_relay_port,omitempty"`
 	// Cert is the base64-encoded TLS cert.
 	Cert string `json:"cert,omitempty"`
 	// Key is the base64-encoded TLS key.
@@ -65,20 +57,8 @@ func (req *ListenerConfig) Validate() error {
 	if req.Port == 0 {
 		req.Port = DefaultPort
 	}
-	if req.MinRelayPort == 0 {
-		req.MinRelayPort = DefaultMinRelayPort
-	}
-	if req.MaxRelayPort == 0 {
-		req.MaxRelayPort = DefaultMaxRelayPort
-	}
-	for _, p := range []int{req.Port, req.MinRelayPort, req.MaxRelayPort} {
-		if p <= 0 || p > 65535 {
-			return fmt.Errorf("invalid port: %d", p)
-		}
-	}
-	if req.MinRelayPort > req.MaxRelayPort {
-		return fmt.Errorf("invalid relay port range: min port (%d) <= max port (%d) must hold",
-			req.MinRelayPort, req.MaxRelayPort)
+	if req.Port <= 0 || req.Port > 65535 {
+		return fmt.Errorf("invalid port: %d", req.Port)
 	}
 
 	if proto == ListenerProtocolTURNTLS || proto == ListenerProtocolTURNDTLS ||
@@ -122,14 +102,7 @@ func (req *ListenerConfig) String() string {
 		n = req.Name
 	}
 
-	min, max := 0, 65535
-	if req.MinRelayPort != 0 {
-		min = req.MinRelayPort
-	}
-	if req.MaxRelayPort != 0 {
-		max = req.MaxRelayPort
-	}
-	status = append(status, fmt.Sprintf("turn://0.0.0.0:%d<%d-%d>", req.Port, min, max))
+	status = append(status, fmt.Sprintf("turn://0.0.0.0:%d", req.Port))
 
 	a, p := "-", "-"
 	if req.PublicAddr != "" {

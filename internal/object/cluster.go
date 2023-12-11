@@ -15,14 +15,16 @@ import (
 
 // Listener implements a STUNner cluster
 type Cluster struct {
-	Name      string
-	Type      stnrv1.ClusterType
-	Protocol  stnrv1.ClusterProtocol
-	Endpoints []net.IPNet
-	Domains   []string
-	Resolver  resolver.DnsResolver // for strict DNS
-	logger    logging.LoggerFactory
-	log       logging.LeveledLogger
+	Name             string
+	Type             stnrv1.ClusterType
+	Protocol         stnrv1.ClusterProtocol
+	MinPort, MaxPort int
+	Endpoints        []net.IPNet
+	Domains          []string
+	Resolver         resolver.DnsResolver // for strict DNS
+
+	logger logging.LoggerFactory
+	log    logging.LeveledLogger
 }
 
 // NewCluster creates a new cluster.
@@ -40,6 +42,8 @@ func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger loggin
 	c := Cluster{
 		Name:      req.Name,
 		Endpoints: []net.IPNet{},
+		MinPort:   req.MinRelayPort,
+		MaxPort:   req.MaxRelayPort,
 		Domains:   []string{},
 		Resolver:  resolver,
 		logger:    logger,
@@ -75,6 +79,8 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 	c.log.Tracef("Reconcile: %s", req.String())
 	c.Type, _ = stnrv1.NewClusterType(req.Type)
 	c.Protocol, _ = stnrv1.NewClusterProtocol(req.Protocol)
+	c.MinPort = req.MinRelayPort
+	c.MaxPort = req.MaxRelayPort
 
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
@@ -147,9 +153,11 @@ func (c *Cluster) ObjectType() string {
 // GetConfig returns the configuration of the running cluster.
 func (c *Cluster) GetConfig() stnrv1.Config {
 	conf := stnrv1.ClusterConfig{
-		Name:     c.Name,
-		Protocol: c.Protocol.String(),
-		Type:     c.Type.String(),
+		Name:         c.Name,
+		Protocol:     c.Protocol.String(),
+		Type:         c.Type.String(),
+		MinRelayPort: c.MinPort,
+		MaxRelayPort: c.MaxPort,
 	}
 
 	switch c.Type {

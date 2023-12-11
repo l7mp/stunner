@@ -1,14 +1,17 @@
-package util
+package stunner
 
 import (
 	"net"
 	"testing"
 	"time"
 
-	"github.com/l7mp/stunner/pkg/logger"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/telemetry"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 var connTestLoglevel string = "all:ERROR"
@@ -18,7 +21,23 @@ var connTestLoglevel string = "all:ERROR"
 // var connTestLoglevel string = "all:TRACE"
 // var connTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
+var testCluster = object.Cluster{Name: "test-cluster"}
+
+func getChecker(minPort, maxPort int) PortRangeChecker {
+	return func(addr net.Addr) (*object.Cluster, bool) {
+		u, ok := addr.(*net.UDPAddr)
+		if !ok {
+			return nil, false
+		}
+
+		return &testCluster, u.Port >= minPort && u.Port <= maxPort
+	}
+}
+
 func TestPortRangePacketConn(t *testing.T) {
+	telemetry.Init()
+	defer telemetry.Close()
+
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -42,7 +61,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, "test", 10000, 20000, log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -72,7 +91,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, "test", 10000, 20000, log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -101,7 +120,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, "test", 15000, 15000, log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(15000, 15000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -126,6 +145,9 @@ func TestPortRangePacketConn(t *testing.T) {
 
 // BenchmarkPortRangePacketConn sends lots of invalid packets: this is mostly for testing the logger
 func BenchmarkPortRangePacketConn(b *testing.B) {
+	telemetry.Init()
+	defer telemetry.Close()
+
 	loggerFactory := logger.NewLoggerFactory(connTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 	//	relayLog := loggerFactory.WithRateLimiter(.25, 1).NewLogger("relay")
@@ -146,7 +168,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	msg := "PING!"
 
 	log.Debug("Creating filtered packet conn wrappeer socket")
-	conn := WithCounter(NewPortRangePacketConn(baseConn, "test", 15000, 15000, relayLog))
+	conn := WithCounter(NewPortRangePacketConn(baseConn, getChecker(15000, 15000), relayLog))
 	if err != nil {
 		b.Fatalf("Cannot create port-range packetconn: %s", err.Error())
 	}

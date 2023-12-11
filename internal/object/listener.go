@@ -94,8 +94,6 @@ func (l *Listener) Inspect(old, new, full stnrv1.Config) (bool, error) {
 		l.Proto == proto && // protocol unchanged
 		l.rawAddr == req.Addr && // address unchanged
 		l.Port == req.Port && // ports unchanged
-		l.MinPort == req.MinRelayPort &&
-		l.MaxPort == req.MaxRelayPort &&
 		bytes.Equal(l.Cert, cert) && // TLS creds unchanged
 		bytes.Equal(l.Key, key) {
 		restart = nil
@@ -137,7 +135,7 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 	l.Proto = proto
 	l.Addr = ipAddr
 	l.rawAddr = req.Addr
-	l.Port, l.MinPort, l.MaxPort = req.Port, req.MinRelayPort, req.MaxRelayPort
+	l.Port = req.Port
 	if proto == stnrv1.ListenerProtocolTURNTLS || proto == stnrv1.ListenerProtocolTURNDTLS {
 		cert, err := base64.StdEncoding.DecodeString(req.Cert)
 		if err != nil {
@@ -181,12 +179,10 @@ func (l *Listener) GetConfig() stnrv1.Config {
 	sort.Strings(l.Routes)
 
 	c := &stnrv1.ListenerConfig{
-		Name:         l.Name,
-		Protocol:     l.Proto.String(),
-		Addr:         l.rawAddr,
-		Port:         l.Port,
-		MinRelayPort: l.MinPort,
-		MaxRelayPort: l.MaxPort,
+		Name:     l.Name,
+		Protocol: l.Proto.String(),
+		Addr:     l.rawAddr,
+		Port:     l.Port,
 	}
 
 	c.Cert = string(l.Cert)

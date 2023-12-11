@@ -31,16 +31,8 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
 
-	// listen on all IPs, relay to the listener address
-	relay := &util.RelayAddressGenerator{
-		ListenerName: l.Name,
-		RelayAddress: l.Addr,
-		Address:      "0.0.0.0",
-		MinRelayPort: l.MinPort,
-		MaxRelayPort: l.MaxPort,
-		Net:          l.Net,
-		Logger:       s.logger,
-	}
+	relay := NewRelayGen(l, s.logger)
+	relay.PortRangeChecker = s.GenPortRangeChecker(relay)
 
 	permissionHandler := s.NewPermissionHandler(l)
 
@@ -48,7 +40,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 	switch l.Proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := util.NewPacketConnPool(l.Net, s.udpThreadNum)
+		socketPool := util.NewPacketConnPool(l.Name, l.Net, s.udpThreadNum)
 
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
@@ -58,9 +50,8 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		for _, c := range conns {
-			udpListener := telemetry.NewPacketConn(c, l.Name, telemetry.ListenerType)
 			conn := turn.PacketConnConfig{
-				PacketConn:            udpListener,
+				PacketConn:            c,
 				RelayAddressGenerator: relay,
 				PermissionHandler:     permissionHandler,
 			}

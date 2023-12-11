@@ -91,8 +91,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -102,6 +100,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -334,8 +334,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -345,6 +343,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -420,8 +420,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -430,6 +428,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
@@ -510,8 +510,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -521,6 +519,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -596,8 +596,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -607,6 +605,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -681,8 +681,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -692,6 +690,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -770,8 +770,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -781,6 +779,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -816,13 +816,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				},
 			},
 			Listeners: []stnrv1.ListenerConfig{{
-				Name:         "default-listener",
-				Protocol:     "turn-tcp",
-				Addr:         "127.0.0.2",
-				Port:         12345,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "default-listener",
+				Protocol: "turn-tcp",
+				Addr:     "127.0.0.2",
+				Port:     12345,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -846,8 +844,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 12345, "listener port ok")
-			assert.Equal(t, l.MinPort, 10, "listener minport ok")
-			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
 			assert.Len(t, l.Routes, 2, "listener route count ok")
 			// sorted!!!
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
@@ -864,6 +860,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -898,13 +896,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				},
 			},
 			Listeners: []stnrv1.ListenerConfig{{
-				Name:         "newlistener",
-				Protocol:     "turn-tcp",
-				Addr:         "127.0.0.2",
-				Port:         1,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "newlistener",
+				Protocol: "turn-tcp",
+				Addr:     "127.0.0.2",
+				Port:     1,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -927,8 +923,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Equal(t, l.MinPort, 10, "listener minport ok")
-			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
 			assert.Len(t, l.Routes, 2, "listener route count ok")
 			// sorted!
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
@@ -938,6 +932,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -972,13 +968,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				},
 			},
 			Listeners: []stnrv1.ListenerConfig{{
-				Name:         "newlistener",
-				Protocol:     "turn-tls",
-				Addr:         "127.0.0.2",
-				Port:         1,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "newlistener",
+				Protocol: "turn-tls",
+				Addr:     "127.0.0.2",
+				Port:     1,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -1007,13 +1001,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Addr:   "127.0.0.1",
 				Routes: []string{"allow-any"},
 			}, {
-				Name:         "newlistener",
-				Protocol:     "turn-tcp",
-				Addr:         "127.0.0.2",
-				Port:         1,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "newlistener",
+				Protocol: "turn-tcp",
+				Addr:     "127.0.0.2",
+				Port:     1,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -1032,8 +1024,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -1041,6 +1031,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -1067,8 +1059,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Equal(t, l.MinPort, 10, "listener minport ok")
-			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
 			assert.Len(t, l.Routes, 2, "listener route count ok")
 			// sorted!
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
@@ -1110,13 +1100,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
-				Name:         "newlistener",
-				Protocol:     "turn-tcp",
-				Addr:         "127.0.0.2",
-				Port:         1,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "newlistener",
+				Protocol: "turn-tcp",
+				Addr:     "127.0.0.2",
+				Port:     1,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -1141,8 +1129,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
 			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -1150,6 +1136,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -1176,8 +1164,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Equal(t, l.MinPort, 10, "listener minport ok")
-			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
 			assert.Len(t, l.Routes, 2, "listener route count ok")
 			// sorted!
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
@@ -1219,13 +1205,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Key:      dummyKey64,
 				Routes:   []string{"allow-any"},
 			}, {
-				Name:         "newlistener",
-				Protocol:     "turn-tcp",
-				Addr:         "127.0.0.2",
-				Port:         1,
-				MinRelayPort: 10,
-				MaxRelayPort: 100,
-				Routes:       []string{"none", "dummy"},
+				Name:     "newlistener",
+				Protocol: "turn-tcp",
+				Addr:     "127.0.0.2",
+				Port:     1,
+				Routes:   []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
@@ -1250,8 +1234,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
 			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
 			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.MinPort, stnrv1.DefaultMinRelayPort, "listener minport ok")
-			assert.Equal(t, l.MaxPort, stnrv1.DefaultMaxRelayPort, "listener maxport ok")
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
@@ -1259,6 +1241,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -1285,8 +1269,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
 			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
 			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Equal(t, l.MinPort, 10, "listener minport ok")
-			assert.Equal(t, l.MaxPort, 100, "listener maxport ok")
 			assert.Len(t, l.Routes, 2, "listener route count ok")
 			// sorted!
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
@@ -1432,6 +1414,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("1.1.1.1/32")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -1476,8 +1460,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Routes: []string{"allow-any"},
 			}},
 			Clusters: []stnrv1.ClusterConfig{{
-				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Name:         "newcluster",
+				Endpoints:    []string{"1.1.1.1", "2.2.2.2/8"},
+				MinRelayPort: 10,
+				MaxRelayPort: 100,
 			}, {
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
@@ -1505,6 +1491,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, 10, "minport ok")
+			assert.Equal(t, c.MaxPort, 100, "maxport ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			_, n, _ = net.ParseCIDR("1.1.1.1/32")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")
@@ -1575,6 +1563,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, c.MinPort, stnrv1.DefaultMinRelayPort, "minport ok")
+			assert.Equal(t, c.MaxPort, stnrv1.DefaultMaxRelayPort, "maxport ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			_, n, _ = net.ParseCIDR("1.1.1.1/32")
 			assert.IsType(t, c.Endpoints[0], *n, "cluster endpoint type ok")

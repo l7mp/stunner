@@ -473,6 +473,7 @@ func TestServerWatchBootstrap(t *testing.T) {
 
 	testLog.Debug("poll: no config")
 	s = watchConfig(ch1, 10*time.Millisecond)
+	assert.Nil(t, s, "config 1")
 }
 
 // test APIs
