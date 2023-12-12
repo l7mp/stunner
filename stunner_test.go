@@ -19,9 +19,11 @@ import (
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/turn/v3"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/logger"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -653,6 +655,7 @@ type StunnerTestClusterConfig struct {
 	config         stnrv1.StunnerConfig
 	echoServerAddr string
 	result         bool
+	tester         func(t *testing.T)
 }
 
 var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
@@ -1162,7 +1165,6 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 // Port range filtering tests with VNet
 // *****************
 var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
-	// port range filtering
 	{
 		testName: "static endpoint with peer address in the admitted port range ok",
 		config: stnrv1.StunnerConfig{
@@ -1198,6 +1200,35 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+		},
 	},
 	{
 		testName: "static endpoint with peer address matching singleton admitted port ok",
@@ -1222,18 +1253,53 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 					"echo-server-cluster",
 				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name:         "echo-server-cluster",
-				Type:         "STATIC",
-				MinRelayPort: 5678,
-				MaxRelayPort: 5678,
-				Endpoints: []string{
-					"1.2.3.5",
+			Clusters: []stnrv1.ClusterConfig{
+				{
+					Name:         "dummy-cluster",
+					Type:         "STATIC",
+					MinRelayPort: 5678,
+					MaxRelayPort: 5678,
+					Endpoints:    []string{"1.2.3.6"},
+				}, {
+					Name:         "echo-server-cluster",
+					Type:         "STATIC",
+					MinRelayPort: 5678,
+					MaxRelayPort: 5678,
+					Endpoints:    []string{"1.2.3.5"},
 				},
-			}},
+			},
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+		},
 	},
 	{
 		testName: "static endpoint with peer address in rejected port range fails",
@@ -1270,6 +1336,35 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         false,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(50))     // just signaling
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(1000)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(1000))    // just signaling
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+		},
 	},
 	{
 		testName: "static endpoint with peer address in rejected singleton port fails",
@@ -1306,6 +1401,167 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         false,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(50))     // just signaling
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(1000)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(1000))    // just signaling
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+		},
+	},
+	{
+		testName: "strict_dns with default port range ok",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "turn-udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{
+				{
+					Name:      "dummy-cluster",
+					Type:      "STATIC",
+					Endpoints: []string{"1.2.3.6"},
+				}, {
+					Name:      "echo-server-cluster",
+					Type:      "STRICT_DNS",
+					Endpoints: []string{"echo-server.l7mp.io"},
+				},
+			},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         true,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+		},
+	},
+	{
+		testName: "strict_dns with prohibited port range fails",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "turn-udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes: []string{
+					"echo-server-cluster",
+				},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:         "echo-server-cluster",
+				Type:         "STRICT_DNS",
+				MinRelayPort: 1,
+				MaxRelayPort: 1,
+				Endpoints: []string{
+					"echo-server.l7mp.io",
+				},
+			}},
+		},
+		echoServerAddr: "1.2.3.5:5678",
+		result:         false,
+		tester: func(t *testing.T) {
+			c := telemetry.ListenerConnsTotal
+			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+
+			g := telemetry.ListenerConnsActive
+			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
+			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+
+			c = telemetry.ListenerPacketsTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(50))     // just signaling
+
+			c = telemetry.ListenerBytesTotal
+			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(1000)) // signaling+data
+			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(1000))    // just signaling
+
+			c = telemetry.ClusterPacketsTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+
+			c = telemetry.ClusterBytesTotal
+			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
+			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+		},
 	},
 }
 
@@ -1371,6 +1627,10 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
 				c.echoServerAddr, true, true, c.result, loggerFactory}
 			stunnerEchoFloodTest(testConfig)
+
+			if c.tester != nil {
+				c.tester(t)
+			}
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
 			stunner.Close()
@@ -1480,6 +1740,7 @@ func stunnerEchoFloodTest(conf echoTestConfig) {
 			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 		}
 	}
+
 	time.Sleep(150 * time.Millisecond)
 	client.Close()
 }

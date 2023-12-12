@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	// "github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -10,49 +9,49 @@ const (
 )
 
 var (
-	promConnLabels           = []string{"name"}
-	promCounterLabels        = []string{"name", "direction"}
-	promListenerPacketsTotal *prometheus.CounterVec
-	promListenerBytesTotal   *prometheus.CounterVec
-	promListenerConnsTotal   *prometheus.CounterVec
-	promListenerConnsActive  *prometheus.GaugeVec
-	promClusterPacketsTotal  *prometheus.CounterVec
-	promClusterBytesTotal    *prometheus.CounterVec
+	ConnLabels           = []string{"name"}
+	CounterLabels        = []string{"name", "direction"}
+	ListenerPacketsTotal *prometheus.CounterVec
+	ListenerBytesTotal   *prometheus.CounterVec
+	ListenerConnsTotal   *prometheus.CounterVec
+	ListenerConnsActive  *prometheus.GaugeVec
+	ClusterPacketsTotal  *prometheus.CounterVec
+	ClusterBytesTotal    *prometheus.CounterVec
 	// promClusterConnsTotal    *prometheus.CounterVec
 	// promClusterConnsActive   *prometheus.GaugeVec
 )
 
 func Init() {
 	// listener stats
-	promListenerConnsActive = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	ListenerConnsActive = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "listener",
 		Name:      "connections",
 		Help:      "Number of active downstream connections at a listener.",
-	}, promConnLabels)
-	promListenerConnsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	}, ConnLabels)
+	ListenerConnsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "listener",
 		Name:      "connections_total",
 		Help:      "Number of downstream connections at a listener.",
-	}, promConnLabels)
-	promListenerPacketsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	}, ConnLabels)
+	ListenerPacketsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "listener",
 		Name:      "packets_total",
 		Help:      "Number of datagrams sent or received at a listener.",
-	}, promCounterLabels)
-	promListenerBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	}, CounterLabels)
+	ListenerBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "listener",
 		Name:      "bytes_total",
 		Help:      "Number of bytes sent or received at a listener.",
-	}, promCounterLabels)
+	}, CounterLabels)
 
-	prometheus.MustRegister(promListenerPacketsTotal)
-	prometheus.MustRegister(promListenerBytesTotal)
-	prometheus.MustRegister(promListenerConnsTotal)
-	prometheus.MustRegister(promListenerConnsActive)
+	prometheus.MustRegister(ListenerPacketsTotal)
+	prometheus.MustRegister(ListenerBytesTotal)
+	prometheus.MustRegister(ListenerConnsTotal)
+	prometheus.MustRegister(ListenerConnsActive)
 
 	// cluster stats
 	// promClusterConnsActive = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -67,32 +66,32 @@ func Init() {
 	// 	Name:      "connections_total",
 	// 	Help:      "Number of upstream connections on behalf of a listener.",
 	// }, promConnLabels)
-	promClusterPacketsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	ClusterPacketsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "cluster",
 		Name:      "packets_total",
 		Help:      "Number of datagrams sent to backends or received from backends on behalf of a listener",
-	}, promCounterLabels)
-	promClusterBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+	}, CounterLabels)
+	ClusterBytesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: stunnerNamespace,
 		Subsystem: "cluster",
 		Name:      "bytes_total",
 		Help:      "Number of bytes sent to backends or received from backends on behalf of a listener.",
-	}, promCounterLabels)
+	}, CounterLabels)
 
-	prometheus.MustRegister(promClusterPacketsTotal)
-	prometheus.MustRegister(promClusterBytesTotal)
+	prometheus.MustRegister(ClusterPacketsTotal)
+	prometheus.MustRegister(ClusterBytesTotal)
 	// prometheus.MustRegister(promClusterConnsTotal)
 	// prometheus.MustRegister(promClusterConnsActive)
 }
 
 func Close() {
-	_ = prometheus.Unregister(promListenerPacketsTotal)
-	_ = prometheus.Unregister(promListenerBytesTotal)
-	_ = prometheus.Unregister(promListenerConnsTotal)
-	_ = prometheus.Unregister(promListenerConnsActive)
-	_ = prometheus.Unregister(promClusterPacketsTotal)
-	_ = prometheus.Unregister(promClusterBytesTotal)
+	_ = prometheus.Unregister(ListenerPacketsTotal)
+	_ = prometheus.Unregister(ListenerBytesTotal)
+	_ = prometheus.Unregister(ListenerConnsTotal)
+	_ = prometheus.Unregister(ListenerConnsActive)
+	_ = prometheus.Unregister(ClusterPacketsTotal)
+	_ = prometheus.Unregister(ClusterBytesTotal)
 	// _ = prometheus.Unregister(promClusterConnsTotal)
 	// _ = prometheus.Unregister(promClusterConnsActive)
 }
@@ -100,26 +99,26 @@ func Close() {
 func IncrementPackets(n string, c ConnType, d Direction, count uint64) {
 	switch c {
 	case ListenerType:
-		promListenerPacketsTotal.WithLabelValues(n, d.String()).Add(float64(count))
+		ListenerPacketsTotal.WithLabelValues(n, d.String()).Add(float64(count))
 	case ClusterType:
-		promClusterPacketsTotal.WithLabelValues(n, d.String()).Add(float64(count))
+		ClusterPacketsTotal.WithLabelValues(n, d.String()).Add(float64(count))
 	}
 }
 
 func IncrementBytes(n string, c ConnType, d Direction, count uint64) {
 	switch c {
 	case ListenerType:
-		promListenerBytesTotal.WithLabelValues(n, d.String()).Add(float64(count))
+		ListenerBytesTotal.WithLabelValues(n, d.String()).Add(float64(count))
 	case ClusterType:
-		promClusterBytesTotal.WithLabelValues(n, d.String()).Add(float64(count))
+		ClusterBytesTotal.WithLabelValues(n, d.String()).Add(float64(count))
 	}
 }
 
 func AddConnection(n string, c ConnType) {
 	switch c {
 	case ListenerType:
-		promListenerConnsActive.WithLabelValues(n).Add(1)
-		promListenerConnsTotal.WithLabelValues(n).Add(1)
+		ListenerConnsActive.WithLabelValues(n).Add(1)
+		ListenerConnsTotal.WithLabelValues(n).Add(1)
 	case ClusterType:
 		// promClusterConnsActive.WithLabelValues(n).Add(1)
 		// promClusterConnsTotal.WithLabelValues(n).Add(1)
@@ -129,7 +128,7 @@ func AddConnection(n string, c ConnType) {
 func SubConnection(n string, c ConnType) {
 	switch c {
 	case ListenerType:
-		promListenerConnsActive.WithLabelValues(n).Sub(1)
+		ListenerConnsActive.WithLabelValues(n).Sub(1)
 	case ClusterType:
 		// promClusterConnsActive.WithLabelValues(n).Sub(1)
 	}
@@ -158,4 +157,11 @@ func SubConnection(n string, c ConnType) {
 // 		}
 // 	}
 // 	log.Warn("GaugeFunc 'stunner_allocations_active' cannot be unregistered.")
+// }
+
+// func GetListenerPacketsTotal(ch chan prometheus.Metric) {
+// 	go func() {
+// 		defer close(ch)
+// 		promListenerPacketsTotal.Collect(ch)
+// 	}()
 // }

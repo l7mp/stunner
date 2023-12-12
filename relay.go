@@ -18,7 +18,7 @@ import (
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-const ClusterCacheSize = 128
+const ClusterCacheSize = 512
 
 var (
 	errNilConn = errors.New("cannot allocate relay connection")
