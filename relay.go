@@ -133,7 +133,7 @@ func (s *Stunner) GenPortRangeChecker(g *RelayGen) PortRangeChecker {
 		}
 
 		if cluster != nil {
-			return cluster, u.Port >= cluster.MinPort && u.Port <= cluster.MaxPort
+			return cluster, cluster.Match(u.IP, u.Port)
 		}
 
 		return nil, false

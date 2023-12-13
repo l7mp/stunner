@@ -15,13 +15,12 @@ import (
 
 // Listener implements a STUNner cluster
 type Cluster struct {
-	Name             string
-	Type             stnrv1.ClusterType
-	Protocol         stnrv1.ClusterProtocol
-	MinPort, MaxPort int
-	Endpoints        []net.IPNet
-	Domains          []string
-	Resolver         resolver.DnsResolver // for strict DNS
+	Name      string
+	Type      stnrv1.ClusterType
+	Protocol  stnrv1.ClusterProtocol
+	Endpoints []*util.Endpoint
+	Domains   []string
+	Resolver  resolver.DnsResolver // for strict DNS
 
 	logger logging.LoggerFactory
 	log    logging.LeveledLogger
@@ -41,9 +40,7 @@ func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger loggin
 
 	c := Cluster{
 		Name:      req.Name,
-		Endpoints: []net.IPNet{},
-		MinPort:   req.MinRelayPort,
-		MaxPort:   req.MaxRelayPort,
+		Endpoints: []*util.Endpoint{},
 		Domains:   []string{},
 		Resolver:  resolver,
 		logger:    logger,
@@ -79,8 +76,6 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 	c.log.Tracef("Reconcile: %s", req.String())
 	c.Type, _ = stnrv1.NewClusterType(req.Type)
 	c.Protocol, _ = stnrv1.NewClusterProtocol(req.Protocol)
-	c.MinPort = req.MinRelayPort
-	c.MaxPort = req.MaxRelayPort
 
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
@@ -88,36 +83,16 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 		c.Endpoints = c.Endpoints[:0]
 		for _, e := range req.Endpoints {
 			// try to parse as a subnet
-			_, n, err := net.ParseCIDR(e)
-			if err == nil {
-				c.Endpoints = append(c.Endpoints, *n)
-				continue
-			}
-
-			// try to parse as an IP address
-			a := net.ParseIP(e)
-			if a == nil {
-				c.log.Warnf("cluster %q: invalid endpoint IP: %q, ignoring", c.Name, e)
-				continue
-			}
-
-			// add a prefix and reparse
-			if a.To4() == nil {
-				e = e + "/128"
-			} else {
-				e = e + "/32"
-			}
-
-			_, n2, err := net.ParseCIDR(e)
+			ep, err := util.ParseEndpoint(e)
 			if err != nil {
-				c.log.Warnf("cluster %q: could not convert endpoint %q to CIDR subnet ",
+				c.log.Warnf("cluster %q: could not parse endpoint %q ",
 					"(ignoring): %s", c.Name, e, err.Error())
-				continue
 			}
 
-			c.Endpoints = append(c.Endpoints, *n2)
+			c.Endpoints = append(c.Endpoints, ep)
 		}
 	case stnrv1.ClusterTypeStrictDNS:
+		// TOD: port-range support for DNS clusters
 		if c.Resolver == nil {
 			return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
 		}
@@ -153,19 +128,16 @@ func (c *Cluster) ObjectType() string {
 // GetConfig returns the configuration of the running cluster.
 func (c *Cluster) GetConfig() stnrv1.Config {
 	conf := stnrv1.ClusterConfig{
-		Name:         c.Name,
-		Protocol:     c.Protocol.String(),
-		Type:         c.Type.String(),
-		MinRelayPort: c.MinPort,
-		MaxRelayPort: c.MaxPort,
+		Name:     c.Name,
+		Protocol: c.Protocol.String(),
+		Type:     c.Type.String(),
 	}
 
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
 		conf.Endpoints = make([]string, len(c.Endpoints))
 		for i, e := range c.Endpoints {
-			// e.String() adds a /32 at the end of IPs, remove
-			conf.Endpoints[i] = strings.TrimRight(e.String(), "/32")
+			conf.Endpoints[i] = e.String()
 		}
 	case stnrv1.ClusterTypeStrictDNS:
 		conf.Endpoints = make([]string, len(c.Domains))
@@ -192,24 +164,33 @@ func (c *Cluster) Close() error {
 	return nil
 }
 
-// Route decides whwther a peer IP appears among the permitted endpoints of a cluster.
+// Route decides whether a peer IP appears among the permitted endpoints of a cluster.
 func (c *Cluster) Route(peer net.IP) bool {
+	return c.Match(peer, 0)
+}
+
+// Match decides whether a peer IP and port matches one of the permitted endpoints of a cluster. If
+// port is zero then port-matching is disabled.
+func (c *Cluster) Match(peer net.IP, port int) bool {
+
 	c.log.Tracef("Route: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
 		peer.String())
 
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
 		// endpoints are IPNets
+		c.log.Tracef("route: STATIC cluster with %d endpoints", len(c.Endpoints))
+
 		for _, e := range c.Endpoints {
 			c.log.Tracef("considering endpoint %q", e)
-			if e.Contains(peer) {
+			if e.Match(peer, port) {
 				return true
 			}
 		}
 
 	case stnrv1.ClusterTypeStrictDNS:
 		// endpoints are obtained from the DNS
-		c.log.Tracef("running STRICT_DNS cluster with domains: [%s]", strings.Join(c.Domains, ", "))
+		c.log.Tracef("route: STRICT_DNS cluster with domains: [%s]", strings.Join(c.Domains, ", "))
 
 		for _, d := range c.Domains {
 			c.log.Tracef("considering domain %q", d)
@@ -221,7 +202,6 @@ func (c *Cluster) Route(peer net.IP) bool {
 
 			for _, n := range hs {
 				c.log.Tracef("considering IP address %q", n)
-
 				if n.Equal(peer) {
 					return true
 				}
