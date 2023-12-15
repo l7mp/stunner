@@ -627,9 +627,9 @@ notable limitations at this point are as follows.
 * v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
 * v0.12: Security: Expose TLS/DTLS settings via the Gateway API.
 * v0.13: Observability: Prometheus + Grafana dashboard.
-* v0.15: Performance: per-allocation CPU load-balancing for UDP
-* v0.16: Management: managed STUNner dataplane.
-* v0.17: Performance: eBPF TURN acceleration.
+* v0.15: Performance: Per-allocation CPU load-balancing for UDP
+* v0.16: Management: Managed STUNner dataplane.
+* v0.17: Stabilization: All Gateway and STUNner APIs move to V1.
 * v1.0: GA
 * v2.0: Service mesh: adaptive scaling & resiliency
 
