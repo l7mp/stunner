@@ -172,8 +172,7 @@ func (c *Cluster) Route(peer net.IP) bool {
 // Match decides whether a peer IP and port matches one of the permitted endpoints of a cluster. If
 // port is zero then port-matching is disabled.
 func (c *Cluster) Match(peer net.IP, port int) bool {
-
-	c.log.Tracef("Route: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
+	c.log.Tracef("Match: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
 		peer.String())
 
 	switch c.Type {

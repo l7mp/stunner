@@ -71,10 +71,10 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 		auth := s.GetAuth()
 
 		peerIP := peer.String()
-		auth.Log.Debugf("permission handler for listener %q: client %q, peer %q",
-			l.Name, src.String(), peerIP)
-		clusters := s.clusterManager.Keys()
+		auth.Log.Debugf("permission handler for listener %q: client %q, peer %q", l.Name,
+			src.String(), peerIP)
 
+		clusters := s.clusterManager.Keys()
 		for _, r := range l.Routes {
 			auth.Log.Tracef("considering route to cluster %q", r)
 			if util.Member(clusters, r) {

@@ -21,7 +21,9 @@ func (e Config) String() string {
 	return fmt.Sprintf("id=%s: %s", e.Id, e.Config.String())
 }
 
+// UpsertConfig upserts a single config in the server.
 func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
+	s.configs.Upsert(id, c)
 	s.configCh <- Config{Id: id, Config: c}
 }
 
@@ -30,6 +32,7 @@ func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
 // entering the graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with
 // all active connections allocated to it, currently we suppress the config update.
 func (s *Server) DeleteConfig(id string) {
+	s.configs.Delete(id)
 	s.log.Info("suppressing config update for terminating client", "client", id)
 	// s.configCh <- Config{Id: id, Config: client.ZeroConfig(id)}
 }
@@ -37,17 +40,15 @@ func (s *Server) DeleteConfig(id string) {
 // UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
 // particular instance of time and generates an update per each change.
 func (s *Server) UpdateConfig(newConfigs []Config) error {
-	oldNewConfigs := s.configs.Snapshot()
+	oldConfigs := s.configs.Snapshot()
 
-	for _, oldC := range oldNewConfigs {
+	for _, oldC := range oldConfigs {
 		found := false
 		for _, newC := range newConfigs {
 			if oldC.Id == newC.Id {
 				if !oldC.Config.DeepEqual(newC.Config) {
 					s.log.V(2).Info("updating config", "client", newC.Id, "config",
 						newC.Config.String())
-
-					s.configs.Upsert(newC.Id, newC.Config)
 					s.UpsertConfig(newC.Id, newC.Config)
 				}
 				found = true
@@ -57,15 +58,13 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 
 		if !found {
 			s.log.V(2).Info("removing config", "client", oldC.Id)
-
-			s.configs.Delete(oldC.Id)
 			s.DeleteConfig(oldC.Id)
 		}
 	}
 
 	for _, newC := range newConfigs {
 		found := false
-		for _, oldC := range oldNewConfigs {
+		for _, oldC := range oldConfigs {
 			if oldC.Id == newC.Id {
 				found = true
 				break
@@ -74,8 +73,6 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 
 		if !found {
 			s.log.V(2).Info("adding config", "client", newC.Id, "config", newC.Config)
-
-			s.configs.Upsert(newC.Id, newC.Config)
 			s.UpsertConfig(newC.Id, newC.Config)
 		}
 	}

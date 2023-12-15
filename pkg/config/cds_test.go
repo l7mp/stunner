@@ -970,6 +970,85 @@ func TestClientReconnect(t *testing.T) {
 	assert.True(t, s.DeepEqual(sc1), "deepeq 1")
 }
 
+// test server config update mechanism
+func TestServerUpdate(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	defer serverCancel()
+
+	testLog.Debug("create server")
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
+	assert.NoError(t, err, "start")
+
+	oldC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[]}`))
+	assert.NoError(t, err, "parse 1")
+
+	srv.UpsertConfig("stunner/udp-gateway", oldC)
+
+	cs := srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 1, "snapshot len")
+	sc1 := srv.GetConfigStore().Get("stunner/udp-gateway")
+	assert.NotNil(t, sc1, "get")
+	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
+
+	// reapply - no change
+	srv.UpsertConfig("stunner/udp-gateway", oldC)
+	time.Sleep(20 * time.Millisecond) // let the server process
+
+	cs = srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 1, "snapshot len")
+	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
+	assert.NotNil(t, sc1, "get")
+	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
+
+	// add another config
+	tcpC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/tcp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/tcp-gateway/tcp-listener", "protocol":"turn-tcp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
+	assert.NoError(t, err, "parse")
+
+	srv.UpsertConfig("stunner/tcp-gateway", tcpC)
+	time.Sleep(20 * time.Millisecond) // let the server process
+
+	cs = srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 2, "snapshot len")
+	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
+	assert.NotNil(t, sc1, "get")
+	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
+	sc2 := srv.GetConfigStore().Get("stunner/tcp-gateway")
+	assert.NotNil(t, sc2, "get")
+	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
+
+	// add a cluster
+	newC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name": "stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
+	assert.NoError(t, err, "parse 1")
+	assert.False(t, oldC.DeepEqual(newC), "deepeq")
+
+	// process in a single go
+	err = srv.UpdateConfig([]server.Config{{Id: "stunner/udp-gateway", Config: newC}, {Id: "stunner/tcp-gateway", Config: tcpC}})
+	assert.NoError(t, err, "parse 1")
+
+	time.Sleep(20 * time.Millisecond) // let the server process
+
+	cs = srv.GetConfigStore().Snapshot()
+	assert.Len(t, cs, 2, "snapshot len")
+	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
+	assert.NotNil(t, sc1, "get")
+	assert.True(t, sc1.DeepEqual(newC), "deepeq")
+	sc2 = srv.GetConfigStore().Get("stunner/tcp-gateway")
+	assert.NotNil(t, sc2, "get")
+	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
+}
+
 // only differ in id and realm
 func testConfig(id, realm string) server.Config {
 	c := client.ZeroConfig(id)
@@ -989,6 +1068,17 @@ func watchConfig(ch chan stnrv1.StunnerConfig, d time.Duration) *stnrv1.StunnerC
 		return nil
 	}
 }
+
+// func watchServerConfig(ch chan server.Config, d time.Duration) *stnrv1.StunnerConfig {
+// 	select {
+// 	case c := <-ch:
+// 		// fmt.Println("++++++++++++ got config ++++++++++++: ", c.String())
+// 		return c.Config
+// 	case <-time.After(d):
+// 		// fmt.Println("++++++++++++ timeout ++++++++++++")
+// 		return nil
+// 	}
+// }
 
 func findConfById(cs []*stnrv1.StunnerConfig, id string) *stnrv1.StunnerConfig {
 	for _, c := range cs {

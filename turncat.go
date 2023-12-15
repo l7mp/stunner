@@ -412,7 +412,7 @@ func (t *Turncat) runConnection(conn *connection) {
 				t.peerAddr.Network(), t.peerAddr.String())
 
 			if _, writeErr := conn.serverConn.WriteTo(buffer[0:n], t.peerAddr); writeErr != nil {
-				t.log.Debugf("cannot write to TURN relay connection for client %s (likely hamrless): %s",
+				t.log.Debugf("cannot write to TURN relay connection for client %s (likely harmless): %s",
 					conn.clientAddr.String(), writeErr.Error())
 				t.deleteConnection(conn)
 				return
