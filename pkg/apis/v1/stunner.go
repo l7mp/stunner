@@ -83,19 +83,20 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 		return false
 	}
 
+	if len(req.Listeners) != len(other.Listeners) {
+		return false
+	}
 	for i := range req.Listeners {
-		if i >= len(other.Listeners) {
-			return false
-		}
 		if !req.Listeners[i].DeepEqual(&other.Listeners[i]) {
 			return false
 		}
 	}
 
+	if len(req.Clusters) != len(other.Clusters) {
+		return false
+	}
+
 	for i := range req.Clusters {
-		if i >= len(other.Clusters) {
-			return false
-		}
 		if !req.Clusters[i].DeepEqual(&other.Clusters[i]) {
 			return false
 		}
