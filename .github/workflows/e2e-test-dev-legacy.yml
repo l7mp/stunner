@@ -44,7 +44,7 @@ jobs:
         run: |
           helm repo add stunner https://l7mp.io/stunner
           helm repo update
-          helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m
+          helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner --set stunnerGatewayOperator.dataplane.mode=legacy --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m
           helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner --set stunner.deployment.container.stunnerd.resources.requests.cpu=200m
 
       - name: Deploy iperf server
