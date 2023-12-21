@@ -29,7 +29,7 @@ func main() {
 	os.Args[0] = "stunnerd"
 	var config = flag.StringP("config", "c", "", fmt.Sprintf("Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: %s).", defaultConfigDiscoveryAddress))
 	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO).")
-	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <hostname>).")
+	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
 	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
 		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0).")
@@ -72,13 +72,13 @@ func main() {
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
-	log.Infof("starting stunnerd instance %q", *id)
+	log.Infof("starting stunnerd instance %q", st.GetId())
 
 	conf := make(chan stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
-	if configOrigin == "" && flag.NArg() == 1 {
+	if flag.NArg() == 1 {
 		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
 
@@ -90,7 +90,7 @@ func main() {
 
 		conf <- *c
 
-	} else if configOrigin != "" && !*watch {
+	} else if !*watch {
 		log.Infof("loading configuration from origin %q", configOrigin)
 
 		c, err := st.LoadConfig(configOrigin)
@@ -101,7 +101,7 @@ func main() {
 
 		conf <- *c
 
-	} else if configOrigin != "" && *watch {
+	} else if *watch {
 		log.Info("bootstrapping with minimal config")
 		z := cdsclient.ZeroConfig(st.GetId())
 		conf <- *z

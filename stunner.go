@@ -78,7 +78,7 @@ func NewStunner(options Options) *Stunner {
 		if h, err := os.Hostname(); err != nil {
 			id = DefaultInstanceId
 		} else {
-			id = h
+			id = fmt.Sprintf("default/stunnerd-%s", h)
 		}
 	}
 
