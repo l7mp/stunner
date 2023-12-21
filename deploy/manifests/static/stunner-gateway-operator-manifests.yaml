@@ -141,6 +141,7 @@ rules:
   - dataplanes
   - gatewayconfigs
   - staticservices
+  - udproutes
   verbs:
   - get
   - list
@@ -153,6 +154,8 @@ rules:
   - dataplanes/finalizers
   - gatewayconfigs/finalizers
   - staticservices/finalizers
+  - udproutes/finalizers
+  - udproutes/status
   verbs:
   - update
 ---
