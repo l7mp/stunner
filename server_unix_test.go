@@ -54,7 +54,7 @@ func TestStunnerMultithreadedUDP(t *testing.T) {
 
 // Benchmark
 func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
-	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	//loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 	initSeq := []byte("init-data")
@@ -66,6 +66,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 		SuppressRollback:     true,
 		UDPListenerThreadNum: udpThreadNum, // ignored for anything but UDP
 	})
+	defer stunner.Close()
 
 	log.Debug("starting stunnerd")
 	err := stunner.Reconcile(stnrv1.StunnerConfig{
@@ -109,6 +110,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	if err != nil {
 		b.Fatalf("Failed to allocate sink: %s", err)
 	}
+	defer sink.Close() //nolint:errcheck
 
 	go func() {
 		buf := make([]byte, 1600)
@@ -124,11 +126,14 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	}()
 
 	log.Debug("creating a turncat client")
-	stunnerURI := fmt.Sprintf("turn://127.0.0.1:23478?transport=%s", proto)
-	clientProto := "tcp"
+	clientProto, turnScheme := "tcp", "turn"
 	if proto == "turn-udp" || proto == "turn-dtls" {
 		clientProto = "udp"
 	}
+	if proto == "turn-tls" || proto == "turn-dtls" {
+		turnScheme = "turns"
+	}
+	stunnerURI := fmt.Sprintf("%s://127.0.0.1:23478?transport=%s", turnScheme, clientProto)
 	testTurncatConfig := TurncatConfig{
 		ListenerAddr:  fmt.Sprintf("%s://127.0.0.1:25000", clientProto),
 		ServerAddr:    stunnerURI,
@@ -142,6 +147,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	if err != nil {
 		b.Fatalf("Failed to create turncat client: %s", err)
 	}
+	defer turncat.Close()
 
 	// test with 20 clients
 	log.Debugf("creating %d senders", clientNum)
@@ -182,12 +188,9 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 
 	time.Sleep(750 * time.Millisecond)
 
-	turncat.Close()
-	stunner.Close()
 	for i := 0; i < clientNum; i++ {
 		clients[i].Close()
 	}
-	sink.Close() //nolint:errcheck
 }
 
 // BenchmarkUDPServer will benchmark the STUNner UDP server with a different number of readloop
