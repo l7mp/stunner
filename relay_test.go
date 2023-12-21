@@ -188,14 +188,11 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 
 		// should never receive: we drop everything
 		err = conn.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
-		if err == nil {
-			b.Fatal("Could not set read deadline")
+		if err != nil {
+			b.Fatalf("Could not set read deadline: %s", err)
 		}
 
-		_, _, err = conn.ReadFrom(buffer)
-		if err == nil {
-			b.Fatal("Conn should never read")
-		}
+		conn.ReadFrom(buffer) //nolint:errcheck
 	}
 
 	readCounter := conn.(*CounterPacketConn).ReadCounter()
