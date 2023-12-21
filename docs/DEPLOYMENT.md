@@ -129,18 +129,9 @@ you from adopting STUNner.
 
 ## Control plane models
 
-STUNner can run in one of several modes. 
-
-In the default mode STUNner configuration is controlled by a *gateway-operator* component based on
-high-level intent encoded in [Kubernetes Gateway API resources](https://gateway-api.sigs.k8s.io),
-while in the *standalone model* the user configures STUNner manually. The standalone mode provides
-perfect control over the way STUNner ingests media, but at the same time it requires users to deal
-with the subtleties of internal STUNner APIs that are subject to change between subsequent
-releases. As of v0.16, STUNner's operator-ful mode is feature complete and the standalone model is
-considered obsolete. If still interested, comprehensive documentation for the standalone can be
-found [here](OBSOLETE.md), but this mode is no longer supported.
-
-In addition, STUNner supports two dataplane provisioning modes. In the *legacy* mode the dataplane
-is supposed to be deployed by the user manually (by installing the `stunner/stunner` Helm chart
-into the target namespaces) while in the *managed* mode the dataplane pods are provisioned by the
-gateway operator automatically. As of STUNner v0.16.0, the default is the *legacy* dataplane mode.
+In addition, STUNner supports two dataplane provisioning modes. In the default *managed* mode, the
+dataplane pods (i.e., the `stunnerd` pods) are provisioned by the gateway operator automatically
+per each Gateway existing in the cluster. In the *legacy* mode, the dataplane is supposed to be
+deployed by the user manually (by installing the `stunner/stunner` Helm chart into the target
+namespaces). Legacy mode is considered obsolete at this point and it will be removed in a later
+release.
