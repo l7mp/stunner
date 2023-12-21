@@ -89,7 +89,7 @@ The `stunnerd` pods created by the operator can be customized using the Dataplan
 
 ```console
 kubectl get dataplanes.stunner.l7mp.io default -o yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: Dataplane
 metadata:
   name: default

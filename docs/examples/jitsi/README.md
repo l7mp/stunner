@@ -110,7 +110,7 @@ kubectl apply -f docs/examples/jitsi/jitsi-call-stunner.yaml
 The relevant parts here are the STUNner [Gateway definition](../../GATEWAY.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../GATEWAY.md), which takes care of routing media to the pods running the Jitsi service. Also, with the GatewayConfig object we set the `authType: longterm` parameter because Prosody can't use Plaintext authentication only long term.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig
@@ -119,7 +119,7 @@ spec:
   authType: longterm
   sharedSecret: "my-shared-secret"
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -131,7 +131,7 @@ spec:
       port: 3478
       protocol: UDP
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: jitsi-media-plane

@@ -106,7 +106,7 @@ can connect from behind even the most over-zealous enterprise NAT or firewall.
 
 ```console
 kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -126,7 +126,7 @@ into the `cloudretro` namespace by the default installation scripts.
 
 ```console
 kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: worker-udp-route

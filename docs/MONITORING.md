@@ -17,7 +17,7 @@ For instance, the below GatewayConfig will expose the metrics-collection server 
 `http://:8080/metrics` in all the STUNner media gateway instances of the current gateway hierarchy.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig

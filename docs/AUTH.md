@@ -118,7 +118,7 @@ Then, we create or update the current [GatewayConfig](REFERENCE.md) to refer STU
 for setting the authentication credentials.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig

@@ -269,7 +269,7 @@ public TURN server on the UDP port 3478 through which clients will connect to th
 server pods.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -294,7 +294,7 @@ magic.
 Below is the corresponding UDPRoute.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: stunner-headless
@@ -476,7 +476,7 @@ everything should happen from this point automagically.
 
 ```console
 kubectl apply -f - <<EOF
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig

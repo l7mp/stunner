@@ -1,4 +1,4 @@
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: Dataplane
 metadata:
   name: default

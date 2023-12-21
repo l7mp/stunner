@@ -24,7 +24,7 @@ This will open a STUNner Gateway at port UDP:3478 and add a UDPRoute with the Ku
 DNS service as the backend:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: stunner-udproute
@@ -76,7 +76,7 @@ Should any of these prerequisites fail, STUNner will block access to the target 
 Now rewrite the backend service in the UDPRoute to an arbitrary non-existent service.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: stunner-udproute
@@ -130,7 +130,7 @@ a proper UDPRoute. For instance, the below UDPRoute allows access *only* to the 
 service in the `media-plane` namespace, and nothing else.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: stunner-udproute

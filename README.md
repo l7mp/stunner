@@ -212,7 +212,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
    ``` console
    kubectl apply -f - <<EOF
-   apiVersion: gateway.networking.k8s.io/v1beta1
+   apiVersion: gateway.networking.k8s.io/v1
    kind: GatewayClass
    metadata:
      name: stunner-gatewayclass
@@ -237,7 +237,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
    ```console
    kubectl apply -f - <<EOF
-   apiVersion: stunner.l7mp.io/v1alpha1
+   apiVersion: stunner.l7mp.io/v1
    kind: GatewayConfig
    metadata:
      name: stunner-gatewayconfig
@@ -288,7 +288,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
    ```console
    kubectl apply -f - <<EOF
-   apiVersion: gateway.networking.k8s.io/v1beta1
+   apiVersion: gateway.networking.k8s.io/v1
    kind: Gateway
    metadata:
      name: udp-gateway
@@ -318,7 +318,7 @@ The standard way to interact with STUNner is via the standard Kubernetes [Gatewa
 
    ```console
    kubectl apply -f - <<EOF
-   apiVersion: gateway.networking.k8s.io/v1alpha2
+   apiVersion: stunner.l7mp.io/v1
    kind: UDPRoute
    metadata:
      name: media-plane
@@ -478,7 +478,7 @@ greeter) by STUNner.
 
    ```console
    kubectl apply -f - <<EOF
-   apiVersion: gateway.networking.k8s.io/v1alpha2
+   apiVersion: stunner.l7mp.io/v1
    kind: UDPRoute
    metadata:
      name: media-plane

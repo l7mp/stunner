@@ -17,7 +17,7 @@ The GatewayClass resource provides the root of the gateway hierarchy. GatewayCla
 Below is a sample GatewayClass resource. Each GatewayClass must specify a controller that will manage the Gateway objects created under the hierarchy; this must be set to `stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In addition, a GatewayClass can refer to further implementation-specific configuration via a `parametersRef`; in the case of STUNner this will always be a GatewayConfig object (see [below](#gatewayconfig)).
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
@@ -46,7 +46,7 @@ The GatewayConfig resource provides general configuration for STUNner, most impo
 The following example takes the [STUNner authentication settings](AUTH.md) from the Secret called `stunner-auth-secret` in the `stunner` namespace, sets the authentication realm to `stunner.l7mp.io`, sets the dataplane loglevel to `all:DEBUG,turn:INFO` (this will set all loggers to `DEBUG` level except the TURN protocol machinery's logger which is set to `INFO`), and sets the default URL for metric scraping.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig
@@ -89,7 +89,7 @@ Gateways describe the STUN/TURN server listeners exposed to clients.
 The below Gateway will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and automatically expose it on a public IP address and port by creating a [LoadBalancer service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer). The name and namespace of the automatically provisioned service are the same as those of the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port changes).
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -105,7 +105,7 @@ spec:
 The below more complex example defines two TURN listeners: a TURN listener at the UDP:3478 port that accepts routes from any namespace, and a TURN listener at port TLS/TCP:443 that accepts routes from all namespaces labeled as `app:dev`.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: complex-gateway
@@ -178,7 +178,7 @@ Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` 
 Mixed multi-protocol Gateways are supported: this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. The below Gateway will expose both ports with their respective protocols.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: mixed-protocol-gateway
@@ -213,7 +213,7 @@ UDPRoute resources can be attached to Gateways in order to specify the backend s
 The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: media-plane-route
@@ -244,7 +244,7 @@ The below StaticService represents a hypothetical Kubernetes Service backing a s
 addresses in the range `192.0.2.0/24` or `198.51.100.0/24`.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: StaticService
 metadata:
   name: static-svc
@@ -258,7 +258,7 @@ spec:
 Assigning this StaticService to a UDPRoute will make sure allows access to *any* IP address in the specified ranges.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: media-plane-route
