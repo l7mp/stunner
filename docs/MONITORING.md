@@ -1,43 +1,18 @@
 # Monitoring
 
-STUNner can export various statistics into an external timeseries database like
-[Prometheus](https://prometheus.io). This allows one to observe the state of the STUNner media
-gateway instances, like CPU or memory use, as well as the amount of data received and sent, in
-quasi-real-time. These statistics can then be presented to the operator in easy-to-use monitoring
-dashboards in [Grafana](https://grafana.com).
+STUNner can export various statistics into an external timeseries database like [Prometheus](https://prometheus.io). This allows one to observe the state of the STUNner media gateway instances, like CPU or memory use or the amount of data received and sent in quasi-real-time. These statistics can then be presented to the operator in a monitoring dashboard using, e.g., [Grafana](https://grafana.com).
 
 ## Configuration
 
-Metrics collection is *not* enabled in the default installation. In order to open the
-metrics-collection endpoint for a [gateway hierarchy](GATEWAY.md), configure an
-appropriate HTTP URL in the `metricsEndpoint` field of corresponding the
-[GatewayConfig](GATEWAY.md#gatewayconfig) resource.
-
-For instance, the below GatewayConfig will expose the metrics-collection server on the URL
-`http://:8080/metrics` in all the STUNner media gateway instances of the current gateway hierarchy.
-
-```yaml
-apiVersion: stunner.l7mp.io/v1
-kind: GatewayConfig
-metadata:
-  name: stunner-gatewayconfig
-  namespace: stunner
-spec:
-  userName: "my-user"
-  password: "my-password"
-  metricsEndpoint: "http://:8080/metrics"
-```
+Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](GATEWAY.md#dataplane) template. This will configure the `stunnerd` dataplane pods to expose a HTTP metrics endpoint at port 8080 that Prometheus can scrape for metrics.
 
 ## Metrics
 
-STUNner exports two types of metrics: the *Go collector metrics* describe the state of the Go
-runtime, while the *Connection statistics* expose traffic monitoring data.
+STUNner exports two types of metrics: the *Go collector metrics* describe the state of the Go runtime, while the *Connection statistics* expose traffic monitoring data.
 
 ### Go collector metrics
 
-Each STUNner gateway instance exports a number of standard metrics that describe the state of the
-current Go process runtime. Some notable metrics as listed below, see more in the
-[documentation](https://github.com/prometheus/client_golang).
+Each STUNner gateway instance exports a number of standard metrics that describe the state of the current Go process. Some notable metrics as listed below, see more in the [documentation](https://github.com/prometheus/client_golang).
 
 | Metric | Description |
 | :--- | :--- |
@@ -50,8 +25,7 @@ current Go process runtime. Some notable metrics as listed below, see more in th
 
 ### Connection statistics
 
-STUNner provides deep visibility into the amount of traffic sent and received on each listener
-(downstream connections) and cluster (upstream connections). The particular metrics are as follows.
+STUNner provides deep visibility into the amount of traffic sent and received on each listener (downstream connections) and cluster (upstream connections). The particular metrics are as follows.
 
 | Metric | Description | Type | Labels |
 | :--- | :--- | :--- | :--- |
@@ -59,18 +33,16 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | `stunner_listener_connections_total` | Number of downstream connections at a listener. | counter | `name=<listener-name>` |
 | `stunner_listener_packets_total` | Number of datagrams sent or received at a listener. Unreliable for listeners running on a connection-oriented transport protocol (TCP/TLS).  | counter | `direction=<rx\|tx>`, `name=<listener-name>`|
 | `stunner_listener_bytes_total` | Number of bytes sent or received at a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
-| `stunner_cluster_connections` | Number of *active* upstream connections on behalf of a listener. | gauge | `name=<listener-name>` |
-| `stunner_cluster_connections_total` | Number of upstream connections on behalf of a listener. | counter | `name=<listener-name>` |
-| `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends on behalf of a listener.  Unreliable for clusters running on a connection-oriented transport  protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<listener-name>` |
-| `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends on behalf of a listener. | counter | `direction=<rx\|tx>`, `name=<listener-name>` |
+| `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends of a cluster.  Unreliable for clusters running on a connection-oriented transport protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<cluster-name>` |
+| `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends of a cluster. | counter | `direction=<rx\|tx>`, `name=<cluster-name>` |
 
 ## Integration with Prometheus and Grafana
 
-Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a way to [install](#installation) a ready-to-use Prometheus and Grafana stack. In addition, metrics visualization requires [user input](#configuration-and-usage) on configuring the plots; see below.
+Collection and visualization of STUNner relies on Prometheus and Grafana services. The STUNer helm repository provides a way to [install](https://github.com/l7mp/stunner-helm#monitoring) a ready-to-use Prometheus and Grafana stack. In addition, metrics visualization requires [user input](#configuration) on configuring the plots; see below.
 
 ### Installation
 
-A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm repo. To use this chart, the installation steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana stack with helm.
+A full-fledged Prometheus+Grafana helm chart is available in the [STUNner helm repo](https://github.com/l7mp/stunner-helm#monitoring). To use this chart, the installation steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana stack with helm.
 
 1. Install STUNner with Prometheus support:
 
@@ -78,7 +50,7 @@ A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm re
    helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
    ```
 
-2. Configure STUNner to expose the metrics by [exposing the STUNner metrics-collection server in the GatewayConfig](#configuration).
+2. Configure STUNner to expose the metrics.
 
 3. Install the Prometheus+Grafana stack with a helm chart. 
 
@@ -87,23 +59,14 @@ A full-fledged Prometheus+Grafana helm chart is available in the STUNner helm re
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-
 helm install prometheus stunner/stunner-prometheus
 ```
 
-### Configuration and Usage
+### Configuration
 
 The helm chart deploys a ready-to-use Prometheus and Grafana stack, but leaves the Grafana dashboard empty to let the user pick metrics and configure their visualization. An interactive way to visualize STUNner metrics is to use the Grafana dashboard.
 
-#### Access the Grafana dashboard
-
-To open the Grafana dashboard navigate a web browser to `grafana` NodePort service IP and port 80.
-
-The default username is **admin** with the password **admin**.
-
-At the first login you can change the password or leave as it is (use the *Skip* button).
-
-#### Visualize STUNner metrics
+To open the Grafana dashboard navigate a web browser to `grafana` NodePort service IP and port 80. The default username is **admin** with the password **admin**. At the first login you can change the password or leave as it is (use the *Skip* button).
 
 As an example, let us plot the STUNner metric `stunner_listener_connections`. First step is to create a new panel, then to configure the plot parameters.
 
@@ -131,10 +94,7 @@ Below is an example dashboard with data collected from the [simple-tunnel](examp
 
 Prometheus and Grafana both provide a dashboard to troubleshoot a running system, and to check the flow of metrics from STUNner to Prometheus, and from Prometheus to Grafana.
 
-### Check Prometheus operations via its dashboard
-The Prometheus dashboard is available as the `prometheus` NodePort service (use the node IP and node port to connect with a web browser).
-
-The dashboard enables checking running Prometheus configuration and testing the metrics collection.
+The Prometheus dashboard is available as the `prometheus` NodePort service (use the node IP and node port to connect with a web browser). The dashboard enables checking running Prometheus configuration and testing the metrics collection.
 
 For example, to observe the `stunner_listener_connections` metric on the Prometheus dashboard:
 
@@ -144,9 +104,7 @@ For example, to observe the `stunner_listener_connections` metric on the Prometh
 
 ![Prometheus Dashboard](img/prometheus-dashboard.png)
 
-Note: some STUNner metrics are not available when they are inactive (e.g., there is no active cluster).
-
-#### Check Prometheus data source in Grafana
+Note that some STUNner metrics may not be available when they are inactive (e.g., there is no active cluster).
 
 To configure/check the Prometheus data source in Grafana, first click on *Configuration* (1), then *Data sources* (2), as shown here:
 
