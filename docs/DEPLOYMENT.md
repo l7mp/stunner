@@ -62,8 +62,7 @@ ICE candidates.
 In *asymmetric ICE mode*, one peer is configured with STUNner as the TURN server and the other peer
 runs with no STUN or TURN servers whatsoever. The first peer will create a TURN transport relay
 connection via STUNner to which the other peer can directly join. Asymmetric ICE mode is the
-recommended way for setup for the media-plane deployment model for hosting WebRTC media servers in
-Kubernetes.
+recommended way for the media-plane deployment model.
 
 ![STUNner asymmetric ICE mode](img/stunner_asymmetric_ice.svg)
 
