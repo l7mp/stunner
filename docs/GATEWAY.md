@@ -1,23 +1,15 @@
 # Reference
 
-The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) exposes the control plane configuration using the standard [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io). This allows to configure STUNner in the familiar YAML-engineering style via Kubernetes manifests. The below reference gives a quick overview of the Gateway API. Note that STUNner implements only a subset of the full [spec](GATEWAY.md), see [here](https://github.com/l7mp/stunner-gateway-operator#caveats) for a list of the most important simplifications.
-
-## Overview
-
-The main unit of the control plane configuration is the *gateway hierarchy*. Here, a Gateway hierarchy is a collection of [Kubernetes Custom Resources](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources) that together describe the way media traffic should enter the cluster via STUNner, including public IP addresses and ports clients can use to reach STUNner, TURN credentials, routing rules, etc. The anchor of the gateway hierarchy is the GatewayClass object, and the rest of the resources form a complete hierarchy underneath it.
-
-![Gateway hierarchy](img/gateway_api.svg)
-
-In general, the scope of a gateway hierarchy is a single namespace, but this is not strictly enforced: e.g., the GatewayClass is [cluster-scoped](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions) so it is outside the namespace, GatewayClasses can refer to GatewayConfigs across namespaces, Routes can attach to Gateways across a namespace boundary (if the Gateway [allows](https://gateway-api.sigs.k8s.io/guides/multiple-ns) this), etc. Still, it is a good practice to keep all control plane configuration, plus the actual dataplane pods, in a single namespace as much as possible.
+The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) exposes the control plane configuration using the standard [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io). This allows to configure STUNner in the familiar YAML-engineering style via Kubernetes manifests. The below reference gives an overview of the subset of the Gateway API supported by STUNner, see [here](https://github.com/l7mp/stunner-gateway-operator#caveats) for a list of the most important simplifications.
 
 ## GatewayClass
 
-The GatewayClass resource provides the root of the gateway hierarchy. GatewayClass resources are cluster-scoped, so they can be attached to from any namespace, and we usually assume that each namespaced gateway hierarchy will have a separate global GatewayClass as the anchor.
+The GatewayClass resource provides the root of a STUNner gateway configuration. GatewayClass resources are cluster-scoped, so they can be attached to from any namespace.
 
-Below is a sample GatewayClass resource. Each GatewayClass must specify a controller that will manage the Gateway objects created under the hierarchy; this must be set to `stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In addition, a GatewayClass can refer to further implementation-specific configuration via a `parametersRef`; in the case of STUNner this will always be a GatewayConfig object (see [below](#gatewayconfig)).
+Below is a sample GatewayClass resource. Each GatewayClass specifies a controller that will manage the Gateway objects created under the class; this must be set to `stunner.l7mp.io/gateway-operator` for the STUNner gateway operator to pick up the GatewayClass. In addition, a GatewayClass can refer to further implementation-specific configuration via a `parametersRef`; in the case of STUNner this will always be a GatewayConfig object (see [below](#gatewayconfig)).
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
@@ -41,12 +33,12 @@ Below is a quick reference of the most important fields of the GatewayClass [`sp
 
 ## GatewayConfig
 
-The GatewayConfig resource provides general configuration for STUNner, most importantly the STUN/TURN authentication [credentials](AUTH.md) clients can use to connect to STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a particular GatewayConfig in the GatewayClass `parametersRef`.  GatewayConfig resources are namespaced, and every hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error because the authentication credentials cannot be learned by the dataplane otherwise.
+The GatewayConfig resource provides general configuration for STUNner, most importantly the STUN/TURN authentication [credentials](AUTH.md) clients can use to connect to STUNner. GatewayClass resources attach a STUNner configuration to the hierarchy by specifying a particular GatewayConfig in the GatewayClass `parametersRef`.  GatewayConfig resources are namespaced, and every hierarchy can contain at most one GatewayConfig. Failing to specify a GatewayConfig is an error because the authentication credentials cannot be learned otherwise.
 
-The following example takes the [STUNner authentication settings](AUTH.md) from the Secret called `stunner-auth-secret` in the `stunner` namespace, sets the authentication realm to `stunner.l7mp.io`, sets the dataplane loglevel to `all:DEBUG,turn:INFO` (this will set all loggers to `DEBUG` level except the TURN protocol machinery's logger which is set to `INFO`), and sets the default URL for metric scraping.
+The following example takes the [STUNner authentication settings](AUTH.md) from the Secret called `stunner-auth-secret` in the `stunner` namespace, sets the authentication realm to `stunner.l7mp.io`, and sets the dataplane loglevel to `all:DEBUG,turn:INFO` (this will set all loggers to `DEBUG` level except the TURN protocol machinery's logger which is set to `INFO`).
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig
@@ -54,42 +46,38 @@ metadata:
 spec:
   logLevel: "all:DEBUG,turn:INFO"
   realm: stunner.l7mp.io
-  authRef: 
+  authRef:
     name: stunner-auth-secret
     namespace: stunner
-  metricsEndpoint: "http://0.0.0.0:8080/metrics"
 ```
 
-Below is a quick reference of the most important fields of the GatewayConfig [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects)
+Below is a reference of the most important fields of the GatewayConfig [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects)
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
-| `stunnerConfig` | `string` | The name of the ConfigMap into which the operator renders the `stunnerd` running configuration. Default: `stunnerd-config`. | No |
-| `logLevel` | `string` | Logging level for the dataplane daemon pods (`stunnerd`). Default: `all:INFO`. | No |
+| `dataplane` | `string` | The name of the Dataplane template to use for provisioning `stunnerd` pods. Default: `default`. | No |
+| `logLevel` | `string` | Logging level for the dataplane pods. Default: `all:INFO`. | No |
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authRef` | `reference` | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`. | No |
 | `username` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `password` | `string` | The password for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `sharedSecret` | `string` | The shared secret for [`ephemeral` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
-| `metricsEndpoint` | `string` | The metrics server (Prometheus) endpoint URL for the `stunnerd` pods.| No |
-| `healthCheckEndpoint` | `string` | HTTP health-check endpoint exposed by `stunnerd`. Liveness check will be available on path `/live` and readiness check on path `/ready`. Default is to enable health-checking on `http://0.0.0.0:8086/ready` and `http://0.0.0.0:8086/live`, use an empty string to disable.| No |
 | `authLifetime` | `int` | The lifetime of [`ephemeral` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
-| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP addresses. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
+| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP address. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
 
-> **Warning**  
 At least a valid username/password pair *must* be supplied for `static` authentication, or a `sharedSecret` for the `ephemeral` mode, either via an external Secret or inline in the GatewayConfig. External authentication settings override inline settings. Missing both is an error.
 
-Except the TURN authentication realm, all GatewayConfig resources are safe for modification. That is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting listeners/TURN servers. Changing the realm, however, induces a *full* TURN server restart (see below).
+Except the TURN authentication realm, all GatewayConfig resources are safe for modification. That is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting listeners/TURN servers. Changing the realm, however, induces a *full* dataplane restart.
 
 ## Gateway
 
 Gateways describe the STUN/TURN server listeners exposed to clients.
 
-The below Gateway will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and automatically expose it on a public IP address and port by creating a [LoadBalancer service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer). The name and namespace of the automatically provisioned service are the same as those of the Gateway, and the service is automatically updated if the Gateway changes (e.g., a port changes).
+The below Gateway resource will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and make it available on a public IP address and port to clients. Each Gateway will have a `stunnerd` Deployment that will run the dataplane, a LoadBalancer Service that will expose the dataplane to the Internet, and an ancillary ConfigMap that will hold the corresponding configuration, each using the same name and namespace as the Gateway. Once the Gateway is removed, the corresponding resources are automatically garbage-collected.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -102,10 +90,10 @@ spec:
       protocol: TURN-UDP
 ```
 
-The below more complex example defines two TURN listeners: a TURN listener at the UDP:3478 port that accepts routes from any namespace, and a TURN listener at port TLS/TCP:443 that accepts routes from all namespaces labeled as `app:dev`.
+The below example defines two TURN listeners: a TURN listener at the UDP:3478 port that accepts routes from any namespace (see below), and a TURN listener at port TLS/TCP:443 that accepts routes only from namespaces labeled with `app=dev`.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: complex-gateway
@@ -142,7 +130,7 @@ spec:
               app: dev
 ```
 
-Below is a quick reference of the most important fields of the Gateway [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects).
+Below is a reference of the most important fields of the Gateway [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects).
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
@@ -150,20 +138,34 @@ Below is a quick reference of the most important fields of the Gateway [`spec`](
 | `listeners` | `list` | The list of TURN listeners. | Yes |
 | `addresses` | `list` | The list of manually hinted external IP addresses for the rendered service (only the first one is used). | No |
 
-Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a
-`tls` configuration is required for TURN-TLS and TURN-DTLS listeners.
+> [!WARNING]
+>
+> Gateway resources are *not* safe for modification. This means that certain changes to a Gateway will restart the underlying TURN server listener, causing all active client sessions to terminate.  The particular rules are as follows:
+> - adding or removing a listener will start/stop *only* the TURN listener being created/removed, without affecting the rest of the listeners on the same Gateway;
+> - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
+> - changing the TURN authentication realm will restart *all* TURN listeners.
+
+### Listener configuration
+
+Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a `tls` configuration is required for TURN-TLS and TURN-DTLS listeners. Per-listener configuration is as follows.
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
-| `name` | `string` | Name of the TURN listener. | Yes |
+| `name` | `string` | Name of the TURN listener. Must be unique per Gateway. | Yes |
 | `port` | `int` | Network port for the TURN listener. | Yes |
 | `protocol` | `string` | Transport protocol for the TURN listener. Either TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS. | Yes |
 | `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TURN-TLS/TURN-DTLS) |
-| `allowedRoutes.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes), either `All`, `Selector`, or `Same` (default is `Same`) | No | 
+| `allowedRoutes.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes), either `All`, `Selector`, or `Same`. Default: `Same`. | No |
 
 For TURN-TLS/TURN-DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key.
 
+### Load balancer configuration
+
 STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN over UDP and TURN over DTLS listeners are exposed as UDP services, TURN-TCP and TURN-TLS listeners are exposed as TCP.
+
+STUNner implements two ways to customize the automatically created Service, both involving certain per-defined [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) added to the Service.  This is useful to, e.g., specify health-check settings for the Kubernetes load-balancer controller. The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
+
+By default, each key-value pair set in the GatewayConfig `loadBalancerServiceAnnotations` field will be copied verbatim into the Service. Service annotations can be customized on a per-Gateway basis as well, by adding the corresponding annotations to a Gateway resource. STUNner copies all annotations from the Gateway into the Service, overwriting the annotations specified in the GatewayConfig on conflict.
 
 Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
 
@@ -172,13 +174,14 @@ Manually hinted external address describes an address that can be bound to a Gat
 | `type`  | `string` | Type of the address. Currently only `IPAddress` is supported. | Yes      |
 | `value` | `string` | Address that should be bound to the Gateway's service.        | Yes      |
 
-> **Warning**  
-Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if the cloud-provider or your Kubernetes install do not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
+> [!WARNING]
+>
+> Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if the cloud-provider or your Kubernetes install do not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
 
-Mixed multi-protocol Gateways are supported: this means if you want to expose a UDP and a TCP port on the same LoadBalancer service you can do it with a single Gateway. The below Gateway will expose both ports with their respective protocols.
+[Mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) are supported: this means if you want to expose a UDP and a TCP port on the same IP you can do it with a single Gateway. The below Gateway will expose both ports with their respective protocols.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: mixed-protocol-gateway
@@ -195,22 +198,32 @@ spec:
       protocol: TURN-TCP
 ```
 
-> **Warning**  
-> Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature for compatibility reasons. You can re-enable mixed-protocol LBs by annotating your Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair.
-
-STUNner implements two ways to customize the automatically created Service, both involving adding certain [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) to the Service. First, if any annotation is set in the GatewayConfig `loadBalancerServiceAnnotations` field then those will be copied verbatim into the Service. Note that `loadBalancerServiceAnnotations` affect *all* LoadBalancer Services created by STUNner under the current Gateway hierarchy. Second, Service annotations can be customized on a per-Gateway basis as well by adding the annotations to Gateway resources. STUNner then copies all annotations from the Gateway verbatim into the Service, overwriting the annotations specified in the GatewayConfig on conflict. This is useful to, e.g., specify health-check settings for the Kubernetes load-balancer controller. The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
-
-> **Warning**  
-Gateway resources are *not* safe for modification. This means that certain changes to a Gateway will restart the underlying TURN server listener, causing all active client sessions to terminate.  The particular rules are as follows:
-> - adding or removing a listener will start/stop *only* the TURN listener to be started/stopped, without affecting the rest of the listeners on the same Gateway;
-> - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
-> - changing the TURN authentication realm will restart *all* TURN listeners.
+> [!WARNING]
+>
+> Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature. You can enable mixed-protocol LBs by annotating a Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair.
 
 ## UDPRoute
 
-UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. An UDPRoute can be attached only to a Gateway in any namespace by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` for each Gateway listener to control which namespaces the listener accepts routes from.
+UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. An UDPRoute can be attached to a Gateway by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` per each Gateway listener to control which namespaces the listener accepts routes from.
 
-The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace.
+The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to *any UDP port* on the pods of the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace. 
+
+```yaml
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: media-plane-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+  rules:
+    - backendRefs:
+        - name: media-server-pool
+          namespace: media-plane
+```
+
+Note that STUNner provides its own UDPRoute resource instead of the official UDPRoute resource available in the Gateway API. In contrast to the official version, still at version v1alpha2, STUNner's UDPRoutes can be considered stable and expected to be supported throughout the entire lifetime of STUNner v1. You can still use the official UDPRoute resource as well, by changing the API version and adding an arbitrary port to the backend references (this is required by the official API). Note that the port will be omitted.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -225,26 +238,37 @@ spec:
     - backendRefs:
         - name: media-server-pool
           namespace: media-plane
+          port: 1
 ```
 
-Below is a quick reference of the most important fields of the UDPRoute [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects).
+Below is a reference of the most important fields of the STUNner UDPRoute `spec`.
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `parentRefs` | `list` | Name/namespace of the Gateways to attach the route to. If no namespace is given, then the Gateway will be searched in the UDPRoute's namespace. | Yes |
-| `rules.backendRefs` | `list` | A list of `name`/`namespace` pairs specifying the backend Service(s) reachable through the UDPRoute. It is allowed to specify a service from a namespace other than the UDPRoute's own namespace. | No |
+| `rules.backendRefs` | `list` | A list of backends (Services or StaticServices) reachable through the UDPRoute. It is allowed to specify a service from a namespace other than the UDPRoute's own namespace. | No |
+
+Backend reference configuration is as follows:
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `group` | `string` | API group for the backend, either empty string for Service backends or `stunner.l7mp.io` for StaticService backends. Default: `""`. | No |
+| `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
+| `name` | `string` | Name of the backend Service or StaticService. | Yes |
+| `namespace` | `string` | Namespace of the backend Service or StaticService. | Yes |
+| `port` | `int` | Port to use to reach the backend. If empty, make all ports available on the backend. Default: empty.| No |
+| `endPort` | `int` | If port is also specified, then access to the backend is restricted to the port range [port, endPort] inclusive. If port and endPort are empty, make all ports available on the backend. If port is given but endPort is not, admit the singleton port range [port,port]. Default: empty.| No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
 ## StaticService
 
-When the target backend of a UDPRoute is running *inside* Kubernetes then the backend is always a proper Kubernetes Service. However, when the target is deployed *outside* Kubernetes then there is no Kubernetes Service that could be configured as a backend. This is particularly important when STUNner is used as a public TURN service. The StaticService resource provides a way to assign a routable IP address range to a UDPRoute for these cases.
+When the target backend of a UDPRoute is running *inside* Kubernetes then the backend is always a proper Kubernetes Service. However, when the target is deployed *outside* Kubernetes then there is no Kubernetes Service that could be configured as a backend. This is particularly problematic in the cases when STUNner is used as a public TURN service. For such deployments, the StaticService resource provides a way to assign a routable IP address range to a UDPRoute.
 
-The below StaticService represents a hypothetical Kubernetes Service backing a set of pods with IP
-addresses in the range `192.0.2.0/24` or `198.51.100.0/24`.
+The below StaticService represents a hypothetical Kubernetes Service backing a set of pods with IP addresses in the range `192.0.2.0/24` or `198.51.100.0/24`.
 
 ```yaml
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: StaticService
 metadata:
   name: static-svc
@@ -258,7 +282,7 @@ spec:
 Assigning this StaticService to a UDPRoute will make sure allows access to *any* IP address in the specified ranges.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: media-plane-route
@@ -275,16 +299,69 @@ spec:
 
 The StaticService `spec.prefixes` must be a list of proper IPv4 prefixes: any IP address in any of the listed prefixes will be whitelisted. Use the single prefix `0.0.0.0/0` to provide wildcard access via an UDPRoute.
 
-> **Warning**  
-Never use StaticServices to access Services running *inside* Kubernetes, this may open up an unintended backdoor to your cluster. Use StaticServices only with *external* target backends.
+> [!WARNING]
+>
+> Never use StaticServices to access Services running *inside* Kubernetes, this may open up an unintended backdoor to your cluster. Use StaticServices only with *external* target backends.
 
-## Status
+## Dataplane
 
-Most Kubernetes resources contain a `status` subresource that describes the current state of the resource, supplied and updated by the Kubernetes system and its components. The Kubernetes control plane continually and actively manages every object's actual state to match the desired state you supplied and updates the status field to indicate whether any error was encountered during the reconciliation process.
+The Dataplane resource is used as a template for provisioning of `stunnerd` pods. This is useful to choose the image origin and version, set custom command line arguments and environment variables to the `stunnerd` daemon, configure resource requests/limits, etc.
 
-If you are not sure about whether the STUNner gateway operator successfully picked up your Gateways or UDPRoutes, it is worth checking the status to see what went wrong.
+Below is the `default` Dataplane installed by STUNner.
 
-```console
-kubectl get <resource> -n <namespace> <name> -o jsonpath='{.status}'
+```yaml
+apiVersion: stunner.l7mp.io/v1
+kind: Dataplane
+metadata:
+  name: default
+spec:
+  command:
+  - stunnerd
+  args:
+  - -w
+  - --udp-thread-num=16
+  image: l7mp/stunnerd:latest
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  terminationGracePeriodSeconds: 3600
 ```
 
+Below is a reference of the most important fields of the Dataplane `spec` that can be used to customize the provisioning of `stunnerd` pods.
+
+| Field                           | Type       | Description                                                                                                                                                                             | Required |
+|:--------------------------------|:----------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
+| `image`                         | `string`   | The container image.                                                                                                                                                                    | Yes      |
+| `imagePullPolicy`               | `string`   | Policy for if/when to pull an image, can be either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if `:latest` tag is specified on the image, or `IfNotPresent` otherwise.     | No       |
+| `command`                       | `list`     | Entrypoint array. Default: `stunnerd`.                                                                                                                                                  | No       |
+| `args`                          | `list`     | Arguments to the entrypoint.                                                                                                                                                            | Yes      |
+| `envFrom`                       | `list`     | List of sources to populate environment variables in the container. Default: empty.                                                                                                     | No       |
+| `env`                           | `list`     | List of environment variables to set in the container. Default: empty.                                                                                                                  | No       |
+| `replicas`                      | `int`      | Number of `stunnerd` pods per Gateway to provision. Not enforced if the `stunnerd` Deployment replica count is overwritten manually or by an autoscaler. Default: 1.                    | No       |
+| `hostNetwork`                   | `bool`     | Deploy `stunnerd` into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                 | No       |
+| `resources`                     | `object`   | Compute resources required by `stunnerd`. Default: whatever Kubernetes assigns.                                                                                                         | No       |
+| `affinity`                      | `object`   | Scheduling constraints. Default: none.                                                                                                                                                  | No       |
+| `tolerations`                   | `object`   | Tolerations. Default: none.                                                                                                                                                             | No       |
+| `disableHealthCheck`            | `bool`     | Disable health-checking. If true, enable HTTP health-checks on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: true. | No       |
+| `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                            | No       |
+| `terminationGracePeriodSeconds` | `duration` | Optional duration in seconds for `stunnerd` to terminate gracefully. Default: 30 seconds.                                                                                               | No       |
+
+There can be multiple Dataplane resources defined in a cluster, say, one for the production workload and one for development. Use the `spec.dataplane` field in the corresponding GatewayConfig to choose the Dataplane for each STUNner install.
+
+> [!WARNING]
+>
+> A Dataplane resource called `default` must always be available in the cluster, otherwise the operator will not know how to provision dataplane pods. Removing the `default` template will break your STUNner installation.
+
+<!-- ## Status -->
+
+<!-- Most Kubernetes resources provide a `status` subresource that describes the current state of the resource. The status is supplied and updated by the Kubernetes system and its components. The Kubernetes control plane continually and actively manages every object's actual state to match the desired state you supplied and updates the status field to indicate whether any error was encountered during the reconciliation process. -->
+
+<!-- If you are not sure about whether the STUNner gateway operator successfully picked up your Gateways or UDPRoutes, it is worth checking the status to see what went wrong. -->
+
+<!-- ```console -->
+<!-- kubectl get <resource> -n <namespace> <name> -o jsonpath='{.status}' -->
+<!-- ``` -->

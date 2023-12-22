@@ -18,11 +18,11 @@
 
 ## User guides
 
-* [Gateway API reference](GATEWAY.md)
 * [Authentication](AUTH.md)
 * [Monitoring](MONITORING.md)
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
+* [Reference](GATEWAY.md)
 
 ## Tutorials
 
@@ -49,7 +49,3 @@
 * [`stunnerd` manual](cmd/stunnerd.md)
 * [`turncat` manual](cmd/turncat.md)
 * [`stunnerctl` manual](cmd/stunnerctl.md)
-
-## Obsolete features
-
-* [Standalone mode](OBSOLETE.md)

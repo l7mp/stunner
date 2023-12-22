@@ -38,7 +38,8 @@ cd stunner/docs/examples/neko
 kubectl apply -f stunner.yaml
 ```
 
-> **Warning**
+> [!WARNING]
+> 
 > In case of [managed mode](/docs/INSTALL.md), update the `neko-plane` UDPRoute by replacing `stunner` in backendRefs with the generated deployment, e.g., `udp-gateway`.
 
 This will expose STUNner on a public IP on UDP port 3478. A Kubernetes `LoadBalancer` assigns an

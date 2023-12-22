@@ -9,43 +9,40 @@ used outside of this context (e.g., as a regular STUN/TURN server), but this is 
 
 ## The problem
 
-The main pain points STUNner is trying to solve are all related to that Kubernetes and WebRTC are
+The pain points STUNner is trying to solve are all related to that Kubernetes and WebRTC are
 currently foes, not friends.
 
 Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
 streaming workloads, and especially UDP/RTP based WebRTC media, feel like a foreign citizen. Most
 importantly, Kubernetes runs the media server pods/containers over a private L3 network over a
-private IP address and the network dataplane applies several rounds of Network Address Translation
-(NAT) steps to ingest media traffic into this private pod network. Most cloud load-balancers apply
-a DNAT step to route packets to a node and then an SNAT step to put the packet to the private pod
+private IP address and the several rounds of Network Address Translation (NAT) steps are required
+to ingest media traffic into this private pod network. Most cloud load-balancers apply a DNAT step
+to route packets to a Kubernetes node and then an SNAT step to inject a packet into the private pod
 network, so that by the time a media packet reaches a pod essentially all header fields in the [IP
 5-tuple](https://www.techopedia.com/definition/28190/5-tuple) are modified except the destination
 port. Then, if any pod sends the packet over to another pod via a Kubernetes service load-balancer
 then the packet will again undergo a DNAT step, and so on.
 
-The *Kubernetes dataplane teems with NATs*. This is not a big deal for the usual HTTP/TCP web
-protocols Kubernetes was designed for, since an HTTP/TCP session contains an HTTP header that fully
-describes it. Once an HTTP/TCP session is accepted by a server it does not need to re-identify the
-client per each received packet, because it has session context.
-
-This is not the case with the prominent WebRTC media protocol encapsulation though, RTP over
-UDP. RTP does not have anything remotely similar to an HTTP header. Consequently, the only
-"semi-stable" connection identifier WebRTC servers can use to identify a client is by expecting the
-client's packets to arrive from a negotiated IP source address and source port. When the IP 5-tuple
-changes, for instance because there is a NAT in the datapath, then WebRTC media connections
-break. Due to reasons which are mostly historical at this point, *UDP/RTP connections do not
-survive not even a single NAT step*, let alone the 2-3 rounds of NATs a packet regularly undergoes
-in the Kubernetes dataplane.
+The *Kubernetes dataplane teems with NATs*. This is not a big deal for the web protocols Kubernetes
+was designed for, since each HTTP/TCP connection involves a session context that can be used by a
+server to identify clients. This is not the case with WebRTC media protocol stack though, since
+UDP/RTP connections do not involve anything remotely similar to an HTTP context. Consequently, the
+only "semi-stable" connection identifier WebRTC servers can use to identify a client is by
+expecting the client's packets to arrive from a negotiated IP source address and source port. When
+the IP 5-tuple changes, for instance because there is a NAT in the datapath, then WebRTC media
+connections break. Due to reasons which are mostly historical at this point, *UDP/RTP connections
+do not survive not even a single NAT step*, let alone the 2-3 rounds of NATs a packet regularly
+undergoes in the Kubernetes dataplane.
 
 ## The state-of-the-art
 
 The current stance is that the only way to deploy a WebRTC media server into Kubernetes is to
 exploit a [well-documented Kubernetes
 anti-pattern](https://kubernetes.io/docs/concepts/configuration/overview): *running the media
-server pods in the host network namespace* (using the `hostNetwork=true` setting in the pod's
-container template). This way the media server shares the network namespace of the host (i.e., the
-Kubernetes node) it is running on, inheriting the public address (if any) of the host and
-(hopefully) sidestepping the private pod network with the involved NATs.
+server pods in the host network namespace* of Kubernetes nodes (using the `hostNetwork=true`
+setting in the pod's container template). This way the media server shares the network namespace of
+the host (i.e., the Kubernetes node) it is running on, inheriting the public address (if any) of
+the host and (hopefully) sidestepping the private pod network with the involved NATs.
 
 There are *lots* of reasons why this deployment model is less than ideal:
 

@@ -220,7 +220,7 @@ The most important component in the STUNner configuration is the TURN Gateway: t
 public TURN server on the UDP port 3478 through which clients will connect to each other.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -243,7 +243,7 @@ Here is the corresponding UDPRoute. Note that the route attaches itself to both 
 Gateway, so no matter on which gateway the client connects via our UDPRoute will apply.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: stunner-headless

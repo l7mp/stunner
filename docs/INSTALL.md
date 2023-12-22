@@ -2,112 +2,95 @@
 
 ## Prerequisites
 
-You need a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be installed and
-configured to communicate with your cluster. STUNner should be compatible with *any* major hosted
-Kubernetes service or any on-prem Kubernetes cluster; if not, please file an issue.
+You need a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must be installed and configured to communicate with your cluster. STUNner should be compatible with *any* major hosted Kubernetes service or any on-prem Kubernetes cluster; if not, please file an issue.
 
-The simplest way to expose STUNner to clients is through Kubernetes [LoadBalancer
-services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer);
-these are automatically managed by STUNner. This depends on a functional LoadBalancer integration
-in your cluster (if using Minikube, try `minikube tunnel` to get an idea of how this
-works). STUNner automatically detects if LoadBalancer service integration is functional and falls
-back to using NodePorts when it is not; however, this may require manual tweaking of the firewall
-rules to admit the UDP NodePort range into the cluster.
+The simplest way to expose STUNner to clients is through Kubernetes [LoadBalancer services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer); these are automatically managed by STUNner. This depends on a functional LoadBalancer integration in your cluster (if using Minikube, try `minikube tunnel` to get an idea of how this works). STUNner automatically detects if LoadBalancer service integration is functional and falls back to using NodePorts when it is not; however, this may require manual tweaking of the firewall rules to admit the UDP NodePort range into the cluster.
 
-To recompile STUNner, at least Go v1.19 is required. Building the container images requires
-[Docker](https://docker.io) or [Podman](https://podman.io).
+To compile STUNner, at least Go v1.19 is required. Building the container images requires [Docker](https://docker.io) or [Podman](https://podman.io).
 
-## Basic installation
+## Installation
 
-The simplest way to deploy the full STUNner distro, with the dataplane and the controller
-automatically installed, is through [Helm](https://helm.sh). STUNner configuration parameters are
-available for customization as [Helm
-Values](https://helm.sh/docs/chart_template_guide/values_files). We recommend deploying each
-STUNner dataplane into a separate Kubernetes namespace (e.g., `stunner`), while the gateway
-operator should go into the `stunner-system` namespace (but effectively any namespace would work).
+The simplest way to deploy STUNner is through [Helm](https://helm.sh). STUNner configuration parameters are available for customization as [Helm Values](https://helm.sh/docs/chart_template_guide/values_files); see the [STUNner-helm](https://github.com/l7mp/stunner-helm) repository for a list of the available customizations.
 
-First, register the STUNner repository with Helm.
+The first step is to register the STUNner repository with Helm.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 ```
 
-Install the control plane:
+### Stable version
+
+The below will install the stable version of STUNner. In particular, the this will install only the STUNner control plane, i.e., the gateway operator and the authentication service, the dataplane will be automatically provisioned by the operator when needed (but see below). We recommend to use the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
+    --namespace=stunner-system
 ```
 
-Install the dataplane:
+And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec).
+
+### Development version
+
+By default, the Helm chart installs the stable version of STUNner. To track the bleeding edge, STUNner provides a `dev` release channel that tracks the latest development version. Use it at your own risk: we do not promise any stability for the dev-channel.
 
 ```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace \
+    --namespace=stunner-system
+```
+
+### Legacy mode
+
+In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times.
+
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
+    --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
 helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
-## Parallel deployments
-
-You can install multiple STUNner dataplanes side-by-side, provided that the corresponding
-namespaces are different. For instance, to create a `prod` dataplane installation for your
-production workload and a `dev` installation for experimentation, the below commands will install
-two dataplanes, one into the `stunner-prod` and another one into the `stunner-dev` namespace.
+You can install multiple legacy STUNner dataplanes side-by-side, provided that the corresponding namespaces are different. For instance, to create a `prod` dataplane installation for your production workload and a `dev` installation for experimentation, the below commands will install two dataplanes, one into the `stunner-prod` and another one into the `stunner-dev` namespace.
 
 ```console
 helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod
 helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
 ```
 
-Now, you can build a separate [gateway hierarchy](CONCEPTS.md) per each namespace to supply a
-distinct ingress gateway configuration per dataplane.
+## Customization
 
-For the list of available customizations, see the
-[STUNner-helm](https://github.com/l7mp/stunner-helm) repository. For installing STUNner in the
-standalone mode, consult the documentation [here](OBSOLETE.md).
+The Helm charts let you fine-tune STUNner features, including [compute resources](#resources) provisioned for `stunnerd` pods, [UDP multithreading](#udp-multithreading), and[graceful shutdown](#graceful-shutdown).
 
-## Development version
+### Resources requests/limits
 
-STUNner provides a `dev` release channel, which allows to track the latest development version. Use
-it at your own risk: we do not promise any stability for STUNner installed from the dev-channel.
+it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-gateway-operator/values.yaml) resource request and limit is set as follows: 
 
-```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
-helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
+```yaml
+resources:
+  limits:
+    cpu: 2
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 128Mi
+``` 
+
+This means that every `stunnerd` pod will request 0.5 CPU cores and 128 Mibytes of memory. Note that the pods will start only if Kubernetes can successfully allocate the given amount of resources. In order to avoid stressing the Kubernetes scheduler, it is advised to keep the limits at the bare minimum and scale out by [increasing the number of running `stunnerd` pods](SCALING.md) if needed.
+
+### UDP multithreading
+
+STUNner can run multiple UDP listeners over multiple parallel readloops for loadbalancing. Namely, ech `stunnerd` pod can create a configurable number of UDP server sockets using `SO_REUSEPORT` and then spawn a separate goroutine to run a parallel readloop per each. The kernel will load-balance allocations across the sockets/readloops per the IP 5-tuple, so the same allocation will always stay at the same CPU. This allows UDP listeners to scale to multiple CPUs, improving performance. Note that this is required only for UDP: TCP, TLS and DTLS listeners spawn a per-client readloop anyway. Also note that `SO_REUSEPORT` is not portable, so currently we enable this only for UNIX architectures.
+
+The feature is exposed via the command line flag `--udp-thread-num=<THREAD_NUMBER>` in `stunnerd`. In the Helm chart, it can be enabled or disabled with the `--set stunner.deployment.container.stunnerd.udpMultithreading.enabled=true` flag. By default, UDP multithreading is enabled with 16 separate readloops per each UDP listener.
+
+```yaml
+udpMultithreading:
+  enabled: true
+  readLoopsPerUDPListener: 16
 ```
 
-## Managed mode
+### Graceful shutdown
 
-From v0.16.0 STUNner provides a new way to provision dataplane pods that is called the *managed mode*. In the traditional operational model (called the *legacy mode*), the user was responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart [possibly multiple times](#parallel-deployments). In the managed mode the operator *automatically* provisions the necessary dataplanes by creating a separate `stunnerd` Deployment per each Gateway, plus the usual LoadBalancer service to expose it. This substantially simplifies operations and removes lot of manual and repetitive work.
+STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunner` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile. 
 
-To install the gateway operator using the new manged mode, start with a clean Kubernetes cluster and install the `stunner-gateway-operator` Helm chart, setting the flag `stunnerGatewayOperator.dataplane.mode` to `managed`. Observe that we do not install the `stunner` Helm chart separately; the operator will readily create the `stunnerd` pods as needed.
+The default termination period is set to 3600 seconds (1 hour). To modify, use the `--set stunner.deployment.container.terminationGracePeriodSeconds=<NEW_PERIOD_IN_SECONDS>` flag.
 
-```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
-    --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=managed
-```
-
-The `stunnerd` pods created by the operator can be customized using the Dataplane CR: for instance you can specify the `stunnerd` container image version to be used as the dataplane, provision resources for each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec). All gateways will use the `default` Dataplane; you can override this by creating a new Dataplane CR and setting the name in the [`spec.dataplane` field](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator@v0.15.2/api/v1alpha1#GatewayConfigSpec) of the corresponding GatewayConfig.
-
-```console
-kubectl get dataplanes.stunner.l7mp.io default -o yaml
-apiVersion: stunner.l7mp.io/v1alpha1
-kind: Dataplane
-metadata:
-  name: default
-spec:
-  image: l7mp/stunnerd:latest
-  imagePullPolicy: Always
-  command:
-  - stunnerd
-  args:
-  - -w
-  - --udp-thread-num=16
-  hostNetwork: false
-  resources:
-    limits:
-      cpu: 2
-      memory: 512Mi
-    requests:
-      cpu: 500m
-      memory: 128Mi
-  terminationGracePeriodSeconds: 3600
-```
