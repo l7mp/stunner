@@ -9,7 +9,7 @@ dashboards in [Grafana](https://grafana.com).
 ## Configuration
 
 Metrics collection is *not* enabled in the default installation. In order to open the
-metrics-collection endpoint for a [gateway hierarchy](GATEWAY.md#overview), configure an
+metrics-collection endpoint for a [gateway hierarchy](GATEWAY.md), configure an
 appropriate HTTP URL in the `metricsEndpoint` field of corresponding the
 [GatewayConfig](GATEWAY.md#gatewayconfig) resource.
 

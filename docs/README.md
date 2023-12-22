@@ -18,11 +18,11 @@
 
 ## User guides
 
-* [Gateway API reference](GATEWAY.md)
 * [Authentication](AUTH.md)
 * [Monitoring](MONITORING.md)
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
+* [Reference](GATEWAY.md)
 
 ## Tutorials
 

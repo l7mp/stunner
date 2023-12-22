@@ -206,7 +206,7 @@ spec:
 
 UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. An UDPRoute can be attached to a Gateway by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` per each Gateway listener to control which namespaces the listener accepts routes from.
 
-The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace.
+The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to *any UDP port* on the pods of the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace. 
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -223,7 +223,7 @@ spec:
           namespace: media-plane
 ```
 
-Note that STUNner provides its own UDPRoute resource instead of the official UDPRoute resource available in the Gateway API. In contrast to the official version, still at version v1alpha2, STUNner's UDPRoutes can be considered stable and expected to be supported throughout the entire lifetime of STUNner v1. You can still use the official UDPRoute resource as well, by changing the API version and adding an arbitrary port to the backend references (this is required by the official API).
+Note that STUNner provides its own UDPRoute resource instead of the official UDPRoute resource available in the Gateway API. In contrast to the official version, still at version v1alpha2, STUNner's UDPRoutes can be considered stable and expected to be supported throughout the entire lifetime of STUNner v1. You can still use the official UDPRoute resource as well, by changing the API version and adding an arbitrary port to the backend references (this is required by the official API). Note that the port will be omitted.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
@@ -256,8 +256,8 @@ Backend reference configuration is as follows:
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
 | `namespace` | `string` | Namespace of the backend Service or StaticService. | Yes |
-| `port` | `int` | Port to use to reach the backend. Default: make all ports available on the backend. | No |
-| `endPort` | `int` | If port is also specified, then access to the backend is restricted to the port range [port, endPort] inclusive. Must be greater than, or equal to port. Default: make all ports available on the backend. | No |
+| `port` | `int` | Port to use to reach the backend. If empty, make all ports available on the backend. Default: empty.| No |
+| `endPort` | `int` | If port is also specified, then access to the backend is restricted to the port range [port, endPort] inclusive. If port and endPort are empty, make all ports available on the backend. If port is given but endPort is not, admit the singleton port range [port,port]. Default: empty.| No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
