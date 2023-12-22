@@ -46,6 +46,5 @@ spec:
     - name: udp-gateway
   rules:
     - backendRefs:
-        - name: dummy
-        # - name: kube-dns
-        #   namespace: kube-system
+        - name: kube-dns
+          namespace: kube-system
