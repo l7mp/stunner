@@ -26,7 +26,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-
     --namespace=stunner-system
 ```
 
-And that's all: you don't need to install the dataplane separately as provisioning this is handled automatically by the operator. The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec). All gateways will use the `default` Dataplane custom resource for provisioning `stunnerd` pods; you can override this by creating a new Dataplane CR and setting the name in the [`spec.dataplane` field](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator@v0.15.2/api/v1alpha1#GatewayConfigSpec) of the corresponding GatewayConfig.
+And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator. The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec). All gateways will use the `default` Dataplane custom resource as a template for creating `stunnerd` pods; you can override this by creating a new Dataplane resource and setting the name in the [`spec.dataplane` field](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator@v0.15.2/api/v1alpha1#GatewayConfigSpec) of the corresponding GatewayConfig.
 
 ```console
 kubectl get dataplanes.stunner.l7mp.io default -o yaml
@@ -53,7 +53,7 @@ spec:
   terminationGracePeriodSeconds: 3600
 ```
 
-Modifications to the `default `Dataplane template are immediately enforced in the cluster, which usually induces a full restart of the entire dataplane. A misconfigured `default `Dataplane template can therefore easily break an entire STUNner installation. It is best to avoid changing (or deleting!) the `default` Dataplane unless you really know what you are doing.
+Modifications to the `default` Dataplane template are immediately enforced in the cluster, which usually induces a full restart of the entire dataplane. A misconfigured `default` Dataplane template can therefore easily break a STUNner installation, this it is best to avoid changing (or deleting!) it unless you really know what you are doing.
 
 ## Development version
 
@@ -66,7 +66,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --cre
 
 ## Legacy mode
 
-In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the necessary dataplanes by creating a separate `stunnerd` Deployment per each Gateway, plus a LoadBalancer service to expose it. This substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In tnis more the user was responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times. 
+In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times.
 
 ```console
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
