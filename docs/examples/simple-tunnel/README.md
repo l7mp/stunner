@@ -111,93 +111,95 @@ spec:
 Check whether you have all the necessary STUNner resources installed namespace.
 
 ```console 
-kubectl get gatewayconfigs,gateways,udproutes -n stunner 
-NAME                                                  REALM             AUTH        AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   3m53s
+kubectl get gatewayconfigs,gateways,udproutes.stunner.l7mp.io -n stunner 
+NAME                                                  REALM             DATAPLANE   AGE
+gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   default     139m
 
-NAME                                            CLASS                  ADDRESS   READY   AGE
-gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass             True    14s
-gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass             True    14s
+NAME                                            CLASS                  ADDRESS         PROGRAMMED   AGE
+gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass   35.187.97.94    True         139m
+gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass   35.205.10.190   True         139m
 
-NAME                                              AGE
-udproute.gateway.networking.k8s.io/iperf-server   14s
+NAME                                    AGE
+udproute.stunner.l7mp.io/iperf-server   139m
 ```
 
-You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
+You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration for the
+UDP gateway.
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
-STUN/TURN authentication type:  plaintext
+cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
+STUN/TURN authentication type:  static
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
 Listener 1
-        Name:   udp-listener
-        Listener:       udp-listener
-        Protocol:       UDP
-        Public address: 34.116.220.190
-        Public port:    30501
-Listener 2
-        Name:   tcp-listener
-        Listener:       tcp-listener
-        Protocol:       TCP
-        Public address: 34.118.93.28
+        Name:   stunner/udp-gateway/udp-listener
+        Listener:       stunner/udp-gateway/udp-listener
+        Protocol:       TURN-UDP
+        Public address: 35.205.10.190
+        Public port:    3478
+```
+
+Likewise, the below will dump the config for the TCP gateway.
+
+``` console
+cmd/stunnerctl/stunnerctl running-config stunner/tcp-gateway
+STUN/TURN authentication type:  static
+STUN/TURN username:             user-1
+STUN/TURN password:             pass-1
+Listener 1
+        Name:   stunner/tcp-gateway/tcp-listener
+        Listener:       stunner/tcp-gateway/tcp-listener
+        Protocol:       TURN-TCP
+        Public address: 35.187.97.94
         Public port:    3478
 ```
 
 NOTE: It usually takes 30-60 seconds for Kubernetes to assign an external IP address to STUNner
 gateways. As long as the external address is in `<PENDING>` status, STUNner exposes the Gateway on
-a NodePort: in the above example the UDP Gateway's `udp-listener` is exposed on a node IP
-(`34.116.220.190`) and the NodePort 30501. Once Kubernetes finishes the exposition of the Gateway
-service, STUNner picks up the new address/port and updates the config accordingly. The end
-result should be something similar to the below; observe how the `udp-listener` public port has
-changed to the requested port 3478 and the public address is updated as well.
-
-``` console
-cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
-[...]
-Listener 1
-        Name:   udp-listener
-        Listener:       udp-listener
-        Protocol:       UDP
-        Public address: 34.118.16.31
-        Public port:    3478
-[...]
-```
+a NodePort.  Once Kubernetes finishes the exposition of the Gateway service, STUNner will pick up
+the new address/port and update the config accordingly. 
 
 If in doubt, you can always query Kubernetes for the service statuses.
 ``` console
 kubectl get -n stunner services
-NAME                              TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)          AGE
-stunner                           ClusterIP      10.120.4.118    <none>          3478/UDP         2d
-tcp-gateway                       LoadBalancer   10.120.11.196   34.118.93.28    3478:30959/TCP   14h
-udp-gateway                       LoadBalancer   10.120.3.228    34.118.16.31    3478:30501/UDP   6m42s
+NAME          TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)          AGE
+stunner       ClusterIP      10.0.9.70     <none>          3478/UDP         15m
+tcp-gateway   LoadBalancer   10.0.3.91     35.187.97.94    3478:31781/TCP   143m
+udp-gateway   LoadBalancer   10.0.14.218   35.205.10.190   3478:31048/UDP   143m
 ```
 
 ### Run the benchmark
 
 We will need to learn the ClusterIP assigned by Kubernetes to the `iperf-server` service: this will
 be the peer address to which `turncat` will ask STUNner to relay the iperf test traffic.
+
 ``` console
 export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}")
 ```
 
-Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this
-listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat`
-is clever enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set
-the STUN/TURN server public address/port and the authentication credentials
-accordingly.
+Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this listener
+via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat` is clever
+enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set the
+STUN/TURN server public address/port and the authentication credentials accordingly.
+
 ``` console
-./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener \
+./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener \
      udp://$IPERF_ADDR:5001
 ```
 
-Fire up an iperf client from another terminal to start the benchmark.
+The most important part here is the TURN meta-URI: `k8s://stunner/udp-gateway:udp-listener`
+instructs `turncat` to look for the Gateway called `udp-gateway` in the `stunner` namespace and
+create a connection to the TURN listener called `udp-listener` of the Gateway.
+
+Fire up an iperf client from another terminal that will connect to STUNner via `turncat` and start
+the benchmark.
 
 ```console
 iperf -c localhost -p 5000 -u -i 1 -l 100 -b 800000 -t 10
 ```
 
 If successful, the iperf server logs should contain the benchmark results.
+
 ```console
 kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}')
 ------------------------------------------------------------
@@ -207,21 +209,25 @@ UDP buffer size:  208 KByte (default)
 ------------------------------------------------------------
 [  1] local 10.116.2.30%eth0 port 5001 connected with 10.116.1.21 port 56439 (peer 2.1.7)
 [ ID] Interval            Transfer     Bandwidth        Jitter   Lost/Total   Latency avg/min/max/stdev PPS  inP NetPwr
+...
 [  1] 0.0000-9.9204 sec   977 KBytes   807 Kbits/sec    1.426 ms 0/10003 (0%) 14.256/10.791/97.428/ 4.993 ms 1008 pps 1.40 KByte 7.07
 ```
 
-The results show that we have managed to squeeze 1000 packets/sec through STUNner without packet
-loss, at an average one-way latency of 14.2 ms and average jitter 1.426 ms. Not bad from a
+The results show that we have managed to send 1000 packets/sec through STUNner to the iperf server
+without packet loss, at an average one-way latency of 14.2 ms and 1.426 ms jitter. Not bad from a
 Kubernetes cluster running in some remote datacenter!
 
-Repeating the test, this time with a STUN/TURN over TCP, casts a somewhat more negative
-picture. Change the STUN/TURN URI in the `turncat` CLI to connect via the `tcp-listener`.
+Repeating the test, this time with a STUN/TURN over TCP, casts a somewhat different picture. Notice
+the new meta-URI: `k8s://stunner/tcp-gateway:tcp-listener` to select the TURN server exposed on
+TCP for`turncat`.
+
 ``` console
-./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:tcp-listener \
+./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/tcp-gateway:tcp-listener \
      udp://$IPERF_ADDR:5001
 ```
 
 Run the benchmark again at 10kpps and watch the logs.
+
 ``` console
 iperf -c localhost -p 5000 -u -l 100 -b 8000000 -o /dev/null -t 10 && \
     kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}') | tail -n 1
@@ -229,13 +235,14 @@ iperf -c localhost -p 5000 -u -l 100 -b 8000000 -o /dev/null -t 10 && \
 ```
 
 It seems that average latency has jumped to 148 ms, with a max latency of close to 460 ms! That's
-why you should try to [avoid TCP at all
+why you should [avoid TCP at all
 cost](https://bloggeek.me/why-you-should-prefer-udp-over-tcp-for-your-webrtc-sessions) in real-time
 communications.
 
 ### Cleaning up
 
 Stop `turncat` and wipe all Kubernetes configuration.
+
 ```console
 kubectl delete -f docs/examples/simple-tunnel/iperf-server.yaml
 kubectl delete -f docs/examples/simple-tunnel/iperf-stunner.yaml

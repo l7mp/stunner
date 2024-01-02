@@ -312,7 +312,7 @@ The StaticService `spec.prefixes` must be a list of proper IPv4 prefixes: any IP
 
 ## Dataplane
 
-The Dataplane resource is used as a template for provisioning of `stunnerd` pods. This is useful to choose the image origin and version, set custom command line arguments and environment variables to the `stunnerd` daemon, configure resource requests/limits, etc.
+The Dataplane resource is used as a template for provisioning dataplane (`stunnerd`) pods that actually implement TURN media ingestion. This is useful to choose the `stunnerd` image origin and version, set custom command line arguments and environment variables, configure resource requests/limits, etc.
 
 Below is the `default` Dataplane installed by STUNner.
 
@@ -338,26 +338,26 @@ spec:
   terminationGracePeriodSeconds: 3600
 ```
 
-Below is a reference of the most important fields of the Dataplane `spec` that can be used to customize the provisioning of `stunnerd` pods.
+The following fields can be set in the Dataplane `spec` to customize the provisioning of `stunnerd` pods.
 
 | Field                           | Type       | Description                                                                                                                                                                             | Required |
 |:--------------------------------|:----------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
 | `image`                         | `string`   | The container image.                                                                                                                                                                    | Yes      |
-| `imagePullPolicy`               | `string`   | Policy for if/when to pull an image, can be either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if `:latest` tag is specified on the image, or `IfNotPresent` otherwise.     | No       |
-| `command`                       | `list`     | Entrypoint array. Default: `stunnerd`.                                                                                                                                                  | No       |
-| `args`                          | `list`     | Arguments to the entrypoint.                                                                                                                                                            | Yes      |
-| `envFrom`                       | `list`     | List of sources to populate environment variables in the container. Default: empty.                                                                                                     | No       |
-| `env`                           | `list`     | List of environment variables to set in the container. Default: empty.                                                                                                                  | No       |
-| `replicas`                      | `int`      | Number of `stunnerd` pods per Gateway to provision. Not enforced if the `stunnerd` Deployment replica count is overwritten manually or by an autoscaler. Default: 1.                    | No       |
-| `hostNetwork`                   | `bool`     | Deploy `stunnerd` into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                 | No       |
-| `resources`                     | `object`   | Compute resources required by `stunnerd`. Default: whatever Kubernetes assigns.                                                                                                         | No       |
-| `affinity`                      | `object`   | Scheduling constraints. Default: none.                                                                                                                                                  | No       |
-| `tolerations`                   | `object`   | Tolerations. Default: none.                                                                                                                                                             | No       |
+| `imagePullPolicy`               | `string`   | Policy for if/when to pull an image, can be either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if the `latest` tag is specified on the image, or `IfNotPresent` otherwise.  | No       |
+| `command`                       | `list`     | Entrypoints for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container). .                                                                                           | No       |
+| `args`                          | `list`     | Commane line arguments for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container).                                                                                  | No       |
+| `envFrom`                       | `list`     | List of sources to populate environment variables for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container). Default: empty.                                       | No       |
+| `env`                           | `list`     | List of environment variablesfor the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container). Default: empty.                                                            | No       |
+| `replicas`                      | `int`      | Number of dataplane pods per Gateway to provision. Not enforced if the `stunnerd` Deployment replica count is overwritten, either manually or by an autoscaler. Default: 1.             | No       |
+| `hostNetwork`                   | `bool`     | Deploy the dataplane into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.              | No       |
+| `resources`                     | `object`   | Compute resources per dataplane pod.                                                                                                                                                    | No       |
+| `affinity`                      | `object`   | Scheduling constraints for the dataplane pods. Default: none.                                                                                                                           | No       |
+| `tolerations`                   | `object`   | Tolerations for the dataplane pods. Default: none.                                                                                                                                      | No       |
 | `disableHealthCheck`            | `bool`     | Disable health-checking. If true, enable HTTP health-checks on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: true. | No       |
-| `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                            | No       |
+| `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                             | No       |
 | `terminationGracePeriodSeconds` | `duration` | Optional duration in seconds for `stunnerd` to terminate gracefully. Default: 30 seconds.                                                                                               | No       |
 
-There can be multiple Dataplane resources defined in a cluster, say, one for the production workload and one for development. Use the `spec.dataplane` field in the corresponding GatewayConfig to choose the Dataplane for each STUNner install.
+There can be multiple Dataplane resources defined in a cluster, say, one for the production workload and one for development. Use the `spec.dataplane` field in the GatewayConfig to choose the Dataplane per each STUNner install.
 
 > [!WARNING]
 >
