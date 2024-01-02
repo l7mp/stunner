@@ -55,12 +55,6 @@ func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerCo
 		return errors.New("uninitialized config file path")
 	}
 
-	// emit an empty config: this bootstraps stunner the default resources (above all, starts
-	// the health-checker)
-	w.log.Debug("bootstrapping with zero configuration")
-	initConf := ZeroConfig(w.id)
-	ch <- *initConf
-
 	go func() {
 		for {
 			// try to watch

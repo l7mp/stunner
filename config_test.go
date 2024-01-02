@@ -2,7 +2,6 @@ package stunner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,7 +16,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
-	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -187,13 +185,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// // wait a bit so that the watcher has time to react
 	// time.Sleep(50 * time.Millisecond)
 
-	// first read should yield a zeroconfig
 	c2, ok := <-conf
-	assert.True(t, ok, "zeroconfig emitted")
-	checkZeroConfig(t, &c2, stunner.GetId())
-
-	// second read yields the real config
-	c2, ok = <-conf
 	assert.True(t, ok, "config emitted")
 	checkDefaultConfig(t, &c2, "TURN-UDP")
 
@@ -285,13 +277,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	_, err = f.WriteString(testConfigV1)
 	assert.NoError(t, err, "write config to temp file")
 
-	// first read should yield a zeroconfig
 	c2, ok := <-conf
-	assert.True(t, ok, "zeroconfig emitted")
-	checkZeroConfig(t, &c2, stunner.GetId())
-
-	// second read yields the real config
-	c2, ok = <-conf
 	assert.True(t, ok, "config emitted")
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
@@ -382,12 +368,6 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 				return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
 			})
 
-			// send initial config
-			z := cdsclient.ZeroConfig("ns1/tester")
-			j, err := json.Marshal(z)
-			assert.NoError(t, err, "json marshal zeroconfig")
-			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, j), "write zeroconfig")
-
 			// send v1config
 			assert.NoError(t, conn.WriteMessage(websocket.TextMessage, []byte(testConfigV1)), "write config v1")
 
@@ -420,13 +400,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	log.Debug("init config poller")
 	assert.NoError(t, stunner.WatchConfig(ctx, origin, conf), "creating config poller")
 
-	// first read should yield a zeroconfig
 	c2, ok := <-conf
-	assert.True(t, ok, "zeroconfig emitted")
-	checkZeroConfig(t, &c2, "ns1/tester")
-
-	// second read yields a v1 config
-	c2, ok = <-conf
 	assert.True(t, ok, "config emitted")
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
@@ -531,8 +505,4 @@ func checkDefaultConfig(t *testing.T, c *stnrv1.StunnerConfig, proto string) {
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
 	assert.Len(t, c.Clusters[0].Endpoints, 1, "cluster endpoint len")
 	assert.Equal(t, "0.0.0.0/0", c.Clusters[0].Endpoints[0], "endpoint")
-}
-
-func checkZeroConfig(t *testing.T, c *stnrv1.StunnerConfig, id string) {
-	assert.True(t, c.DeepEqual(cdsclient.ZeroConfig(id)), "zeroconfig ok")
 }
