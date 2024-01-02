@@ -2,6 +2,13 @@
 
 The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator) exposes the control plane configuration using the standard [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io). This allows to configure STUNner in the familiar YAML-engineering style via Kubernetes manifests. The below reference gives an overview of the subset of the Gateway API supported by STUNner, see [here](https://github.com/l7mp/stunner-gateway-operator#caveats) for a list of the most important simplifications.
 
+1. [GatewayClass](#gatewayclass)
+1. [GatewayConfig](#gatewayconfig)
+1. [Gateway](#gateway)
+1. [UDPRoute](#udproute)
+1. [StaticService](#staticservice)
+1. [Dataplane](#dataplane)
+
 ## GatewayClass
 
 The GatewayClass resource provides the root of a STUNner gateway configuration. GatewayClass resources are cluster-scoped, so they can be attached to from any namespace.
@@ -206,7 +213,7 @@ spec:
 
 UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. An UDPRoute can be attached to a Gateway by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` per each Gateway listener to control which namespaces the listener accepts routes from.
 
-The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to *any UDP port* on the pods of the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace. 
+The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to *any UDP port* on the pods of the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -323,10 +330,10 @@ spec:
   image: l7mp/stunnerd:latest
   resources:
     limits:
-      cpu: 500m
+      cpu: 2
       memory: 512Mi
     requests:
-      cpu: 100m
+      cpu: 500m
       memory: 128Mi
   terminationGracePeriodSeconds: 3600
 ```
