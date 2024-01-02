@@ -27,6 +27,7 @@ nav:
   - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
   - 'LiveKit': 'examples/livekit/README.md'
   - 'Jitsi': 'examples/jitsi/README.md'
+  - 'mediasoup': 'examples/mediasoup/README.md'
   - 'Cloud Retro': 'examples/cloudretro/README.md'
   - 'N.eko': 'examples/neko/README.md'
   - 'Benchmark': 'examples/benchmark/README.md'
