@@ -4,17 +4,21 @@ A CLI tool to simplify the interaction with STUNner.
 
 ## Usage
 
-Dump the running config from a live STUNner deployment in human-readable format.
+Dump the running config of a STUNner gateway in human-readable format.
+
+The below will select the Gateway called `tcp-gateway` in the `stunner` namespace:
 
 ```console
-cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
-STUN/TURN authentication type:	plaintext
-STUN/TURN username:		user-1
-STUN/TURN password:		pass-1
-Listener:	udp-listener
-Protocol:	UDP
-Public address:	34.118.36.108
-Public port:	3478
+cmd/stunnerctl/stunnerctl running-config stunner/stunner-gateway
+STUN/TURN authentication type:  static
+STUN/TURN username:             user-1
+STUN/TURN password:             pass-1
+Listener 1
+        Name:   stunner/tcp-gateway/tcp-listener
+        Listener:       stunner/tcp-gateway/tcp-listener
+        Protocol:       TURN-TCP
+        Public address: 35.187.97.94
+        Public port:    3478
 ```
 
 ## License
