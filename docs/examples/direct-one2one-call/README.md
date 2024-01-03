@@ -66,7 +66,7 @@ change the ICE configuration.
 
 We solve this problem by (1) generating a new ICE configuration every time a new client registers
 with the application server and (2) sending the ICE configuration back to the client in the
-`regiterResponse` message. Note that this choice is suboptimal for time-locked STUNner
+`registerResponse` message. Note that this choice is suboptimal for time-locked STUNner
 authentication modes (i.e., the `ephemeral` mode, see below), because clients' STUN/TURN
 credentials might expire by the time they decide to connect. It is up to the application server
 developer to make sure that clients' ICE server configuration is periodically updated.
@@ -123,10 +123,9 @@ application to generate an ICE config for each client.
    [...]
    ```
 
-1. Modify the application server code to query the STUNner authentication server every time a a
-   valid ICE config in needed. In particular, the code will return the ICE configuration before
-   returning a `registerResponse` to the client, so that the generated ICE configuration can be
-   piggy-backed on the response message.
+1. Modify the application server code to query the STUNner authentication server every time a valid
+   ICE config in needed. In particular, the code will generate a new ICE configuration before
+   returning a `registerResponse` to the client and piggyback it on the response message.
 
    ```js
    function register(id, name, ws, callback) {
@@ -235,9 +234,11 @@ spec:
 
 For later convenience we also create a TCP Gateway that runs on port TCP:3478.
 
-In order to realize the headless deployment model, we set STUNner's own service as the backend in
-the UDPRoute. This way, STUNner will loop back client connections to itself. The rest, that is,
-cross-connecting the clients' media streams between each other, is just pure TURN magic.
+Observe that we set STUNner's own service as the backend in the UDPRoute. This way, STUNner will be
+allowed to loop back client connections to itself. This is required by the headless model, since in
+this case the only way for clients to connect is via the transport relay connections created by
+STUNner. The rest, that is, cross-connecting the clients' media streams between each other, is just
+pure TURN magic.
 
 Here is the corresponding UDPRoute. Note that the route attaches itself to both the UDP and the TCP
 Gateway, so no matter on which gateway the client connects via our UDPRoute will apply.
@@ -270,36 +271,31 @@ kubectl expose deployment -n stunner stunner --port 3478 --protocol UDP
 Check whether you have all the necessary objects installed into the `stunner` namespace.
 
 ```console
-kubectl get gatewayconfigs,gateways,udproutes -n stunner
-NAME                                                  REALM             AUTH        AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   plaintext   4s
+kubectl get gatewayconfigs,gateways,udproutes.stunner.l7mp.io -n stunner
+NAME                                                  REALM             DATAPLANE   AGE
+gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   default     2m50s
 
-NAME                                            CLASS                  ADDRESS   READY   AGE
-gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass             True    4s
-gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass             True    4s
+NAME                                            CLASS                  ADDRESS          PROGRAMMED   AGE
+gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass   34.118.104.235   True         2m50s
+gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass   34.116.255.91    True         2m50s
 
-NAME                                                  AGE
-udproute.gateway.networking.k8s.io/stunner-headless   3s
+NAME                                        AGE
+udproute.stunner.l7mp.io/stunner-headless   2m50s
 ```
 
-You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
+You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration. For
+instance, below is the human-readable config of the Gateway called `udp-gateway`:
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/stunnerd-config
+cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
 STUN/TURN authentication type:  static
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
 Listener 1
-        Name:   udp-listener
-        Listener:       udp-listener
+        Name:   stunner/udp-gateway/udp-listener
+        Listener:       stunner/udp-gateway/udp-listener
         Protocol:       TURN-UDP
-        Public address: 34.118.82.225
-        Public port:    3478
-Listener 2
-        Name:   tcp-listener
-        Listener:       tcp-listener
-        Protocol:       TURN-TCP
-        Public address: 34.118.89.139
+        Public address: 34.116.255.91
         Public port:    3478
 ```
 
@@ -332,23 +328,23 @@ with STUNner.
 
   ```js
   {
-      "id": "registerResponse",
-      "response": "accepted",
-      "iceConfiguration": {
-          "iceServers": [
-              {
-                  "url": "turn:34.118.82.225:3478?transport=UDP",
-                  "username": "user-1",
-                  "credential": "pass-1"
-              },
-              {
-                  "url": "turn:34.118.8.3:3478?transport=TCP",
-                  "username": "user-1",
-                  "credential": "pass-1"
-              }
-          ],
-          "iceTransportPolicy": "relay"
-      }
+    "id": "registerResponse",
+    "response": "accepted",
+    "iceConfiguration": {
+      "iceServers": [
+        {
+          "urls": ["turn:34.118.104.235:3478?transport=tcp"],
+          "username": "user-1",
+          "credential": "pass-1"
+        },
+        {
+          "urls": ["turn:34.116.255.91:3478?transport=udp"],
+          "username": "user-1",
+          "credential": "pass-1"
+        }
+      ],
+      "iceTransportPolicy": "relay"
+    }
   }
   ```
 
@@ -361,10 +357,10 @@ with STUNner.
   them over verbatim to the other client.
 
   ```console
-  Sending message: {[...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
+  Sending message: {[...] "candidate:0 1 UDP 92020735 10.76.0.15 44703 typ relay raddr 10.76.0.15 rport 44703" [...]}
   ```
 
-  Observe that the ICE candidate contains a private IP address (`10.116.1.21` in this case) as the
+  Observe that the ICE candidate contains a private IP address (`10.76.0.15` in this case) as the
   TURN relay connection address: this just happens to be the IP address of the STUNner pod that
   receives the TURN allocation request from the browser.
 
@@ -373,7 +369,7 @@ with STUNner.
   parties will have a set of local and remote ICE candidates they can probe for connectivity.
 
   ```console
-  Received message: { [...] "candidate:0 1 UDP 91889663 10.116.1.21 36930 typ relay raddr 10.116.1.21 rport 36930" [...]}
+  Received message: {[...] "candidate:0 1 UDP 92020735 10.76.0.15 57511 typ relay raddr 10.76.0.15 rport 57511", [...]}
   ```
 
 - Once ICE candidates are exchanged, the browsers perform a connectivity check on each
