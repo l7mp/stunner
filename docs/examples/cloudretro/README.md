@@ -79,14 +79,8 @@ the CloudRetro servers running on a private pod IP address. That is where STUNne
 
 ### STUNner
 
-Use the official [Helm charts](../../INSTALL.md#installation) to install STUNner.
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace stunner-system
-helm install stunner stunner/stunner --namespace stunner
-```
+You will need to install Stunner on Your cluster, you can do this by following the official [installation guide](../../INSTALL.md#installation).
+Wait until all the necessary resources are up and running, then you are ready to continue.
 
 Next, register STUNner with the Kubernetes Gateway API.
 
@@ -94,7 +88,7 @@ Next, register STUNner with the Kubernetes Gateway API.
 kubectl apply -f stunner-gwcc.yaml
 ```
 
-The default configuration uses the `plaintext` STUN/TURN authentication mode with the
+The default configuration uses the `static` STUN/TURN authentication mode with the
 username/password pair `user-1/pass-1`; make sure to [customize](../../AUTH.md) these defaults.
 
 Next, we expose the CloudRetro media services over STUNner.  The below Gateway specification will
@@ -116,7 +110,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 EOF
 ```
 

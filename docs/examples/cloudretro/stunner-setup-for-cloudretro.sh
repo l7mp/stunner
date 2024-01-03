@@ -23,7 +23,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 EOF
 kubectl apply $context -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1alpha2
