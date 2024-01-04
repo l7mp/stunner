@@ -65,21 +65,14 @@ export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 
 We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management.
 
-First, install cert-manager's CRDs.
-
-```console
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.crds.yaml
-```
-
-Then add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
+Add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
 
 ```console
 helm repo add cert-manager https://charts.jetstack.io
 helm repo update
-helm install my-cert-manager cert-manager/cert-manager \
-    --create-namespace \
-    --namespace cert-manager \
-    --version v1.8.0
+helm install cert-manager jetstack/cert-manager --namespace cert-manager \
+    --create-namespace --set global.leaderElection.namespace=cert-manager \
+    --set installCRDs=true --timeout 600s --debug
 ```
 
 At this point we have all the necessary boilerplate set up to automate TLS issuance for LiveKit.
@@ -90,11 +83,21 @@ Now comes the fun part. The simplest way to run this demo is to clone the [STUNn
 
 Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
 
+Legacy mode:
+
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
-helm install stunner stunner/stunner --create-namespace --namespace=stunner
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
+```
+
+Managed mode:
+
+```console
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
 ```
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the LiveKit server pods.

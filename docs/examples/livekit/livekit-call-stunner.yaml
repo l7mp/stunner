@@ -19,7 +19,7 @@ metadata:
   namespace: stunner
 spec:
   realm: stunner.l7mp.io
-  authType: plaintext
+  authType: static
   userName: "user-1"
   password: "pass-1"
 
