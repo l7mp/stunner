@@ -90,8 +90,8 @@ Legacy mode:
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
-helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
+helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
 Managed mode:
@@ -99,7 +99,7 @@ Managed mode:
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
 ```
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the Jitsi server pods.
