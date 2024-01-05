@@ -72,7 +72,7 @@ helm repo add cert-manager https://charts.jetstack.io
 helm repo update
 helm install cert-manager jetstack/cert-manager --namespace cert-manager \
     --create-namespace --set global.leaderElection.namespace=cert-manager \
-    --set installCRDs=true --timeout 600s --debug
+    --set installCRDs=true --timeout 600s
 ```
 
 At this point we have all the necessary boilerplate set up to automate TLS issuance for LiveKit.

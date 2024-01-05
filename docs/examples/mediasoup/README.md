@@ -19,7 +19,7 @@ The recommended way to install mediasoup ([link](https://mediasoup.discourse.gro
 
 The figure below shows mediasoup deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, mediasoup is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for mediasoup, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-In this tutorial we deploy a video room example using [mediasoup's demo application](https://github.com/versatica/mediasoup-demo/) with slight modifications (more on these below), the [mediasoup server](https://github.com/versatica/mediasoup/) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the LiveKit server pool to clients.
+In this tutorial we deploy a video room example using [mediasoup's demo application](https://github.com/versatica/mediasoup-demo/) with slight modifications (more on these below), the [mediasoup server](https://github.com/versatica/mediasoup/) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the mediasoup server pool to clients.
 
 ### Modifications on the mediasoup demo
 
@@ -83,21 +83,14 @@ export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
 
 We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management.
 
-First, install cert-manager's CRDs.
-
-```console
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.8.0/cert-manager.crds.yaml
-```
-
-Then add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
+Add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
 
 ```console
 helm repo add cert-manager https://charts.jetstack.io
 helm repo update
-helm install my-cert-manager cert-manager/cert-manager \
-    --create-namespace \
-    --namespace cert-manager \
-    --version v1.8.0
+helm install cert-manager jetstack/cert-manager --namespace cert-manager \
+    --create-namespace --set global.leaderElection.namespace=cert-manager \
+    --set installCRDs=true --timeout 600s
 ```
 
 At this point we have all the necessary boilerplate set up to automate TLS issuance for mediasoup.
@@ -106,13 +99,23 @@ At this point we have all the necessary boilerplate set up to automate TLS issua
 
 Now comes the fun part.
 
-Install the STUNner gateway operator using the [managed dataplane mode](https://github.com/l7mp/stunner/blob/main/docs/INSTALL.md#managed-mode) via [Helm](https://github.com/l7mp/stunner-helm):
+Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
+
+Legacy mode:
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace
- --namespace=stunner --set stunnerGatewayOperator.dataplane.mode=managed --set stunnerGatewayOperator.dataplane.spec.image=l7mp/stunnerd:latest
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-system
+```
+
+Managed mode (recommended):
+
+```console
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
 ```
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the mediasoup server pods.
@@ -141,7 +144,7 @@ spec:
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
-  name: livekit-media-plane
+  name: mediasoup-media-plane
   namespace: stunner
 spec:
   parentRefs:
@@ -160,8 +163,8 @@ Wait until Kubernetes assigns an external IP and store the external IP assigned 
 STUNner in an environment variable for later use.
 
 ```console
-until [ -n "$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-export STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+until [ -n "$(kubectl get svc udp-gateway -n stunner-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+export STUNNERIP=$(kubectl get service udp-gateway -n stunner-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### mediasoup
@@ -179,6 +182,7 @@ sed -i "s/ingressserviceip/$INGRESSIP/g" docs/examples/mediasoup/mediasoup-serve
 Finally, fire up mediasoup.
 
 ```console
+kubectl create ns mediasoup
 kubectl apply -f docs/examples/mediasoup/mediasoup-server.yaml
 ```
 
