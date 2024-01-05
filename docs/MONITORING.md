@@ -51,7 +51,7 @@ A full-fledged Prometheus+Grafana helm chart is available in the [STUNner helm r
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
 ```
 
-Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](./CONCEPTS.md#dataplane) objects.
+Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](GATEWAY.md#dataplane) objects.
 
 > [!NOTE]
 > Metrics are exposed at `http://:8080/metrics` on each STUNner pod
