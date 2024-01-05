@@ -21,6 +21,7 @@ Each STUNner gateway instance exports a number of standard metrics that describe
 | `go_goroutines` | Number of goroutines that currently exist. |
 | `go_threads`  | Number of OS threads created. |
 | `process_open_fds` | Number of open file descriptors.|
+| `process_resident_memory_bytes` | Resident memory size in bytes. |
 | `process_virtual_memory_bytes` | Virtual memory size in bytes. |
 
 ### Connection statistics
@@ -44,17 +45,21 @@ Collection and visualization of STUNner relies on Prometheus and Grafana service
 
 A full-fledged Prometheus+Grafana helm chart is available in the [STUNner helm repo](https://github.com/l7mp/stunner-helm#monitoring). To use this chart, the installation steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana stack with helm.
 
-1. Install STUNner with Prometheus support:
+1. Install stunner-gateway-operator with Prometheus support:
 
-   ```console
-   helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunner.deployment.monitoring.enabled=true
-   ```
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
+```
 
-2. Configure STUNner to expose the metrics.
+Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](./CONCEPTS.md#dataplane) objects.
 
-3. Install the Prometheus+Grafana stack with a helm chart. 
+> [!NOTE]
+> Metrics are exposed at `http://:8080/metrics` on each STUNner pod
 
-   The below creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: Prometheus, along with the prometheus-operator, is installed for metrics scarping, Grafana is set up for visualization, and the Prometheus is configured as a datasource for Grafana.
+
+2. Install the Prometheus+Grafana stack with a helm chart.
+
+The below creates a ready-to-use Prometheus+Grafana stack in the `monitoring` namespace: Prometheus, along with the prometheus-operator, is installed for metrics scarping, Grafana is set up for visualization, and the Prometheus is configured as a datasource for Grafana.
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
