@@ -43,7 +43,13 @@ func main() {
 	// var passwd = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
 	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
+	var help = flag.BoolP("help", "h", false, "Display this help text and exit")
 	flag.Parse()
+
+	if *help {
+		Usage()
+		os.Exit(0)
+	}
 
 	if flag.NArg() != 3 {
 		Usage()
