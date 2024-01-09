@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -165,11 +164,4 @@ func getStunnerProtoForURI(u *url.URL) (string, error) {
 	}
 
 	return "", fmt.Errorf("Invalid scheme/protocol in URI %q", u.String())
-}
-
-func reuseAddr(network, address string, conn syscall.RawConn) error {
-	return conn.Control(func(descriptor uintptr) {
-		_ = syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
-	})
 }
