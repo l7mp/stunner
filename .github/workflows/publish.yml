@@ -65,3 +65,56 @@ jobs:
           repo: stunner-helm
           client_payload: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
           workflow_file_name: publish.yaml
+
+  add_turncat_binaries:
+    name: Add turncat binaries to release assets
+    needs: run_tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            os: linux
+            file_end: ""
+          - arch: arm64
+            os: linux
+            file_end: ""
+          - arch: amd64
+            os: darwin
+            file_end: ""
+          - arch: arm64
+            os: darwin
+            file_end: ""
+          - arch: amd64
+            os: windows
+            file_end: ".exe"
+          - arch: arm64
+            os: windows
+            file_end: ".exe"
+
+    name: Build release assets
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: vars
+        run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build turncat binary
+        run: |
+          CGO_ENABLED=0 GOARCH=${{ matrix.arch }} GOOS=${{ matrix.os }} go build -ldflags="-w -s" -trimpath -o turncat cmd/turncat/main.go
+          mv turncat turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+
+      - name: Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          tag: ${{ github.ref_name }}
+          asset_name: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
