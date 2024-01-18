@@ -92,7 +92,6 @@ jobs:
             os: windows
             file_end: ".exe"
 
-    name: Build release assets
     steps:
       - name: Checkout
         uses: actions/checkout@v4
