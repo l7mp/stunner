@@ -69,7 +69,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	defer stunner.Close()
 
 	log.Debug("starting stunnerd")
-	err := stunner.Reconcile(stnrv1.StunnerConfig{
+	err := stunner.Reconcile(&stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
 			LogLevel: stunnerTestLoglevel,

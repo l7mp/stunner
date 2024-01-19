@@ -24,16 +24,16 @@ type ConfigList struct {
 	Items   []*stnrv1.StunnerConfig `json:"items"`
 }
 
-type CDSAPI interface {
+type CdsApi interface {
 	// Endpoint returns the address of the server plus the WebSocket API endpoint.
 	Endpoint() (string, string)
 	// Get loads the config(s) from the API endpoint.
 	Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error)
 	// Watch watches config(s) from the API endpoint of a CDS server. If the server is not
 	// available watch will retry, and if the connection goes away it will create a new one.
-	Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
+	Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
 	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
-	Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
+	Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
 	logging.LeveledLogger
 }
 
@@ -44,7 +44,7 @@ type AllConfigsAPI struct {
 	logging.LeveledLogger
 }
 
-func NewAllConfigsAPI(addr string, logger logging.LeveledLogger) (CDSAPI, error) {
+func NewAllConfigsAPI(addr string, logger logging.LeveledLogger) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -88,12 +88,12 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error
 	return decodeConfigList(r.Body)
 }
 
-func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("WATCH: watching all configs from CDS server %s", a.wsURI)
 	return watch(ctx, a, ch)
 }
 
-func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("POLL: polling all configs from CDS server %s", a.wsURI)
 	return poll(ctx, a, ch)
 }
@@ -105,7 +105,7 @@ type ConfigsNamespaceAPI struct {
 	logging.LeveledLogger
 }
 
-func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger) (CDSAPI, error) {
+func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -152,13 +152,13 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig,
 	return decodeConfigList(r.Body)
 }
 
-func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("WATCH: watching all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return watch(ctx, a, ch)
 }
 
-func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("POLL: polling all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return poll(ctx, a, ch)
@@ -170,7 +170,7 @@ type ConfigNamespaceNameAPI struct {
 	logging.LeveledLogger
 }
 
-func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.LeveledLogger) (CDSAPI, error) {
+func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.LeveledLogger) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -205,7 +205,8 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 	a.Debugf("GET: loading config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.addr)
 
-	r, err := a.client.GetV1ConfigNamespaceNameWithResponse(ctx, a.namespace, a.name, nil)
+	var params *api.GetV1ConfigNamespaceNameParams
+	r, err := a.client.GetV1ConfigNamespaceNameWithResponse(ctx, a.namespace, a.name, params)
 	if err != nil {
 		return []*stnrv1.StunnerConfig{}, err
 	}
@@ -218,13 +219,13 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 	return decodeConfig(r.Body)
 }
 
-func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("WATCH: watching config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return watch(ctx, a, ch)
 }
 
-func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return poll(ctx, a, ch)

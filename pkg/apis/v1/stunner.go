@@ -67,37 +67,38 @@ func (req *StunnerConfig) ConfigName() string {
 }
 
 // DeepEqual compares two configurations.
-func (req *StunnerConfig) DeepEqual(conf Config) bool {
-	other, ok := conf.(*StunnerConfig)
+func (a *StunnerConfig) DeepEqual(conf Config) bool {
+	b, ok := conf.(*StunnerConfig)
 	if !ok {
 		return false
 	}
 
-	if req.ApiVersion != other.ApiVersion {
-		return false
-	}
-	if !req.Admin.DeepEqual(&other.Admin) {
-		return false
-	}
-	if !req.Auth.DeepEqual(&other.Auth) {
+	if a.ApiVersion != b.ApiVersion {
 		return false
 	}
 
-	if len(req.Listeners) != len(other.Listeners) {
+	if !a.Admin.DeepEqual(&b.Admin) {
 		return false
 	}
-	for i := range req.Listeners {
-		if !req.Listeners[i].DeepEqual(&other.Listeners[i]) {
+
+	if !a.Auth.DeepEqual(&b.Auth) {
+		return false
+	}
+
+	if len(a.Listeners) != len(b.Listeners) {
+		return false
+	}
+	for i := range a.Listeners {
+		if !a.Listeners[i].DeepEqual(&b.Listeners[i]) {
 			return false
 		}
 	}
 
-	if len(req.Clusters) != len(other.Clusters) {
+	if len(a.Clusters) != len(b.Clusters) {
 		return false
 	}
-
-	for i := range req.Clusters {
-		if !req.Clusters[i].DeepEqual(&other.Clusters[i]) {
+	for i := range a.Clusters {
+		if !a.Clusters[i].DeepEqual(&b.Clusters[i]) {
 			return false
 		}
 	}

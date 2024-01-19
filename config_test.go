@@ -66,7 +66,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(*c), "starting server")
+			assert.NoError(t, stunner.Reconcile(c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -145,7 +145,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
 
 	log.Debug("starting watcher")
-	conf := make(chan stnrv1.StunnerConfig, 1)
+	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	log.Debug("init watcher with nonexistent config file")
@@ -187,9 +187,9 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 	c2, ok := <-conf
 	assert.True(t, ok, "config emitted")
-	checkDefaultConfig(t, &c2, "TURN-UDP")
+	checkDefaultConfig(t, c2, "TURN-UDP")
 
-	log.Debug("write a wrong config file (WatchConfig does not validate)")
+	log.Debug("write a wrong config file: WatchConfig validates")
 
 	c2.Listeners[0].Protocol = "dummy"
 	y, err = yaml.Marshal(c2)
@@ -204,12 +204,20 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// this makes sure that we do not share anything with ConfigWatch
 	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
 
-	c3 := <-conf
-	checkDefaultConfig(t, &c3, "dummy")
+	// we should not read anything so that channel should not br redable
+	time.Sleep(50 * time.Millisecond)
+	readable := false
+	select {
+	case _, ok := <-conf:
+		readable = ok
+	default:
+		readable = false
+	}
+	assert.False(t, readable, "wrong config file does not trigger a watch event")
 
 	log.Debug("update the config file and check")
-	c3.Listeners[0].Protocol = "TURN-TCP"
-	y, err = yaml.Marshal(c3)
+	c2.Listeners[0].Protocol = "TURN-TCP"
+	y, err = yaml.Marshal(c2)
 	assert.NoError(t, err, "marshal config file")
 	err = f.Truncate(0)
 	assert.NoError(t, err, "truncate temp file")
@@ -218,15 +226,15 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	c4 := <-conf
-	checkDefaultConfig(t, &c4, "TURN-TCP")
+	c3 := <-conf
+	checkDefaultConfig(t, c3, "TURN-TCP")
 
 	stunner.Close()
 }
 
 const (
 	testConfigV1   = `{"version":"v1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"static","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
-	testConfigV1A1 = `{"version":"v1alpha1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
+	testConfigV1A1 = `{"version":"v1alpha1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"ephemeral","credentials":{"secret":"test-secret"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
 )
 
 // test with v1alpha1 and v1
@@ -251,7 +259,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
 
 	log.Debug("starting watcher")
-	conf := make(chan stnrv1.StunnerConfig, 1)
+	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	log.Debug("init watcher with nonexistent config file")
@@ -285,7 +293,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
 	assert.Len(t, c2.Listeners, 1, "listeners len")
 	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
-	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, "TURN-UDP", c2.Listeners[0].Protocol, "listener proto")
 	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
 	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
 	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
@@ -310,7 +318,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
 	assert.Len(t, c2.Listeners, 1, "listeners len")
 	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
-	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, "TURN-UDP", c2.Listeners[0].Protocol, "listener proto")
 	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
 	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
 	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
@@ -391,10 +399,10 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel, Id: "ns1/tester"})
+	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel, Name: "ns1/tester"})
 
 	log.Debug("starting watcher")
-	conf := make(chan stnrv1.StunnerConfig, 1)
+	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	log.Debug("init config poller")
@@ -408,7 +416,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
 	assert.Len(t, c2.Listeners, 1, "listeners len")
 	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
-	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, "TURN-UDP", c2.Listeners[0].Protocol, "listener proto")
 	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
 	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
 	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")
@@ -427,7 +435,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	assert.True(t, c2.Auth.Type == "static" || c2.Auth.Type == "ephemeral", "loglevel")
 	assert.Len(t, c2.Listeners, 1, "listeners len")
 	assert.Equal(t, "udp", c2.Listeners[0].Name, "listener name")
-	assert.Equal(t, "turn-udp", c2.Listeners[0].Protocol, "listener proto")
+	assert.Equal(t, "TURN-UDP", c2.Listeners[0].Protocol, "listener proto")
 	assert.Equal(t, 3478, c2.Listeners[0].Port, "listener port")
 	assert.Len(t, c2.Listeners[0].Routes, 1, "routes len")
 	assert.Equal(t, "echo-server-cluster", c2.Listeners[0].Routes[0], "route name")

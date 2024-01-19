@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 
@@ -20,37 +19,40 @@ import (
 // Server is a generic config discovery server implementation.
 type Server struct {
 	*http.Server
+	router   *mux.Router
 	addr     string
 	conns    *ConnTrack
 	configs  *ConfigStore
 	configCh chan Config
+	patch    ConfigPatcher
 	log      logr.Logger
 }
 
 // New creates a new config discovery server instance for the specified address.
-func New(addr string, logger logr.Logger) *Server {
+func New(addr string, patch ConfigPatcher, logger logr.Logger) *Server {
 	if addr == "" {
 		addr = stnrv1.DefaultConfigDiscoveryAddress
 	}
 
-	cds := &Server{
+	return &Server{
+		router:   mux.NewRouter(),
 		conns:    NewConnTrack(),
 		configs:  NewConfigStore(),
 		configCh: make(chan Config, 8),
 		addr:     addr,
+		patch:    patch,
 		log:      logger,
 	}
-	return cds
 }
 
 // Start let the config discovery server listen to new client connections.
 func (s *Server) Start(ctx context.Context) error {
-	r := mux.NewRouter()
-	api.HandlerFromMux(s, r)
-	s.Server = &http.Server{Addr: s.addr, Handler: r}
+	handler := api.NewStrictHandler(s, []api.StrictMiddlewareFunc{s.WSUpgradeMiddleware})
+	api.HandlerFromMux(handler, s.router)
+	s.Server = &http.Server{Addr: s.addr, Handler: s.router}
 
 	go func() {
-		s.log.Info("Starting CDS server", "address", s.addr)
+		s.log.Info("starting CDS server", "address", s.addr, "patch", s.patch != nil)
 
 		err := s.ListenAndServe()
 		if err != nil {
@@ -114,41 +116,8 @@ func (s *Server) RemoveClient(id string) {
 	}
 }
 
-func (s *Server) handleReq(w http.ResponseWriter, r *http.Request, endpoint string, responder ResponseGen) {
-	s.log.V(1).Info("received new request", "api", endpoint, "client", r.RemoteAddr)
-
-	response, err := responder()
-	if err != nil {
-		s.log.Info("client config not found", "api", endpoint, "client", r.RemoteAddr,
-			"code", err.Code, "message", err.Message)
-		sendServerErrorRaw(w, err)
-	}
-
-	s.log.V(2).Info("sending response to client", "api", endpoint, "client", r.RemoteAddr,
-		"response", string(response))
-
-	if _, err := w.Write(response); err != nil {
-		s.log.Error(err, "could not write config", "api", endpoint, "client", r.RemoteAddr)
-		http.Error(w, "Could not write config", http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Server) handleConn(w http.ResponseWriter, r *http.Request, endpoint string, responder ResponseGen, filter FilterConfig) {
-	// upgrade to webSocket
-	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-
-	wsConn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		msg := fmt.Sprintf("could not upgrade HTTP connection for client %s: %s",
-			r.RemoteAddr, err.Error())
-		sendServerError(w, msg, http.StatusInternalServerError)
-		return
-	}
-	conn := NewConn(wsConn, filter)
+func (s *Server) handleConn(ctx context.Context, wsConn *websocket.Conn, operationID string, filter ConfigFilter, patch ClientConfigPatcher) {
+	conn := NewConn(wsConn, filter, patch)
 	s.conns.Upsert(conn)
 
 	// a dummy reader that drops everything it receives: this must be there for the
@@ -167,44 +136,49 @@ func (s *Server) handleConn(w http.ResponseWriter, r *http.Request, endpoint str
 		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
 	})
 
-	s.log.V(1).Info("new config stream connection", "api", endpoint, "client", conn.Id())
+	s.log.V(1).Info("new config stream connection", "api", operationID, "client", conn.Id())
 
 	// send initial config(list)
 	for _, conf := range s.configs.Snapshot() {
 		if filter(conf.Id) {
-			s.sendConfig(conn, conf)
+			s.sendConfig(conn, conf.Config)
 		}
 	}
 
 	// wait until client closes the connection or the server is cancelled (which will kill all
 	// the running connections)
-	<-r.Context().Done()
+	<-ctx.Done()
 
-	s.log.V(1).Info("client connection closed", "api", endpoint,
-		"client", r.RemoteAddr)
+	s.log.V(1).Info("client connection closed", "api", operationID, "client", conn.Id())
 
 	conn.Close()
 }
 
 // iterate through all connections and send response if needed
 func (s *Server) broadcastConfig(e Config) {
-	json, err := json.Marshal(e.Config)
-	if err != nil {
-		s.log.Error(err, "error JSON marshaling config", "event", e.String())
-		return
-	}
-
 	for _, conn := range s.conns.Snapshot() {
 		if conn.Filter(e.Id) {
-			s.sendJSONConfig(conn, json)
+			s.sendConfig(conn, e.Config)
 		}
 	}
 }
 
-func (s *Server) sendConfig(conn *Conn, e Config) {
-	json, err := json.Marshal(e.Config)
+func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
+	c := &stnrv1.StunnerConfig{}
+	e.DeepCopyInto(c)
+
+	if conn.patch != nil {
+		newC, err := conn.patch(c)
+		if err != nil {
+			s.log.Error(err, "cannot patch config", "event", e.String())
+			return
+		}
+		c = newC
+	}
+
+	json, err := json.Marshal(c)
 	if err != nil {
-		s.log.Error(err, "error JSON marshaling config", "event", e.String())
+		s.log.Error(err, "cannor JSON serialize config", "event", e.String())
 		return
 	}
 

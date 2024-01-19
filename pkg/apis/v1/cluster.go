@@ -64,7 +64,12 @@ func (req *ClusterConfig) Validate() error {
 		}
 	}
 
+	if req.Endpoints == nil {
+		req.Endpoints = []string{}
+	}
+
 	sort.Strings(req.Endpoints)
+
 	return nil
 }
 

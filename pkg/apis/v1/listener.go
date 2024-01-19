@@ -71,6 +71,10 @@ func (req *ListenerConfig) Validate() error {
 		}
 	}
 
+	if req.Routes == nil {
+		req.Routes = []string{}
+	}
+
 	sort.Strings(req.Routes)
 	return nil
 }
@@ -102,7 +106,12 @@ func (req *ListenerConfig) String() string {
 		n = req.Name
 	}
 
-	status = append(status, fmt.Sprintf("turn://0.0.0.0:%d", req.Port))
+	addr := "0.0.0.0"
+	if req.Addr != "" && req.Addr != "$STUNNER_ADDR" {
+		addr = req.Addr
+	}
+
+	status = append(status, fmt.Sprintf("turn://%s:%d", addr, req.Port))
 
 	a, p := "-", "-"
 	if req.PublicAddr != "" {

@@ -111,7 +111,7 @@ func TestTurncatPlaintext(t *testing.T) {
 		SuppressRollback: true,
 	})
 
-	err := stunner.Reconcile(stnrv1.StunnerConfig{
+	err := stunner.Reconcile(&stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
 			LogLevel:        turncatTestLoglevel,
@@ -227,7 +227,7 @@ func TestTurncatLongterm(t *testing.T) {
 		LogLevel:         turncatTestLoglevel,
 		SuppressRollback: true,
 	})
-	err := stunner.Reconcile(stnrv1.StunnerConfig{
+	err := stunner.Reconcile(&stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
 			LogLevel: turncatTestLoglevel,

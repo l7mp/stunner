@@ -230,7 +230,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c), "starting server")
+			assert.NoError(t, stunner.Reconcile(&c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")

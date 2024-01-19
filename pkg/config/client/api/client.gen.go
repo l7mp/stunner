@@ -19,6 +19,24 @@ import (
 // V1Config Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
 type V1Config = stunnerv1.StunnerConfig
 
+// V1ConfigList ConfigList is a list of Configs.
+type V1ConfigList struct {
+	// Items Items is the list of Config objects in the list.
+	Items []V1Config `json:"items"`
+
+	// Version version defines the versioned schema of this object.
+	Version string `json:"version"`
+}
+
+// V1Error API error.
+type V1Error struct {
+	// Code Error code.
+	Code int32 `json:"code"`
+
+	// Message Error message.
+	Message *string `json:"message,omitempty"`
+}
+
 // ListV1ConfigsParams defines parameters for ListV1Configs.
 type ListV1ConfigsParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
@@ -35,6 +53,9 @@ type ListV1ConfigsNamespaceParams struct {
 type GetV1ConfigNamespaceNameParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
 	Watch *bool `form:"watch,omitempty" json:"watch,omitempty"`
+
+	// Node Name of the node the client runs on.
+	Node *string `form:"node,omitempty" json:"node,omitempty"`
 }
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
@@ -313,6 +334,22 @@ func NewGetV1ConfigNamespaceNameRequest(server string, namespace string, name st
 
 		}
 
+		if params.Node != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "node", runtime.ParamLocationQuery, *params.Node); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
 		queryURL.RawQuery = queryValues.Encode()
 	}
 
@@ -380,6 +417,8 @@ type ClientWithResponsesInterface interface {
 type ListV1ConfigsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *V1ConfigList
+	JSON500      *V1Error
 }
 
 // Status returns HTTPResponse.Status
@@ -401,6 +440,9 @@ func (r ListV1ConfigsResponse) StatusCode() int {
 type ListV1ConfigsNamespaceResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *V1ConfigList
+	JSON400      *V1Error
+	JSON500      *V1Error
 }
 
 // Status returns HTTPResponse.Status
@@ -423,6 +465,8 @@ type GetV1ConfigNamespaceNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *V1Config
+	JSON400      *V1Error
+	JSON500      *V1Error
 }
 
 // Status returns HTTPResponse.Status
@@ -481,6 +525,23 @@ func ParseListV1ConfigsResponse(rsp *http.Response) (*ListV1ConfigsResponse, err
 		HTTPResponse: rsp,
 	}
 
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest V1ConfigList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
 	return response, nil
 }
 
@@ -495,6 +556,30 @@ func ParseListV1ConfigsNamespaceResponse(rsp *http.Response) (*ListV1ConfigsName
 	response := &ListV1ConfigsNamespaceResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest V1ConfigList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
@@ -521,8 +606,19 @@ func ParseGetV1ConfigNamespaceNameResponse(rsp *http.Response) (*GetV1ConfigName
 		}
 		response.JSON200 = &dest
 
-	case rsp.StatusCode == 200:
-		// Content-type (application/json;stream=watch) unsupported
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

@@ -25,8 +25,7 @@ var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
-	id                                                         string
-	version                                                    string
+	name, version                                              string
 	adminManager, authManager, listenerManager, clusterManager manager.Manager
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
@@ -73,7 +72,7 @@ func NewStunner(options Options) *Stunner {
 		udpThreadNum = options.UDPListenerThreadNum
 	}
 
-	id := options.Id
+	id := options.Name
 	if id == "" {
 		if h, err := os.Hostname(); err != nil {
 			id = DefaultInstanceId
@@ -83,7 +82,7 @@ func NewStunner(options Options) *Stunner {
 	}
 
 	s := &Stunner{
-		id:               id,
+		name:             id,
 		version:          stnrv1.ApiVersion,
 		logger:           logger,
 		log:              log,
@@ -117,7 +116,7 @@ func NewStunner(options Options) *Stunner {
 
 // GetId returns the id of the current stunnerd instance.
 func (s *Stunner) GetId() string {
-	return s.id
+	return s.name
 }
 
 // GetVersion returns the STUNner API version.

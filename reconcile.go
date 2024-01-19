@@ -15,11 +15,11 @@ import (
 // least one internal object (usually, a listener) for the new config (unless DryRun is enabled),
 // and an error if an error has occurred during reconciliation, in which case it will rollback the
 // last working configuration (unless SuppressRollback is on).
-func (s *Stunner) Reconcile(req stnrv1.StunnerConfig) error {
+func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
 	return s.reconcileWithRollback(req, false)
 }
 
-func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback bool) error {
+func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bool) error {
 	var errFinal error
 	new, deleted, changed := 0, 0, 0
 
@@ -33,7 +33,7 @@ func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback boo
 	toBeStarted, toBeRestarted := []object.Object{}, []object.Object{}
 
 	// admin
-	adminState, err := s.adminManager.PrepareReconciliation([]stnrv1.Config{&req.Admin}, &req)
+	adminState, err := s.adminManager.PrepareReconciliation([]stnrv1.Config{&req.Admin}, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for admin config: %s",
 			err.Error())
@@ -44,7 +44,7 @@ func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback boo
 	deleted += len(adminState.DeletedJobQueue)
 
 	// auth
-	authState, err := s.authManager.PrepareReconciliation([]stnrv1.Config{&req.Auth}, &req)
+	authState, err := s.authManager.PrepareReconciliation([]stnrv1.Config{&req.Auth}, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for auth config: %s",
 			err.Error())
@@ -59,7 +59,7 @@ func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback boo
 	for i := range req.Listeners {
 		lconf[i] = &(req.Listeners[i])
 	}
-	listenerState, err := s.listenerManager.PrepareReconciliation(lconf, &req)
+	listenerState, err := s.listenerManager.PrepareReconciliation(lconf, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for listener config: %s", err.Error())
 	}
@@ -73,7 +73,7 @@ func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback boo
 	for i := range req.Clusters {
 		cconf[i] = &(req.Clusters[i])
 	}
-	clusterState, err := s.clusterManager.PrepareReconciliation(cconf, &req)
+	clusterState, err := s.clusterManager.PrepareReconciliation(cconf, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for cluster config: %s", err.Error())
 	}
@@ -193,7 +193,7 @@ func (s *Stunner) reconcileWithRollback(req stnrv1.StunnerConfig, inRollback boo
 rollback:
 	if !s.suppressRollback {
 		s.log.Infof("rolling back to previous configuration: %s", rollback.String())
-		return s.reconcileWithRollback(*rollback, true)
+		return s.reconcileWithRollback(rollback, true)
 	}
 
 	return errFinal

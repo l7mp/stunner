@@ -17,17 +17,9 @@ import (
 
 // usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
 
-const (
-	defaultLoglevel               = "all:INFO"
-	defaultConfigDiscoveryAddress = "http://localhost:13478"
-	envVarName                    = "STUNNER_NAME"
-	envVarNamespace               = "STUNNER_NAMESPACE"
-	envVarConfigOrigin            = "STUNNER_CONFIG_ORIGIN"
-)
-
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", fmt.Sprintf("Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: %s).", defaultConfigDiscoveryAddress))
+	var config = flag.StringP("config", "c", "", fmt.Sprintf("Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: %s).", stnrv1.DefaultConfigDiscoveryAddress))
 	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO).")
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>).")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
@@ -37,7 +29,7 @@ func main() {
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>.")
 	flag.Parse()
 
-	logLevel := defaultLoglevel
+	logLevel := stnrv1.DefaultLogLevel
 	if *verbose {
 		logLevel = "all:DEBUG"
 	}
@@ -46,8 +38,8 @@ func main() {
 		logLevel = *level
 	}
 
-	configOrigin := defaultConfigDiscoveryAddress
-	if origin, ok := os.LookupEnv(envVarConfigOrigin); ok {
+	configOrigin := stnrv1.DefaultConfigDiscoveryAddress
+	if origin, ok := os.LookupEnv(stnrv1.DefaultEnvVarConfigOrigin); ok {
 		configOrigin = origin
 	}
 	if *config != "" {
@@ -55,15 +47,15 @@ func main() {
 	}
 
 	if *id == "" {
-		name, ok1 := os.LookupEnv(envVarName)
-		namespace, ok2 := os.LookupEnv(envVarNamespace)
+		name, ok1 := os.LookupEnv(stnrv1.DefaultEnvVarName)
+		namespace, ok2 := os.LookupEnv(stnrv1.DefaultEnvVarNamespace)
 		if ok1 && ok2 {
 			*id = fmt.Sprintf("%s/%s", namespace, name)
 		}
 	}
 
 	st := stunner.NewStunner(stunner.Options{
-		Id:                   *id,
+		Name:                 *id,
 		LogLevel:             logLevel,
 		DryRun:               *dryRun,
 		UDPListenerThreadNum: *udpThreadNum,
@@ -74,7 +66,7 @@ func main() {
 
 	log.Infof("starting stunnerd instance %q", st.GetId())
 
-	conf := make(chan stnrv1.StunnerConfig, 1)
+	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
@@ -88,7 +80,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		conf <- *c
+		conf <- c
 
 	} else if !*watch {
 		log.Infof("loading configuration from origin %q", configOrigin)
@@ -99,12 +91,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		conf <- *c
+		conf <- c
 
 	} else if *watch {
 		log.Info("bootstrapping with minimal config")
 		z := cdsclient.ZeroConfig(st.GetId())
-		conf <- *z
+		conf <- z
 
 		log.Infof("watching configuration at origin %q", configOrigin)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -157,7 +149,7 @@ func main() {
 			}()
 
 		case c := <-conf:
-			log.Trace("new configuration file available")
+			log.Trace("new configuration available")
 
 			// command line loglevel overrides config
 			if *verbose || *level != "" {

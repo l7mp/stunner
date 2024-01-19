@@ -29,7 +29,6 @@ func init() {
 	client.PongWait = 800 * time.Millisecond
 	client.WriteWait = 200 * time.Millisecond
 	client.RetryPeriod = 250 * time.Millisecond
-
 }
 
 func TestServerLoad(t *testing.T) {
@@ -47,7 +46,7 @@ func TestServerLoad(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
@@ -83,9 +82,11 @@ func TestServerLoad(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -133,7 +134,7 @@ func TestServerPoll(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
@@ -149,11 +150,11 @@ func TestServerPoll(t *testing.T) {
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("poll: no result")
-	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch1)
-	ch2 := make(chan stnrv1.StunnerConfig, 8)
+	ch2 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch2)
-	ch3 := make(chan stnrv1.StunnerConfig, 8)
+	ch3 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch3)
 
 	go func() {
@@ -186,9 +187,11 @@ func TestServerPoll(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -233,7 +236,7 @@ func TestServerWatch(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -247,11 +250,11 @@ func TestServerWatch(t *testing.T) {
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("watch: no result")
-	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch1)
-	ch2 := make(chan stnrv1.StunnerConfig, 8)
+	ch2 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch2)
-	ch3 := make(chan stnrv1.StunnerConfig, 8)
+	ch3 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch3)
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
@@ -280,9 +283,11 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -307,12 +312,15 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
+	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
 	// poll should have fed the configs to the channels
@@ -331,7 +339,7 @@ func TestServerWatch(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -357,11 +365,13 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.Nil(t, sc2, "get 2")
 	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
+	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
 	s = watchConfig(ch1, 50*time.Millisecond)
@@ -403,7 +413,7 @@ func TestServerWatchBootstrap(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -422,15 +432,17 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
 
 	testLog.Debug("watch: 1 result")
-	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch1)
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
@@ -455,9 +467,11 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 
 	s = watchConfig(ch1, 500*time.Millisecond)
@@ -491,7 +505,7 @@ func TestServerAPI(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -507,13 +521,13 @@ func TestServerAPI(t *testing.T) {
 	assert.NoError(t, err, "client 4")
 
 	testLog.Debug("watch: no result")
-	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch1)
-	ch2 := make(chan stnrv1.StunnerConfig, 8)
+	ch2 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch2)
-	ch3 := make(chan stnrv1.StunnerConfig, 8)
+	ch3 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch3)
-	ch4 := make(chan stnrv1.StunnerConfig, 8)
+	ch4 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch4)
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
@@ -548,10 +562,12 @@ func TestServerAPI(t *testing.T) {
 	cs := srv.GetConfigStore().Snapshot()
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
-	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 := srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 
 	testLog.Debug("load")
@@ -632,12 +648,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
+	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc3
@@ -719,7 +738,7 @@ func TestServerAPI(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -730,12 +749,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
+	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc3
@@ -830,12 +852,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc4 := srv.GetConfigStore().Get("ns3/gw1")
 	assert.NotNil(t, sc3, "get 3")
+	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
 	assert.True(t, c4.Config.DeepEqual(sc4), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc4
@@ -915,7 +940,7 @@ func TestClientReconnect(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -925,7 +950,7 @@ func TestClientReconnect(t *testing.T) {
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("watch: no result")
-	ch1 := make(chan stnrv1.StunnerConfig, 8)
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 	defer close(ch1)
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
@@ -945,6 +970,7 @@ func TestClientReconnect(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 
 	// poll should have fed the config to the channels
@@ -986,12 +1012,13 @@ func TestServerUpdate(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, log)
+	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
-	oldC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[]}`))
+	oldC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[]}`))
+	assert.NoError(t, oldC.Validate(), "validate")
 	assert.NoError(t, err, "parse 1")
 
 	srv.UpsertConfig("stunner/udp-gateway", oldC)
@@ -1000,6 +1027,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 
 	// reapply - no change
@@ -1010,10 +1038,12 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 
 	// add another config
-	tcpC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/tcp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/tcp-gateway/tcp-listener", "protocol":"turn-tcp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
+	tcpC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/tcp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name": "stunner/tcp-gateway/tcp-listener", "protocol":"turn-tcp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
+	assert.NoError(t, tcpC.Validate(), "validate")
 	assert.NoError(t, err, "parse")
 
 	srv.UpsertConfig("stunner/tcp-gateway", tcpC)
@@ -1023,14 +1053,17 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 	sc2 := srv.GetConfigStore().Get("stunner/tcp-gateway")
 	assert.NotNil(t, sc2, "get")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
 
 	// add a cluster
-	newC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","username":"a","password":"b"},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name": "stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
+	newC, err := client.ParseConfig([]byte(`{"version":"v1","admin":{"name":"stunner/udp-gateway","logLevel":"all:INFO","health-check":"http://:8086"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name": "stunner/udp-gateway/udp-listener", "protocol":"turn-udp","address":"0.0.0.0","port":3478,"routes":["stunner/media-plane"]}],"clusters":[{"name": "stunner/media-plane", "type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`))
 	assert.NoError(t, err, "parse 1")
+	assert.NoError(t, newC.Validate(), "validate")
 	assert.False(t, oldC.DeepEqual(newC), "deepeq")
 
 	// process in a single go
@@ -1043,42 +1076,161 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
+	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
 	assert.True(t, sc1.DeepEqual(newC), "deepeq")
 	sc2 = srv.GetConfigStore().Get("stunner/tcp-gateway")
 	assert.NotNil(t, sc2, "get")
+	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
 	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
 }
+
+// func TestServerPatcher(t *testing.T) {
+// 	zc := zap.NewProductionConfig()
+// 	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+// 	z, err := zc.Build()
+// 	assert.NoError(t, err, "logger created")
+// 	zlogger := zapr.NewLogger(z)
+// 	log := zlogger.WithName("tester")
+
+// 	logger := logger.NewLoggerFactory(stunnerLogLevel)
+// 	testLog := logger.NewLogger("test")
+
+// 	ctx, cancel := context.WithCancel(context.Background())
+// 	defer cancel()
+
+// 	testLog.Debug("create server")
+// 	patcher := func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error) {
+// 		testLog.Debugf("patching config: %s", conf.String())
+// 		if conf == nil {
+// 			return nil, fmt.Errorf("config patcher: nil config received")
+// 		}
+// 		for i := range conf.Listeners {
+// 			conf.Listeners[i].Addr = node
+// 		}
+// 		testLog.Tracef(" patching ready: %s", conf.String())
+// 		return conf, nil
+// 	}
+// 	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, patcher, log)
+// 	assert.NotNil(t, srv, "server")
+// 	err = srv.Start(ctx)
+// 	assert.NoError(t, err, "start")
+
+// 	time.Sleep(20 * time.Millisecond)
+
+// 	c := testConfigListener("ns1/gw1", "realm1", "1.2.3.4")
+// 	err = srv.UpdateConfig([]server.Config{c})
+// 	assert.NoError(t, err, "update")
+// 	// expected result
+// 	p := testConfigListener("ns1/gw1", "realm1", "10.11.12.13")
+// 	p.Config.Listeners[0].Addr = "10.11.12.13"
+// 	p.Config.Listeners[1].Addr = "10.11.12.13"
+// 	p.Config.Listeners[2].Addr = "10.11.12.13"
+
+// 	testLog.Debug("client w/o node IP")
+// 	loader1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+// 	assert.NoError(t, err, "client")
+// 	sc1, err := loader1.Load()
+// 	assert.NoError(t, err, "load")
+// 	assert.True(t, sc1.DeepEqual(c.Config), "deepeq")
+
+// 	testLog.Debug("client w/ node IP")
+// 	loader2, err := client.New("127.0.0.1:13478", "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
+// 	assert.NoError(t, err, "client")
+// 	sc2, err := loader2.Load()
+// 	assert.NoError(t, err, "load")
+// 	assert.True(t, sc2.DeepEqual(p.Config), "deepeq")
+
+// 	watchCtx, watchCancel := context.WithCancel(context.Background())
+// 	defer watchCancel()
+
+// 	testLog.Debug("watcher1 w/o node IP")
+// 	watcher1, err := client.New("127.0.0.1:13478", "ns1/gw1", nil, logger)
+// 	assert.NoError(t, err, "client")
+// 	ch1 := make(chan *stnrv1.StunnerConfig, 8)
+// 	defer close(ch1)
+
+// 	err = watcher1.Watch(watchCtx, ch1)
+// 	assert.NoError(t, err, "client watch")
+
+// 	s := watchConfig(ch1, 100*time.Millisecond)
+// 	assert.NotNil(t, s, "watch-config")
+// 	assert.True(t, s.DeepEqual(c.Config), "deepeq")
+
+// 	testLog.Debug("watcher2 w/ node IP")
+// 	watcher2, err := client.New("127.0.0.1:13478", "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
+// 	assert.NoError(t, err, "client")
+// 	ch2 := make(chan *stnrv1.StunnerConfig, 8)
+// 	defer close(ch2)
+
+// 	err = watcher2.Watch(watchCtx, ch2)
+// 	assert.NoError(t, err, "client watch")
+
+// 	s = watchConfig(ch2, 100*time.Millisecond)
+// 	assert.NotNil(t, s, "watch-config")
+// 	assert.True(t, s.DeepEqual(p.Config), "deepeq")
+
+// 	// testing update
+// 	c = testConfigListener("ns1/gw1", "realm1", "8.7.6.5")
+// 	err = srv.UpdateConfig([]server.Config{c})
+// 	assert.NoError(t, err, "update")
+
+// 	testLog.Debug("client w/o node IP")
+// 	sc1, err = loader1.Load()
+// 	assert.NoError(t, err, "load")
+// 	assert.True(t, sc1.DeepEqual(c.Config), "deepeq")
+
+// 	testLog.Debug("client w/ node IP")
+// 	sc2, err = loader2.Load()
+// 	assert.NoError(t, err, "load")
+// 	assert.True(t, sc2.DeepEqual(p.Config), "deepeq")
+
+// 	s = watchConfig(ch1, 100*time.Millisecond)
+// 	assert.NotNil(t, s, "watch-config")
+// 	assert.True(t, s.DeepEqual(c.Config), "deepeq")
+
+// 	s = watchConfig(ch2, 100*time.Millisecond)
+// 	assert.NotNil(t, s, "watch-config")
+// 	assert.True(t, s.DeepEqual(p.Config), "deepeq")
+// }
 
 // only differ in id and realm
 func testConfig(id, realm string) server.Config {
 	c := client.ZeroConfig(id)
 	c.Auth.Realm = realm
-
+	_ = c.Validate() // make sure deepeq works
 	return server.Config{Id: id, Config: c}
 }
 
+// func testConfigListener(id, realm, addr string) server.Config {
+// 	c := client.ZeroConfig(id)
+// 	c.Auth.Realm = realm
+// 	c.Listeners = []stnrv1.ListenerConfig{{
+// 		Name: "l-1",
+// 		Addr: addr,
+// 		Port: 1,
+// 	}, {
+// 		Name: "l-2",
+// 		Port: 2,
+// 	}, {
+// 		Name: "l-3",
+// 		Addr: "101.102.103.104",
+// 		Port: 3,
+// 	}}
+// 	_ = c.Validate() // make sure deepeq works
+// 	return server.Config{Id: id, Config: c}
+// }
+
 // wait for some configurable time for a watch element
-func watchConfig(ch chan stnrv1.StunnerConfig, d time.Duration) *stnrv1.StunnerConfig {
+func watchConfig(ch chan *stnrv1.StunnerConfig, d time.Duration) *stnrv1.StunnerConfig {
 	select {
 	case c := <-ch:
 		// fmt.Println("++++++++++++ got config ++++++++++++: ", c.String())
-		return &c
+		return c
 	case <-time.After(d):
 		// fmt.Println("++++++++++++ timeout ++++++++++++")
 		return nil
 	}
 }
-
-// func watchServerConfig(ch chan server.Config, d time.Duration) *stnrv1.StunnerConfig {
-// 	select {
-// 	case c := <-ch:
-// 		// fmt.Println("++++++++++++ got config ++++++++++++: ", c.String())
-// 		return c.Config
-// 	case <-time.After(d):
-// 		// fmt.Println("++++++++++++ timeout ++++++++++++")
-// 		return nil
-// 	}
-// }
 
 func findConfById(cs []*stnrv1.StunnerConfig, id string) *stnrv1.StunnerConfig {
 	for _, c := range cs {

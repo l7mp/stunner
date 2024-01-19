@@ -36,9 +36,9 @@ type Client interface {
 	// Watch grabs new configs from a config origin (config file or CDS server) and returns
 	// them on the channel. The context cancels the watcher. If the origin is not available
 	// watch will retry.
-	Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
+	Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
 	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
-	Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error
+	Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
 	fmt.Stringer
 }
 

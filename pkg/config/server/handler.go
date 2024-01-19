@@ -1,9 +1,8 @@
 package server
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/l7mp/stunner/pkg/config/server/api"
@@ -12,112 +11,81 @@ import (
 )
 
 // make sure the server satisfies the generate OpenAPI server interface
-var _ api.ServerInterface = &Server{}
+var _ api.StrictServerInterface = (*Server)(nil)
 
-// ResponseGen is a callback to generate a response to a request (also used for sending the initial config dump for watches).
-type ResponseGen func() ([]byte, *Error)
+// ConfigFilter is a callback to filter config updates for a client.
+type ConfigFilter func(confId string) bool
 
-// FilterConfig is a callback to filter config updates for a client.
-type FilterConfig func(confId string) bool
+// ConfigPatcher is a callback to patch config updates for a client.
+type ConfigPatcher func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error)
 
 // (GET /api/v1/configs)
-func (s *Server) ListV1Configs(w http.ResponseWriter, r *http.Request, params api.ListV1ConfigsParams) {
-	endpoint := "/api/v1/configs"
+func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsRequestObject) (api.ListV1ConfigsResponseObject, error) {
+	s.log.V(1).Info("handling ListV1Configs API call")
 
-	responder := func() ([]byte, *Error) {
-		configs := s.configs.Snapshot()
-		response := ConfigList{Version: "v1", Items: []*stnrv1.StunnerConfig{}}
-		for _, c := range configs {
-			response.Items = append(response.Items, c.Config)
-		}
-
-		json, err := json.Marshal(response)
-		if err != nil {
-			return []byte{}, &Error{
-				Code:    http.StatusInternalServerError,
-				Message: "Could not JSON marshal config list",
-			}
-		}
-
-		return json, nil
+	configs := s.configs.Snapshot()
+	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
+	for _, c := range configs {
+		cpy := stnrv1.StunnerConfig{}
+		c.Config.DeepCopyInto(&cpy)
+		response.Items = append(response.Items, cpy)
 	}
 
-	filter := func(confId string) bool {
-		return true
-	}
+	s.log.V(3).Info("ListV1Configs API handler: ready",
+		"configlist-len", len(configs))
 
-	if params.Watch != nil && *params.Watch {
-		s.handleConn(w, r, endpoint, responder, filter)
-	} else {
-		s.handleReq(w, r, endpoint, responder)
-	}
+	return api.ListV1Configs200JSONResponse(response), nil
 }
 
 // (GET /api/v1/configs/{namespace})
-func (s *Server) ListV1ConfigsNamespace(w http.ResponseWriter, r *http.Request, namespace string, params api.ListV1ConfigsNamespaceParams) {
-	endpoint := fmt.Sprintf("/api/v1/configs/%s", namespace)
+func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1ConfigsNamespaceRequestObject) (api.ListV1ConfigsNamespaceResponseObject, error) {
+	s.log.V(1).Info("handling ListV1ConfigsNamespace API call",
+		"namespace", request.Namespace)
 
-	responder := func() ([]byte, *Error) {
-		configs := s.configs.Snapshot()
-		response := ConfigList{Version: "v1", Items: []*stnrv1.StunnerConfig{}}
-		for _, c := range configs {
-			ps := strings.Split(c.Id, "/")
-			if len(ps) == 2 && ps[0] == namespace {
-				response.Items = append(response.Items, c.Config)
-			}
+	configs := s.configs.Snapshot()
+	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
+	for _, c := range configs {
+		ps := strings.Split(c.Id, "/")
+		if len(ps) == 2 && ps[0] == request.Namespace {
+			cpy := stnrv1.StunnerConfig{}
+			c.Config.DeepCopyInto(&cpy)
+			response.Items = append(response.Items, cpy)
 		}
-
-		json, err := json.Marshal(response)
-		if err != nil {
-			return []byte{}, &Error{
-				Code:    http.StatusInternalServerError,
-				Message: "Could not JSON marshal config list",
-			}
-		}
-
-		return json, nil
-	}
-	filter := func(confId string) bool {
-		ps := strings.Split(confId, "/")
-		return len(ps) == 2 && ps[0] == namespace
 	}
 
-	if params.Watch != nil && *params.Watch {
-		s.handleConn(w, r, endpoint, responder, filter)
-	} else {
-		s.handleReq(w, r, endpoint, responder)
-	}
+	s.log.V(3).Info("ListV1ConfigsNamespace API handler: ready",
+		"configlist-len", len(configs))
+
+	return api.ListV1ConfigsNamespace200JSONResponse(response), nil
 }
 
 // (GET /api/v1/configs/{namespace}/{name})
-func (s *Server) GetV1ConfigNamespaceName(w http.ResponseWriter, r *http.Request, namespace string, name string, params api.GetV1ConfigNamespaceNameParams) {
+func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1ConfigNamespaceNameRequestObject) (api.GetV1ConfigNamespaceNameResponseObject, error) {
+	namespace, name := request.Namespace, request.Name
+	s.log.V(1).Info("handling GetV1ConfigNamespaceName API call", "namespace", namespace,
+		"name", name)
+
 	id := fmt.Sprintf("%s/%s", namespace, name)
-	endpoint := fmt.Sprintf("/api/v1/configs/%s/%s", namespace, name)
+	c := s.configs.Get(id)
+	if c == nil {
+		s.log.V(1).Info("GetV1ConfigNamespaceName: config not found", "client", id)
+		return nil, fmt.Errorf("config not found for id %q", id)
+	}
 
-	responder := func() ([]byte, *Error) {
-		c := s.configs.Get(id)
-		if c == nil {
-			return []byte{}, &Error{
-				Code:    http.StatusBadRequest,
-				Message: "Config not found",
-			}
-		}
+	ret := &stnrv1.StunnerConfig{}
+	c.DeepCopyInto(ret)
 
-		json, err := json.Marshal(c)
+	if s.patch != nil && request.Params.Node != nil {
+		conf, err := s.patch(ret, *request.Params.Node)
 		if err != nil {
-			return []byte{}, &Error{
-				Code:    http.StatusInternalServerError,
-				Message: "Config not found",
-			}
+			s.log.Error(err, "GetV1ConfigNamespaceName: patch config failed")
+			return nil, err
 		}
-
-		return json, nil
+		ret = conf
 	}
-	filter := func(confId string) bool { return confId == id }
 
-	if params.Watch != nil && *params.Watch {
-		s.handleConn(w, r, endpoint, responder, filter)
-	} else {
-		s.handleReq(w, r, endpoint, responder)
-	}
+	s.log.V(3).Info("GetV1ConfigNamespaceName API handler: ready",
+		"config", ret.String())
+
+	return api.GetV1ConfigNamespaceName200JSONResponse(*ret), nil
 }

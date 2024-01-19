@@ -45,12 +45,21 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 		return nil, errFileTruncated
 	}
 
-	return ParseConfig(b)
+	c, err := ParseConfig(b)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse config: %w", err)
+	}
+
+	if err := c.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return c, nil
 }
 
 // WatchConfig watches a configuration file for changes. If no file exists at the given path,
 // WatchConfig will periodically retry until the file appears.
-func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	if w.configFile == "" {
 		return errors.New("uninitialized config file path")
 	}
@@ -76,7 +85,7 @@ func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- stnrv1.StunnerCo
 
 // Poll watches the config file and emits new configs on the specified channel. Returns an error if
 // further action is needed (tryWatchConfig is to be started) or nil on normal exit.
-func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- stnrv1.StunnerConfig) error {
+func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	w.log.Tracef("configWatcher")
 
 	// create a new watcher
@@ -97,13 +106,9 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- stnrv1.StunnerCon
 		return err
 	}
 
-	// send a deepcopy over the channel
-	confCopy := stnrv1.StunnerConfig{}
-	c.DeepCopyInto(&confCopy)
+	w.log.Debugf("initial config file successfully loaded from %q: %s", config, c.String())
 
-	w.log.Debugf("initial config file successfully loaded from %q: %s", config, confCopy.String())
-
-	ch <- confCopy
+	ch <- c
 
 	// save deepcopy so that we can filter repeated events
 	prev := stnrv1.StunnerConfig{}
@@ -152,12 +157,9 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- stnrv1.StunnerCon
 				continue
 			}
 
-			confCopy := stnrv1.StunnerConfig{}
-			c.DeepCopyInto(&confCopy)
+			w.log.Debugf("config file successfully loaded from %q: %s", config, c.String())
 
-			w.log.Debugf("config file successfully loaded from %q: %s", config, confCopy.String())
-
-			ch <- confCopy
+			ch <- c
 
 			// save deepcopy so that we can filter repeated events
 			c.DeepCopyInto(&prev)

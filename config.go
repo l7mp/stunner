@@ -15,8 +15,8 @@ import (
 
 // Options defines various options for the STUNner server.
 type Options struct {
-	// Id is the identifier of this stunnerd daemon instance. Defaults to hostname.
-	Id string
+	// Name is the identifier of this stunnerd daemon instance. Defaults to hostname.
+	Name string
 	// DryRun suppresses sideeffects: STUNner will not initialize listener sockets and bring up
 	// the TURN server, and it will not fire up the health-check and the metrics
 	// servers. Intended for testing, default is false.
@@ -144,8 +144,8 @@ func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around ConfigOrigin.Load.
-func (s *Stunner) LoadConfig(config string) (*stnrv1.StunnerConfig, error) {
-	client, err := client.New(config, s.id, s.logger)
+func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
+	client, err := client.New(origin, s.name, s.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -154,8 +154,8 @@ func (s *Stunner) LoadConfig(config string) (*stnrv1.StunnerConfig, error) {
 }
 
 // WatchConfig watches a configuration from an origin. This is a shim wrapper around ConfigOrigin.Watch.
-func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- stnrv1.StunnerConfig) error {
-	client, err := client.New(origin, s.id, s.logger)
+func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv1.StunnerConfig) error {
+	client, err := client.New(origin, s.name, s.logger)
 	if err != nil {
 		return err
 	}

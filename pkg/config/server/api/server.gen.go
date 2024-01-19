@@ -6,7 +6,9 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,10 +19,29 @@ import (
 	"github.com/gorilla/mux"
 	stunnerv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/oapi-codegen/runtime"
+	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
 
 // V1Config Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
 type V1Config = stunnerv1.StunnerConfig
+
+// V1ConfigList ConfigList is a list of Configs.
+type V1ConfigList struct {
+	// Items Items is the list of Config objects in the list.
+	Items []V1Config `json:"items"`
+
+	// Version version defines the versioned schema of this object.
+	Version string `json:"version"`
+}
+
+// V1Error API error.
+type V1Error struct {
+	// Code Error code.
+	Code int32 `json:"code"`
+
+	// Message Error message.
+	Message *string `json:"message,omitempty"`
+}
 
 // ListV1ConfigsParams defines parameters for ListV1Configs.
 type ListV1ConfigsParams struct {
@@ -38,6 +59,9 @@ type ListV1ConfigsNamespaceParams struct {
 type GetV1ConfigNamespaceNameParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
 	Watch *bool `form:"watch,omitempty" json:"watch,omitempty"`
+
+	// Node Name of the node the client runs on.
+	Node *string `form:"node,omitempty" json:"node,omitempty"`
 }
 
 // ServerInterface represents all server handlers.
@@ -159,6 +183,14 @@ func (siw *ServerInterfaceWrapper) GetV1ConfigNamespaceName(w http.ResponseWrite
 	err = runtime.BindQueryParameter("form", true, false, "watch", r.URL.Query(), &params.Watch)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "watch", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "node" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "node", r.URL.Query(), &params.Node)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node", Err: err})
 		return
 	}
 
@@ -295,22 +327,247 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	return r
 }
 
+type ListV1ConfigsRequestObject struct {
+	Params ListV1ConfigsParams
+}
+
+type ListV1ConfigsResponseObject interface {
+	VisitListV1ConfigsResponse(w http.ResponseWriter) error
+}
+
+type ListV1Configs200JSONResponse V1ConfigList
+
+func (response ListV1Configs200JSONResponse) VisitListV1ConfigsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListV1Configs500JSONResponse V1Error
+
+func (response ListV1Configs500JSONResponse) VisitListV1ConfigsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListV1ConfigsNamespaceRequestObject struct {
+	Namespace string `json:"namespace"`
+	Params    ListV1ConfigsNamespaceParams
+}
+
+type ListV1ConfigsNamespaceResponseObject interface {
+	VisitListV1ConfigsNamespaceResponse(w http.ResponseWriter) error
+}
+
+type ListV1ConfigsNamespace200JSONResponse V1ConfigList
+
+func (response ListV1ConfigsNamespace200JSONResponse) VisitListV1ConfigsNamespaceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListV1ConfigsNamespace400JSONResponse V1Error
+
+func (response ListV1ConfigsNamespace400JSONResponse) VisitListV1ConfigsNamespaceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListV1ConfigsNamespace500JSONResponse V1Error
+
+func (response ListV1ConfigsNamespace500JSONResponse) VisitListV1ConfigsNamespaceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetV1ConfigNamespaceNameRequestObject struct {
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Params    GetV1ConfigNamespaceNameParams
+}
+
+type GetV1ConfigNamespaceNameResponseObject interface {
+	VisitGetV1ConfigNamespaceNameResponse(w http.ResponseWriter) error
+}
+
+type GetV1ConfigNamespaceName200JSONResponse V1Config
+
+func (response GetV1ConfigNamespaceName200JSONResponse) VisitGetV1ConfigNamespaceNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetV1ConfigNamespaceName400JSONResponse V1Error
+
+func (response GetV1ConfigNamespaceName400JSONResponse) VisitGetV1ConfigNamespaceNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetV1ConfigNamespaceName500JSONResponse V1Error
+
+func (response GetV1ConfigNamespaceName500JSONResponse) VisitGetV1ConfigNamespaceNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+// StrictServerInterface represents all server handlers.
+type StrictServerInterface interface {
+
+	// (GET /api/v1/configs)
+	ListV1Configs(ctx context.Context, request ListV1ConfigsRequestObject) (ListV1ConfigsResponseObject, error)
+
+	// (GET /api/v1/configs/{namespace})
+	ListV1ConfigsNamespace(ctx context.Context, request ListV1ConfigsNamespaceRequestObject) (ListV1ConfigsNamespaceResponseObject, error)
+
+	// (GET /api/v1/configs/{namespace}/{name})
+	GetV1ConfigNamespaceName(ctx context.Context, request GetV1ConfigNamespaceNameRequestObject) (GetV1ConfigNamespaceNameResponseObject, error)
+}
+
+type StrictHandlerFunc = strictnethttp.StrictHttpHandlerFunc
+type StrictMiddlewareFunc = strictnethttp.StrictHttpMiddlewareFunc
+
+type StrictHTTPServerOptions struct {
+	RequestErrorHandlerFunc  func(w http.ResponseWriter, r *http.Request, err error)
+	ResponseErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		},
+	}}
+}
+
+func NewStrictHandlerWithOptions(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc, options StrictHTTPServerOptions) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: options}
+}
+
+type strictHandler struct {
+	ssi         StrictServerInterface
+	middlewares []StrictMiddlewareFunc
+	options     StrictHTTPServerOptions
+}
+
+// ListV1Configs operation middleware
+func (sh *strictHandler) ListV1Configs(w http.ResponseWriter, r *http.Request, params ListV1ConfigsParams) {
+	var request ListV1ConfigsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListV1Configs(ctx, request.(ListV1ConfigsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListV1Configs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListV1ConfigsResponseObject); ok {
+		if err := validResponse.VisitListV1ConfigsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListV1ConfigsNamespace operation middleware
+func (sh *strictHandler) ListV1ConfigsNamespace(w http.ResponseWriter, r *http.Request, namespace string, params ListV1ConfigsNamespaceParams) {
+	var request ListV1ConfigsNamespaceRequestObject
+
+	request.Namespace = namespace
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListV1ConfigsNamespace(ctx, request.(ListV1ConfigsNamespaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListV1ConfigsNamespace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListV1ConfigsNamespaceResponseObject); ok {
+		if err := validResponse.VisitListV1ConfigsNamespaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetV1ConfigNamespaceName operation middleware
+func (sh *strictHandler) GetV1ConfigNamespaceName(w http.ResponseWriter, r *http.Request, namespace string, name string, params GetV1ConfigNamespaceNameParams) {
+	var request GetV1ConfigNamespaceNameRequestObject
+
+	request.Namespace = namespace
+	request.Name = name
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetV1ConfigNamespaceName(ctx, request.(GetV1ConfigNamespaceNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetV1ConfigNamespaceName")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetV1ConfigNamespaceNameResponseObject); ok {
+		if err := validResponse.VisitGetV1ConfigNamespaceNameResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

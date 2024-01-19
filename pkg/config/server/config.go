@@ -5,12 +5,10 @@ import (
 	"sync"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/config/client/api"
 )
 
-type ConfigList struct {
-	Version string                  `json:"version"`
-	Items   []*stnrv1.StunnerConfig `json:"items"`
-}
+type ConfigList = api.V1ConfigList
 
 type Config struct {
 	Id     string
@@ -23,8 +21,10 @@ func (e Config) String() string {
 
 // UpsertConfig upserts a single config in the server.
 func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
-	s.configs.Upsert(id, c)
-	s.configCh <- Config{Id: id, Config: c}
+	cpy := &stnrv1.StunnerConfig{}
+	c.DeepCopyInto(cpy)
+	s.configs.Upsert(id, cpy)
+	s.configCh <- Config{Id: id, Config: cpy}
 }
 
 // DeleteConfig should remove a config from the client. Theoretically, this would be done by

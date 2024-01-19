@@ -55,6 +55,10 @@ func (req *AuthConfig) Validate() error {
 		req.Realm = DefaultRealm
 	}
 
+	if req.Credentials == nil {
+		req.Credentials = map[string]string{}
+	}
+
 	return nil
 }
 

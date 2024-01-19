@@ -16,7 +16,7 @@ import (
 // CDSClient is a client for the config discovery service that knows how to poll configs for a
 // specific gateway. Use the CDSAPI to access the general CDS client set.
 type CDSClient struct {
-	CDSAPI
+	CdsApi
 	addr, id string
 }
 
@@ -31,7 +31,7 @@ func NewCDSClient(addr, id string, logger logging.LeveledLogger) (Client, error)
 		return nil, err
 	}
 
-	return &CDSClient{CDSAPI: client, addr: addr, id: id}, nil
+	return &CDSClient{CdsApi: client, addr: addr, id: id}, nil
 }
 
 func (p *CDSClient) String() string {
@@ -39,7 +39,7 @@ func (p *CDSClient) String() string {
 }
 
 func (p *CDSClient) Load() (*stnrv1.StunnerConfig, error) {
-	configs, err := p.CDSAPI.Get(context.Background())
+	configs, err := p.CdsApi.Get(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -47,13 +47,17 @@ func (p *CDSClient) Load() (*stnrv1.StunnerConfig, error) {
 		return nil, fmt.Errorf("expected exactly one config, got %d", len(configs))
 	}
 
-	return configs[0], nil
+	c := configs[0]
+	if err := c.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	return c, nil
 }
 
-func watch(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
+func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
 	go func() {
 		for {
-			// try to watch
 			if err := poll(ctx, a, ch); err != nil {
 				_, wsuri := a.Endpoint()
 				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
@@ -70,7 +74,7 @@ func watch(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error 
 	return nil
 }
 
-func poll(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
+func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
 	_, url := a.Endpoint()
 	a.Tracef("poll: trying to open connection to CDS server at %s", url)
 
@@ -150,12 +154,14 @@ func poll(ctx context.Context, a CDSAPI, ch chan<- stnrv1.StunnerConfig) error {
 				continue
 			}
 
-			confCopy := stnrv1.StunnerConfig{}
-			c.DeepCopyInto(&confCopy)
+			if err := c.Validate(); err != nil {
+				a.Warnf("invalid config: %s", err.Error())
+				continue
+			}
 
-			a.Debugf("new config received from %q: %q", url, confCopy.String())
+			a.Debugf("new config received from %q: %q", url, c.String())
 
-			ch <- confCopy
+			ch <- c
 		}
 	}()
 

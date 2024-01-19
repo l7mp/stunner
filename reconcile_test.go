@@ -1741,7 +1741,7 @@ func TestStunnerReconcile(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, s.Reconcile(*conf), "starting server")
+			assert.NoError(t, s.Reconcile(conf), "starting server")
 
 			runningConf := s.GetConfig()
 			assert.NotNil(t, runningConf, "default stunner get config ok")
@@ -1764,7 +1764,7 @@ func TestStunnerReconcile(t *testing.T) {
 
 			assert.True(t, conf.DeepEqual(runningConf), "default stunner config ok")
 
-			err = s.Reconcile(c.config)
+			err = s.Reconcile(&c.config)
 			c.tester(t, s, err)
 
 			s.Close()
@@ -1827,14 +1827,14 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	})
 
 	log.Debug("starting stunnerd")
-	assert.NoError(t, s.Reconcile(*conf), "starting server")
+	assert.NoError(t, s.Reconcile(conf), "starting server")
 
 	for _, c := range testcases {
 		t.Run(c.testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", c.testName)
 
 			log.Debug("reconciling server")
-			err := s.Reconcile(c.config)
+			err := s.Reconcile(&c.config)
 			if c.restart {
 				assert.ErrorContains(t, err, "restart", "starting server")
 			} else {

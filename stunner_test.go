@@ -37,6 +37,7 @@ var stunnerTestLoglevel string = "all:ERROR"
 // var stunnerTestLoglevel string = stnrv1.DefaultLogLevel
 // var stunnerTestLoglevel string = "all:INFO"
 // var stunnerTestLoglevel string = "all:TRACE"
+
 // var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
 var certPem, keyPem, _ = GenerateSelfSignedKey()
@@ -557,7 +558,7 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 			// assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c), "starting server")
+			assert.NoError(t, stunner.Reconcile(&c), "starting server")
 
 			assert.False(t, stunner.shutdown, "lifecycle 2: alive")
 			assert.True(t, stunner.ready, "lifecycle 2: ready")
@@ -1130,7 +1131,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c.config), "starting server")
+			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
 			var u, p string
 			auth := c.config.Auth.Type
@@ -1595,7 +1596,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c.config), "starting server")
+			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
 			var u, p string
 			auth := c.config.Auth.Type
@@ -1875,7 +1876,7 @@ func TestStunnerLifecycle(t *testing.T) {
 	}
 
 	log.Debug("reconciling empty server")
-	err = s.Reconcile(conf)
+	err = s.Reconcile(&conf)
 	assert.NoError(t, err, "reconcile empty server")
 
 	status, err := doLivenessCheck("http://127.0.0.1:8086")
@@ -1892,7 +1893,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 			log.Debug("reconciling server")
 			conf.Admin.HealthCheckEndpoint = c.hcEndpoint
-			err := s.Reconcile(conf)
+			err := s.Reconcile(&conf)
 			assert.NoError(t, err, "cannot reconcile")
 
 			// obtain hc address
@@ -1926,7 +1927,7 @@ func TestStunnerLifecycle(t *testing.T) {
 	// make sure health-check is running
 	h := "0.0.0.0"
 	conf.Admin.HealthCheckEndpoint = &h
-	assert.NoError(t, s.Reconcile(conf), "cannot reconcile")
+	assert.NoError(t, s.Reconcile(&conf), "cannot reconcile")
 
 	status, err = doLivenessCheck("http://127.0.0.1:8086")
 	assert.NoError(t, err, "liveness test before graceful-shutdown: running")
@@ -2046,7 +2047,7 @@ func TestStunnerMetrics(t *testing.T) {
 	}
 
 	log.Debug("reconciling empty server")
-	err := s.Reconcile(conf)
+	err := s.Reconcile(&conf)
 	assert.NoError(t, err, "reconcile empty server")
 
 	assert.True(t, s.IsReady(), "server ready")
@@ -2057,7 +2058,7 @@ func TestStunnerMetrics(t *testing.T) {
 
 			log.Debug("reconciling server")
 			conf.Admin.MetricsEndpoint = c.mcEndpoint
-			err := s.Reconcile(conf)
+			err := s.Reconcile(&conf)
 			assert.NoError(t, err, "cannot reconcile")
 
 			// obtain metric address
@@ -2227,7 +2228,7 @@ func TestStunnerConfigV1Alpha1(t *testing.T) {
 			assert.True(t, len(config.Clusters) > 0, "clusters len")
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(*config), "starting server")
+			assert.NoError(t, stunner.Reconcile(config), "starting server")
 
 			var u, p string
 			auth := config.Auth.Type

@@ -20,17 +20,21 @@ paths:
           schema:
             type: boolean
       responses:
-        "501":
-          description: Unimplemented
-        # "200":
-        #   description: OK
-        #   content:
-        #     application/json:
-        #       schema:
-        #         $ref: '#/components/schemas/v1.ConfigList'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.ConfigList'
         #     application/json;stream=watch:
         #       schema:
         #         $ref: '#/components/schemas/v1.ConfigList'
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
   /api/v1/configs/{namespace}:
     get:
       description: API to list or watch config objects in a specific namespace.
@@ -48,14 +52,24 @@ paths:
           schema:
             type: boolean
       responses:
-        "501":
-          description: Unimplemented
-        # "200":
-        #   description: OK
-        #   content:
-        #     application/json:
-        #       schema:
-        #         $ref: '#/components/schemas/v1.ConfigList'
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.ConfigList'
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
         #     application/json;stream=watch:
         #       schema:
         #         $ref: '#/components/schemas/v1.ConfigList'
@@ -81,6 +95,11 @@ paths:
           description: Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
           schema:
             type: boolean
+        - name: node
+          in: query
+          description: Name of the node the client runs on.
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -88,15 +107,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.Config'
-            application/json;stream=watch:
+        "400":
+          description: Bad request.
+          content:
+            application/json:
               schema:
-                $ref: '#/components/schemas/v1.Config'
+                $ref: '#/components/schemas/v1.Error'
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+            # application/json;stream=watch:
+            #   schema:
+            #     $ref: '#/components/schemas/v1.Config'
 components:
   schemas:
+    v1.ClientInfo:
+      description: Client description.
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: Client id.
+          type: string
+        node:
+          description: Name of the node client is deployed to.
+          type: string
     v1.ConfigList:
       description: ConfigList is a list of Configs.
       type: object
       required:
+        - version
         - items
       properties:
         version:
@@ -107,12 +151,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/v1.Config'
-        kind:
-          description: Kind is a string value representing the REST resource this object represents.
-          type: string
     v1.Config:
       description: 'Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
       x-go-type: "stunnerv1.StunnerConfig"
       x-go-type-import:
         name: stunnerv1
         path: "github.com/l7mp/stunner/pkg/apis/v1"
+    v1.Error:
+      description: API error.
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          description: Error code.
+          type: integer
+          format: int32
+        message:
+          description: Error message.
+          type: string
