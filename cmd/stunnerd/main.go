@@ -149,7 +149,7 @@ func main() {
 			}()
 
 		case c := <-conf:
-			log.Trace("new configuration available")
+			log.Infof("new configuration available: %q", c.String())
 
 			// command line loglevel overrides config
 			if *verbose || *level != "" {

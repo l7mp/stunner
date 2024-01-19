@@ -20,6 +20,8 @@ type CDSClient struct {
 	addr, id string
 }
 
+// NewCDSClient creates a config discovery service client that can be used to load or watch STUNner
+// configurations from a CDS remote server.
 func NewCDSClient(addr, id string, logger logging.LeveledLogger) (Client, error) {
 	ps := strings.Split(id, "/")
 	if len(ps) != 2 {
@@ -34,10 +36,12 @@ func NewCDSClient(addr, id string, logger logging.LeveledLogger) (Client, error)
 	return &CDSClient{CdsApi: client, addr: addr, id: id}, nil
 }
 
+// String outputs the status of the client.
 func (p *CDSClient) String() string {
 	return fmt.Sprintf("config discovery client %q: using server %s", p.id, p.addr)
 }
 
+// Load grabs a new configuration from the config doscovery server.
 func (p *CDSClient) Load() (*stnrv1.StunnerConfig, error) {
 	configs, err := p.CdsApi.Get(context.Background())
 	if err != nil {

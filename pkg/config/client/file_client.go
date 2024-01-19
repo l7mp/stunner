@@ -22,6 +22,8 @@ type ConfigFileClient struct {
 	log logging.LeveledLogger
 }
 
+// NewConfigFileClient creates a client that load or watch STUNner configurations from a local
+// file.
 func NewConfigFileClient(origin, id string, logger logging.LeveledLogger) (Client, error) {
 	return &ConfigFileClient{
 		configFile: origin,
@@ -31,10 +33,12 @@ func NewConfigFileClient(origin, id string, logger logging.LeveledLogger) (Clien
 
 }
 
+// String outputs the status of the client.
 func (w *ConfigFileClient) String() string {
 	return fmt.Sprintf("config client using file %q", w.configFile)
 }
 
+// Load grabs a new configuration from a config file.
 func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 	b, err := os.ReadFile(w.configFile)
 	if err != nil {
@@ -57,8 +61,8 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 	return c, nil
 }
 
-// WatchConfig watches a configuration file for changes. If no file exists at the given path,
-// WatchConfig will periodically retry until the file appears.
+// Watch watches a configuration file for changes. If no file exists at the given path, it will
+// periodically retry until the file appears.
 func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	if w.configFile == "" {
 		return errors.New("uninitialized config file path")

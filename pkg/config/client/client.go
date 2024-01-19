@@ -42,6 +42,7 @@ type Client interface {
 	fmt.Stringer
 }
 
+// New creates a generic config client.
 func New(origin string, id string, logger logging.LoggerFactory) (Client, error) {
 	u, err := getURI(origin)
 	if err != nil {
