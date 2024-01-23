@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -90,13 +91,19 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 
 	a.Infof("connection successfully opened to config discovery server at %s", url)
 
-	errCh := make(chan error, 1)
 	pingTicker := time.NewTicker(PingPeriod)
 	closePinger := make(chan any)
 	defer close(closePinger)
 
+	// wait until all threads are closed and we can remove the error channel
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	go func() {
 		defer pingTicker.Stop()
+		defer wg.Done()
+
 		for {
 			select {
 			case <-pingTicker.C:
@@ -116,7 +123,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 
 	// poller
 	go func() {
-		defer close(errCh)
+		defer wg.Done()
 
 		// the next pong must arrive within the PongWait period
 		conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
@@ -147,10 +154,6 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 				continue
 			}
 
-			// fmt.Println("++++++++++++++++++++")
-			// fmt.Println(string(msg))
-			// fmt.Println("++++++++++++++++++++")
-
 			c, err := ParseConfig(msg)
 			if err != nil {
 				// assume it is a YAML/JSON syntax error: report and ignore
@@ -176,6 +179,8 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
 			conn.Close()
 			closePinger <- struct{}{}
+			wg.Wait()
+			close(errCh)
 		}()
 
 		select {
