@@ -40,6 +40,7 @@ func (s *Server) DeleteConfig(id string) {
 // UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
 // particular instance of time and generates an update per each change.
 func (s *Server) UpdateConfig(newConfigs []Config) error {
+	s.log.V(4).Info("processing config updates", "num-configs", len(newConfigs))
 	oldConfigs := s.configs.Snapshot()
 
 	for _, oldC := range oldConfigs {
@@ -50,6 +51,10 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 					s.log.V(2).Info("updating config", "client", newC.Id, "config",
 						newC.Config.String())
 					s.UpsertConfig(newC.Id, newC.Config)
+				} else {
+					s.log.V(2).Info("config not updated", "client", newC.Id,
+						"old-config", oldC.Config.String(),
+						"new-config", newC.Config.String())
 				}
 				found = true
 				break
