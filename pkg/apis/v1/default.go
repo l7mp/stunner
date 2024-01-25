@@ -18,7 +18,7 @@ const DefaultAuthName = "default-auth-config"
 const DefaultMetricsPort int = 8080
 const DefaultHealthCheckPort int = 8086
 
-const DefaultConfigDiscoveryAddress = ":13478"
+const DefaultConfigDiscoveryAddress = "0.0.0.0:13478"
 const DefaultEnvVarName = "STUNNER_NAME"
 const DefaultEnvVarNamespace = "STUNNER_NAMESPACE"
 const DefaultEnvVarNodeName = "STUNNER_NODENAME"
