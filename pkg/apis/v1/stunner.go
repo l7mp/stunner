@@ -124,6 +124,28 @@ func (req *StunnerConfig) DeepCopyInto(dst Config) {
 	}
 }
 
+// GetListenerConfig finds a Listener by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetListenerConfig(name string) (ListenerConfig, error) {
+	for _, l := range req.Listeners {
+		if l.Name == name {
+			return l, nil
+		}
+	}
+
+	return ListenerConfig{}, ErrNoSuchListener
+}
+
+// GetClusterConfig finds a Cluster by name in a StunnerConfig or returns an error.
+func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
+	for _, c := range req.Clusters {
+		if c.Name == name {
+			return c, nil
+		}
+	}
+
+	return ClusterConfig{}, ErrNoSuchCluster
+}
+
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
 	status := []string{}
@@ -146,24 +168,48 @@ func (req *StunnerConfig) String() string {
 	return fmt.Sprintf("{%s}", strings.Join(status, ","))
 }
 
-// GetListenerConfig finds a Listener by name in a StunnerConfig or returns an error.
-func (req *StunnerConfig) GetListenerConfig(name string) (ListenerConfig, error) {
+// Summary returns a stringified configuration.
+func (req *StunnerConfig) Summary() string {
+	// isEnabled = func(b bool) string { if b {return "enabled"} else {return "disabled"}}
+	strOrNone := func(s string) string {
+		if s != "" {
+			return s
+		} else {
+			return "<none>"
+		}
+	}
+	intOrNone := func(s int) string {
+		if s != 0 {
+			return fmt.Sprintf("%d", s)
+		} else {
+			return "<none>"
+		}
+	}
+	status := fmt.Sprintf("Gateway: %s (loglevel: %q)\n", req.Admin.Name, req.Admin.LogLevel)
+	if t, err := NewAuthType(req.Auth.Type); err == nil {
+		if t == AuthTypeStatic {
+			status += fmt.Sprintf("Authentication type: static, username/password: %s/%s\n",
+				req.Auth.Credentials["username"], req.Auth.Credentials["password"])
+		} else {
+			status += fmt.Sprintf("Authentication type: ephemeral, shared-secret: %s\n",
+				req.Auth.Credentials["secret"])
+		}
+	}
+
+	status += "Listeners:\n"
 	for _, l := range req.Listeners {
-		if l.Name == name {
-			return l, nil
+		status += fmt.Sprintf("  - Name: %s\n", l.Name)
+		status += fmt.Sprintf("    Protocol: %s\n", l.Protocol)
+		status += fmt.Sprintf("    Public address:port: %s:%s\n", strOrNone(l.PublicAddr), intOrNone(l.PublicPort))
+		status += fmt.Sprintf("    Routes: [%s]\n", strings.Join(l.Routes, ", "))
+		ep := []string{}
+		for _, r := range l.Routes {
+			if c, err := req.GetClusterConfig(r); err == nil {
+				ep = append(ep, c.Endpoints...)
+			}
 		}
+		status += fmt.Sprintf("    Endpoints: [%s]\n", strings.Join(ep, ", "))
 	}
 
-	return ListenerConfig{}, ErrNoSuchListener
-}
-
-// GetClusterConfig finds a Cluster by name in a StunnerConfig or returns an error.
-func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
-	for _, c := range req.Clusters {
-		if c.Name == name {
-			return c, nil
-		}
-	}
-
-	return ClusterConfig{}, ErrNoSuchCluster
+	return status
 }

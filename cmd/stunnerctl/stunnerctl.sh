@@ -6,6 +6,9 @@ USAGE="stunnerctl running-config <namespace/name>"
 COMMAND="$1"
 ARG="$2"
 
+# stop the port-forwarder
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM EXIT
+
 jq=$(which jq)
 if [ -z "$jq" ] ; then
     echo "Error: cannot find jq in PATH" && exit 0
@@ -19,12 +22,24 @@ running_config () {
     name=${args[1]}
     [ -z $namespace -o -z $name ] && echo "cannot parse <namespace/name> argument" && exit 0
 
-    [ $(kubectl get cm -n $namespace -o json| jq ".items | map(select(.metadata.name==\"${name}\"))|length") -eq 0 ] && \
-        echo "STUNner configmap ${namespace}/${name} not found" && exit 1
+    # find the CDS server
+    CDS_SERVER_NAME=$(kubectl get pods -l stunner.l7mp.io/config-discovery-service=enabled --all-namespaces -o jsonpath='{.items[0].metadata.name}')
+    CDS_SERVER_NAMESPACE=$(kubectl get pods -l stunner.l7mp.io/config-discovery-service=enabled --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
+    [ -z $CDS_SERVER_NAME -o -z $CDS_SERVER_NAMESPACE ] && echo "Could not find CDS server" && exit 1
 
+    # start the port-forwarder
+    kubectl -n $CDS_SERVER_NAMESPACE port-forward pod/${CDS_SERVER_NAME}  63478:13478 >/dev/null 2>&1 &
+
+    # query the cds server
+    sleep 1
     tmpfile=$(mktemp "./stunnerd-config.XXXXXX")
-    kubectl get cm -n $namespace $name -o jsonpath="{.data.stunnerd\.conf}" > $tmpfile
+    curl -s http://127.0.0.1:63478/api/v1/configs/${namespace}/${name} > $tmpfile
 
+    if grep -q "onfig not found" $tmpfile >/dev/null 2>&1; then
+       cat $tmpfile
+       exit 1
+    fi
+    
     local AUTH_TYPE=$($jq ".auth.type" $tmpfile)
     [ $AUTH_TYPE == "plaintext" ] && AUTH_TYPE="static"
     [ $AUTH_TYPE == "longterm" ]  && AUTH_TYPE="ephemeral"

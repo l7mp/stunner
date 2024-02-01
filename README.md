@@ -349,30 +349,23 @@ The current STUNner dataplane configuration is always made available in a conven
 has the same name and namespace as the Gateway it belongs to (so this is supposed to be
 `stunner/udp-gateway` as per our example). 
 
-STUNner comes with a small utility to dump the running configuration in human readable format (you
-must have [`jq`](https://stedolan.github.io/jq) installed in your PATH to be able to use it). Issue
-the below from the main STUNner directory.
+STUNner comes with a small CLI utility called [`stunnerctl`](/cmd/stunnerctl/README.md) to dump the
+running configuration in human readable format. 
 
 ```console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/udp-gateway/udp-listener
-        Listener:       stunner/udp-gateway/udp-listener
-        Protocol:       TURN-UDP
-        Public address: 34.34.150.65
-        Public port:    3478
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: ephemeral, shared-secret: my-very-secure-secret
+Listeners:
+  - Name: stunner/udp-gateway/udp-listener
+    Protocol: TURN-UDP
+    Public address:port: 34.118.88.91:3478
+    Routes: [stunner/iperf-server]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 As it turns out, STUNner has successfully assigned a public IP and port to our Gateway and set the
-STUN/TURN credentials based on the GatewayConfig. You can use the below to dump the entire running
-configuration; `jq` is there just to pretty-print JSON.
-
-```console
-kubectl get cm -n stunner udp-gateway -o jsonpath="{.data.stunnerd\.conf}" | jq .
-```
+STUN/TURN credentials based on the GatewayConfig. 
 
 ### Testing
 

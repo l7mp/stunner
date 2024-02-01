@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,21 +13,28 @@ import (
 	"github.com/pion/turn/v3"
 	flag "github.com/spf13/pflag"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/l7mp/stunner"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-const usage = "turncat [-l|--log <level>] [-i|--insecure] client server peer\n\tclient: <udp|tcp|unix>://<listener_addr>:<listener_port>\n\tserver: <turn://<auth>@<server_addr>:<server_port> | <k8s://<namesspace>/<name>:listener\n\tpeer: udp://<peer_addr>:<peer_port>\n\tauth: <username:password|secret>\n"
-const defaultStunnerdConfigfileName = "stunnerd.conf"
+const usage = `turncat [options] <client-addr> <turn-server-addr> <peer-addr>
+    client-addr: <udp|tcp|unix>://<listener_addr>:<listener_port>
+    turn-server-addr: <turn://<auth>@<server_addr>:<server_port> | <k8s://<gateway-namespace>/<gateway-name>:<gateway-listener>
+    peer-addr: udp://<peer_addr>:<peer_port>
+    auth: <username:password|secret>
+`
 
-var log logging.LeveledLogger
-var defaultDuration time.Duration
+var (
+	k8sConfigFlags  *cliopt.ConfigFlags
+	cdsConfigFlags  *cdsclient.CDSConfigFlags
+	log             logging.LeveledLogger
+	defaultDuration time.Duration
+	loggerFactory   *logger.LeveledLoggerFactory
+)
 
 func main() {
 	var Usage = func() {
@@ -38,12 +44,20 @@ func main() {
 
 	os.Args[0] = "turncat"
 	defaultDuration, _ = time.ParseDuration("1h")
-	var level = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
-	// var user = flag.StringP("user", "u", "", "Set username. Auth fields in the TURN URI override this.")
-	// var passwd = flag.StringP("log", "l", "all:WARN", "Log level (default: all:WARN).")
-	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed certificates (default: false).")
-	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to -l all:DEBUG.")
+
+	// Kubernetes config flags
+	k8sConfigFlags = cliopt.NewConfigFlags(true)
+	k8sConfigFlags.AddFlags(flag.CommandLine)
+
+	// CDS server discovery flags
+	cdsConfigFlags = cdsclient.NewCDSConfigFlags()
+	cdsConfigFlags.AddFlags(flag.CommandLine)
+
+	var level = flag.StringP("log", "l", "all:WARN", "Log level")
+	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed TURN server certificates (default: false)")
+	var verbose = flag.BoolP("verbose", "v", false, "Enable verbose logging, identical to -l all:DEBUG")
 	var help = flag.BoolP("help", "h", false, "Display this help text and exit")
+
 	flag.Parse()
 
 	if *help {
@@ -60,8 +74,8 @@ func main() {
 		*level = "all:DEBUG"
 	}
 
-	logger := logger.NewLoggerFactory(*level)
-	log = logger.NewLogger("turncat-cli")
+	loggerFactory = logger.NewLoggerFactory(*level)
+	log = loggerFactory.NewLogger("turncat-cli")
 
 	uri := flag.Arg(1)
 	log.Debugf("Reading STUNner config from URI %q", uri)
@@ -93,7 +107,7 @@ func main() {
 		Realm:         config.Auth.Realm,
 		AuthGen:       authGen,
 		InsecureMode:  *insecure,
-		LoggerFactory: logger,
+		LoggerFactory: loggerFactory,
 	}
 	t, err := stunner.NewTurncat(cfg)
 	if err != nil {
@@ -143,37 +157,31 @@ func getStunnerConfFromK8s(def string) (*stnrv1.StunnerConfig, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
-	cfg := config.GetConfigOrDie()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	cli, err := client.New(cfg, client.Options{})
+	log.Debug("Searching for CDS server")
+	cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+		loggerFactory.NewLogger("cds-fwd"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error searching for CDS server: %w", err)
 	}
 
-	// get the configmap
-	lookupKey := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
-	cm := &corev1.ConfigMap{}
-
-	err = cli.Get(ctx, lookupKey, cm)
+	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr, namespace, name,
+		loggerFactory.NewLogger("cds-client"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating CDS client: %w", err)
 	}
 
-	//parse out the stunnerconf
-	jsonConf, found := cm.Data[defaultStunnerdConfigfileName]
-	if !found {
-		return nil, fmt.Errorf("error unpacking STUNner configmap: %s not found",
-			defaultStunnerdConfigfileName)
+	confs, err := cds.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error obtaining config from CDS client: %w", err)
 	}
-
-	conf := stnrv1.StunnerConfig{}
-	if err := json.Unmarshal([]byte(jsonConf), &conf); err != nil {
-		return nil, err
+	if len(confs) != 1 {
+		return nil, fmt.Errorf("invalid number of configs returned from CDS client: %d",
+			len(confs))
 	}
+	conf := confs[0]
 
 	// remove all but the named listener
 	ls := []stnrv1.ListenerConfig{}
@@ -202,10 +210,10 @@ func getStunnerConfFromK8s(def string) (*stnrv1.StunnerConfig, error) {
 			"specified TURN server URI", listener)
 	}
 
-	conf.Listeners = []stnrv1.ListenerConfig{{}}
+	conf.Listeners = make([]stnrv1.ListenerConfig, 1)
 	copy(conf.Listeners, ls)
 
-	return &conf, nil
+	return conf, nil
 }
 
 func getStunnerConfFromCLI(def string) (*stnrv1.StunnerConfig, error) {
@@ -292,11 +300,17 @@ func getStunnerURI(config *stnrv1.StunnerConfig) (string, error) {
 }
 
 func parseK8sDef(def string) (string, string, string, error) {
-	re := regexp.MustCompile(`([0-9A-Za-z_-]+)/([0-9A-Za-z_-]+):([0-9A-Za-z_-]+)`)
+	re := regexp.MustCompile(`^/([0-9A-Za-z_-]+):([0-9A-Za-z_-]+)$`)
 	xs := re.FindStringSubmatch(def)
-	if len(xs) != 4 {
-		return "", "", "", fmt.Errorf("cannot parse STUNner configmap def: %q", def)
+	if len(xs) == 3 && k8sConfigFlags.Namespace != nil {
+		return *k8sConfigFlags.Namespace, xs[1], xs[2], nil
 	}
 
-	return xs[1], xs[2], xs[3], nil
+	re = regexp.MustCompile(`^([0-9A-Za-z_-]+)/([0-9A-Za-z_-]+):([0-9A-Za-z_-]+)$`)
+	xs = re.FindStringSubmatch(def)
+	if len(xs) == 4 {
+		return xs[1], xs[2], xs[3], nil
+	}
+
+	return "", "", "", fmt.Errorf("cannot parse STUNner K8s URI: %q", def)
 }

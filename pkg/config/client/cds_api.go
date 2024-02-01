@@ -3,10 +3,8 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client/api"
@@ -24,6 +22,9 @@ type ConfigList struct {
 	Items   []*stnrv1.StunnerConfig `json:"items"`
 }
 
+type ClientOption = api.ClientOption
+type HttpRequestDoer = api.HttpRequestDoer
+
 type CdsApi interface {
 	// Endpoint returns the address of the server plus the WebSocket API endpoint.
 	Endpoint() (string, string)
@@ -37,6 +38,8 @@ type CdsApi interface {
 	logging.LeveledLogger
 }
 
+func WithHTTPClient(doer HttpRequestDoer) ClientOption { return api.WithHTTPClient(doer) }
+
 // AllConfigsAPI is the API for listing all configs in a namespace.
 type AllConfigsAPI struct {
 	addr, httpURI, wsURI string
@@ -44,7 +47,7 @@ type AllConfigsAPI struct {
 	logging.LeveledLogger
 }
 
-func NewAllConfigsAPI(addr string, logger logging.LeveledLogger) (CdsApi, error) {
+func NewAllConfigsAPI(addr string, logger logging.LeveledLogger, opts ...ClientOption) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -55,7 +58,7 @@ func NewAllConfigsAPI(addr string, logger logging.LeveledLogger) (CdsApi, error)
 		return nil, err
 	}
 
-	client, err := api.NewClientWithResponses(httpuri.String())
+	client, err := api.NewClientWithResponses(httpuri.String(), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +108,7 @@ type ConfigsNamespaceAPI struct {
 	logging.LeveledLogger
 }
 
-func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger) (CdsApi, error) {
+func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger, opts ...ClientOption) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -116,7 +119,7 @@ func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger
 		return nil, err
 	}
 
-	client, err := api.NewClientWithResponses(httpuri.String())
+	client, err := api.NewClientWithResponses(httpuri.String(), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +173,7 @@ type ConfigNamespaceNameAPI struct {
 	logging.LeveledLogger
 }
 
-func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.LeveledLogger) (CdsApi, error) {
+func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.LeveledLogger, opts ...ClientOption) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
@@ -181,7 +184,7 @@ func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.Leve
 		return nil, err
 	}
 
-	client, err := api.NewClientWithResponses(httpuri.String())
+	client, err := api.NewClientWithResponses(httpuri.String(), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -229,53 +232,4 @@ func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.Stu
 	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return poll(ctx, a, ch)
-}
-
-func decodeConfig(r []byte) ([]*stnrv1.StunnerConfig, error) {
-	c := stnrv1.StunnerConfig{}
-	if err := json.Unmarshal(r, &c); err != nil {
-		return nil, err
-	}
-
-	// copy
-
-	return []*stnrv1.StunnerConfig{&c}, nil
-}
-
-func decodeConfigList(r []byte) ([]*stnrv1.StunnerConfig, error) {
-	l := ConfigList{}
-	if err := json.Unmarshal(r, &l); err != nil {
-		return nil, err
-	}
-	return l.Items, nil
-}
-
-// getURI tries to parse an address or an URL or a file name into an URL.
-func getURI(addr string) (*url.URL, error) {
-	url, err := url.Parse(addr)
-	if err != nil {
-		// try to parse with a http scheme as a last resort
-		u, err2 := url.Parse("http://" + addr)
-		if err2 != nil {
-			return nil, err
-		}
-		url = u
-	}
-	return url, nil
-}
-
-// wsURI returns a websocket url from a HTTP URI.
-func wsURI(addr, endpoint string) (string, error) {
-	uri, err := getURI(addr)
-	if err != nil {
-		return "", err
-	}
-
-	uri.Scheme = "ws"
-	uri.Path = endpoint
-	v := url.Values{}
-	v.Set("watch", "true")
-	uri.RawQuery = v.Encode()
-
-	return uri.String(), nil
 }

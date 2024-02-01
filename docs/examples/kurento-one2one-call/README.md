@@ -293,7 +293,7 @@ Below is the corresponding UDPRoute.
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
-  name: stunner-headless
+  name: kms-media-plane
   namespace: stunner
 spec:
   parentRefs:
@@ -319,19 +319,18 @@ NAME                                       AGE
 udproute.stunner.l7mp.io/kms-media-plane   84s
 ```
 
-You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration.
+You can also use the handy CLI tool called [`stunnerctl`](/cmd/stunnerctl/README.md) to dump the running STUNner configuration.
 
 ```console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/udp-gateway/udp-listener
-        Listener:       stunner/udp-gateway/udp-listener
-        Protocol:       TURN-UDP
-        Public address: 34.118.112.176
-        Public port:    3478
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: static, username/password: user-1/pass-1
+Listeners:
+  - Name: stunner/udp-gateway/udp-listener
+    Protocol: TURN-UDP
+    Public address:port: 34.118.112.176:3478
+    Routes: [stunner/kms-media-plane]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 ### Run the test
@@ -442,14 +441,13 @@ applications with STUNner.
 
 ## Update STUN/TURN credentials
 
-As exemplified by `stunnerctl` output, STUNner currently runs with fairly poor security: using
+As shown in the  `stunnerctl` output, STUNner currently runs with fairly poor security: using
 `static` authentication, sharing a single username/password pair between all active sessions.
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: static, username/password: user-1/pass-1
 ...
 ```
 
@@ -458,8 +456,8 @@ credentials on the client side for potentially nefarious purposes. Note that att
 be able to make too much harm with these credentials, since the only Kubernetes service they can
 reach via STUNner is the Kurento media server pool. This is why we have installed the UDPRoute:
 STUNner will allow clients to connect *only* to the backend service(s) of the UDPRoute, and nothing
-else. Then, the attackers would need access to the application-server to open WebRTC endpoints on
-the media server for their own purposes, but application servers should be secure by default no?
+else. Then, attackers would need access to the application-server to open WebRTC endpoints on the
+media server for their own purposes, but media servers should be secure by default no?
 
 In other words, *STUNner's default security model is exactly the same as if we put the application
 servers and media servers on public-facing physical servers*.
@@ -468,7 +466,7 @@ Still, it would be nice to use per-session passwords. STUNner allows you to do t
 the authentication type to `ephemeral` instead of `static`. Even better: STUNner's ephemeral TURN
 credentials are valid only for a specified time (one day by default, but you can override this via
 the [authentication service](https://github.com/l7mp/stunner-auth-service)), after which they
-expire and attackers can no longer reuse them. And to make things even better we don't even have to
+expire and attackers can no longer reuse them. To make things even better, we don't even have to
 work too much to switch STUNner to the `ephemeral` authentication mode: it is enough to update the
 GatewayConfig and everything should happen from this point automagically.
 
@@ -496,15 +494,15 @@ this goes without having to restart the server.
 Check that the running config indeed is updated correctly.
 
 ```console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  ephemeral
-STUN/TURN secret:               my-very-secure-secret
-Listener 1
-        Name:   stunner/udp-gateway/udp-listener
-        Listener:       stunner/udp-gateway/udp-listener
-        Protocol:       TURN-UDP
-        Public address: 34.118.112.176
-        Public port:    3478
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: ephemeral, shared-secret: my-very-secure-secret
+Listeners:
+  - Name: stunner/udp-gateway/udp-listener
+    Protocol: TURN-UDP
+    Public address:port: 34.118.88.91:3478
+    Routes: [stunner/iperf-server]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 Reload the browser client and re-register: you should see an updated ICE configuration with the
@@ -524,7 +522,7 @@ new, per-session STUN/TURN credentials.
 ```
 
 Ephemeral credentials expire in one day, after which they are either refreshed (e.g., by forcing
-the users to re-register) or become useless. See more in the STUNner [authentication
+the users to re-register) or become useless. See more on this in the STUNner [authentication
 guide](/doc/AUTH.md).
 
 ## Clean up

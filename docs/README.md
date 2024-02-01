@@ -49,3 +49,4 @@
 * [`stunnerd` manual](cmd/stunnerd.md)
 * [`turncat` manual](cmd/turncat.md)
 * [`stunnerctl` manual](cmd/stunnerctl.md)
+* [Benchmarking](examples/benchmark)

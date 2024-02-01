@@ -283,20 +283,19 @@ NAME                                        AGE
 udproute.stunner.l7mp.io/stunner-headless   2m50s
 ```
 
-You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration. For
+You can also use the handy [`stunnerctl` CLI tool](/cmd/stunnerctl/README.md) to dump the running STUNner configuration. For
 instance, below is the human-readable config of the Gateway called `udp-gateway`:
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/udp-gateway/udp-listener
-        Listener:       stunner/udp-gateway/udp-listener
-        Protocol:       TURN-UDP
-        Public address: 34.116.255.91
-        Public port:    3478
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: static, username/password: user-1/pass-1
+Listeners:
+  - Name: stunner/udp-gateway/udp-listener
+    Protocol: TURN-UDP
+    Public address:port: 34.118.88.91:3478
+    Routes: [stunner/iperf-server]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 ### Run the test
@@ -389,7 +388,7 @@ WebRTC service and many things can go wrong. Below is a list of steps to help de
 * No ICE candidate appears: Most probably this occurs because the browser's ICE configuration does
   not match the running STUNner config. Check that the ICE configuration returned by the
   application server in the `registerResponse` message matches the output of `stunnerctl
-  running-config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
+  config`. Examine the `stunner` pods' logs (`kubectl logs...`): permission-denied messages
   typically indicate that STUN/TURN authentication was unsuccessful.
 * No video-connection: This is most probably due to a communication issue between your client and
   STUNner. Try disabling STUNner's UDP Gateway and force the browser to use TCP.

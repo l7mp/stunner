@@ -123,35 +123,33 @@ NAME                                    AGE
 udproute.stunner.l7mp.io/iperf-server   139m
 ```
 
-You can also use the handy `stunnerctl` CLI tool to dump the running STUNner configuration for the
+You can also use the handy [`stunnerctl` CLI tool](/cmd/stunnerctl/README.md) to dump the running STUNner configuration for the
 UDP gateway.
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/udp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/udp-gateway/udp-listener
-        Listener:       stunner/udp-gateway/udp-listener
-        Protocol:       TURN-UDP
-        Public address: 35.205.10.190
-        Public port:    3478
+stunnerctl -n stunner config udp-gateway
+Gateway: stunner/udp-gateway (loglevel: "all:INFO")
+Authentication type: static, username/password: user-1/pass-1
+Listeners:
+  - Name: stunner/udp-gateway/udp-listener
+    Protocol: TURN-UDP
+    Public address:port: 34.118.88.91:3478
+    Routes: [stunner/iperf-server]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 Likewise, the below will dump the config for the TCP gateway.
 
 ``` console
-cmd/stunnerctl/stunnerctl running-config stunner/tcp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/tcp-gateway/tcp-listener
-        Listener:       stunner/tcp-gateway/tcp-listener
-        Protocol:       TURN-TCP
-        Public address: 35.187.97.94
-        Public port:    3478
+stunnerctl -n stunner config tcp-gateway
+Gateway: stunner/tcp-gateway (loglevel: "all:INFO")
+Authentication type: static, username/password: user-1/pass-1
+Listeners:
+  - Name: stunner/tcp-gateway/tcp-listener
+    Protocol: TURN-TCP
+    Public address:port: 34.116.180.89:3478
+    Routes: [stunner/iperf-server]
+    Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
 NOTE: It usually takes 30-60 seconds for Kubernetes to assign an external IP address to STUNner
