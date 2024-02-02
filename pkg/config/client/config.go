@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"regexp"
 	"strconv"
@@ -54,12 +55,36 @@ func ParseConfig(c []byte) (*stnrv1.StunnerConfig, error) {
 		os.Setenv("STUNNER_PORT", fmt.Sprintf("%d", publicPort))
 	}
 
-	e := os.ExpandEnv(string(c))
+	// make sure credentials are not affected by environment substitution
 
+	// parse up before env substitution is applied
+	confRaw, err := parseRaw(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// save credentials
+	credRaw := make(map[string]string)
+	maps.Copy(credRaw, confRaw.Auth.Credentials)
+
+	// apply env substitution and parse again
+	e := os.ExpandEnv(string(c))
+	confExp, err := parseRaw([]byte(e))
+	if err != nil {
+		return nil, err
+	}
+
+	// restore credentials
+	maps.Copy(confExp.Auth.Credentials, credRaw)
+
+	return confExp, nil
+}
+
+func parseRaw(c []byte) (*stnrv1.StunnerConfig, error) {
 	// try to parse only the config version first
 	k := ConfigSkeleton{}
-	if err := yaml.Unmarshal([]byte(e), &k); err != nil {
-		if errJ := json.Unmarshal([]byte(e), &k); err != nil {
+	if err := yaml.Unmarshal([]byte(c), &k); err != nil {
+		if errJ := json.Unmarshal([]byte(c), &k); err != nil {
 			return nil, fmt.Errorf("could not parse config file API version: "+
 				"YAML parse error: %s, JSON parse error: %s\n",
 				err.Error(), errJ.Error())
@@ -70,8 +95,8 @@ func ParseConfig(c []byte) (*stnrv1.StunnerConfig, error) {
 
 	switch k.ApiVersion {
 	case stnrv1.ApiVersion:
-		if err := yaml.Unmarshal([]byte(e), &s); err != nil {
-			if errJ := json.Unmarshal([]byte(e), &s); err != nil {
+		if err := yaml.Unmarshal([]byte(c), &s); err != nil {
+			if errJ := json.Unmarshal([]byte(c), &s); errJ != nil {
 				return nil, fmt.Errorf("could not parse config file: "+
 					"YAML parse error: %s, JSON parse error: %s\n",
 					err.Error(), errJ.Error())
@@ -79,8 +104,8 @@ func ParseConfig(c []byte) (*stnrv1.StunnerConfig, error) {
 		}
 	case stnrv1a1.ApiVersion:
 		a := stnrv1a1.StunnerConfig{}
-		if err := yaml.Unmarshal([]byte(e), &a); err != nil {
-			if errJ := json.Unmarshal([]byte(e), &a); err != nil {
+		if err := yaml.Unmarshal([]byte(c), &a); err != nil {
+			if errJ := json.Unmarshal([]byte(c), &a); errJ != nil {
 				return nil, fmt.Errorf("could not parse config file: "+
 					"YAML parse error: %s, JSON parse error: %s\n",
 					err.Error(), errJ.Error())

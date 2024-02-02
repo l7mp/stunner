@@ -501,6 +501,48 @@ func TestStunnerURIParser(t *testing.T) {
 	}
 }
 
+// make sure credentials are excempt from env-substitution in ParseConfig
+func TestCredentialParser(t *testing.T) {
+	lim := test.TimeOut(time.Second * 30)
+	defer lim.Stop()
+
+	report := test.CheckRoutines(t)
+	defer report()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test")
+
+	for _, testConf := range []struct {
+		name               string
+		config             []byte
+		user, pass, secret string
+	}{
+		{"plain", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pass","username":"user"}}}`), "user", "pass", ""},
+		// user name with $
+		{"username_with_leading_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pass","username":"$user"}}}`), "$user", "pass", ""},
+		{"username_with_trailing_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pass","username":"user$"}}}`), "user$", "pass", ""},
+		{"username_with_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pass","username":"us$er"}}}`), "us$er", "pass", ""},
+		// passwd with $
+		{"passwd_with_leading_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"$pass","username":"user"}}}`), "user", "$pass", ""},
+		{"passwd_with_trailing_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pass$","username":"user"}}}`), "user", "pass$", ""},
+		{"passwd_with_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"password":"pa$ss","username":"user"}}}`), "user", "pa$ss", ""},
+		// secret with $
+		{"secret_with_leading_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"secret":"$secret","username":"user"}}}`), "user", "", "$secret"},
+		{"secret_with_trailing_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"secret":"secret$","username":"user"}}}`), "user", "", "secret$"},
+		{"secret_with_$", []byte(`{"version":"v1","admin":{"name":"ns1/tester"},"auth":{"type":"static","credentials":{"secret":"sec$ret","username":"user"}}}`), "user", "", "sec$ret"},
+	} {
+		testName := fmt.Sprintf("TestCredentialParser:%s", testConf.name)
+		t.Run(testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", testName)
+			c, err := cdsclient.ParseConfig(testConf.config)
+			assert.NoError(t, err, "parser")
+			assert.Equal(t, testConf.user, c.Auth.Credentials["username"], "username")
+			assert.Equal(t, testConf.pass, c.Auth.Credentials["password"], "password")
+			assert.Equal(t, testConf.secret, c.Auth.Credentials["secret"], "secret")
+		})
+	}
+}
+
 func checkDefaultConfig(t *testing.T, c *stnrv1.StunnerConfig, proto string) {
 	assert.Equal(t, "static", c.Auth.Type, "auth-type")
 	assert.Equal(t, "user1", c.Auth.Credentials["username"], "username")
