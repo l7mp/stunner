@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client/api"
@@ -85,7 +86,9 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error
 	}
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error: %s", r.HTTPResponse.Status)
+		body := strings.TrimSpace(string(r.Body))
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+			r.HTTPResponse.Status, body)
 	}
 
 	return decodeConfigList(r.Body)
@@ -148,8 +151,9 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig,
 	}
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error: %s",
-			r.HTTPResponse.Status)
+		body := strings.TrimSpace(string(r.Body))
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+			r.HTTPResponse.Status, body)
 	}
 
 	return decodeConfigList(r.Body)
@@ -215,8 +219,9 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 	}
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error: %s",
-			r.HTTPResponse.Status)
+		body := strings.TrimSpace(string(r.Body))
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+			r.HTTPResponse.Status, body)
 	}
 
 	return decodeConfig(r.Body)
