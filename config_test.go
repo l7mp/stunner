@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -342,7 +343,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	log.Debugf("-------------- Running test: %s -------------", testName)
 
 	log.Debug("creating a mock CDS server")
-	addr := "localhost:13478"
+	addr := "localhost:63479"
 	origin := "ws://" + addr
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -426,7 +427,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	assert.Len(t, c2.Clusters[0].Endpoints, 1, "endpoints len")
 	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
 
-	// thrird read yields a v1alpha1 config
+	// next read yields a v1alpha1 config
 	c2, ok = <-conf
 	assert.True(t, ok, "config emitted")
 

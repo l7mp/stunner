@@ -23,6 +23,8 @@ var testerLogLevel = zapcore.ErrorLevel
 // const stunnerLogLevel = "all:TRACE"
 const stunnerLogLevel = "all:ERROR"
 
+const testCDSAddr = ":63478"
+
 func init() {
 	// setup a fast pinger so that we get a timely error notification
 	client.PingPeriod = 500 * time.Millisecond
@@ -46,7 +48,7 @@ func TestServerLoad(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
@@ -54,12 +56,12 @@ func TestServerLoad(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New("127.0.0.1:13478", "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
 	assert.NoError(t, err, "client 2")
 	// nonexistent
-	client3, err := client.New("127.0.0.1:13478", "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("load: error")
@@ -134,7 +136,7 @@ func TestServerPoll(t *testing.T) {
 	defer cancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
@@ -142,11 +144,11 @@ func TestServerPoll(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New("127.0.0.1:13478", "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New("127.0.0.1:13478", "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("poll: no result")
@@ -236,17 +238,17 @@ func TestServerWatch(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New("127.0.0.1:13478", "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New("127.0.0.1:13478", "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("watch: no result")
@@ -339,7 +341,7 @@ func TestServerWatch(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv = server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -413,13 +415,13 @@ func TestServerWatchBootstrap(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("bootstrap")
@@ -505,19 +507,19 @@ func TestServerAPI(t *testing.T) {
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.NewAllConfigsAPI("127.0.0.1:13478", logger.NewLogger("all-config-client"))
+	client1, err := client.NewAllConfigsAPI(testCDSAddr, logger.NewLogger("all-config-client"))
 	assert.NoError(t, err, "client 1")
-	client2, err := client.NewConfigsNamespaceAPI("127.0.0.1:13478", "ns1", logger.NewLogger("ns-config-client-ns1"))
+	client2, err := client.NewConfigsNamespaceAPI(testCDSAddr, "ns1", logger.NewLogger("ns-config-client-ns1"))
 	assert.NoError(t, err, "client 2")
-	client3, err := client.NewConfigsNamespaceAPI("127.0.0.1:13478", "ns2", logger.NewLogger("ns-config-client-ns2"))
+	client3, err := client.NewConfigsNamespaceAPI(testCDSAddr, "ns2", logger.NewLogger("ns-config-client-ns2"))
 	assert.NoError(t, err, "client 3")
-	client4, err := client.NewConfigNamespaceNameAPI("127.0.0.1:13478", "ns1", "gw1", logger.NewLogger("gw-config-client"))
+	client4, err := client.NewConfigNamespaceNameAPI(testCDSAddr, "ns1", "gw1", logger.NewLogger("gw-config-client"))
 	assert.NoError(t, err, "client 4")
 
 	testLog.Debug("watch: no result")
@@ -738,7 +740,7 @@ func TestServerAPI(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	serverCtx, serverCancel = context.WithCancel(context.Background())
 	defer serverCancel()
-	srv = server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv = server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -940,13 +942,13 @@ func TestClientReconnect(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("watch: no result")
@@ -1012,7 +1014,7 @@ func TestServerUpdate(t *testing.T) {
 	defer serverCancel()
 
 	testLog.Debug("create server")
-	srv := server.New(stnrv1.DefaultConfigDiscoveryAddress, nil, log)
+	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
 	assert.NoError(t, err, "start")
@@ -1127,14 +1129,14 @@ func TestServerUpdate(t *testing.T) {
 // 	p.Config.Listeners[2].Addr = "10.11.12.13"
 
 // 	testLog.Debug("client w/o node IP")
-// 	loader1, err := client.New("127.0.0.1:13478", "ns1/gw1", logger)
+// 	loader1, err := client.New(testCDSAddr, "ns1/gw1", logger)
 // 	assert.NoError(t, err, "client")
 // 	sc1, err := loader1.Load()
 // 	assert.NoError(t, err, "load")
 // 	assert.True(t, sc1.DeepEqual(c.Config), "deepeq")
 
 // 	testLog.Debug("client w/ node IP")
-// 	loader2, err := client.New("127.0.0.1:13478", "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
+// 	loader2, err := client.New(testCDSAddr, "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
 // 	assert.NoError(t, err, "client")
 // 	sc2, err := loader2.Load()
 // 	assert.NoError(t, err, "load")
@@ -1144,7 +1146,7 @@ func TestServerUpdate(t *testing.T) {
 // 	defer watchCancel()
 
 // 	testLog.Debug("watcher1 w/o node IP")
-// 	watcher1, err := client.New("127.0.0.1:13478", "ns1/gw1", nil, logger)
+// 	watcher1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 // 	assert.NoError(t, err, "client")
 // 	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 // 	defer close(ch1)
@@ -1157,7 +1159,7 @@ func TestServerUpdate(t *testing.T) {
 // 	assert.True(t, s.DeepEqual(c.Config), "deepeq")
 
 // 	testLog.Debug("watcher2 w/ node IP")
-// 	watcher2, err := client.New("127.0.0.1:13478", "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
+// 	watcher2, err := client.New(testCDSAddr, "ns1/gw1", map[string]string{"node": "10.11.12.13"}, logger)
 // 	assert.NoError(t, err, "client")
 // 	ch2 := make(chan *stnrv1.StunnerConfig, 8)
 // 	defer close(ch2)
