@@ -68,7 +68,7 @@ The below will dump the running config of `tcp-gateway` deployed into the `stunn
 
 ```console
 cd stunner
-cmd/stunnerctl/stunnerctl.sh running-config stunner/stunner-gateway
+cmd/stunnerctl/stunnerctl.sh running-config stunner/tcp-gateway
 STUN/TURN authentication type:  static
 STUN/TURN username:             user-1
 STUN/TURN password:             pass-1
@@ -82,7 +82,7 @@ Listener 1
 
 ## Last resort
 
-You can use `kubectl port-forward` to load or watch STUNner configs manually. 
+You can also use `kubectl port-forward` to load or watch STUNner configs manually.
 Open a port-forwarded connection to the STUNner gateway operator:
 
 ``` console

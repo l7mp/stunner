@@ -1,27 +1,38 @@
 package v1
 
-const ApiVersion string = "v1"
-const DefaultStunnerName = "default-stunnerd"
-const DefaultProtocol = "turn-udp"
-const DefaultClusterProtocol = "udp"
-const DefaultPort int = 3478
-const DefaultLogLevel = "all:INFO"
-const DefaultRealm = "stunner.l7mp.io"
-const DefaultAuthType = "static"
-const DefaultMinRelayPort int = 1
-const DefaultMaxRelayPort int = 1<<16 - 1
-const DefaultClusterType = "STATIC"
+// stunnerd defaults
+const (
+	ApiVersion             string = "v1"
+	DefaultStunnerName            = "default-stunnerd"
+	DefaultProtocol               = "turn-udp"
+	DefaultClusterProtocol        = "udp"
+	DefaultPort            int    = 3478
+	DefaultLogLevel               = "all:INFO"
+	DefaultRealm                  = "stunner.l7mp.io"
+	DefaultAuthType               = "static"
+	DefaultMinRelayPort    int    = 1
+	DefaultMaxRelayPort    int    = 1<<16 - 1
+	DefaultClusterType            = "STATIC"
+	DefaultAdminName              = "default-admin-config"
+	DefaultAuthName               = "default-auth-config"
+)
 
-const DefaultAdminName = "default-admin-config"
-const DefaultAuthName = "default-auth-config"
+// health-check and metrics reporting defaults
+const (
+	DefaultMetricsPort     int = 8080
+	DefaultHealthCheckPort int = 8086
+)
 
-const DefaultMetricsPort int = 8080
-const DefaultHealthCheckPort int = 8086
-
-const DefaultConfigDiscoveryAddress = ":13478"
-const DefaultEnvVarName = "STUNNER_NAME"
-const DefaultEnvVarNamespace = "STUNNER_NAMESPACE"
-const DefaultEnvVarNodeName = "STUNNER_NODENAME"
-const DefaultEnvVarConfigOrigin = "STUNNER_CONFIG_ORIGIN"
-const DefaultCDSServiceLabelKey = "stunner.l7mp.io/config-discovery-service"
-const DefaultCDSServiceLabelValue = "enabled"
+// CDS defaults
+const (
+	DefaultConfigDiscoveryAddress = ":13478"
+	DefaultEnvVarName             = "STUNNER_NAME"
+	DefaultEnvVarNamespace        = "STUNNER_NAMESPACE"
+	DefaultEnvVarNodeName         = "STUNNER_NODENAME"
+	DefaultEnvVarConfigOrigin     = "STUNNER_CONFIG_ORIGIN"
+	DefaultCDSServiceLabelKey     = "stunner.l7mp.io/config-discovery-service"
+	DefaultCDSServiceLabelValue   = "enabled"
+	DefaultCDSServerAddrEnv       = "CDS_SERVER_ADDR"
+	DefaultCDSServerNamespaceEnv  = "CDS_SERVER_NAMESPACE"
+	DefaultCDSServerPortEnv       = "CDS_SERVER_PORT"
+)

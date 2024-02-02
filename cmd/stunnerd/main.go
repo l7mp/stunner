@@ -19,14 +19,14 @@ import (
 
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", fmt.Sprintf("Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN, default: %s).", stnrv1.DefaultConfigDiscoveryAddress))
-	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO).")
-	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>).")
-	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false).")
+	var config = flag.StringP("config", "c", "", "Config origin, either a valid IP address or URL to the CDS server, or a file name (overrides: STUNNER_CONFIG_ORIGIN)")
+	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO)")
+	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>)")
+	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
 	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
-		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0).")
-	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false).")
-	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>.")
+		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0)")
+	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
+	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
 	flag.Parse()
 
 	logLevel := stnrv1.DefaultLogLevel

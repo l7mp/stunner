@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pion/logging"
 	"github.com/spf13/pflag"
@@ -19,12 +20,16 @@ import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-const (
-	DefaultCDSServerPort  = 13478
-	CDSServerAddrEnv      = "CDS_SERVER_ADDR"
-	CDSServerNamespaceEnv = "CDS_SERVER_NAME"
-	CDSServerPortEnv      = "CDS_SERVER_PORT"
-)
+var DefaultCDSServerPort = 13478
+
+func init() {
+	as := strings.Split(stnrv1.DefaultConfigDiscoveryAddress, ":")
+	if len(as) == 2 {
+		if port, err := strconv.Atoi(as[1]); err != nil {
+			DefaultCDSServerPort = port
+		}
+	}
+}
 
 // CDSConfigFlags composes a set of flags for CDS server discovery
 type CDSConfigFlags struct {
@@ -39,16 +44,16 @@ type CDSConfigFlags struct {
 // NewCDSConfigFlags returns CDS service discovery flags with default values set.
 func NewCDSConfigFlags() *CDSConfigFlags {
 	port := DefaultCDSServerPort
-	if os.Getenv(CDSServerPortEnv) != "" {
-		p, err := strconv.Atoi(os.Getenv(CDSServerPortEnv))
+	if os.Getenv(stnrv1.DefaultCDSServerPortEnv) != "" {
+		p, err := strconv.Atoi(os.Getenv(stnrv1.DefaultCDSServerPortEnv))
 		if err != nil {
 			port = p
 		}
 	}
 	return &CDSConfigFlags{
-		ServerAddr:      os.Getenv(CDSServerAddrEnv),
+		ServerAddr:      os.Getenv(stnrv1.DefaultCDSServerAddrEnv),
 		ServerPort:      port,
-		ServerNamespace: os.Getenv(CDSServerNamespaceEnv),
+		ServerNamespace: os.Getenv(stnrv1.DefaultCDSServerNamespaceEnv),
 	}
 }
 
