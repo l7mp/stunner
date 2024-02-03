@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/l7mp/stunner/pkg/config/server/api"
@@ -68,8 +69,11 @@ func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1
 	id := fmt.Sprintf("%s/%s", namespace, name)
 	c := s.configs.Get(id)
 	if c == nil {
-		s.log.V(1).Info("GetV1ConfigNamespaceName: config not found", "client", id)
-		return nil, fmt.Errorf("config not found for id %q", id)
+		s.log.V(1).Info("GetV1ConfigNamespaceName: Config not found", "client", id)
+		return api.GetV1ConfigNamespaceName404JSONResponse{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Config not found for ID %q", id),
+		}, nil
 	}
 
 	ret := &stnrv1.StunnerConfig{}
@@ -79,7 +83,10 @@ func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1
 		conf, err := s.patch(ret, *request.Params.Node)
 		if err != nil {
 			s.log.Error(err, "GetV1ConfigNamespaceName: patch config failed")
-			return nil, err
+			return api.GetV1ConfigNamespaceName500JSONResponse{
+				Code:    http.StatusInternalServerError,
+				Message: fmt.Sprintf("Config patch failed: %s", err.Error()),
+			}, nil
 		}
 		ret = conf
 	}

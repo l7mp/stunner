@@ -26,11 +26,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.ConfigList'
-        #     application/json;stream=watch:
-        #       schema:
-        #         $ref: '#/components/schemas/v1.ConfigList'
-        "500":
-          description: Internal server error.
+        default:
+          description: Unexpected error
           content:
             application/json:
               schema:
@@ -58,21 +55,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.ConfigList'
-        "400":
-          description: Bad request.
+        default:
+          description: Unexpected error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.Error'
-        "500":
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/v1.Error'
-        #     application/json;stream=watch:
-        #       schema:
-        #         $ref: '#/components/schemas/v1.ConfigList'
   /api/v1/configs/{namespace}/{name}:
     get:
       description: API to list or watch config objects for a specific gateway in a specific namespace.
@@ -107,8 +95,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.Config'
-        "400":
-          description: Bad request.
+        "404":
+          description: Not found.
           content:
             application/json:
               schema:
@@ -119,9 +107,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/v1.Error'
-            # application/json;stream=watch:
-            #   schema:
-            #     $ref: '#/components/schemas/v1.Config'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
 components:
   schemas:
     v1.ClientInfo:
@@ -162,6 +153,7 @@ components:
       type: object
       required:
         - code
+        - message
       properties:
         code:
           description: Error code.
