@@ -7,6 +7,7 @@ on:
         description: Whether to release a dev version
         required: true
         type: boolean
+    secrets: inherit
 
 jobs:
   push_charts:
