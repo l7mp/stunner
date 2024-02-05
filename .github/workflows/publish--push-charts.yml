@@ -2,12 +2,11 @@ name: "publish: Push Helm charts to web"
 
 on:
   workflow_call:
-    with:
-      inputs:
-        dev:
-          description: Whether to release a dev version
-          required: true
-          type: boolean
+    inputs:
+      dev:
+        description: Whether to release a dev version
+        required: true
+        type: boolean
 
 jobs:
   push_charts:
