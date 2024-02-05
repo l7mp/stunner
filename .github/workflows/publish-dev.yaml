@@ -58,4 +58,4 @@ jobs:
     needs: push_to_registry
     uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
     with:
-      dev: 'true'
+      dev: true

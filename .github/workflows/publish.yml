@@ -53,7 +53,7 @@ jobs:
     needs: push_to_registry
     uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
     with:
-      dev: 'false'
+      dev: false
 
   add_binaries:
     name: Add binaries to release assets
