@@ -54,6 +54,7 @@ jobs:
     uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
     with:
       dev: false
+    secrets: inherit
 
   add_binaries:
     name: Add binaries to release assets

@@ -59,3 +59,4 @@ jobs:
     uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
     with:
       dev: true
+    secrets: inherit
