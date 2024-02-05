@@ -56,13 +56,6 @@ jobs:
   push_chart:
     name: Push helm charts to the repo
     needs: push_to_registry
-    runs-on: ubuntu-latest
-    steps:
-      - name: Triggering release workflow in the stunner-helm repo
-        uses: convictional/trigger-workflow-and-wait@v1.6.5
-        with:
-          github_token: ${{ secrets.WEB_PAT_TOKEN }}
-          owner: l7mp
-          repo: stunner-helm
-          client_payload: '{"tag": "dev", "type": "stunner"}'
-          workflow_file_name: publish.yaml
+    uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
+    with:
+      dev: true
