@@ -1,0 +1,40 @@
+name: "publish: Push Helm charts to web"
+
+on:
+  workflow_call:
+    with:
+      inputs:
+        dev:
+          description: Whether to release a dev version
+          required: true
+          type: boolean
+
+jobs:
+  push_charts:
+    name: Push Helm charts to web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get version for non-dev release
+        if: ${{ inputs.dev == false || inputs.dev == 'false' }}
+        id: vars
+        run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
+
+      - name: Trigger release workflow in the stunner-helm repo
+        if: ${{ inputs.dev == false || inputs.dev == 'false' }}
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          github_token: ${{ secrets.WEB_PAT_TOKEN }}
+          owner: l7mp
+          repo: stunner-helm
+          client_payload: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
+          workflow_file_name: publish.yaml
+
+      - name: Trigger release workflow in the stunner-helm repo
+        if: ${{ inputs.dev == true || inputs.dev == 'true' }}
+        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        with:
+          github_token: ${{ secrets.WEB_PAT_TOKEN }}
+          owner: l7mp
+          repo: stunner-helm
+          client_payload: '{"tag": "dev", "type": "stunner"}'
+          workflow_file_name: publish.yaml

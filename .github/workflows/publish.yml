@@ -49,22 +49,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   push_chart:
-    name: Push charts to the web
+    name: Push helm charts to the repo
     needs: push_to_registry
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get version
-        id: vars
-        run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
-
-      - name: Triggering release workflow in the stunner-helm repo
-        uses: convictional/trigger-workflow-and-wait@v1.6.5
-        with:
-          github_token: ${{ secrets.WEB_PAT_TOKEN }}
-          owner: l7mp
-          repo: stunner-helm
-          client_payload: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
-          workflow_file_name: publish.yaml
+    uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
+    with:
+      dev: false
 
   add_binaries:
     name: Add binaries to release assets
