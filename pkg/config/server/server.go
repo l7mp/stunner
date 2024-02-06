@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
@@ -14,6 +15,13 @@ import (
 	"github.com/l7mp/stunner/pkg/config/server/api"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+)
+
+var (
+	// ConfigDeletionUpdateDelay is the delay between deleting a config from the server and
+	// sending the corresponing zero-config to the client. Set this to zero to suppress sending
+	// the zero-config all together.
+	ConfigDeletionUpdateDelay = 5 * time.Second
 )
 
 // Server is a generic config discovery server implementation.
@@ -24,6 +32,7 @@ type Server struct {
 	conns    *ConnTrack
 	configs  *ConfigStore
 	configCh chan Config
+	deleteCh chan Config
 	patch    ConfigPatcher
 	log      logr.Logger
 }
@@ -39,6 +48,7 @@ func New(addr string, patch ConfigPatcher, logger logr.Logger) *Server {
 		conns:    NewConnTrack(),
 		configs:  NewConfigStore(),
 		configCh: make(chan Config, 8),
+		deleteCh: make(chan Config, 8),
 		addr:     addr,
 		patch:    patch,
 		log:      logger,
@@ -67,12 +77,26 @@ func (s *Server) Start(ctx context.Context) error {
 
 	go func() {
 		defer close(s.configCh)
+		defer close(s.deleteCh)
 		defer s.Close()
 
 		for {
 			select {
-			case e := <-s.configCh:
-				s.broadcastConfig(e)
+			case c := <-s.configCh:
+				s.broadcastConfig(c)
+
+			case c := <-s.deleteCh:
+				// delayed config deletion
+				go func() {
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(ConfigDeletionUpdateDelay):
+						s.configCh <- Config{Id: c.Id, Config: c.Config}
+						return
+					}
+				}()
+
 			case <-ctx.Done():
 				return
 			}

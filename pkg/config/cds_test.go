@@ -939,19 +939,24 @@ func TestServerAPI(t *testing.T) {
 	s2 = watchConfig(ch1, 500*time.Millisecond)
 	assert.NotNil(t, s2)
 	s3 = watchConfig(ch1, 500*time.Millisecond)
-	assert.Nil(t, s3)
-	lst = []*stnrv1.StunnerConfig{s1, s2}
+	assert.NotNil(t, s3)
+	lst = []*stnrv1.StunnerConfig{s1, s2, s3}
 	assert.NotNil(t, findConfById(lst, "ns1/gw1"))
 	assert.True(t, findConfById(lst, "ns1/gw1").DeepEqual(sc1), "deepeq")
 	assert.NotNil(t, findConfById(lst, "ns3/gw1"))
 	assert.True(t, findConfById(lst, "ns3/gw1").DeepEqual(sc4), "deepeq")
+	assert.NotNil(t, findConfById(lst, "ns1/gw2"))
+	gw2zero := client.ZeroConfig("ns1/gw2") // deleted!
+	assert.NoError(t, gw2zero.Validate())
+	assert.True(t, findConfById(lst, "ns1/gw2").DeepEqual(gw2zero), "deepeq")
 
 	// 1 config from client2 watch (removed config never updated)
 	s1 = watchConfig(ch2, 50*time.Millisecond)
 	assert.NotNil(t, s1)
 	s2 = watchConfig(ch2, 50*time.Millisecond)
-	assert.Nil(t, s2)
+	assert.NotNil(t, s2)
 	assert.True(t, s1.DeepEqual(sc1), "deepeq")
+	assert.True(t, s2.DeepEqual(gw2zero), "deepeq") // deleted!
 
 	// no config from client3 watch
 	s = watchConfig(ch3, 50*time.Millisecond)
