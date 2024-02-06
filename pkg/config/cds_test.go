@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -23,7 +25,11 @@ var testerLogLevel = zapcore.ErrorLevel
 // const stunnerLogLevel = "all:TRACE"
 const stunnerLogLevel = "all:ERROR"
 
-const testCDSAddr = ":63478"
+// run on random port
+func getRandCDSAddr() string {
+	rndPort := rand.Intn(10000) + 50000
+	return fmt.Sprintf(":%d", rndPort)
+}
 
 func init() {
 	// setup a fast pinger so that we get a timely error notification
@@ -44,10 +50,16 @@ func TestServerLoad(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
@@ -132,10 +144,16 @@ func TestServerPoll(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
@@ -235,9 +253,15 @@ func TestServerWatch(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
@@ -411,10 +435,16 @@ func TestServerWatchBootstrap(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
@@ -504,9 +534,15 @@ func TestServerAPI(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = time.Millisecond
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
@@ -935,13 +971,19 @@ func TestClientReconnect(t *testing.T) {
 	zlogger := zapr.NewLogger(z)
 	log := zlogger.WithName("tester")
 
+	// suppress deletions
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
@@ -1010,10 +1052,16 @@ func TestServerUpdate(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
+	// make sure deletions are suppressed
+	deleteDelay := server.ConfigDeletionUpdateDelay
+	server.ConfigDeletionUpdateDelay = 0
+	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
 
-	testLog.Debug("create server")
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
 	srv := server.New(testCDSAddr, nil, log)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(serverCtx)
@@ -1023,6 +1071,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.NoError(t, oldC.Validate(), "validate")
 	assert.NoError(t, err, "parse 1")
 
+	testLog.Debug("upsert stunner/udp-gateway")
 	srv.UpsertConfig("stunner/udp-gateway", oldC)
 
 	cs := srv.GetConfigStore().Snapshot()
@@ -1033,6 +1082,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 
 	// reapply - no change
+	testLog.Debug("re-apply stunner/udp-gateway")
 	srv.UpsertConfig("stunner/udp-gateway", oldC)
 	time.Sleep(20 * time.Millisecond) // let the server process
 
@@ -1048,6 +1098,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.NoError(t, tcpC.Validate(), "validate")
 	assert.NoError(t, err, "parse")
 
+	testLog.Debug("upsert stunner/tcp-gateway")
 	srv.UpsertConfig("stunner/tcp-gateway", tcpC)
 	time.Sleep(20 * time.Millisecond) // let the server process
 
@@ -1069,6 +1120,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.False(t, oldC.DeepEqual(newC), "deepeq")
 
 	// process in a single go
+	testLog.Debug("modify stunner/udp-gateway using UpdateConfig")
 	err = srv.UpdateConfig([]server.Config{{Id: "stunner/udp-gateway", Config: newC}, {Id: "stunner/tcp-gateway", Config: tcpC}})
 	assert.NoError(t, err, "parse 1")
 
