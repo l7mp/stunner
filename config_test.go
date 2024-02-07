@@ -153,7 +153,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err = stunner.WatchConfig(ctx, file, conf)
+	url := "file://" + file
+	err = stunner.WatchConfig(ctx, url, conf)
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
@@ -266,7 +267,9 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err = stunner.WatchConfig(ctx, file, conf)
+
+	url := "file://" + file
+	err = stunner.WatchConfig(ctx, url, conf)
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start

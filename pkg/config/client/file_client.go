@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -25,6 +26,8 @@ type ConfigFileClient struct {
 // NewConfigFileClient creates a client that load or watch STUNner configurations from a local
 // file.
 func NewConfigFileClient(origin, id string, logger logging.LeveledLogger) (Client, error) {
+	origin = strings.TrimPrefix(origin, "file://") // returns original if there is no "file://" prefix
+
 	return &ConfigFileClient{
 		configFile: origin,
 		id:         id,

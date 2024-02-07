@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"net/url"
+	"strings"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
@@ -28,14 +29,16 @@ func decodeConfigList(r []byte) ([]*stnrv1.StunnerConfig, error) {
 
 // getURI tries to parse an address or an URL or a file name into an URL.
 func getURI(addr string) (*url.URL, error) {
+	// make sure we have a working HTTP scheme
+	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") &&
+		!strings.HasPrefix(addr, "ws://") && !strings.HasPrefix(addr, "wss://") &&
+		!strings.HasPrefix(addr, "file://") {
+		addr = "http://" + addr
+	}
+
 	url, err := url.Parse(addr)
 	if err != nil {
-		// try to parse with a http scheme as a last resort
-		u, err2 := url.Parse("http://" + addr)
-		if err2 != nil {
-			return nil, err
-		}
-		url = u
+		return nil, err
 	}
 	return url, nil
 }

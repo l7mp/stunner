@@ -42,7 +42,9 @@ type Client interface {
 	fmt.Stringer
 }
 
-// New creates a generic config client.
+// New creates a generic config client. Origin is either a network address in the form
+// "<IP>:<port>" or a proper HTTP/WS URI, in which case a CDS client is returned, or a proper file
+// URL "file://<path>/<filename>" in which case a config file watcher is returned.
 func New(origin string, id string, logger logging.LoggerFactory) (Client, error) {
 	u, err := getURI(origin)
 	if err != nil {
