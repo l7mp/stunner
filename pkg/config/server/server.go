@@ -140,8 +140,12 @@ func (s *Server) RemoveClient(id string) {
 	}
 }
 
-func (s *Server) handleConn(ctx context.Context, wsConn *websocket.Conn, operationID string, filter ConfigFilter, patch ClientConfigPatcher) {
-	conn := NewConn(wsConn, filter, patch)
+func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, operationID string, filter ConfigFilter, patch ClientConfigPatcher) {
+	// since wsConn is hijacked, reqCtx is unreliable in that it may not be canceled when the
+	// connection is closed, so we create our own connection context that we can cancel
+	// explicitly
+	ctx, cancel := context.WithCancel(reqCtx)
+	conn := NewConn(wsConn, filter, patch, cancel)
 	s.conns.Upsert(conn)
 
 	// a dummy reader that drops everything it receives: this must be there for the
@@ -210,8 +214,7 @@ func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
 }
 
 func (s *Server) sendJSONConfig(conn *Conn, json []byte) {
-	s.log.V(2).Info("sending configuration to client", "client", conn.Id(),
-		"config", string(json))
+	s.log.V(2).Info("sending configuration to client", "client", conn.Id())
 
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
 		s.log.Error(err, "error sending config update", "client", conn.Id())
@@ -223,6 +226,12 @@ func (s *Server) closeConn(conn *Conn) {
 	s.log.V(1).Info("closing client connection", "client", conn.Id())
 
 	conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+
+	if conn.cancel != nil {
+		conn.cancel()
+		conn.cancel = nil // make sure we can cancel multiple times
+	}
+
 	s.conns.Delete(conn)
 	conn.Close()
 }

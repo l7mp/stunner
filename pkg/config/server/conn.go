@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -15,15 +16,17 @@ type Conn struct {
 	*websocket.Conn
 	Filter              ConfigFilter
 	patch               ClientConfigPatcher
+	cancel              context.CancelFunc
 	readLock, writeLock sync.Mutex // for writemessage
 }
 
 // NewConn wraps a WebSocket connection.
-func NewConn(conn *websocket.Conn, filter ConfigFilter, patch ClientConfigPatcher) *Conn {
+func NewConn(conn *websocket.Conn, filter ConfigFilter, patch ClientConfigPatcher, cancel context.CancelFunc) *Conn {
 	return &Conn{
 		Conn:   conn,
 		Filter: filter,
 		patch:  patch,
+		cancel: cancel,
 	}
 }
 
