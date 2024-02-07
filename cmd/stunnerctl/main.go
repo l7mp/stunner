@@ -169,6 +169,10 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	for c := range confChan {
+		if cdsclient.IsConfigDeleted(c) {
+			fmt.Printf("Gateway: %s <deleted>\n", c.Admin.Name)
+			continue
+		}
 		switch output {
 		case "yaml":
 			if out, err := yaml.Marshal(c); err != nil {

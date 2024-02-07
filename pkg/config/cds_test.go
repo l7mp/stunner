@@ -946,9 +946,7 @@ func TestServerAPI(t *testing.T) {
 	assert.NotNil(t, findConfById(lst, "ns3/gw1"))
 	assert.True(t, findConfById(lst, "ns3/gw1").DeepEqual(sc4), "deepeq")
 	assert.NotNil(t, findConfById(lst, "ns1/gw2"))
-	gw2zero := client.ZeroConfig("ns1/gw2") // deleted!
-	assert.NoError(t, gw2zero.Validate())
-	assert.True(t, findConfById(lst, "ns1/gw2").DeepEqual(gw2zero), "deepeq")
+	assert.True(t, client.IsConfigDeleted(findConfById(lst, "ns1/gw2")), "deepeq")
 
 	// 1 config from client2 watch (removed config never updated)
 	s1 = watchConfig(ch2, 50*time.Millisecond)
@@ -956,7 +954,7 @@ func TestServerAPI(t *testing.T) {
 	s2 = watchConfig(ch2, 50*time.Millisecond)
 	assert.NotNil(t, s2)
 	assert.True(t, s1.DeepEqual(sc1), "deepeq")
-	assert.True(t, s2.DeepEqual(gw2zero), "deepeq") // deleted!
+	assert.True(t, client.IsConfigDeleted(s2), "deepeq") // deleted!
 
 	// no config from client3 watch
 	s = watchConfig(ch3, 50*time.Millisecond)

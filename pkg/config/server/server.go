@@ -86,7 +86,8 @@ func (s *Server) Start(ctx context.Context) error {
 				s.broadcastConfig(c)
 
 			case c := <-s.deleteCh:
-				// delayed config deletion
+				s.log.V(2).Info("initiating deleyed config deletion", "id", c.Id)
+
 				go func() {
 					select {
 					case <-ctx.Done():
@@ -206,15 +207,12 @@ func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
 
 	json, err := json.Marshal(c)
 	if err != nil {
-		s.log.Error(err, "cannor JSON serialize config", "event", e.String())
+		s.log.Error(err, "cannot JSON serialize config", "event", e.String())
 		return
 	}
 
-	s.sendJSONConfig(conn, json)
-}
-
-func (s *Server) sendJSONConfig(conn *Conn, json []byte) {
-	s.log.V(2).Info("sending configuration to client", "client", conn.Id())
+	s.log.V(2).Info("sending configuration to client", "client", conn.Id(),
+		"config", c.String())
 
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
 		s.log.Error(err, "error sending config update", "client", conn.Id())

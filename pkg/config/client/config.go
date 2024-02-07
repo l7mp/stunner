@@ -122,3 +122,19 @@ func parseRaw(c []byte) (*stnrv1.StunnerConfig, error) {
 
 	return &s, nil
 }
+
+// IsConfigDeleted is a helper that allows to decide whether a config is being deleted. When a
+// config is being removed (say, because the corresponding Gateway is deleted), the CDS server
+// sends a validated zero-config for the client. This function is a quick helper to decide whether
+// the config received is such a zero-config.
+func IsConfigDeleted(conf *stnrv1.StunnerConfig) bool {
+	if conf == nil {
+		return false
+	}
+	zeroConf := ZeroConfig(conf.Admin.Name)
+	// zeroconfs have to be explcitly validated before deepEq (the cds client validates)
+	if err := zeroConf.Validate(); err != nil {
+		return false
+	}
+	return conf.DeepEqual(zeroConf)
+}
