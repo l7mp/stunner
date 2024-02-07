@@ -81,7 +81,7 @@ Except the TURN authentication realm, all GatewayConfig resources are safe for m
 
 Gateways describe the STUN/TURN server listeners exposed to clients.
 
-The below Gateway resource will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and make it available on a public IP address and port to clients. Each Gateway will have a `stunnerd` Deployment that will run the dataplane, a LoadBalancer Service that will expose the dataplane to the Internet, and an ancillary ConfigMap that will hold the corresponding configuration, each using the same name and namespace as the Gateway. Once the Gateway is removed, the corresponding resources are automatically garbage-collected.
+The below Gateway resource will configure STUNner to open a STUN/TURN listener over the UDP port 3478 and make it available on a public IP address and port to clients. Each Gateway will have a `stunnerd` Deployment that will run the dataplane and a LoadBalancer Service that will expose the gateway to the Internet, both using the same name and namespace as the Gateway. Once the Gateway is removed, the corresponding resources are automatically garbage-collected.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1

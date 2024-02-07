@@ -345,12 +345,9 @@ modifications and update the underlying dataplane. Kubernetes is beautiful, isn'
 
 ### Check your config
 
-The current STUNner dataplane configuration is always made available in a convenient ConfigMap that
-has the same name and namespace as the Gateway it belongs to (so this is supposed to be
-`stunner/udp-gateway` as per our example). 
-
-STUNner comes with a small CLI utility called [`stunnerctl`](/cmd/stunnerctl/README.md) to dump the
-running configuration in human readable format. 
+The current STUNner dataplane configuration is always made available via the convenient
+[`stunnerctl`](/cmd/stunnerctl/README.md) CLI utility. The below will dump the config of the UDP
+gateway in human readable format.
 
 ```console
 stunnerctl -n stunner config udp-gateway
