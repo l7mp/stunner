@@ -5,7 +5,7 @@
 # inspired by https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCtl.sh
 
 
-REPO=https://github.com/l7mp/stunner
+REPO=levaitamas/stunner
 
 # Determine OS
 OS="${TARGET_OS:-$(uname)}"
@@ -17,9 +17,9 @@ fi
 
 # Determine the latest STUNner version
 if [ "${STUNNER_VERSION}" = "" ] ; then
-  STUNNER_VERSION="$(curl -sL ${REPO}/releases | \
-                  grep -o 'releases/tag/v[0-9]*.[0-9]*.[0-9]*' | sort -V | \
-                  tail -1 | awk -F'/' '{ print $3}')"
+    STUNNER_VERSION="$(curl -Lsf https://api.github.com/repos/${REPO}/releases/latest \
+                       | grep -o '"tag_name": "v[0-9]*.[0-9]*.[0-9]*' \
+                       | awk -F'"' '{print $4}')"
   STUNNER_VERSION="${STUNNER_VERSION##*/}"
 fi
 
@@ -53,7 +53,7 @@ tmp=$(mktemp -d /tmp/stunner.XXXXXX)
 
 for prog in $progs; do
     NAME="${prog}-${STUNNER_VERSION}"
-    URL="${REPO}/releases/download/${STUNNER_VERSION}/${prog}-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
+    URL="https://github.com/${REPO}/releases/download/${STUNNER_VERSION}/${prog}-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
     filename="${prog}-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
 
     printf "\nDownloading %s from %s ...\n" "${NAME}" "$URL"
