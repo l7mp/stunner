@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# turncat download script
+# STUNner tools downloader script
 #
 # inspired by https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCtl.sh
 
@@ -47,30 +47,34 @@ case "${LOCAL_ARCH}" in
     ;;
 esac
 
-# Download turncat
-tmp=$(mktemp -d /tmp/turncat.XXXXXX)
-NAME="turncat-${STUNNER_VERSION}"
-URL="${REPO}/releases/download/${STUNNER_VERSION}/turncat-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
-filename="turncat-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
+# Download binaries
+progs="stunnerctl turncat"
+tmp=$(mktemp -d /tmp/stunner.XXXXXX)
 
-printf "\nDownloading %s from %s ...\n" "${NAME}" "$URL"
-if ! curl -o /dev/null -sIf "$URL"; then
-  printf "\n%s is not found, please specify a valid STUNNER_VERSION and TARGET_ARCH\n" "$URL"
-  exit 1
-fi
-curl -fsL -o "${tmp}/${filename}" "$URL"
-printf "%s download complete!\n" "${filename}"
+for prog in $progs; do
+    NAME="${prog}-${STUNNER_VERSION}"
+    URL="${REPO}/releases/download/${STUNNER_VERSION}/${prog}-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
+    filename="${prog}-${STUNNER_VERSION}-${OSEXT}-${STUNNER_ARCH}"
 
-# Install turncat
-mkdir -p "$HOME/.l7mp/bin"
-mv "${tmp}/${filename}" "$HOME/.l7mp/bin/turncat"
-chmod +x "$HOME/.l7mp/bin/turncat"
+    printf "\nDownloading %s from %s ...\n" "${NAME}" "$URL"
+    if ! curl -o /dev/null -sIf "$URL"; then
+	printf "\n%s is not found, please specify a valid STUNNER_VERSION and TARGET_ARCH\n" "$URL"
+	exit 1
+    fi
+    curl -fsL -o "${tmp}/${filename}" "$URL"
+    printf "%s download complete!\n" "${filename}"
+
+    mkdir -p "$HOME/.l7mp/bin"
+    mv "${tmp}/${filename}" "$HOME/.l7mp/bin/${prog}"
+    chmod +x "$HOME/.l7mp/bin/${prog}"
+done
+
 rm -r "${tmp}"
 
 # Print final message
 printf "\n"
-printf "Add turncat to your path with:"
+printf "Add stunner tools to your path with:"
 printf "\n"
 printf "  export PATH=\$HOME/.l7mp/bin:\$PATH \n"
 printf "\n"
-printf "Need more information? Visit https://docs.l7mp.io/en/${STUNNER_VERSION}/cmd/turncat/ \n"
+printf "Need more information? Visit https://docs.l7mp.io/en/${STUNNER_VERSION}/ \n"
