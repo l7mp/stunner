@@ -12,7 +12,7 @@ curl -sL https://raw.githubusercontent.com/l7mp/stunner/main/cmd/getstunner/gets
 export PATH=$HOME/.l7mp/bin:$PATH
 ```
 > [!NOTE]
-> The script installs `stunnerctl` too.
+> The script installs `turncat` too.
 
 Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`.
 
