@@ -51,7 +51,7 @@ STUNNERIP=$(kubectl get service udp-gateway -n default -o jsonpath='{.status.loa
 We need to give this public IP the Neko configuration in the `NEKO_ICESERVERS` environment variable, inside the `json` content (basically this will tell you browser to use STUNner as a STUN/TURN server).
 You can do that by hand, or by this fancy `sed` command:
 ```console
-sed -i "s/1.1.1.1/$STUNNERIP/g" neko.yaml
+sed -i "s/turn:[\.0-9]*:3478/turn:$STUNNERIP:3478/g" neko.yaml
 ```
 
 Now apply the Neko manifests and wait for the `neko` deployment to be available (should take a couple of seconds):
@@ -64,6 +64,9 @@ In this setup we use `ingress` to expose the Neko UI. Feel free to customize the
 If you don't have an ingress controller, you can use the `neko-tcp` service with a `LoadBalancer` type.
 
 Ideally, by opening your ingress controller in your browser, you should see the Neko UI. You can log in with the `admin`:`admin` credentials. The WebRTC stream then should be relayed through STUNner.
+
+> [!NOTE]
+> Tested with Chromium/Google Chrome.
 
 ## Help
 
