@@ -352,7 +352,7 @@ gateway in human readable format.
 ```console
 stunnerctl -n stunner config udp-gateway
 Gateway: stunner/udp-gateway (loglevel: "all:INFO")
-Authentication type: ephemeral, shared-secret: my-very-secure-secret
+Authentication type: static, username/password: user-1/pass-1
 Listeners:
   - Name: stunner/udp-gateway/udp-listener
     Protocol: TURN-UDP
@@ -390,9 +390,9 @@ a heartwarming welcome message.
 
 1. We also need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy
    STUN/TURN client called [`turncat`](cmd/turncat/README.md) for this purpose. Once
-   [built](cmd/turncat/README.md#installation), you can fire up `turncat` to listen on the standard
-   input and send everything it receives to STUNner. Type any input and press Enter, and you should
-   see a nice greeting from your cluster!
+   [installed](cmd/turncat/README.md#installation), you can fire up `turncat` to listen on the
+   standard input and send everything it receives to STUNner. Type any input and press Enter, and
+   you should see a nice greeting from your cluster!
 
    ```console
    ./turncat - k8s://stunner/udp-gateway:udp-listener udp://${PEER_IP}:9001
