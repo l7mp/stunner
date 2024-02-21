@@ -177,7 +177,7 @@ func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bo
 		"deleted objects: %d, started objects: %d, restarted objects: %d",
 		new, changed, deleted, len(toBeStarted), len(toBeRestarted))
 
-	s.log.Info(s.Status())
+	s.log.Infof("new dataplane status: %s", s.Status().String())
 
 	if len(toBeRestarted) > 0 {
 		names := make([]string, len(toBeRestarted))

@@ -179,3 +179,5 @@ func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 	}
 	return uri, nil
 }
+
+type ListenerStatus = ListenerConfig

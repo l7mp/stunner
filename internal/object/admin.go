@@ -2,6 +2,7 @@ package object
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -11,8 +12,6 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	health "github.com/heptiolabs/healthcheck"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
@@ -25,12 +24,12 @@ type Admin struct {
 	DryRun                               bool
 	MetricsEndpoint, HealthCheckEndpoint string
 	metricsServer, healthCheckServer     *http.Server
-	health                               health.Handler
+	health                               *http.ServeMux
 	log                                  logging.LeveledLogger
 }
 
 // NewAdmin creates a new Admin object.
-func NewAdmin(conf stnrv1.Config, dryRun bool, rc health.Check, logger logging.LoggerFactory) (Object, error) {
+func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
@@ -38,15 +37,44 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc health.Check, logger logging.L
 
 	admin := Admin{
 		DryRun: dryRun,
-		health: health.NewHandler(),
+		health: http.NewServeMux(),
 		log:    logger.NewLogger("stunner-admin"),
 	}
 	admin.log.Tracef("NewAdmin: %s", req.String())
 
 	// health checker
 	// liveness probe always succeeds once we got here
-	admin.health.AddLivenessCheck("server-alive", func() error { return nil })
-	admin.health.AddReadinessCheck("server-ready", rc)
+	admin.health.HandleFunc("/live", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}\n")) //nolint:errcheck
+	})
+	// readniness checker calls the checker from the factory
+	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if err := rc(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusServiceUnavailable, err.Error())))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusOK, "READY")))
+		}
+	})
+	// status handler returns the status
+	admin.health.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if js, err := json.Marshal(status()); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusInternalServerError, err.Error())))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write(js) //nolint:errcheck
+		}
+	})
 
 	if err := admin.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
 		return nil, err
@@ -140,6 +168,19 @@ func (a *Admin) Close() error {
 	}
 
 	return nil
+}
+
+// Status returns the status of the object.
+func (a *Admin) Status() stnrv1.Status {
+	s := stnrv1.AdminStatus{
+		Name:                a.Name,
+		LogLevel:            a.LogLevel,
+		MetricsEndpoint:     a.MetricsEndpoint,
+		HealthCheckEndpoint: a.HealthCheckEndpoint,
+	}
+
+	// add licensing status here
+	return &s
 }
 
 func (a *Admin) reconcileMetrics(req *stnrv1.AdminConfig) error {
@@ -275,13 +316,14 @@ end:
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
 	dry    bool
-	rc     health.Check
+	rc     ReadinessHandler
+	status StatusHandler
 	logger logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(dryRun bool, rc health.Check, logger logging.LoggerFactory) Factory {
-	return &AdminFactory{dry: dryRun, rc: rc, logger: logger}
+func NewAdminFactory(dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) Factory {
+	return &AdminFactory{dry: dryRun, rc: rc, status: status, logger: logger}
 }
 
 // New can produce a new Admin object from the given configuration. A nil config will create an
@@ -291,7 +333,7 @@ func (f *AdminFactory) New(conf stnrv1.Config) (Object, error) {
 		return &Admin{}, nil
 	}
 
-	return NewAdmin(conf, f.dry, f.rc, f.logger)
+	return NewAdmin(conf, f.dry, f.rc, f.status, f.logger)
 }
 
 func getHealthAddr(e string) string {

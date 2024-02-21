@@ -14,3 +14,9 @@ type Config interface {
 	// String stringifies the configuration.
 	String() string
 }
+
+// Status holds the status of a component.
+type Status interface {
+	// String stringifies the status.
+	String() string
+}

@@ -1254,6 +1254,58 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 	},
 	{
+		name: "reconcile-test: reconcile existing listener with new public IP and port",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:       "default-listener",
+				Addr:       "127.0.0.1",
+				Protocol:   "TURN-UDP",
+				PublicAddr: "127.0.0.2",
+				PublicPort: 33478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			// does not require a restart!
+			assert.NoError(t, err, "restart")
+
+			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+
+			l := s.GetListener("default-listener")
+			assert.NotNil(t, l, "listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Equal(t, l.PublicAddr, "127.0.0.2", "listener public address ok")
+			assert.Equal(t, l.PublicPort, 33478, "listener public port ok")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+
+			c := s.GetCluster("allow-any")
+			assert.NotNil(t, c, "cluster found")
+			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			_, n, _ := net.ParseCIDR("0.0.0.0/0")
+			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+		},
+	},
+	{
 		name: "reconcile-test: reconcile deleted listener",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,

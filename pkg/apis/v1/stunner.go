@@ -213,3 +213,36 @@ func (req *StunnerConfig) Summary() string {
 
 	return status
 }
+
+// StunnerStatus represents the status of the STUnner daemon.
+type StunnerStatus struct {
+	ApiVersion      string            `json:"version"`
+	Admin           *AdminStatus      `json:"admin"`
+	Auth            *AuthStatus       `json:"auth"`
+	Listeners       []*ListenerStatus `json:"listeners"`
+	Clusters        []*ClusterStatus  `json:"clusters"`
+	AllocationCount int               `json:"allocationCount"`
+	Status          string            `json:"status"`
+}
+
+// String stringifies the status.
+func (s *StunnerStatus) String() string {
+	ls := []string{}
+	for _, l := range s.Listeners {
+		ls = append(ls, l.String())
+	}
+	cs := []string{}
+	for _, c := range s.Clusters {
+		cs = append(cs, c.String())
+	}
+
+	return fmt.Sprintf("%s/%s/%s/%s/allocs:%d/status=%s",
+		s.Admin.String(), s.Auth.String(), ls, cs, s.AllocationCount, s.Status)
+}
+
+// String summarizes the status.
+func (s *StunnerStatus) Summary() string {
+	return fmt.Sprintf("%s\n\t%s\n\tlisteners:%d/clusters:%d\n\tallocs:%d/status=%s",
+		s.Admin.String(), s.Auth.String(), len(s.Listeners), len(s.Clusters),
+		s.AllocationCount, s.Status)
+}

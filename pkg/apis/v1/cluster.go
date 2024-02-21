@@ -113,3 +113,5 @@ func (req *ClusterConfig) String() string {
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }
+
+type ClusterStatus = ClusterConfig
