@@ -22,6 +22,8 @@ type Listener struct {
 	Proto                  stnrv1.ListenerProtocol
 	Addr                   net.IP
 	Port, MinPort, MaxPort int
+	PublicAddr             string // for GetConfig()
+	PublicPort             int    // for GetConfig()
 	rawAddr                string // net.IP.String() may rewrite the string representation
 	Cert, Key              []byte
 	Conns                  []any // either a set of turn.ListenerConfigs or turn.PacketConnConfigs
@@ -46,12 +48,14 @@ func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandle
 	}
 
 	l := Listener{
-		Name:     req.Name,
-		Net:      net,
-		getRealm: realmHandler,
-		Conns:    []any{},
-		logger:   logger,
-		log:      logger.NewLogger(fmt.Sprintf("stunner-listener-%s", req.Name)),
+		Name:       req.Name,
+		PublicAddr: req.PublicAddr,
+		PublicPort: req.PublicPort,
+		Net:        net,
+		getRealm:   realmHandler,
+		Conns:      []any{},
+		logger:     logger,
+		log:        logger.NewLogger(fmt.Sprintf("stunner-listener-%s", req.Name)),
 	}
 
 	l.log.Tracef("NewListener: %s", req.String())
@@ -88,7 +92,7 @@ func (l *Listener) Inspect(old, new, full stnrv1.Config) (bool, error) {
 		return false, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
 	}
 
-	// the only chance we don't need a restart if only the Routes change
+	// the only chance we don't need a restart if only the Routes and/or PublicIP/PublicPort change
 	restart := ErrRestartRequired
 	if l.Name == req.Name && // name unchanged (should always be true)
 		l.Proto == proto && // protocol unchanged
@@ -150,6 +154,9 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 	}
 	l.Realm = l.getRealm()
 
+	l.PublicAddr = req.PublicAddr
+	l.PublicPort = req.PublicPort
+
 	l.Routes = make([]string, len(req.Routes))
 	copy(l.Routes, req.Routes)
 
@@ -179,10 +186,12 @@ func (l *Listener) GetConfig() stnrv1.Config {
 	sort.Strings(l.Routes)
 
 	c := &stnrv1.ListenerConfig{
-		Name:     l.Name,
-		Protocol: l.Proto.String(),
-		Addr:     l.rawAddr,
-		Port:     l.Port,
+		Name:       l.Name,
+		Protocol:   l.Proto.String(),
+		Addr:       l.rawAddr,
+		Port:       l.Port,
+		PublicAddr: l.PublicAddr,
+		PublicPort: l.PublicPort,
 	}
 
 	c.Cert = string(l.Cert)
@@ -238,6 +247,11 @@ func (l *Listener) Close() error {
 	l.Server = nil
 
 	return nil
+}
+
+// Status returns the status of the object.
+func (l *Listener) Status() stnrv1.Status {
+	return l.GetConfig()
 }
 
 // ///////////

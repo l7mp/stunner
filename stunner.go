@@ -4,7 +4,6 @@ package stunner
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pion/logging"
@@ -94,7 +93,7 @@ func NewStunner(options Options) *Stunner {
 	}
 
 	s.adminManager = manager.NewManager("admin-manager",
-		object.NewAdminFactory(options.DryRun, s.NewReadinessHandler(), logger), logger)
+		object.NewAdminFactory(options.DryRun, s.NewReadinessHandler(), s.NewStatusHandler(), logger), logger)
 	s.authManager = manager.NewManager("auth-manager",
 		object.NewAuthFactory(logger), logger)
 	s.listenerManager = manager.NewManager("listener-manager",
@@ -205,30 +204,43 @@ func (s *Stunner) AllocationCount() int {
 	return n
 }
 
-// Status returns a short status description of the running STUNner instance.
-func (s *Stunner) Status() string {
-	listeners := s.listenerManager.Keys()
-	ls := make([]string, len(listeners))
-	for i, l := range listeners {
-		ls[i] = s.GetListener(l).String()
+// Status returns the status for the running STUNner instance.
+func (s *Stunner) Status() stnrv1.Status {
+	status := stnrv1.StunnerStatus{ApiVersion: s.version}
+	if admin := s.GetAdmin(); admin != nil {
+		status.Admin = admin.Status().(*stnrv1.AdminStatus)
 	}
-	str := "NONE"
-	if len(ls) > 0 {
-		str = strings.Join(ls, ", ")
+	if auth := s.GetAuth(); auth != nil {
+		status.Auth = auth.Status().(*stnrv1.AuthStatus)
 	}
 
-	status := "READY"
+	ls := s.listenerManager.Keys()
+	status.Listeners = make([]*stnrv1.ListenerStatus, len(ls))
+	for i, lName := range ls {
+		if l := s.GetListener(lName); l != nil {
+			status.Listeners[i] = l.Status().(*stnrv1.ListenerStatus)
+		}
+	}
+
+	cs := s.clusterManager.Keys()
+	status.Clusters = make([]*stnrv1.ClusterStatus, len(cs))
+	for i, cName := range cs {
+		if c := s.GetCluster(cName); c != nil {
+			status.Clusters[i] = c.Status().(*stnrv1.ClusterStatus)
+		}
+	}
+
+	status.AllocationCount = s.AllocationCount()
+	stat := "READY"
 	if !s.ready {
-		status = "NOT-READY"
+		stat = "NOT-READY"
 	}
 	if s.shutdown {
-		status = "TERMINATING"
+		stat = "TERMINATING"
 	}
+	status.Status = stat
 
-	auth := s.GetAuth()
-	return fmt.Sprintf("status: %s, realm: %s, authentication: %s, listeners: %s"+
-		", active allocations: %d", status, auth.Realm, auth.Type.String(), str,
-		s.AllocationCount())
+	return &status
 }
 
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections

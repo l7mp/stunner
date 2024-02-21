@@ -113,8 +113,7 @@ func (req *AuthConfig) String() string {
 			} else {
 				p = "-"
 			}
-			status = append(status, fmt.Sprintf("type=%q,username=%q,password=%q",
-				atype.String(), u, p))
+			status = append(status, fmt.Sprintf("username=%q,password=%q", u, p))
 
 		case AuthTypeEphemeral:
 			s, secretFound := req.Credentials["secret"]
@@ -128,10 +127,12 @@ func (req *AuthConfig) String() string {
 				s = "-"
 			}
 
-			status = append(status, fmt.Sprintf("type=%q,shared-secret=%q",
-				atype.String(), s))
+			status = append(status, fmt.Sprintf("secret=%q", s))
 		}
 	}
 
-	return fmt.Sprintf("auth:{%s}", strings.Join(status, ","))
+	return fmt.Sprintf("%s-auth:{%s}", req.Type, strings.Join(status, ","))
 }
+
+// AuthStatus represents the authentication status.
+type AuthStatus = AuthConfig

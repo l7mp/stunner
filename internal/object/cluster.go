@@ -92,7 +92,7 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 			c.Endpoints = append(c.Endpoints, ep)
 		}
 	case stnrv1.ClusterTypeStrictDNS:
-		// TOD: port-range support for DNS clusters
+		// TODO: port-range support for DNS clusters
 		if c.Resolver == nil {
 			return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
 		}
@@ -162,6 +162,11 @@ func (c *Cluster) Close() error {
 	}
 
 	return nil
+}
+
+// Status returns the status of the object.
+func (c *Cluster) Status() stnrv1.Status {
+	return c.GetConfig()
 }
 
 // Route decides whether a peer IP appears among the permitted endpoints of a cluster.

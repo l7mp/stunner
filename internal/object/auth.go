@@ -105,6 +105,11 @@ func (auth *Auth) Close() error {
 	return nil
 }
 
+// Status returns the status of the object.
+func (auth *Auth) Status() stnrv1.Status {
+	return auth.GetConfig()
+}
+
 // AuthFactory can create now Auth objects
 type AuthFactory struct {
 	logger logging.LoggerFactory

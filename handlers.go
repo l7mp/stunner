@@ -114,3 +114,8 @@ func (s *Stunner) NewRealmHandler() object.RealmHandler {
 		return ""
 	}
 }
+
+// NewStatusHandler creates a helper function for printing the status of STUNner.
+func (s *Stunner) NewStatusHandler() object.StatusHandler {
+	return func() stnrv1.Status { return s.Status() }
+}

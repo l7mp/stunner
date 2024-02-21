@@ -16,11 +16,13 @@ type Object interface {
 	GetConfig() stnrv1.Config
 	// Close closes the object, may return ErrRestartRequired.
 	Close() error
+	// Status returns the status of the object.
+	Status() stnrv1.Status
 }
 
-// Factory can create new objects
+// Factory can create new objects.
 type Factory interface {
-	// New will spawn a new object from the factory
+	// New will spawn a new object from the factory.
 	New(conf stnrv1.Config) (Object, error)
 }
 
@@ -29,3 +31,6 @@ type ReadinessHandler = func() error
 
 // RealmHandler is a callback that allows an object to find out the authentication realm.
 type RealmHandler = func() string
+
+// StatusHandler is a callback that allows an object to obtain the status of STUNNer.
+type StatusHandler = func() stnrv1.Status

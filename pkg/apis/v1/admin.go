@@ -94,3 +94,30 @@ func (req *AdminConfig) String() string {
 	}
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
 }
+
+// AdminStatus represents the administrative status.
+type AdminStatus struct {
+	Name                string `json:"name,omitempty"`
+	LogLevel            string `json:"loglevel,omitempty"`
+	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
+	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
+	// licencing status comes here
+}
+
+// String returns a string reprsentation of the administrative status.
+func (a *AdminStatus) String() string {
+	status := []string{}
+	if a.LogLevel != "" {
+		status = append(status, fmt.Sprintf("logLevel=%q", a.LogLevel))
+	}
+	if a.MetricsEndpoint != "" {
+		status = append(status, fmt.Sprintf("metrics=%q", a.MetricsEndpoint))
+	}
+	if a.HealthCheckEndpoint != "" {
+		status = append(status, fmt.Sprintf("health-check=%q", a.HealthCheckEndpoint))
+	}
+
+	// add licencing status here
+
+	return fmt.Sprintf("%s:{%s}", a.Name, strings.Join(status, ","))
+}
