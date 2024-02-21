@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/gorilla/websocket"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client/api"
 	"github.com/pion/logging"
@@ -237,4 +240,152 @@ func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.Stu
 	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return poll(ctx, a, ch)
+}
+
+func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
+	go func() {
+		for {
+			if err := poll(ctx, a, ch); err != nil {
+				_, wsuri := a.Endpoint()
+				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
+			} else {
+				// context got cancelled
+				return
+			}
+
+			// wait between each attempt
+			time.Sleep(RetryPeriod)
+		}
+	}()
+
+	return nil
+}
+
+// ////////////
+// API workers
+// ////////////
+func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
+	_, url := a.Endpoint()
+	a.Tracef("poll: trying to open connection to CDS server at %s", url)
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, makeHeader(url))
+	if err != nil {
+		return err
+	}
+	defer conn.Close() // this will close the poller goroutine
+
+	a.Infof("connection successfully opened to config discovery server at %s", url)
+
+	pingTicker := time.NewTicker(PingPeriod)
+	closePinger := make(chan any)
+	defer close(closePinger)
+
+	// wait until all threads are closed and we can remove the error channel
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer pingTicker.Stop()
+		defer wg.Done()
+
+		for {
+			select {
+			case <-pingTicker.C:
+				// p.log.Tracef("++++ PING ++++ for CDS server %q at client %q", location, p.id)
+				conn.SetWriteDeadline(time.Now().Add(WriteWait)) //nolint:errcheck
+				if err := conn.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
+					errCh <- fmt.Errorf("could not ping CDS server at %q: %w",
+						conn.RemoteAddr(), err)
+					return
+				}
+			case <-closePinger:
+				a.Tracef("closing ping handler to config discovery server at %q", url)
+				return
+			}
+		}
+	}()
+
+	// poller
+	go func() {
+		defer wg.Done()
+
+		// the next pong must arrive within the PongWait period
+		conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
+		// reinit the deadline when we get a pong
+		conn.SetPongHandler(func(string) error {
+			// a.Tracef("Got PONG from server %q", url)
+			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
+			return nil
+		})
+
+		for {
+			// ping-pong deadline misses will end up being caught here as a read beyond
+			// the deadline
+			msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			if msgType != websocket.TextMessage {
+				errCh <- fmt.Errorf("unexpected message type (code: %d) from client %q",
+					msgType, conn.RemoteAddr().String())
+				return
+			}
+
+			if len(msg) == 0 {
+				a.Warn("ignoring zero-length config")
+				continue
+			}
+
+			c, err := ParseConfig(msg)
+			if err != nil {
+				// assume it is a YAML/JSON syntax error: report and ignore
+				a.Warnf("could not parse config: %s", err.Error())
+				continue
+			}
+
+			if err := c.Validate(); err != nil {
+				a.Warnf("invalid config: %s", err.Error())
+				continue
+			}
+
+			a.Debugf("new config received from %q: %q", url, c.String())
+
+			ch <- c
+		}
+	}()
+
+	// wait fo cancel
+	for {
+		defer func() {
+			a.Infof("closing connection for client %s", conn.RemoteAddr().String())
+			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+			conn.Close()
+			closePinger <- struct{}{}
+			wg.Wait()
+			close(errCh)
+		}()
+
+		select {
+		case <-ctx.Done():
+			// cancel: normal return
+			return nil
+		case err := <-errCh:
+			// error: return it
+			return err
+		}
+	}
+}
+
+// creates an origin header
+func makeHeader(uri string) http.Header {
+	header := http.Header{}
+	url, _ := getURI(uri) //nolint:errcheck
+	origin := *url
+	origin.Scheme = "http"
+	origin.Path = ""
+	header.Set("origin", origin.String())
+	return header
 }

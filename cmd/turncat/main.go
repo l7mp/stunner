@@ -167,7 +167,7 @@ func getStunnerConfFromK8s(def string) (*stnrv1.StunnerConfig, error) {
 		return nil, fmt.Errorf("error searching for CDS server: %w", err)
 	}
 
-	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr, namespace, name,
+	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr.Addr, namespace, name,
 		loggerFactory.NewLogger("cds-client"))
 	if err != nil {
 		return nil, fmt.Errorf("error creating CDS client: %w", err)

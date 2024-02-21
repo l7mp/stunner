@@ -9,6 +9,7 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
+	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/l7mp/stunner"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -19,7 +20,7 @@ import (
 
 func main() {
 	os.Args[0] = "stunnerd"
-	var config = flag.StringP("config", "c", "", "Config origin, either a valid address in the format IP:port, or HTTP URL to the CDS server, or a proper file name URI in the format file://<path-to-config-file> (overrides: STUNNER_CONFIG_ORIGIN)")
+	var config = flag.StringP("config", "c", "", "Config origin, either a valid address in the format IP:port, or HTTP URL to the CDS server, or literal \"k8s\" to discover the CDS server from Kubernetes, or a proper file name URI in the format file://<path-to-config-file> (overrides: STUNNER_CONFIG_ORIGIN)")
 	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO)")
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>)")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
@@ -27,6 +28,15 @@ func main() {
 		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
+
+	// Kubernetes config flags
+	k8sConfigFlags := cliopt.NewConfigFlags(true)
+	k8sConfigFlags.AddFlags(flag.CommandLine)
+
+	// CDS server discovery flags
+	cdsConfigFlags := cdsclient.NewCDSConfigFlags()
+	cdsConfigFlags.AddFlags(flag.CommandLine)
+
 	flag.Parse()
 
 	logLevel := stnrv1.DefaultLogLevel
@@ -83,13 +93,26 @@ func main() {
 		conf <- c
 
 	} else if !*watch {
-		log.Infof("loading configuration from origin %q", configOrigin)
+		ctx, cancel := context.WithCancel(context.Background())
 
+		if configOrigin == "k8s" {
+			log.Info("discovering configuration from Kubernetes")
+			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+				st.GetLogger().NewLogger("cds-fwd"))
+			if err != nil {
+				log.Errorf("error searching for CDS server: %s", err.Error())
+				os.Exit(1)
+			}
+			configOrigin = cdsAddr.Addr
+		}
+
+		log.Infof("loading configuration from origin %q", configOrigin)
 		c, err := st.LoadConfig(configOrigin)
 		if err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
 		}
+		cancel()
 
 		conf <- c
 
@@ -98,12 +121,22 @@ func main() {
 		z := cdsclient.ZeroConfig(st.GetId())
 		conf <- z
 
-		log.Infof("watching configuration at origin %q", configOrigin)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		cancelConfigLoader = cancel
 
-		// Watch closes the channel
+		if configOrigin == "k8s" {
+			log.Info("discovering configuration from Kubernetes")
+			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+				st.GetLogger().NewLogger("cds-fwd"))
+			if err != nil {
+				log.Errorf("error searching for CDS server: %s", err.Error())
+				os.Exit(1)
+			}
+			configOrigin = cdsAddr.Addr
+		}
+
+		log.Infof("watching configuration at origin %q", configOrigin)
 		if err := st.WatchConfig(ctx, configOrigin, conf); err != nil {
 			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
