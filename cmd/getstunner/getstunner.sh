@@ -5,7 +5,7 @@
 # inspired by https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCtl.sh
 
 
-REPO=levaitamas/stunner
+REPO=l7mp/stunner
 
 # Determine OS
 OS="${TARGET_OS:-$(uname)}"
