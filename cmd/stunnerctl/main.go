@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
@@ -33,6 +35,7 @@ var (
 	watch, all, verbose bool
 	k8sConfigFlags      *cliopt.ConfigFlags
 	cdsConfigFlags      *cdsclient.CDSConfigFlags
+	authConfigFlags     *cdsclient.AuthConfigFlags
 	podConfigFlags      *cdsclient.PodConfigFlags
 	loggerFactory       *logger.LeveledLoggerFactory
 	log                 logging.LeveledLogger
@@ -72,6 +75,19 @@ var (
 			}
 		},
 	}
+	authCmd = &cobra.Command{
+		Use:               "auth",
+		Aliases:           []string{"get-credential"},
+		Short:             "Obtain authenticaction credentials to a gateway",
+		Args:              cobra.RangeArgs(0, 1),
+		DisableAutoGenTag: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := runAuth(cmd, args); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		},
+	}
 )
 
 func init() {
@@ -94,9 +110,14 @@ func init() {
 	podConfigFlags = cdsclient.NewPodConfigFlags()
 	podConfigFlags.AddFlags(statusCmd.Flags())
 
+	// Auth discovery flags: only for "auth" command
+	authConfigFlags = cdsclient.NewAuthConfigFlags()
+	authConfigFlags.AddFlags(authCmd.Flags())
+
 	// Add commands
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(authCmd)
 }
 
 func main() {
@@ -330,6 +351,68 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func runAuth(cmd *cobra.Command, args []string) error {
+	loglevel := "all:WARN"
+	if verbose {
+		loglevel = "all:TRACE"
+	}
+	loggerFactory = logger.NewLoggerFactory(loglevel)
+	log = loggerFactory.NewLogger("stunnerctl")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	log.Debug("Searching for authentication server")
+	pod, err := cdsclient.DiscoverK8sAuthServer(ctx, k8sConfigFlags, authConfigFlags,
+		loggerFactory.NewLogger("auth-fwd"))
+	if err != nil {
+		return fmt.Errorf("error searching for auth service: %w", err)
+	}
+
+	u := url.URL{
+		Scheme: "http",
+		Host:   pod.Addr,
+		Path:   "/ice",
+	}
+	q := u.Query()
+	q.Set("service", "turn")
+	u.RawQuery = q.Encode()
+
+	if authConfigFlags.TurnAuth {
+		// enforce TURN credential format
+		u.Path = ""
+	}
+
+	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
+		q := u.Query()
+		q.Set("namespace", *k8sConfigFlags.Namespace)
+		if len(args) > 0 {
+			q.Set("gateway", args[0])
+		}
+		u.RawQuery = q.Encode()
+	}
+
+	log.Debugf("Querying to authentication server %s using URL %q", pod.String(), u.String())
+	res, err := http.Get(u.String())
+	if err != nil {
+		return fmt.Errorf("error querying auth service %s: %w", pod.String(), err)
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP error querying auth service %s: expected status %d, got %d",
+			pod.String(), http.StatusOK, res.StatusCode)
+	}
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("cannot read HTTP response: %w", err)
+	}
+
+	fmt.Println(string(b))
+
+	return nil
+}
+
+// ////////////////////////
 var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
 
 // k8s.io/kubectl/pkg/cmd/get

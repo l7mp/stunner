@@ -17,18 +17,20 @@ const (
 	DefaultAuthName               = "default-auth-config"
 )
 
-// health-check and metrics reporting defaults
+// default ports
 const (
 	DefaultMetricsPort     int = 8080
 	DefaultHealthCheckPort int = 8086
+	DefaultAuthServicePort int = 8088
 )
 
-// Label/anotation defaults
+// Label/annotation defaults
 const (
 	DefaultCDSServiceLabelKey      = "stunner.l7mp.io/config-discovery-service"
 	DefaultCDSServiceLabelValue    = "enabled"
 	DefaultAppLabelKey             = "app"
 	DefaultAppLabelValue           = "stunner"
+	DefaultAuthAppLabelValue       = "stunner-auth"
 	DefaultRelatedGatewayKey       = "stunner.l7mp.io/related-gateway-name"
 	DefaultRelatedGatewayNamespace = "stunner.l7mp.io/related-gateway-namespace"
 	DefaultOwnedByLabelKey         = "stunner.l7mp.io/owned-by"

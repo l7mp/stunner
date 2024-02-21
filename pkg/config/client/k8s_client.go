@@ -85,6 +85,35 @@ func (f *PodConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&f.Port, "pod-port", f.Port, "Port of the stunnerd pod to connect to")
 }
 
+// AuthConfigFlags composes a set of flags for authentication service discovery.
+type AuthConfigFlags struct {
+	// Addr is an explicit IP address for the server.
+	Addr string
+	// Namespace is the namespace of the server pod.
+	Namespace string
+	// Port is the port of the server pod.
+	Port int
+	// Enforce turn credential.
+	TurnAuth bool
+}
+
+// NewAuthConfigFlags returns auth service discovery flags with default values set.
+func NewAuthConfigFlags() *AuthConfigFlags {
+	return &AuthConfigFlags{
+		Port: stnrv1.DefaultAuthServicePort,
+	}
+}
+
+// AddFlags binds pod discovery configuration flags to a given flagset.
+func (f *AuthConfigFlags) AddFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&f.Addr, "auth-server-address", f.Addr,
+		"Auth service address (disables service discovery)")
+	flags.StringVar(&f.Namespace, "auth-service-namespace", f.Namespace,
+		"Auth service namespace (disables service discovery)")
+	flags.IntVar(&f.Port, "auth-service-port", f.Port, "Auth service port")
+	flags.BoolVar(&f.TurnAuth, "auth-turn-credential", f.TurnAuth, "Request TURN credentials (default: request ICE server config)")
+}
+
 // PodConnector is a helper for discovering and connecting to pods in a Kubernetes cluster.
 type PodConnector struct {
 	cs       *kubernetes.Clientset
@@ -285,6 +314,48 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 	d.log.Debugf("Successfully opened %d port-forward connections", len(pods.Items))
 
 	return ps, nil
+}
+
+// DiscoverK8sAuthServer discovers the cluster authentication service.
+func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, authFlags *AuthConfigFlags, log logging.LeveledLogger) (PodInfo, error) {
+	if authFlags.Addr != "" {
+		return PodInfo{
+			Addr:  fmt.Sprintf("%s:%d", authFlags.Addr, authFlags.Port),
+			Proxy: false,
+		}, nil
+	}
+
+	ns := ""
+	nsLog := "<all>"
+	if authFlags.Namespace != "" {
+		ns = authFlags.Namespace
+		nsLog = ns
+	}
+
+	d, err := NewK8sDiscoverer(k8sFlags, log)
+	if err != nil {
+		return PodInfo{}, fmt.Errorf("failed to init CDS discovery client: %w", err)
+	}
+
+	label := fmt.Sprintf("%s=%s", stnrv1.DefaultAppLabelKey, stnrv1.DefaultAuthAppLabelValue)
+	d.log.Debugf("Querying auth service pods in namespace %q using label-selector %q", nsLog, label)
+
+	pods, err := d.cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: label,
+	})
+	if err != nil {
+		return PodInfo{}, fmt.Errorf("failed to query Kubernetes API server: %w", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return PodInfo{}, fmt.Errorf("no authentication found")
+	}
+
+	if len(pods.Items) > 1 {
+		d.log.Infof("mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
+	}
+
+	return d.portfwd(ctx, &pods.Items[0], authFlags.Port)
 }
 
 func (d *PodConnector) portfwd(ctx context.Context, pod *corev1.Pod, port int) (PodInfo, error) {
