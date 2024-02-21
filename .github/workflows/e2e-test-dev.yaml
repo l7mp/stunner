@@ -1,9 +1,9 @@
-name: Run End-to-End Test [legacy] (dev)
+name: Run End-to-End Test (dev)
 
 on:
   workflow_dispatch:
   schedule:
-  - cron: '0 11 * * 1'
+  - cron: '0 12 * * 1'
 
 jobs:
   e2e_test:
@@ -28,8 +28,8 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          cpus: max
           wait: all
+          cpus: max
           cache: false
 
       - name: Start minikube tunnel
@@ -44,8 +44,7 @@ jobs:
         run: |
           helm repo add stunner https://l7mp.io/stunner
           helm repo update
-          helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner --set stunnerGatewayOperator.dataplane.mode=legacy --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m
-          helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner --set stunner.deployment.container.stunnerd.resources.requests.cpu=200m
+          helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner  --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m  --set stunnerGatewayOperator.dataplane.spec.resources.requests.cpu=100m
 
       - name: Deploy iperf server
         run: kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml
@@ -65,13 +64,13 @@ jobs:
           for n in {1..60}; do [[ ! -z $(kubectl get svc udp-gateway -n stunner -o jsonpath="{.status.loadBalancer.ingress[0].ip}") ]] && break; echo "Waiting for LoadBalancer IP"; sleep 2; done
           echo "* wait for the deployment"
           kubectl get all -A
-          kubectl wait -n stunner --for=condition=Available deployment stunner --timeout 5m
+          kubectl wait -n stunner --for=condition=Available deployment udp-gateway --timeout 5m
           echo "* EVERYTHING UP"
           kubectl get all -A
 
       - name: Start turncat
         run: |
-          ./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/stunnerd-config:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>turncat.log &
+          ./turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>turncat.log &
           sleep 1
 
       - name: Run iperf client
