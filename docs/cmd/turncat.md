@@ -7,7 +7,16 @@ This  is much faster than the TCP connection used by `kubectl`.
 
 ## Installation
 
-Install the `turncat` binary using the standard Go toolchain and add it to `$PATH`. 
+On Linux and macOS, use [this script](/cmd/getstunner/getstunner.sh) to download the latest version of the `turncat` binary:
+
+```console
+curl -sL https://raw.githubusercontent.com/l7mp/stunner/main/cmd/getstunner/getstunner.sh | sh -
+export PATH=$HOME/.l7mp/bin:$PATH
+```
+> [!NOTE]
+> The script installs `stunnerctl` too.
+
+Install the `turncat` binary using the standard Go toolchain and add it to `$PATH`.
 
 ```console
 go install github.com/l7mp/stunner/cmd/turncat@latest

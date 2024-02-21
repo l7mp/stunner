@@ -5,7 +5,16 @@ The prominent use of `stunnerctl` is to load or watch STUNner dataplane configur
 
 ## Installation
 
-Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`. 
+On Linux and macOS, Use [this script](/cmd/getstunner/getstunner.sh) to download the latest version of the `stunnerctl` binary:
+
+```console
+curl -sL https://raw.githubusercontent.com/l7mp/stunner/main/cmd/getstunner/getstunner.sh | sh -
+export PATH=$HOME/.l7mp/bin:$PATH
+```
+> [!NOTE]
+> The script installs `turncat` too.
+
+Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`.
 
 ```console
 go install github.com/l7mp/stunner/cmd/stunnerctl@latest
