@@ -30,10 +30,8 @@ Let the new version be vX.Y.Z.
 
 - `git pull`
 - bump `github.com/l7mp/stunner` version to vX.Y.Z  in the `go.mod`
-- bump `github.com/l7mp/stunner-gateway-operator` version to vX.Y.Z (or whatever you used when
-  releasing the operator) in the `go.mod`
 - `go mod tidy`
-- make sure `make test` passes
+- make sure `go test ./... -count 1` passes
 - make sure `golangci-lint run` passes
 - `git push` if there are local changes
 - release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
