@@ -67,7 +67,7 @@ Below is a reference of the most important fields of the GatewayConfig [`spec`](
 | `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
 | `authRef` | `reference` | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials. | No |
 | `authType` | `string` | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`. | No |
-| `username` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
+| `userName` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `password` | `string` | The password for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `sharedSecret` | `string` | The shared secret for [`ephemeral` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
 | `authLifetime` | `int` | The lifetime of [`ephemeral` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
