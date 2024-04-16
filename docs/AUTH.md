@@ -41,7 +41,7 @@ The authentication workflow of STUNner is as follows.
    Use the below query to generate a valid STUNner credential to access the Gateway called `my-gateway` deployed into the `my-namespace` namespace:
 
    ```console
-   curl "http://stunner-auth.stunner-system:8088/ice?service=turn?ttl=3600&username=my-user&namespace=my-namespace&gateway=my-gateway"
+   curl "http://stunner-auth.stunner-system:8088/ice?service=turn&ttl=3600&username=my-user&namespace=my-namespace&gateway=my-gateway"
    ```
    
 2. The clients *receive the ICE configuration* (usually, from the application server) over a secure channel. This is outside the context of STUNner. Our advice is to return the ICE configuration during the session setup process, say, along with the initial configuration returned for clients before starting the call.
