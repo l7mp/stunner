@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -11,6 +12,7 @@ const (
 var (
 	ConnLabels           = []string{"name"}
 	CounterLabels        = []string{"name", "direction"}
+	AllocActiveGauge     prometheus.GaugeFunc
 	ListenerPacketsTotal *prometheus.CounterVec
 	ListenerBytesTotal   *prometheus.CounterVec
 	ListenerConnsTotal   *prometheus.CounterVec
@@ -134,30 +136,31 @@ func SubConnection(n string, c ConnType) {
 	}
 }
 
-// func RegisterMetrics(log logging.LeveledLogger, GetAllocationCount func() float64) {
-// 	AllocActiveGauge = prometheus.NewGaugeFunc(
-// 		prometheus.GaugeOpts{
-// 			Name: "stunner_allocations_active",
-// 			Help: "Number of active allocations.",
-// 		},
-// 		GetAllocationCount,
-// 	)
-// 	if err := prometheus.Register(AllocActiveGauge); err == nil {
-// 		log.Debug("GaugeFunc 'stunner_allocations_active' registered.")
-// 	} else {
-// 		log.Warn("GaugeFunc 'stunner_allocations_active' cannot be registered.")
-// 	}
-// }
+func RegisterAllocationMetric(log logging.LeveledLogger, GetAllocationCount func() float64) {
+	AllocActiveGauge = prometheus.NewGaugeFunc(
+		prometheus.GaugeOpts{
+			Namespace: stunnerNamespace,
+			Name:      "allocations_active",
+			Help:      "Number of active allocations.",
+		},
+		GetAllocationCount,
+	)
+	if err := prometheus.Register(AllocActiveGauge); err == nil {
+		log.Debug("GaugeFunc 'stunner_allocations_active' registered.")
+	} else {
+		log.Warn("GaugeFunc 'stunner_allocations_active' cannot be registered.")
+	}
+}
 
-// func UnregisterMetrics(log logging.LeveledLogger) {
-// 	if AllocActiveGauge != nil {
-// 		if success := prometheus.Unregister(AllocActiveGauge); success {
-// 			log.Debug("GaugeFunc 'stunner_allocations_active' unregistered.")
-// 			return
-// 		}
-// 	}
-// 	log.Warn("GaugeFunc 'stunner_allocations_active' cannot be unregistered.")
-// }
+func UnregisterAllocationMetric(log logging.LeveledLogger) {
+	if AllocActiveGauge != nil {
+		if success := prometheus.Unregister(AllocActiveGauge); success {
+			log.Debug("GaugeFunc 'stunner_allocations_active' unregistered.")
+			return
+		}
+	}
+	log.Warn("GaugeFunc 'stunner_allocations_active' cannot be unregistered.")
+}
 
 // func GetListenerPacketsTotal(ch chan prometheus.Metric) {
 // 	go func() {
