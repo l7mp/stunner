@@ -61,21 +61,8 @@ spec:
     - name: tcp-gateway
   rules:
     - backendRefs:
-        - name: stunner
+        - name: udp-gateway
           namespace: stunner
-
----
-# make sure the stunner service exists, otherwise the above route will be useless
-apiVersion: v1
-kind: Service
-metadata:
-  name: stunner
-  namespace: stunner
-spec:
-  selector:
-    app: stunner
-  ports:
-  - port: 3478
-    protocol: UDP
-    targetPort: 3478
-  type: ClusterIP
+        - name: tcp-gateway
+          namespace: stunner
+          

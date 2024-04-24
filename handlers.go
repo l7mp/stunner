@@ -67,7 +67,7 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 
 	return func(src net.Addr, peer net.IP) bool {
 		// need auth for logging
-		// dynamic: authHandler might have changed behind ur back
+		// dynamic: authHandler might have changed behind our back
 		auth := s.GetAuth()
 
 		peerIP := peer.String()

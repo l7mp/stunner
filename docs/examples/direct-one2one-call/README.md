@@ -215,8 +215,8 @@ another one at TCP:3478, plus and a UDPRoute.
 kubectl apply -f docs/examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
 
-The most important component in the STUNner configuration is the TURN Gateway: this will expose a
-public TURN server on the UDP port 3478 through which clients will connect to each other.
+The most important component in the STUNner configuration is the Gateway: this will expose a public
+TURN server on the UDP port 3478 through which clients will connect to each other.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -234,14 +234,15 @@ spec:
 
 For later convenience we also create a TCP Gateway that runs on port TCP:3478.
 
-Observe that we set STUNner's own service as the backend in the UDPRoute. This way, STUNner will be
-allowed to loop back client connections to itself. This is required by the headless model, since in
-this case the only way for clients to connect is via the transport relay connections created by
-STUNner. The rest, that is, cross-connecting the clients' media streams between each other, is just
-pure TURN magic.
+We still need to ensure that STUNner will loop back client connections to itself. This is required
+by the headless model, since in this case the only way for clients to connect to each other is via
+the transport relay connections created by STUNner. The rest, that is, cross-connecting the
+clients' media streams, is just pure TURN magic.
 
 Here is the corresponding UDPRoute. Note that the route attaches itself to both the UDP and the TCP
-Gateway, so no matter on which gateway the client connects via our UDPRoute will apply.
+Gateway, so no matter on which gateway the client connects via our UDPRoute will apply. Observe
+also that the backend Services are the Gateway pods themselves: this makes sure that two clients
+that happen to connect via different Gateway pods still connect to each other.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -255,16 +256,14 @@ spec:
     - name: tcp-gateway
   rules:
     - backendRefs:
-        - name: stunner
+        - name: udp-gateway
+          namespace: stunner
+        - name: tcp-gateway
           namespace: stunner
 ```
 
-Note that the `stunner/stunner` service should exist for this to work. The manifest conveniently creates it, but
-if you're doing things manually here is how to create the target service.
-
-```console
-kubectl expose deployment -n stunner stunner --port 3478 --protocol UDP
-```
+Noe that the `stunner/udp-gateway` and `stunner/tcp-gateway` Kubernetes Services are automatically
+created by STUNner to expose your Gateways, here we merely reuse these as backends.
 
 ### Check your configuration
 
@@ -294,8 +293,8 @@ Listeners:
   - Name: stunner/udp-gateway/udp-listener
     Protocol: TURN-UDP
     Public address:port: 34.118.88.91:3478
-    Routes: [stunner/iperf-server]
-    Endpoints: [10.76.1.4, 10.80.4.47]
+    Routes: [stunner/stunner-headless]
+    Endpoints: ...
 ```
 
 ### Run the test
