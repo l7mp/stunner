@@ -104,7 +104,7 @@ func NewStunner(options Options) *Stunner {
 	if !s.dryRun {
 		s.resolver.Start()
 		telemetry.Init()
-		// telemetry.RegisterMetrics(s.log, func() float64 { return s.GetActiveConnections() })
+		telemetry.RegisterAllocationMetric(s.log, s.GetActiveConnections)
 	}
 
 	// TODO: remove this when STUNner gains self-managed dataplanes
@@ -275,7 +275,7 @@ func (s *Stunner) Close() {
 		}
 	}
 
-	// telemetry.UnregisterMetrics(s.log)
+	telemetry.UnregisterAllocationMetric(s.log)
 	if !s.dryRun {
 		telemetry.Close()
 	}
@@ -284,4 +284,7 @@ func (s *Stunner) Close() {
 }
 
 // GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
-func (s *Stunner) GetActiveConnections() float64 { return 0.0 }
+func (s *Stunner) GetActiveConnections() float64 {
+	count := s.AllocationCount()
+	return float64(count)
+}
