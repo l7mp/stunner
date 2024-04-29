@@ -1,11 +1,11 @@
 # stunnerctl: Command line toolbox for STUNner
 
-A CLI tool to simplify the interaction with STUNner. 
+A CLI tool to simplify the interaction with STUNner.
 The prominent use of `stunnerctl` is to load or watch STUNner dataplane configurations from a Kubernetes cluster for debugging and troubleshooting, or just for checking whether everything is configured the way it should be.
 
 ## Installation
 
-Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`. 
+Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`.
 
 ```console
 go install github.com/l7mp/stunner/cmd/stunnerctl@latest
@@ -26,7 +26,7 @@ go build -o stunnerctl cmd/stunnerctl/main.go
 
 ## Usage
 
-Type `stunnerctl` to get a glimpse of the sub-commands and features provided. 
+Type `stunnerctl` to get a glimpse of the sub-commands and features provided.
 
 ### Config
 
@@ -70,7 +70,7 @@ The `config` sub-command is used to load or watch running dataplane configs from
   ```
 
 For those who don't have the Go toolchain available to run `go install`, STUNner provides a minimalistic `stunnerctl` replacement called `stunnerctl.sh`.
-This script requires nothing else than `bash`, `kubectl`, `curl` and `jq` to work. 
+This script requires nothing else than `bash`, `kubectl`, `curl` and `jq` to work.
 
 The below will dump the running config of `tcp-gateway` deployed into the `stunner` namespace:
 

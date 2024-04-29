@@ -10,7 +10,7 @@ spec:
   serviceName: redis
   replicas: 1
   selector:
-    matchLabels: 
+    matchLabels:
       app: redis
   template:
     metadata:

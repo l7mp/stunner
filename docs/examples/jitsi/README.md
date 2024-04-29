@@ -119,7 +119,7 @@ metadata:
   name: stunner-gatewayconfig
   namespace: stunner
 spec:
-  authType: longterm
+  authType: ephemeral
   sharedSecret: "my-shared-secret"
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -132,7 +132,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
@@ -145,6 +145,7 @@ spec:
   rules:
     - backendRefs:
         - name: jitsi-jvb
+          namespace: default
 ```
 
 Once the Gateway resource is installed into Kubernetes, STUNner will create a Kubernetes LoadBalancer for the Gateway to expose the TURN server on UDP:3478 to clients. It can take up to a minute for Kubernetes to allocate a public external IP for the service.
