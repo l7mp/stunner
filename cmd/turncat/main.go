@@ -17,6 +17,7 @@ import (
 
 	"github.com/l7mp/stunner"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/buildinfo"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -34,6 +35,10 @@ var (
 	log             logging.LeveledLogger
 	defaultDuration time.Duration
 	loggerFactory   *logger.LeveledLoggerFactory
+
+	version    = "dev"
+	commitHash = "n/a"
+	buildDate  = "<unknown>"
 )
 
 func main() {
@@ -76,6 +81,9 @@ func main() {
 
 	loggerFactory = logger.NewLoggerFactory(*level)
 	log = loggerFactory.NewLogger("turncat-cli")
+
+	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
+	log.Debugf("Starting turncat %s", buildInfo.String())
 
 	uri := flag.Arg(1)
 	log.Debugf("Reading STUNner config from URI %q", uri)
