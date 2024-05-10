@@ -29,7 +29,7 @@ func decodeConfigList(r []byte) ([]*stnrv1.StunnerConfig, error) {
 
 // getURI tries to parse an address or an URL or a file name into an URL.
 func getURI(addr string) (*url.URL, error) {
-	// make sure we have a working HTTP scheme
+	// default URL scheme is "http"
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") &&
 		!strings.HasPrefix(addr, "ws://") && !strings.HasPrefix(addr, "wss://") &&
 		!strings.HasPrefix(addr, "file://") {

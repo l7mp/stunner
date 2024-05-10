@@ -8,7 +8,14 @@ import (
 
 func TestParseURI(t *testing.T) {
 	// file
-	u, err := getURI("/tmp/a")
+	u, err := getURI("file:///tmp/a")
+	assert.NoError(t, err, "file URI parse")
+	assert.Equal(t, "file", u.Scheme, "file URI scheme")
+	assert.Equal(t, "", u.Host, "file URI host")
+	assert.Equal(t, "/tmp/a", u.Path, "file URI path")
+
+	// default is http
+	u, err = getURI("/tmp/a")
 	assert.NoError(t, err, "file URI parse")
 	assert.Equal(t, "http", u.Scheme, "file URI scheme")
 	assert.Equal(t, "", u.Host, "file URI host")
