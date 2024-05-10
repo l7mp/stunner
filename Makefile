@@ -1,3 +1,17 @@
+# Build variables
+PACKAGE = github.com/l7mp/stunner
+BUILD_DIR ?= bin/
+VERSION ?= $(shell (git describe --tags --abbrev=8 --always --long) | tr "/" "-")
+COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null)
+BUILD_DATE ?= $(shell date +%FT%T%z)
+LDFLAGS += -X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE}
+
+ifeq (${VERBOSE}, 1)
+ifeq ($(filter -v,${GOARGS}),)
+	GOARGS += -v
+endif
+endif
+
 .PHONY: all
 all: build
 
@@ -14,20 +28,16 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet test ## Run tests.
+test: generate fmt vet
+	go test ./... -v
 
 ##@ Build
 
 .PHONY: build
-build: generate fmt vet ## Build binary.
-	go build -o bin/stunnerd cmd/stunnerd/main.go
-	go build -o bin/turncat cmd/turncat/main.go
+build: generate fmt vet
+	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerd cmd/stunnerd/main.go
+	go build ${GOARGS} -o ${BUILD_DIR}/turncat cmd/turncat/main.go
 
-.PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run cmd/stunnerd/main.go
-
-# clean up generated files
 .PHONY: clean
 clean:
 	echo 'Use "make generate` to autogenerate server code' > pkg/server/server.go

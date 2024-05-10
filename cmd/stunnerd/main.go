@@ -13,10 +13,15 @@ import (
 
 	"github.com/l7mp/stunner"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/buildinfo"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 )
 
-// usage: stunnerd -v turn://user1:passwd1@127.0.0.1:3478?transport=udp
+var (
+	version    = "dev"
+	commitHash = "n/a"
+	buildDate  = "<unknown>"
+)
 
 func main() {
 	os.Args[0] = "stunnerd"
@@ -74,7 +79,8 @@ func main() {
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
-	log.Infof("starting stunnerd instance %q", st.GetId())
+	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
+	log.Infof("starting stunnerd id %q, STUNner %s ", st.GetId(), buildInfo.String())
 
 	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
