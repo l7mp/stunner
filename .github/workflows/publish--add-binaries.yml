@@ -44,10 +44,12 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Build turncat binary
+      - name: Build binaries
         run: |
-          CGO_ENABLED=0 GOARCH=${{ matrix.arch }} GOOS=${{ matrix.os }} go build -ldflags="-w -s" -trimpath -o turncat cmd/turncat/main.go
-          mv turncat turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          export CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }}
+          make build
+          mv bin/turncat turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          mv bin/stunnerctl stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
 
       - name: Release turncat binary
         uses: svenstaro/upload-release-action@v2
@@ -56,12 +58,6 @@ jobs:
           file: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
           tag: ${{ github.ref_name }}
           asset_name: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
-
-
-      - name: Build stunnerctl binary
-        run: |
-          CGO_ENABLED=0 GOARCH=${{ matrix.arch }} GOOS=${{ matrix.os }} go build -ldflags="-w -s" -trimpath -o stunnerctl cmd/stunnerctl/main.go
-          mv stunnerctl stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
 
       - name: Release stunnerctl binary
         uses: svenstaro/upload-release-action@v2

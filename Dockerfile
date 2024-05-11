@@ -6,21 +6,25 @@ WORKDIR /app
 
 COPY go.mod ./
 COPY go.sum ./
-RUN go mod download
 
 COPY *.go ./
 COPY internal/ internal/
 COPY pkg/ pkg/
 
-COPY cmd/stunnerd/main.go cmd/stunnerd/
-COPY cmd/stunnerd/stunnerd.conf cmd/stunnerd/
+COPY cmd/ cmd/
+
+COPY .git ./
+COPY Makefile ./
+RUN apk add --no-cache git make
 
 RUN apkArch="$(apk --print-arch)"; \
       case "$apkArch" in \
         aarch64) export GOARCH='arm64' ;; \
         *) export GOARCH='amd64' ;; \
       esac; \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o stunnerd cmd/stunnerd/main.go
+    export CGO_ENABLED=0; \
+    export GOOS=linux; \
+    make build
 
 ###########
 # STUNNERD
@@ -28,7 +32,7 @@ FROM scratch
 
 WORKDIR /app
 
-COPY --from=builder /app/stunnerd /usr/bin/
+COPY --from=builder /app/bin/stunnerd /usr/bin/
 COPY --from=builder /app/cmd/stunnerd/stunnerd.conf /
 
 EXPOSE 3478/udp
