@@ -47,7 +47,7 @@ jobs:
       - name: Build binaries
         run: |
           export CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }}
-          make build
+          make build-bin
           mv bin/turncat turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
           mv bin/stunnerctl stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
 

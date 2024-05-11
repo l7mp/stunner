@@ -24,7 +24,7 @@ RUN apkArch="$(apk --print-arch)"; \
       esac; \
     export CGO_ENABLED=0; \
     export GOOS=linux; \
-    make build
+    make build-bin
 
 ###########
 # STUNNERD

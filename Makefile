@@ -4,6 +4,7 @@ BUILD_DIR ?= bin/
 VERSION ?= $(shell (git describe --tags --abbrev=8 --always --long) | tr "/" "-")
 COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date +%FT%T%z)
+LDFLAGS += -s -w
 LDFLAGS += -X main.version=${VERSION} -X main.commitHash=${COMMIT_HASH} -X main.buildDate=${BUILD_DATE}
 GOARGS = -trimpath
 
@@ -35,7 +36,10 @@ test: generate fmt vet
 ##@ Build
 
 .PHONY: build
-build: generate fmt vet
+build: generate fmt vet build-bin
+
+.PHONY: build-bin
+build-bin:
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerd cmd/stunnerd/main.go
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/turncat cmd/turncat/main.go
 	go build ${GOARGS} -o ${BUILD_DIR}/stunnerctl cmd/stunnerctl/main.go
