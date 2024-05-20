@@ -185,7 +185,9 @@ Manually hinted external address describes an address that can be bound to a Gat
 >
 > Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if the cloud-provider or your Kubernetes install do not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
 
-[Mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) are supported: this means if you want to expose a UDP and a TCP port on the same IP you can do it with a single Gateway. The below Gateway will expose both ports with their respective protocols.
+Currently, STUNner limits each Gateway to a single transport protocol, e.g., UDP or TCP. This is intended to improve the consistency across the Kubernetes services of different cloud providers, which provide varying support for [mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types). If you still want to expose a UDP and a TCP port on the same IP using a single Gateway, add the annotation `stunner.l7mp.io/enable-mixed-protocol-lb: true` to the Gateway.
+
+The below Gateway will expose both ports with their respective protocols.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -208,6 +210,28 @@ spec:
 > [!WARNING]
 >
 > Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature. You can enable mixed-protocol LBs by annotating a Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair.
+
+Some use cases require maintaining the source IP address of the client for correct operation. For the intended use case of STUNner, as an ingress media gateway exposing the cluster's media services over the TURN protocol, this does not matter. However, some users wish to use STUNner as a STUN server, which requires the original source IP to be retained by the load balancer. This can be achieved by adding the annotation `stunner.l7mp.io/external-traffic-policy: local` to a Gateway. This will set the [`service.spec.externalTrafficPolicy`](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip) field in the Service created by STUNner for the Gateway to `local`, which will instruct Kubernetes to preserve the original source IP address in clients' packets.
+
+> [!WARNING]
+>
+> This feature comes with fairly complex [limitations](https://kubernetes.io/docs/tutorials/services/source-ip), use it at your own [risk](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#caveats-and-limitations-when-preserving-source-ips).
+
+### Manually provisioning the dataplane
+
+In some cases it may be useful to manually provision a dataplane for a Gateway, e.g., to deploy `stunnerd` in a DeamonSet instead of a Deployment. Adding the annotation `stunner.l7mp.io/disable-managed-dataplane: true` to a Gateway will prevent STUNner from spawning a dataplane for the Gateway. This then allows one to manually create a `stunnerd` dataplane and connect it to the CDS server exposed by the operator to obtain the dataplane configuration. Remove the annotation to revert to the default mode and let STUNner to manage the dataplane for the Gateway.
+
+> [!WARNING]
+>
+> Manually provisioning a dataplane for a Gateway requires intimate knowledge with the STUNner internals, use this feature only if you know what you are doing.
+
+The below table summarizes the Gateway annotations supported by STUNner.
+
+| Key/value                                           | Description                                                                                                                                                | Default        |
+|:----------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------:|
+| `stunner.l7mp.io/service-type: <svc-type>`          | [Type of the Service](https://kubernetes.io/docs/concepts/services-networking/service) per Gateway, either `ClusterIP`, `NodePort`, or `LoadBalancer`.     | `LoadBalancer` |
+| `stunner.l7mp.io/enable-mixed-protocol-lb: <bool>`  | [Mixed protocol load balancer service](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) support. | False          |
+| `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway                                                                                                         | False          |
 
 ## UDPRoute
 
