@@ -92,7 +92,7 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&all, "all-namespaces", "a", false, "Consider all namespaces")
-	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "summary", "Output format")
+	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "summary", "Output format, either json, yaml, summary or jsonpath=template")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging, identical to -l all:DEBUG")
 
 	// Kubernetes config flags: persistent, all commands
@@ -127,7 +127,7 @@ func main() {
 	}
 }
 
-func runConfig(cmd *cobra.Command, args []string) error {
+func runConfig(_ *cobra.Command, args []string) error {
 	loglevel := "all:WARN"
 	if verbose {
 		loglevel = "all:TRACE"
@@ -136,7 +136,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	log = loggerFactory.NewLogger("stunnerctl")
 
 	gwNs := "default"
-	if k8sConfigFlags.Namespace != nil {
+	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
 		gwNs = *k8sConfigFlags.Namespace
 	}
 
@@ -241,7 +241,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runStatus(cmd *cobra.Command, args []string) error {
+func runStatus(_ *cobra.Command, args []string) error {
 	loglevel := "all:WARN"
 	if verbose {
 		loglevel = "all:TRACE"
