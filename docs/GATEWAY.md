@@ -152,6 +152,17 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 > - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
 > - changing the TURN authentication realm will restart *all* TURN listeners.
 
+Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+
+| Field   | Type     | Description                                                   | Required |
+|:--------|:--------:|:--------------------------------------------------------------|:--------:|
+| `type`  | `string` | Type of the address. Currently only `IPAddress` is supported. | Yes      |
+| `value` | `string` | Address that should be bound to the Gateway's service.        | Yes      |
+
+> [!WARNING]
+>
+> Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if your Kubernetes install does not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
+
 ### Listener configuration
 
 Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a `tls` configuration is required for TURN-TLS and TURN-DTLS listeners. Per-listener configuration is as follows.
@@ -168,62 +179,45 @@ For TURN-TLS/TURN-DTLS listeners, `tls.mode` must be set to `Terminate` or omitt
 
 ### Load balancer configuration
 
-STUNner will automatically generate a Kubernetes LoadBalancer service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN over UDP and TURN over DTLS listeners are exposed as UDP services, TURN-TCP and TURN-TLS listeners are exposed as TCP.
+STUNner will automatically generate a Kubernetes LoadBalancer Service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN over UDP and TURN over DTLS listeners are exposed as UDP services, TURN-TCP and TURN-TLS listeners are exposed as TCP.
 
-STUNner implements two ways to customize the automatically created Service, both involving certain per-defined [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations) added to the Service.  This is useful to, e.g., specify health-check settings for the Kubernetes load-balancer controller. The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
+STUNner implements two ways to customize the automatically created Service, both involving certain pre-defined [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations).  First, you can add global annotations to the `loadBalancerServiceAnnotations` field of the [GatewayConfig spec](#gatewayconfig), which affect the Service created for each Gateway that links to the GatewayConfig (via the GatewayClass `parametersRef`). To customize annotations on a per-gateway status, you can also add specific annotations to the Gateway itself. Gateway annotations override the global annotations on conflict.
 
-By default, each key-value pair set in the GatewayConfig `loadBalancerServiceAnnotations` field will be copied verbatim into the Service. Service annotations can be customized on a per-Gateway basis as well, by adding the corresponding annotations to a Gateway resource. STUNner copies all annotations from the Gateway into the Service, overwriting the annotations specified in the GatewayConfig on conflict.
+The following rules apply:
+- Each annotation is copied verbatim into the Service created for any Gateway. This can be used, for instance, to specify health-check settings on the load-balancer Service (using the `service.beta.kubernetes.io/*-loadbalancer-healthcheck-*` annotations, see above).
+- Annotations with the prefix `stunner.l7mp.io/...` have special meaning: apart from being copied into the Service these annotations also affect some specifics of the created Service, like the service type or the nodeports assigned to listeners.
 
-Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+STUNner defines the following special annotations:
 
-| Field   | Type     | Description                                                   | Required |
-|:--------|:--------:|:--------------------------------------------------------------|:--------:|
-| `type`  | `string` | Type of the address. Currently only `IPAddress` is supported. | Yes      |
-| `value` | `string` | Address that should be bound to the Gateway's service.        | Yes      |
+1. **Service type:** The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
 
-> [!WARNING]
->
-> Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if your Kubernetes install does not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
+1. **Mixed-protocol support:** Currently, STUNner limits each Gateway to a single transport protocol, e.g., UDP or TCP. This is intended to improve the consistency across the Kubernetes services of different cloud providers, which provide varying support for [mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types). If you still want to expose a UDP and a TCP port on the same IP using a single Gateway, add the annotation `stunner.l7mp.io/enable-mixed-protocol-lb: true` to the Gateway. Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature. 
+ 
+   The below Gateway will expose both ports with their respective protocols.
 
-Currently, STUNner limits each Gateway to a single transport protocol, e.g., UDP or TCP. This is intended to improve the consistency across the Kubernetes services of different cloud providers, which provide varying support for [mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types). If you still want to expose a UDP and a TCP port on the same IP using a single Gateway, add the annotation `stunner.l7mp.io/enable-mixed-protocol-lb: true` to the Gateway.
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: Gateway
+   metadata:
+     name: mixed-protocol-gateway
+     annotations:
+       stunner.l7mp.io/enable-mixed-protocol-lb: true
+   spec:
+     gatewayClassName: stunner-gatewayclass
+     listeners:
+       - name: udp-listener
+         port: 3478
+         protocol: TURN-UDP
+       - name: tcp-listener
+         port: 3479
+         protocol: TURN-TCP
+   ```
 
-The below Gateway will expose both ports with their respective protocols.
+1. **Retaining the source IP:** Normally, Kubernetes load balancers will apply a source IP address translation when ingesting packets into the cluster. However, some use cases require maintaining clients' source IP address for correct operation. For STUNner's intended use case, as an ingress media gateway exposing the cluster's media services over the TURN protocol, this does not matter. However, STUNner can also act as a STUN server, which requires clients' source IP to be retained by the load balancer. This can be achieved by adding the annotation `stunner.l7mp.io/external-traffic-policy: local` to a Gateway. This will set the [`service.spec.externalTrafficPolicy`](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip) field in the Service created by STUNner for the Gateway to `Local`. Note that this feature comes with fairly complex [limitations](https://kubernetes.io/docs/tutorials/services/source-ip), use it at your own [risk](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#caveats-and-limitations-when-preserving-source-ips).
 
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: mixed-protocol-gateway
-  annotations:
-    stunner.l7mp.io/enable-mixed-protocol-lb: true
-spec:
-  gatewayClassName: stunner-gatewayclass
-  listeners:
-    - name: udp-listener
-      port: 3478
-      protocol: TURN-UDP
-    - name: tcp-listener
-      port: 3479
-      protocol: TURN-TCP
-```
+1. **Manually provisioning the dataplane:** In some cases it may be useful to manually provision a dataplane for a Gateway, e.g., to deploy `stunnerd` in a DeamonSet instead of a Deployment. Adding the annotation `stunner.l7mp.io/disable-managed-dataplane: true` to a Gateway will prevent STUNner from spawning a dataplane for the Gateway. This then allows one to manually create a `stunnerd` dataplane and connect it to the CDS server exposed by the operator to obtain the dataplane configuration. Remove the annotation to revert to the default mode and let STUNner to manage the dataplane for the Gateway. Manual dataplane provisioning requires intimate knowledge with the STUNner internals, use this feature only if you know what you are doing.
 
-> [!WARNING]
->
-> Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature. You can enable mixed-protocol LBs by annotating a Gateway with the `stunner.l7mp.io/enable-mixed-protocol-lb: true` key-value pair.
-
-Some use cases require maintaining the source IP address of the client for correct operation. For the intended use case of STUNner, as an ingress media gateway exposing the cluster's media services over the TURN protocol, this does not matter. However, some users wish to use STUNner as a STUN server, which requires the original source IP to be retained by the load balancer. This can be achieved by adding the annotation `stunner.l7mp.io/external-traffic-policy: local` to a Gateway. This will set the [`service.spec.externalTrafficPolicy`](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip) field in the Service created by STUNner for the Gateway to `local`, which will instruct Kubernetes to preserve the original source IP address in clients' packets.
-
-> [!WARNING]
->
-> This feature comes with fairly complex [limitations](https://kubernetes.io/docs/tutorials/services/source-ip), use it at your own [risk](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#caveats-and-limitations-when-preserving-source-ips).
-
-### Manually provisioning the dataplane
-
-In some cases it may be useful to manually provision a dataplane for a Gateway, e.g., to deploy `stunnerd` in a DeamonSet instead of a Deployment. Adding the annotation `stunner.l7mp.io/disable-managed-dataplane: true` to a Gateway will prevent STUNner from spawning a dataplane for the Gateway. This then allows one to manually create a `stunnerd` dataplane and connect it to the CDS server exposed by the operator to obtain the dataplane configuration. Remove the annotation to revert to the default mode and let STUNner to manage the dataplane for the Gateway.
-
-> [!WARNING]
->
-> Manually provisioning a dataplane for a Gateway requires intimate knowledge with the STUNner internals, use this feature only if you know what you are doing.
+1. **Selecting the NodePort:** By default, Kubernetes assigns a random external port from the range [32000-32767] for each listener of a Gateway exposed with a NodePort Service. This requires all ports in the [32000-32767] range to be opened on the external firewall, which may raise security concerns for hardened deployments. In order to assign specific nodeports to particular listeners, add the annotation `stunner.l7mp.io/nodeport:` `{listener_name_1:nodeport_1,listener_name_2:nodeport_2,...}` to the Gateway, where each key-value pair is a name of a listener and the selected (numeric) NodePort. The value itself must be proper a JSON map. Unknown listeners are silently ignored. Note that STUNner makes no specific effort to reconcile conflicting NodePorts: whenever the selected NodePort is unavailable Kubernetes will silently reject the Service, which can lead to hard-to-debug failures. Use this feature at your own risk.
 
 The below table summarizes the Gateway annotations supported by STUNner.
 
@@ -231,7 +225,9 @@ The below table summarizes the Gateway annotations supported by STUNner.
 |:----------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------:|
 | `stunner.l7mp.io/service-type: <svc-type>`          | [Type of the Service](https://kubernetes.io/docs/concepts/services-networking/service) per Gateway, either `ClusterIP`, `NodePort`, or `LoadBalancer`.     | `LoadBalancer` |
 | `stunner.l7mp.io/enable-mixed-protocol-lb: <bool>`  | [Mixed protocol load balancer service](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) support. | False          |
+| `stunner.l7mp.io/external-traffic-policy: <string>` | Se the value to `Local` to preserve clients' source IP at the load balancer.                                                                               | `Cluster`      |
 | `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        | False          |
+| `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
 
 ## UDPRoute
 
