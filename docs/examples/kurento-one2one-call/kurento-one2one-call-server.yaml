@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: kms
-        image: kurento/kurento-media-server:latest
+        image: docker.io/kurento/kurento-media-server:latest
         # image: kurento/kurento-media-server:6.7.1-xenial
         imagePullPolicy: Always
         env:
@@ -101,7 +101,7 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        image: l7mp/kurento-one2one-call-server
+        image: docker.io/l7mp/kurento-one2one-call-server
         imagePullPolicy: Always
         # image: localhost/l7mp/kurento-one2one-call-server
         # imagePullPolicy: Never
