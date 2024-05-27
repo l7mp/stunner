@@ -17,6 +17,7 @@ Let the new version be vX.Y.Z.
 
 ## STUNner auth service
 
+- this must finish before releasing the operator, otherwise the Helm build will fail 
 - `git pull`
 - bump `github.com/l7mp/stunner` version to vX.Y.Z  in the `go.mod`
 - `go mod tidy`
