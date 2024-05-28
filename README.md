@@ -610,7 +610,9 @@ notable limitations at this point are as follows.
 * v0.13: Observability: Prometheus + Grafana dashboard.
 * v0.15: Performance: Per-allocation CPU load-balancing for UDP
 * v0.16: Management: Managed STUNner dataplane.
-* v0.17: Stabilization: All Gateway and STUNner APIs move to V1.
+* v0.17: First release candidate: All Gateway and STUNner APIs move to v1.
+* v0.18: Stabilization: Second release candidate.
+* v0.19: The missing pieces: Third release candidate.
 * v1.0: GA
 
 ## Help
