@@ -66,7 +66,7 @@ the exposed service of the Coordinator, which clients will connect to.  Running 
 command will result the IP address assigned by the Kubernetes load-balancer:
 
 ```console
-export EXTERNAL_IP=$(kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip})'
+export EXTERNAL_IP=$(kubectl get service -n cloudretro coordinator-lb-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 If Kubernetes refuses to assign an external IP to your service after a couple of minutes, you will
@@ -79,7 +79,13 @@ the CloudRetro servers running on a private pod IP address. That is where STUNne
 
 ### STUNner
 
-You will need to install Stunner on Your cluster, you can do this by following the official [installation guide](../../INSTALL.md#installation).
+First we install STUNner gateway operator with helm ([more info](https://github.com/l7mp/stunner-helm)):
+```console
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
+```
+
 Wait until all the necessary resources are up and running, then you are ready to continue.
 
 Next, register STUNner with the Kubernetes Gateway API.
@@ -148,7 +154,7 @@ the CloudRetro config accordingly and restart CloudRetro to pick up the new conf
 
 ### Test
 
-At this point, you should be able to play SuperMario on CloudRetro installed in Kubernetes.
+At this point, you can play SuperMario on CloudRetro installed in Kubernetes by navigating to `http://${EXTERNAL-IP}:8000` in your web browser.
 
 ![Supre Maro let's go](mario-super.gif)
 
