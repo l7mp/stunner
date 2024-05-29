@@ -14,6 +14,7 @@ Let the new version be vX.Y.Z.
 - `git push` if there are local changes
 - release vX.Y.Z on github (so that we can publish the release notes)
 - wait until the CI/CD pipeline goes green (may take a while)
+- restore doc disclaimers
 
 ## STUNner auth service
 
