@@ -107,6 +107,9 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error resolving peer address %q: %w", config.PeerAddr, err)
 	}
+	if peerAddress == nil || peerAddress.IP == nil {
+		return nil, fmt.Errorf("empty IP address in peer URL %q", config.PeerAddr)
+	}
 
 	if config.Realm == "" {
 		config.Realm = stnrv1.DefaultRealm
