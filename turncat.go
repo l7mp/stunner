@@ -35,6 +35,8 @@ type TurncatConfig struct {
 	Realm string
 	// AuthGet specifies the function to generate auth tokens.
 	AuthGen AuthGen
+	// ServerName is the SNI used for virtual hosting (unless it is an IP address).
+	ServerName string
 	// InsecureMode controls whether self-signed TLS certificates are accepted by the TURN
 	// client.
 	InsecureMode bool
@@ -53,6 +55,7 @@ type Turncat struct {
 	connTrack     map[string]*connection // Conntrack table.
 	lock          *sync.Mutex            // Sync access to the conntrack state.
 	authGen       AuthGen                // Generate auth tokens.
+	serverName    string
 	insecure      bool
 	loggerFactory logging.LoggerFactory
 	log           logging.LeveledLogger
@@ -165,6 +168,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		lock:          new(sync.Mutex),
 		realm:         config.Realm,
 		authGen:       config.AuthGen,
+		serverName:    config.ServerName,
 		insecure:      config.InsecureMode,
 		loggerFactory: loggerFactory,
 		log:           log,
@@ -263,6 +267,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 		// assert.NoError(t, err, "cannot create certificate for TLS client socket")
 		c, err := tls.Dial("tcp", t.serverAddr.String(), &tls.Config{
 			MinVersion:         tls.VersionTLS10,
+			ServerName:         t.serverName,
 			InsecureSkipVerify: t.insecure,
 		})
 		if err != nil {

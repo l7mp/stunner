@@ -58,8 +58,10 @@ func main() {
 	cdsConfigFlags = cdsclient.NewCDSConfigFlags()
 	cdsConfigFlags.AddFlags(flag.CommandLine)
 
-	var level = flag.StringP("log", "l", "all:WARN", "Log level")
+	var serverName string
+	flag.StringVar(&serverName, "sni", "", "Server name (SNI) for TURN/TLS client connections")
 	var insecure = flag.BoolP("insecure", "i", false, "Insecure TLS mode, accept self-signed TURN server certificates (default: false)")
+	var level = flag.StringP("log", "l", "all:WARN", "Log level")
 	var verbose = flag.BoolP("verbose", "v", false, "Enable verbose logging, identical to -l all:DEBUG")
 	var help = flag.BoolP("help", "h", false, "Display this help text and exit")
 
@@ -114,6 +116,7 @@ func main() {
 		PeerAddr:      flag.Arg(2),
 		Realm:         config.Auth.Realm,
 		AuthGen:       authGen,
+		ServerName:    serverName,
 		InsecureMode:  *insecure,
 		LoggerFactory: loggerFactory,
 	}
