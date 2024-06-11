@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	ErrInvalidConf    = errors.New("invalid configuration")
-	ErrNoSuchListener = errors.New("no such listener")
-	ErrNoSuchCluster  = errors.New("no such cluster")
-	// ErrInvalidRoute   = errors.New("invalid route")
+	ErrInvalidConf    = errors.New("Invalid configuration")
+	ErrNoSuchListener = errors.New("No such listener")
+	ErrNoSuchCluster  = errors.New("No such cluster")
+	// ErrInvalidRoute   = errors.New("Invalid route")
 )
 
 type ErrRestarted struct {

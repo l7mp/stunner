@@ -186,11 +186,11 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		// client connection is file
 		go t.runListenFile()
 	default:
-		t.log.Errorf("internal error: unknown client protocol %q for client %s:%s",
+		t.log.Errorf("Internal error: unknown client protocol %q for client %s:%s",
 			listenerAddress.Network(), listenerAddress.Network(), listenerAddress.String())
 	}
 
-	log.Infof("Turncat client listening on %s, TURN server: %s, peer: %s:%s",
+	log.Infof("Client listening on %s, TURN server: %s, peer: %s:%s",
 		config.ListenerAddr, config.ServerAddr,
 		peerAddress.Network(), peerAddress.String())
 
@@ -200,7 +200,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 // Close terminates all relay connections created via turncat and deletes the relay. Errors in this
 // phase are not critical and not propagated back to the caller.
 func (t *Turncat) Close() {
-	t.log.Info("closing Turncat")
+	t.log.Info("Closing Turncat")
 
 	// close all active connections
 	for _, conn := range t.connTrack {
@@ -210,28 +210,28 @@ func (t *Turncat) Close() {
 	// close the global listener socket
 	switch t.listenerConn.(type) {
 	case net.Listener:
-		t.log.Tracef("closing turncat listener connection")
+		t.log.Tracef("Closing turncat listener connection")
 		l := t.listenerConn.(net.Listener)
 		if err := l.Close(); err != nil {
-			t.log.Warnf("error closing listener connection: %s", err.Error())
+			t.log.Warnf("Error closing listener connection: %s", err.Error())
 		}
 	case net.PacketConn:
-		t.log.Tracef("closing turncat packet listener connection")
+		t.log.Tracef("Closing turncat packet listener connection")
 		l := t.listenerConn.(net.PacketConn)
 		if err := l.Close(); err != nil {
-			t.log.Warnf("error closing listener packet connection: %s", err.Error())
+			t.log.Warnf("Error closing listener packet connection: %s", err.Error())
 		}
 	case *util.FileConn:
 		// do nothing
 	default:
-		t.log.Error("internal error: unknown listener socket type")
+		t.log.Error("Internal error: unknown listener socket type")
 	}
 }
 
 // Generate a new connection by opening a UDP connection to the server
 func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	clientAddr := clientConn.RemoteAddr()
-	t.log.Debugf("new connection from client %s", clientAddr.String())
+	t.log.Debugf("New connection from client %s", clientAddr.String())
 
 	conn := new(connection)
 	conn.clientAddr = clientAddr
@@ -241,7 +241,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	user, passwd, errAuth := t.authGen()
 	if errAuth != nil {
-		return nil, fmt.Errorf("cannot generate username/password pair for client %s:%s: %s",
+		return nil, fmt.Errorf("Cannot generate username/password pair for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), errAuth)
 	}
 
@@ -303,7 +303,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	})
 	if err != nil {
 		turnConn.Close()
-		return nil, fmt.Errorf("cannot allocate TURN client for client %s:%s: %s",
+		return nil, fmt.Errorf("Cannot allocate TURN client for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), err)
 	}
 	conn.turnConn = turnConn
@@ -327,7 +327,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	// The relayConn's local address is actually the transport
 	// address assigned on the TURN server.
-	t.log.Infof("new connection: client-address=%s, relayed-address=%s",
+	t.log.Infof("New connection: client-address=%s, relayed-address=%s",
 		clientAddr.String(), conn.serverConn.LocalAddr().String())
 
 	return conn, nil
@@ -347,14 +347,14 @@ func (t *Turncat) deleteConnection(conn *connection) {
 	delete(t.connTrack, caddr)
 	t.lock.Unlock()
 
-	t.log.Infof("closing client connection to %s", caddr)
+	t.log.Infof("Closing client connection to %s", caddr)
 
 	if err := conn.clientConn.Close(); err != nil {
-		t.log.Warnf("error closing client connection for %s:%s: %s",
+		t.log.Warnf("Error closing client connection for %s:%s: %s",
 			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
 	}
 	if err := conn.serverConn.Close(); err != nil {
-		t.log.Warnf("error closing relayed TURN server connection for %s:%s: %s",
+		t.log.Warnf("Error closing relayed TURN server connection for %s:%s: %s",
 			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
 	}
 
@@ -371,7 +371,7 @@ func (t *Turncat) runConnection(conn *connection) {
 			n, peerAddr, readErr := conn.serverConn.ReadFrom(buffer[0:])
 			if readErr != nil {
 				if !util.IsClosedErr(readErr) {
-					t.log.Debugf("cannot read from TURN relay connection for client %s:%s: %s",
+					t.log.Debugf("Cannot read from TURN relay connection for client %s:%s: %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
 				}
@@ -380,7 +380,7 @@ func (t *Turncat) runConnection(conn *connection) {
 
 			// TODO: not sure if this is the recommended way to compare net.Addrs
 			if peerAddr.Network() != t.peerAddr.Network() || peerAddr.String() != t.peerAddr.String() {
-				t.log.Debugf("received packet of %d bytes from unknown peer %s:%s (expected: "+
+				t.log.Debugf("Received packet of %d bytes from unknown peer %s:%s (expected: "+
 					"%s:%s) on TURN relay connection for client %s:%s: ignoring",
 					n, peerAddr.Network(), peerAddr.String(),
 					t.peerAddr.Network(), t.peerAddr.String(),
@@ -388,12 +388,12 @@ func (t *Turncat) runConnection(conn *connection) {
 				continue
 			}
 
-			t.log.Tracef("forwarding packet of %d bytes from peer %s:%s on TURN relay connection "+
+			t.log.Tracef("Forwarding packet of %d bytes from peer %s:%s on TURN relay connection "+
 				"for client %s:%s", n, peerAddr.Network(), peerAddr.String(),
 				conn.clientAddr.Network(), conn.clientAddr.String())
 
 			if _, writeErr := conn.clientConn.Write(buffer[0:n]); writeErr != nil {
-				t.log.Debugf("cannot write to client connection for client %s:%s: %s",
+				t.log.Debugf("Cannot write to client connection for client %s:%s: %s",
 					conn.clientAddr.Network(), conn.clientAddr.String(), writeErr.Error())
 				t.deleteConnection(conn)
 				return
@@ -408,19 +408,19 @@ func (t *Turncat) runConnection(conn *connection) {
 			n, readErr := conn.clientConn.Read(buffer[0:])
 			if readErr != nil {
 				if !util.IsClosedErr(readErr) {
-					t.log.Debugf("cannot read from client connection for client %s:%s (likely hamrless): %s",
+					t.log.Debugf("Cannot read from client connection for client %s:%s (likely hamrless): %s",
 						conn.clientAddr.Network(), conn.clientAddr.String(), readErr.Error())
 					t.deleteConnection(conn)
 				}
 				return
 			}
 
-			t.log.Tracef("forwarding packet of %d bytes from client %s:%s to peer %s:%s on TURN relay connection",
+			t.log.Tracef("Forwarding packet of %d bytes from client %s:%s to peer %s:%s on TURN relay connection",
 				n, conn.clientAddr.Network(), conn.clientAddr.String(),
 				t.peerAddr.Network(), t.peerAddr.String())
 
 			if _, writeErr := conn.serverConn.WriteTo(buffer[0:n], t.peerAddr); writeErr != nil {
-				t.log.Debugf("cannot write to TURN relay connection for client %s (likely harmless): %s",
+				t.log.Debugf("Cannot write to TURN relay connection for client %s (likely harmless): %s",
 					conn.clientAddr.String(), writeErr.Error())
 				t.deleteConnection(conn)
 				return
@@ -432,7 +432,7 @@ func (t *Turncat) runConnection(conn *connection) {
 func (t *Turncat) runListenPacket() {
 	listenerConn, ok := t.listenerConn.(net.PacketConn)
 	if !ok {
-		t.log.Error("cannot listen on client connection: expected net.PacketConn")
+		t.log.Error("Cannot listen on client connection: expected net.PacketConn")
 		// terminate go routine
 		return
 	}
@@ -442,7 +442,7 @@ func (t *Turncat) runListenPacket() {
 		n, clientAddr, err := listenerConn.ReadFrom(buffer[0:])
 		if err != nil {
 			if !util.IsClosedErr(err) {
-				t.log.Warnf("cannot read from listener connection: %s", err.Error())
+				t.log.Warnf("Cannot read from listener connection: %s", err.Error())
 			}
 			return
 		}
@@ -452,15 +452,15 @@ func (t *Turncat) runListenPacket() {
 		caddr := fmt.Sprintf("%s:%s", clientAddr.Network(), clientAddr.String())
 		trackConn, found := t.connTrack[caddr]
 		if !found {
-			t.log.Tracef("new client connection: read initial packet of %d bytes on listener"+
+			t.log.Tracef("New client connection: read initial packet of %d bytes on listener"+
 				"connnection from client %s", n, caddr)
 
 			// create per-client connection, connect back to client, then call runConnection
-			t.log.Tracef("connnecting back to client %s", caddr)
+			t.log.Tracef("Connnecting back to client %s", caddr)
 			dialer := &net.Dialer{LocalAddr: t.listenerAddr, Control: reuseAddr}
 			clientConn, clientErr := dialer.Dial(clientAddr.Network(), clientAddr.String())
 			if clientErr != nil {
-				t.log.Warnf("cannot connect back to client %s:%s: %s",
+				t.log.Warnf("Cannot connect back to client %s:%s: %s",
 					clientAddr.Network(), clientAddr.String(), clientErr.Error())
 				continue
 			}
@@ -468,7 +468,7 @@ func (t *Turncat) runListenPacket() {
 			conn, err := t.newConnection(clientConn)
 			if err != nil {
 				t.lock.Unlock()
-				t.log.Warnf("relay setup failed for client %s: %s", caddr, err.Error())
+				t.log.Warnf("Relay setup failed for client %s: %s", caddr, err.Error())
 				continue
 			}
 
@@ -481,7 +481,7 @@ func (t *Turncat) runListenPacket() {
 
 			// and send the packet out
 			if _, err := conn.serverConn.WriteTo(buffer[0:n], t.peerAddr); err != nil {
-				t.log.Warnf("cannot write initial packet to TURN relay connection for client %s: %s",
+				t.log.Warnf("Cannot write initial packet to TURN relay connection for client %s: %s",
 					caddr, err.Error())
 				t.deleteConnection(conn)
 				continue
@@ -492,7 +492,7 @@ func (t *Turncat) runListenPacket() {
 			// packets are left stuck in the global listener socket
 			t.lock.Unlock()
 
-			t.log.Debugf("received packet from a known client %s on the global listener connection, sender too fast?",
+			t.log.Debugf("Received packet from a known client %s on the global listener connection, sender too fast?",
 				caddr)
 			// send out anyway
 			if _, err := trackConn.serverConn.WriteTo(buffer[0:n], t.peerAddr); err != nil {

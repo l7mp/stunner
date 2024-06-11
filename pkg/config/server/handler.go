@@ -22,7 +22,7 @@ type ConfigPatcher func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.Stunne
 
 // (GET /api/v1/configs)
 func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsRequestObject) (api.ListV1ConfigsResponseObject, error) {
-	s.log.V(1).Info("handling ListV1Configs API call")
+	s.log.V(1).Info("Handling ListV1Configs API call")
 
 	configs := s.configs.Snapshot()
 	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
@@ -32,16 +32,14 @@ func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsReq
 		response.Items = append(response.Items, cpy)
 	}
 
-	s.log.V(3).Info("ListV1Configs API handler: ready",
-		"configlist-len", len(configs))
+	s.log.V(3).Info("ListV1Configs API handler: ready", "configlist-len", len(configs))
 
 	return api.ListV1Configs200JSONResponse(response), nil
 }
 
 // (GET /api/v1/configs/{namespace})
 func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1ConfigsNamespaceRequestObject) (api.ListV1ConfigsNamespaceResponseObject, error) {
-	s.log.V(1).Info("handling ListV1ConfigsNamespace API call",
-		"namespace", request.Namespace)
+	s.log.V(1).Info("Handling ListV1ConfigsNamespace API call", "namespace", request.Namespace)
 
 	configs := s.configs.Snapshot()
 	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
@@ -54,8 +52,7 @@ func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1C
 		}
 	}
 
-	s.log.V(3).Info("ListV1ConfigsNamespace API handler: ready",
-		"configlist-len", len(configs))
+	s.log.V(3).Info("ListV1ConfigsNamespace API handler: ready", "configlist-len", len(configs))
 
 	return api.ListV1ConfigsNamespace200JSONResponse(response), nil
 }
@@ -63,7 +60,7 @@ func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1C
 // (GET /api/v1/configs/{namespace}/{name})
 func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1ConfigNamespaceNameRequestObject) (api.GetV1ConfigNamespaceNameResponseObject, error) {
 	namespace, name := request.Namespace, request.Name
-	s.log.V(1).Info("handling GetV1ConfigNamespaceName API call", "namespace", namespace,
+	s.log.V(1).Info("Handling GetV1ConfigNamespaceName API call", "namespace", namespace,
 		"name", name)
 
 	id := fmt.Sprintf("%s/%s", namespace, name)

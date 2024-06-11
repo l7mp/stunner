@@ -21,13 +21,13 @@ import (
 const ClusterCacheSize = 512
 
 var (
-	errNilConn = errors.New("cannot allocate relay connection")
-	errTodo    = errors.New("relay to Net.Conn not implemented")
+	errNilConn = errors.New("Cannot allocate relay connection")
+	errTodo    = errors.New("Relay to Net.Conn not implemented")
 )
 
 var (
-	ErrPortProhibited      = errors.New("peer port administratively prohibited")
-	ErrInvalidPeerProtocol = errors.New("unknown peer transport protocol")
+	ErrPortProhibited      = errors.New("Peer port administratively prohibited")
+	ErrInvalidPeerProtocol = errors.New("Unknown peer transport protocol")
 )
 
 type PortRangeChecker = func(addr net.Addr) (*object.Cluster, bool)

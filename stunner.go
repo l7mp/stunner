@@ -57,13 +57,13 @@ func NewStunner(options Options) *Stunner {
 	if options.Net == nil {
 		net, err := stdnet.NewNet() // defaults to native operation
 		if err != nil {
-			log.Error("could not create stdnet.NewNet")
+			log.Error("Could not create vnet")
 			return nil
 		}
 		vnet = net
 	} else {
 		vnet = options.Net
-		log.Warn("vnet is enabled")
+		log.Warn("Virtual net (vnet) is enabled")
 	}
 
 	udpThreadNum := 0

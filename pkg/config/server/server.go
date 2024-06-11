@@ -62,14 +62,14 @@ func (s *Server) Start(ctx context.Context) error {
 	s.Server = &http.Server{Addr: s.addr, Handler: s.router}
 
 	go func() {
-		s.log.Info("starting CDS server", "address", s.addr, "patch", s.patch != nil)
+		s.log.Info("Starting CDS server", "address", s.addr, "patch", s.patch != nil)
 
 		err := s.ListenAndServe()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) || errors.Is(err, http.ErrServerClosed) {
-				s.log.Info("closing config discovery server")
+				s.log.Info("Closing config discovery server")
 			} else {
-				s.log.Error(err, "error closing config discovery server", "error", err.Error())
+				s.log.Error(err, "Error closing config discovery server", "error", err.Error())
 			}
 			return
 		}
@@ -86,7 +86,7 @@ func (s *Server) Start(ctx context.Context) error {
 				s.broadcastConfig(c)
 
 			case c := <-s.deleteCh:
-				s.log.V(2).Info("initiating deleyed config deletion", "id", c.Id)
+				s.log.V(2).Info("Initiating deleyed config deletion", "id", c.Id)
 
 				go func() {
 					select {
@@ -136,7 +136,7 @@ func (s *Server) GetConnTrack() *ConnTrack {
 // RemoveClient forcefully closes a client connection. This is used mainly for testing.
 func (s *Server) RemoveClient(id string) {
 	if c := s.conns.Get(id); c != nil {
-		s.log.V(1).Info("forcefully removing client connection", "client", id)
+		s.log.V(1).Info("Forcefully removing client connection", "client", id)
 		s.closeConn(c)
 	}
 }
@@ -165,7 +165,7 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
 	})
 
-	s.log.V(1).Info("new config stream connection", "api", operationID, "client", conn.Id())
+	s.log.V(1).Info("New config stream connection", "api", operationID, "client", conn.Id())
 
 	// send initial config(list)
 	for _, conf := range s.configs.Snapshot() {
@@ -178,7 +178,7 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 	// the running connections)
 	<-ctx.Done()
 
-	s.log.V(1).Info("client connection closed", "api", operationID, "client", conn.Id())
+	s.log.V(1).Info("Client connection closed", "api", operationID, "client", conn.Id())
 
 	conn.Close()
 }
@@ -199,7 +199,7 @@ func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
 	if conn.patch != nil {
 		newC, err := conn.patch(c)
 		if err != nil {
-			s.log.Error(err, "cannot patch config", "event", e.String())
+			s.log.Error(err, "Cannot patch config", "event", e.String())
 			return
 		}
 		c = newC
@@ -207,21 +207,21 @@ func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
 
 	json, err := json.Marshal(c)
 	if err != nil {
-		s.log.Error(err, "cannot JSON serialize config", "event", e.String())
+		s.log.Error(err, "Cannot JSON serialize config", "event", e.String())
 		return
 	}
 
-	s.log.V(2).Info("sending configuration to client", "client", conn.Id(),
+	s.log.V(2).Info("Sending configuration to client", "client", conn.Id(),
 		"config", c.String())
 
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
-		s.log.Error(err, "error sending config update", "client", conn.Id())
+		s.log.Error(err, "Error sending config update", "client", conn.Id())
 		s.closeConn(conn)
 	}
 }
 
 func (s *Server) closeConn(conn *Conn) {
-	s.log.V(1).Info("closing client connection", "client", conn.Id())
+	s.log.V(1).Info("Closing client connection", "client", conn.Id())
 
 	conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
 

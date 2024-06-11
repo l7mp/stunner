@@ -298,7 +298,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 
 			p, err := d.portfwd(ctx, &pod, podFlags.Port)
 			if err != nil {
-				d.log.Errorf("failed to create port-forwarder to stunnerd pod %s/%s: %s",
+				d.log.Errorf("Failed to create port-forwarder to stunnerd pod %s/%s: %s",
 					pod.GetNamespace(), pod.GetName(), err.Error())
 				return
 			}
@@ -344,7 +344,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 		LabelSelector: label,
 	})
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("failed to query Kubernetes API server: %w", err)
+		return PodInfo{}, fmt.Errorf("Failed to query Kubernetes API server: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
@@ -352,7 +352,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 	}
 
 	if len(pods.Items) > 1 {
-		d.log.Infof("mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
+		d.log.Infof("Mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
 	}
 
 	return d.portfwd(ctx, &pods.Items[0], authFlags.Port)
@@ -387,12 +387,12 @@ func (d *PodConnector) portfwd(ctx context.Context, pod *corev1.Pod, port int) (
 	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
 	fw, err := portforward.New(dialer, []string{remoteAddr}, stopChan, readyChan, out, errOut)
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("error creating port-forwarder: %w", err)
+		return PodInfo{}, fmt.Errorf("Error creating port-forwarder: %w", err)
 	}
 
 	go func() {
 		if err := fw.ForwardPorts(); err != nil {
-			d.log.Errorf("error setting up port-forwarder: %s", err.Error())
+			d.log.Errorf("Error setting up port-forwarder: %s", err.Error())
 			os.Exit(1)
 		}
 	}()

@@ -11,7 +11,7 @@ import (
 	"github.com/pion/logging"
 )
 
-var errFileTruncated = errors.New("zero-length config file")
+var errFileTruncated = errors.New("Zero-length config file")
 
 var (
 	// Send pings to the CDS server with this period. Must be less than PongWait.

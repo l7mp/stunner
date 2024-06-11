@@ -60,7 +60,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	initSeq := []byte("init-data")
 	testSeq := []byte("benchmark-data")
 
-	log.Debug("creating a stunnerd")
+	log.Debug("Creating a stunnerd")
 	stunner := NewStunner(Options{
 		LogLevel:             stunnerTestLoglevel,
 		SuppressRollback:     true,
@@ -68,7 +68,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	})
 	defer stunner.Close()
 
-	log.Debug("starting stunnerd")
+	log.Debug("Starting stunnerd")
 	err := stunner.Reconcile(&stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
@@ -100,7 +100,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 		b.Fatalf("Failed to start stunnerd: %s", err)
 	}
 
-	log.Debug("creating a sink")
+	log.Debug("Creating a sink")
 	sinkAddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:65432")
 	if err != nil {
 		b.Fatalf("Failed to resolve sink address: %s", err)
@@ -150,7 +150,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	defer turncat.Close()
 
 	// test with 20 clients
-	log.Debugf("creating %d senders", clientNum)
+	log.Debugf("Creating %d senders", clientNum)
 	clients := make([]net.Conn, clientNum)
 	for i := 0; i < clientNum; i++ {
 		var client net.Conn

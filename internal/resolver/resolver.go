@@ -85,13 +85,13 @@ func (r *dnsResolverImpl) Register(domain string) error {
 
 // the resolver goroutine
 func startResolver(e *serviceEntry, log logging.LeveledLogger) {
-	log.Infof("resolver thread starting for domain %q, DNS update interval: %v",
+	log.Infof("Resolver thread starting for domain %q, DNS update interval: %v",
 		e.domain, dnsUpdateInterval)
 
 	if err := doResolve(e); err != nil {
-		log.Debugf("initial resolution failed for domain %q: %s", e.domain, err.Error())
+		log.Debugf("Initial resolution failed for domain %q: %s", e.domain, err.Error())
 	}
-	log.Tracef("initial resolution ready for domain %q, found %d endpoints", e.domain,
+	log.Tracef("Initial resolution ready for domain %q, found %d endpoints", e.domain,
 		len(e.hostNames))
 
 	ticker := time.NewTicker(dnsUpdateInterval)
@@ -100,15 +100,15 @@ func startResolver(e *serviceEntry, log logging.LeveledLogger) {
 	for {
 		select {
 		case <-e.ctx.Done():
-			log.Debugf("resolver thread exiting for domain %q", e.domain)
+			log.Debugf("Resolver thread exiting for domain %q", e.domain)
 			return
 		case <-ticker.C:
-			log.Tracef("resolving for domain %q", e.domain)
+			log.Tracef("Resolving for domain %q", e.domain)
 			if err := doResolve(e); err != nil {
-				log.Debugf("resolution failed for domain %q: %s",
+				log.Debugf("Resolution failed for domain %q: %s",
 					e.domain, err.Error())
 			}
-			log.Tracef("periodic resolution ready for domain %q, found %d endpoints", e.domain,
+			log.Tracef("Periodic resolution ready for domain %q, found %d endpoints", e.domain,
 				len(e.hostNames))
 		}
 	}

@@ -68,14 +68,14 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 // periodically retry until the file appears.
 func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
 	if w.configFile == "" {
-		return errors.New("uninitialized config file path")
+		return errors.New("Uninitialized config file path")
 	}
 
 	go func() {
 		for {
 			// try to watch
 			if err := w.Poll(ctx, ch); err != nil {
-				w.log.Warnf("error loading config file %q: %s",
+				w.log.Warnf("Error loading config file %q: %s",
 					w.configFile, err.Error())
 			} else {
 				return
@@ -113,7 +113,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 		return err
 	}
 
-	w.log.Debugf("initial config file successfully loaded from %q: %s", config, c.String())
+	w.log.Debugf("Initial config file successfully loaded from %q: %s", config, c.String())
 
 	ch <- c
 
@@ -128,31 +128,31 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 		case e, ok := <-watcher.Events:
 			if !ok {
-				return errors.New("config watcher event handler received invalid event")
+				return errors.New("Config watcher received invalid event")
 			}
 
-			w.log.Debugf("received watcher event: %s", e.String())
+			w.log.Debugf("Received watch event: %s", e.String())
 
 			if e.Has(fsnotify.Remove) {
 				if err := watcher.Remove(config); err != nil {
-					w.log.Debugf("could not remove config file %q watcher: %s",
+					w.log.Debugf("Could not remove config file %q watcher: %s",
 						config, err.Error())
 				}
 
-				return fmt.Errorf("config file deleted %q, disabling watcher", e.Op.String())
+				return fmt.Errorf("Config file deleted %q, disabling watcher", e.Op.String())
 			}
 
 			if !e.Has(fsnotify.Write) {
-				w.log.Debugf("unhandled notify op on config file %q (ignoring): %s",
+				w.log.Debugf("Unhandled notify op on config file %q (ignoring): %s",
 					e.Name, e.Op.String())
 				continue
 			}
 
-			w.log.Debugf("loading configuration file: %s", config)
+			w.log.Debugf("Loading configuration file: %s", config)
 			c, err := w.Load()
 			if err != nil {
 				if errors.Is(err, errFileTruncated) {
-					w.log.Debugf("ignoring: %s", err.Error())
+					w.log.Debugf("Ignoring: %s", err.Error())
 					continue
 				}
 				return err
@@ -160,11 +160,11 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 			// suppress repeated events
 			if c.DeepEqual(&prev) {
-				w.log.Debugf("ignoring recurrent notify event for the same config file")
+				w.log.Debugf("Ignoring recurrent notify event for the same config file")
 				continue
 			}
 
-			w.log.Debugf("config file successfully loaded from %q: %s", config, c.String())
+			w.log.Debugf("Config file successfully loaded from %q: %s", config, c.String())
 
 			ch <- c
 
@@ -173,15 +173,15 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				return errors.New("config watcher error handler received invalid error")
+				return errors.New("Config watcher error handler received invalid error")
 			}
 
 			if err := watcher.Remove(config); err != nil {
-				w.log.Debugf("could not remove config file %q watcher: %s",
+				w.log.Debugf("Could not remove config file %q watcher: %s",
 					config, err.Error())
 			}
 
-			return fmt.Errorf("watcher error, deactivating watcher: %w", err)
+			return fmt.Errorf("Config watcher error, deactivating: %w", err)
 		}
 	}
 }
@@ -202,16 +202,16 @@ func (w *ConfigFileClient) tryWatchConfig(ctx context.Context) bool {
 			return false
 
 		case <-ticker.C:
-			w.log.Debugf("trying to read config file %q from periodic timer",
+			w.log.Debugf("Trying to read config file %q from periodic timer",
 				config)
 
 			// check if config file exists and it is readable
 			if _, err := os.Stat(config); errors.Is(err, os.ErrNotExist) {
-				w.log.Debugf("config file %q does not exist", config)
+				w.log.Debugf("Config file %q does not exist", config)
 
 				// report status in every 10th second
 				if time.Now().Second()%10 == 0 {
-					w.log.Warnf("waiting for config file %q", config)
+					w.log.Warnf("Waiting for config file %q", config)
 				}
 
 				continue

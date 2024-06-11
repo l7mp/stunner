@@ -39,13 +39,12 @@ func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
 func (s *Server) DeleteConfig(id string) {
 	s.configs.Delete(id)
 	if ConfigDeletionUpdateDelay == 0 {
-		s.log.Info("suppressing config update  for deleted config",
-			"client", id)
+		s.log.Info("Suppressing config update for deleted config", "client", id)
 		return
 	}
 
-	s.log.Info("delaying config update for deleted config",
-		"client", id, "delay", ConfigDeletionUpdateDelay)
+	s.log.Info("Delaying config update for deleted config", "client", id,
+		"delay", ConfigDeletionUpdateDelay)
 
 	s.deleteCh <- Config{Id: id, Config: client.ZeroConfig(id)}
 }
@@ -53,7 +52,7 @@ func (s *Server) DeleteConfig(id string) {
 // UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
 // particular instance of time and generates an update per each change.
 func (s *Server) UpdateConfig(newConfigs []Config) error {
-	s.log.V(4).Info("processing config updates", "num-configs", len(newConfigs))
+	s.log.V(4).Info("Processing config updates", "num-configs", len(newConfigs))
 	oldConfigs := s.configs.Snapshot()
 
 	for _, oldC := range oldConfigs {
@@ -61,11 +60,11 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		for _, newC := range newConfigs {
 			if oldC.Id == newC.Id {
 				if !oldC.Config.DeepEqual(newC.Config) {
-					s.log.V(2).Info("updating config", "client", newC.Id, "config",
+					s.log.V(2).Info("Updating config", "client", newC.Id, "config",
 						newC.Config.String())
 					s.UpsertConfig(newC.Id, newC.Config)
 				} else {
-					s.log.V(2).Info("config not updated", "client", newC.Id,
+					s.log.V(2).Info("Config not updated", "client", newC.Id,
 						"old-config", oldC.Config.String(),
 						"new-config", newC.Config.String())
 				}
@@ -75,7 +74,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("removing config", "client", oldC.Id)
+			s.log.V(2).Info("Removing config", "client", oldC.Id)
 			s.DeleteConfig(oldC.Id)
 		}
 	}
@@ -90,7 +89,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("adding config", "client", newC.Id, "config", newC.Config)
+			s.log.V(2).Info("Adding config", "client", newC.Id, "config", newC.Config)
 			s.UpsertConfig(newC.Id, newC.Config)
 		}
 	}
