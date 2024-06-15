@@ -7,23 +7,23 @@ import (
 
 	"github.com/gorilla/websocket"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/config/util"
 )
 
 type ClientConfigPatcher func(conf *stnrv1.StunnerConfig) (*stnrv1.StunnerConfig, error)
 
 // Conn represents a client WebSocket connection.
 type Conn struct {
-	*websocket.Conn
-	Filter              ConfigFilter
-	patch               ClientConfigPatcher
-	cancel              context.CancelFunc
-	readLock, writeLock sync.Mutex // for writemessage
+	*util.Conn
+	Filter ConfigFilter
+	patch  ClientConfigPatcher
+	cancel context.CancelFunc
 }
 
 // NewConn wraps a WebSocket connection.
 func NewConn(conn *websocket.Conn, filter ConfigFilter, patch ClientConfigPatcher, cancel context.CancelFunc) *Conn {
 	return &Conn{
-		Conn:   conn,
+		Conn:   util.NewConn(conn),
 		Filter: filter,
 		patch:  patch,
 		cancel: cancel,
@@ -33,20 +33,6 @@ func NewConn(conn *websocket.Conn, filter ConfigFilter, patch ClientConfigPatche
 // Id returns the IP 5-tuple for a client connection.
 func (c *Conn) Id() string {
 	return fmt.Sprintf("%s:%s", c.RemoteAddr().Network(), c.RemoteAddr().String())
-}
-
-// WriteMessage writes a message to the client connection with proper locking.
-func (c *Conn) WriteMessage(messageType int, data []byte) error {
-	c.writeLock.Lock()
-	defer c.writeLock.Unlock()
-	return c.Conn.WriteMessage(messageType, data)
-}
-
-// ReadMessage reads a message from the client connection with proper locking.
-func (c *Conn) ReadMessage() (int, []byte, error) {
-	c.readLock.Lock()
-	defer c.readLock.Unlock()
-	return c.Conn.ReadMessage()
 }
 
 // ConnTrack represents the server's connection tracking table.

@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client/api"
+	"github.com/l7mp/stunner/pkg/config/util"
 	"github.com/pion/logging"
 )
 
@@ -268,10 +269,12 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 	_, url := a.Endpoint()
 	a.Tracef("poll: trying to open connection to CDS server at %s", url)
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, makeHeader(url))
+	wc, _, err := websocket.DefaultDialer.DialContext(ctx, url, makeHeader(url))
 	if err != nil {
 		return err
 	}
+	// wrap with a locker to prevent concurrent writes
+	conn := util.NewConn(wc)
 	defer conn.Close() // this will close the poller goroutine
 
 	a.Infof("connection successfully opened to config discovery server at %s", url)
