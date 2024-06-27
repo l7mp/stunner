@@ -191,8 +191,8 @@ STUNner defines the following special annotations:
 
 1. **Service type:** The special annotation `stunner.l7mp.io/service-type` can be used to customize the type of the Service created by STUNner. The value can be either `ClusterIP`, `NodePort`, or `LoadBalancer` (this is the default); for instance, setting `stunner.l7mp.io/service-type: ClusterIP` will prevent STUNner from exposing a Gateway publicly (useful for testing).
 
-1. **Mixed-protocol support:** Currently, STUNner limits each Gateway to a single transport protocol, e.g., UDP or TCP. This is intended to improve the consistency across the Kubernetes services of different cloud providers, which provide varying support for [mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types). If you still want to expose a UDP and a TCP port on the same IP using a single Gateway, add the annotation `stunner.l7mp.io/enable-mixed-protocol-lb: true` to the Gateway. Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature. 
- 
+1. **Mixed-protocol support:** Currently, STUNner limits each Gateway to a single transport protocol, e.g., UDP or TCP. This is intended to improve the consistency across the Kubernetes services of different cloud providers, which provide varying support for [mixed multi-protocol LoadBalancer Services](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types). If you still want to expose a UDP and a TCP port on the same IP using a single Gateway, add the annotation `stunner.l7mp.io/enable-mixed-protocol-lb: true` to the Gateway. Since mixed-protocol LB support is not supported in many popular Kubernetes offerings, STUNner currently defaults to disabling this feature.
+
    The below Gateway will expose both ports with their respective protocols.
 
    ```yaml
@@ -219,6 +219,8 @@ STUNner defines the following special annotations:
 
 1. **Selecting the NodePort:** By default, Kubernetes assigns a random external port from the range [32000-32767] to each listener of a Gateway exposed with a NodePort Service. This requires all ports in the [32000-32767] range to be opened on the external firewall, which may raise security concerns for hardened deployments. In order to assign specific nodeports to particular listeners, add the annotation `stunner.l7mp.io/nodeport:` `{listener_name_1:nodeport_1,listener_name_2:nodeport_2,...}` to the Gateway, where each key-value pair is a name of a listener and the selected (numeric) NodePort. The value itself must be proper a JSON map. Unknown listeners are silently ignored. Note that STUNner makes no specific effort to reconcile conflicting NodePorts: whenever the selected NodePort is unavailable Kubernetes will silently reject the Service, which can lead to hard-to-debug failures. Use this feature at your own risk.
 
+1. **Disabling the exposition of the health-check port:** Some older Kubernetes load-balancer providers required the exposition of the health-check port on LoadBalancer Services for UDP listeners to become externally reachable. Therefore, by default STUNner adds the health-check port (usually set via specific Gateway annotations) to the service-ports in automatically created LoadBalancer services. This has the unfortunate consequence that the health-check port becomes publicly reachable, which is considered a security issue by some, see https://github.com/l7mp/stunner-gateway-operator/issues/49. To prevent STUNner from exposing the health-check port, add the annotation `stunner.l7mp.io/disable-health-check-expose: true` to the corresponding Gateway. Note that this may cause TURN/UDP listeners unreachable on the Gateway, so use this only if you know that this setting will work with your Kubernetes provider.
+
 The below table summarizes the Gateway annotations supported by STUNner.
 
 | Key/value                                           | Description                                                                                                                                                | Default        |
@@ -228,6 +230,8 @@ The below table summarizes the Gateway annotations supported by STUNner.
 | `stunner.l7mp.io/external-traffic-policy: <string>` | Se the value to `Local` to preserve clients' source IP at the load balancer.                                                                               | `Cluster`      |
 | `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        | False          |
 | `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
+| `stunner.l7mp.io/disable-health-check-expose: true` | Disable the default exposition of the health-check port (if any).                                                                                          | False          |
+
 
 ## UDPRoute
 
