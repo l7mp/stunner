@@ -1464,6 +1464,15 @@ spec:
                         type: array
                     type: object
                 type: object
+              annotations:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Custom annotations to add to dataplane pods. Note that this does not affect the
+                  annotations added to the Deployment (this come from the correspnding Gateway), just the
+                  pods. Note also that mandatory pod annotations override whatever you set here on
+                  conflict, and the annotations set here override annotations manually added to the pods.
+                type: object
               args:
                 description: Arguments to the entrypoint.
                 items:
@@ -1838,6 +1847,15 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              labels:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Custom labels to add to dataplane pods. Note that this does not affect the labels added
+                  to the Deployment (those come from the Gateway), just the pods. Note also that mandatory
+                  pod labels override whatever you set here on conflict. The only way to set pod labels is
+                  here: whatever you set manually on the dataplane pod will be reset by the opetator.
+                type: object
               replicas:
                 description: |-
                   Number of desired pods. If empty or set to 1, use whatever is in the target Deployment.
