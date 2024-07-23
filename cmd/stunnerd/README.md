@@ -33,6 +33,7 @@ dataplane using STUNner's config discovery service.
 ### Installation
 
 As easy as with any Go program.
+
 ```console
 cd stunner
 go build -o stunnerd cmd/stunnerd/main.go
@@ -49,7 +50,7 @@ The below command will open a `stunnerd` UDP listener at `127.0.0.1:5000`, set `
 Alternatively, run `stunnerd` in verbose mode with the config file taken from `cmd/stunnerd/stunnerd.conf`. Adding the flag `-w` will enable watch mode.
 
 ```console
-./stunnerd -v -w -c cmd/stunnerd/stunnerd.conf
+./stunnerd -v -w -c file://cmd/stunnerd/stunnerd.conf
 ```
 
 Type `./stunnerd -h` to get a short description of the supported command line arguments.
@@ -61,37 +62,50 @@ In practice, you'll rarely need to run `stunnerd` directly: just fire up the [pr
 Using the below configuration, `stunnerd` will open 4 STUNner listeners: two for accepting unencrypted connections at UDP/3478 and TCP/3478, and two for encrypted connections at TLS/TCP/3479 and DTLS/UDP/3479. The daemon will use `ephemeral` authentication, with the shared secret taken from the environment variable `$STUNNER_SHARED_SECRET` during initialization. The relay address will be taken from the `$STUNNER_ADDR` environment variable.
 
 ``` yaml
-version: v1alpha1
+version: v1
 admin:
   name: my-stunnerd
   logLevel: all:DEBUG
   realm: "my-realm.example.com"
-static:
-  auth:
-    type: ephemeral
-    credentials:
-      secret: $STUNNER_SHARED_SECRET
-  listeners:
-    - name: stunnerd-udp
-      address: "$STUNNER_ADDR"
-      protocol: turn-udp
-      port: 3478
-    - name: stunnerd-tcp
-      address: "$STUNNER_ADDR"
-      protocol: turn-tcp
-      port: 3478
-    - name: stunnerd-tls
-      address: "$STUNNER_ADDR"
-      protocol: turn-tls
-      port: 3479
-      cert: "my-cert.cert"
-      key: "my-key.key"
-    - name: stunnerd-dtls
-      address: "$STUNNER_ADDR"
-      protocol: turn-dtls
-      port: 3479
-      cert: "my-cert.cert"
-      key: "my-key.key"
+auth:
+  type: ephemeral
+  credentials:
+    secret: $STUNNER_SHARED_SECRET
+listeners:
+  - name: stunnerd-udp
+    address: "$STUNNER_ADDR"
+    protocol: turn-udp
+    port: 3478
+    routes:
+      - default/media-plane
+  - name: stunnerd-tcp
+    address: "$STUNNER_ADDR"
+    protocol: turn-tcp
+    port: 3478
+    routes:
+      - default/media-plane
+  - name: stunnerd-tls
+    address: "$STUNNER_ADDR"
+    protocol: turn-tls
+    port: 3479
+    cert: "my-cert.cert"
+    key: "my-key.key"
+    routes:
+      - default/media-plane
+  - name: stunnerd-dtls
+    address: "$STUNNER_ADDR"
+    protocol: turn-dtls
+    port: 3479
+    cert: "my-cert.cert"
+    key: "my-key.key"
+    routes:
+      - default/media-plane
+clusters:
+  - name: stunner/iperf-server
+    protocol: UDP
+    type: STATIC
+    endpoints:
+      - 127.0.0.1
 ```
 
 STUNner can run multiple parallel readloops for TURN/UDP listeners, which allows it to scale to practically any number of CPUs and brings massive performance improvements for UDP workloads. This can be achieved by creating a configurable number of UDP readloop threads over the same TURN listener. The kernel will load-balance allocations across the readloops per the IP 5-tuple and so the same allocation will always stay at the same CPU, which is important for correct TURN operations.
