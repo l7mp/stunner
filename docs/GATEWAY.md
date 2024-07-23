@@ -219,6 +219,28 @@ STUNner defines the following special annotations:
 
 1. **Selecting the NodePort:** By default, Kubernetes assigns a random external port from the range [32000-32767] to each listener of a Gateway exposed with a NodePort Service. This requires all ports in the [32000-32767] range to be opened on the external firewall, which may raise security concerns for hardened deployments. In order to assign specific nodeports to particular listeners, add the annotation `stunner.l7mp.io/nodeport:` `{listener_name_1:nodeport_1,listener_name_2:nodeport_2,...}` to the Gateway, where each key-value pair is a name of a listener and the selected (numeric) NodePort. The value itself must be proper a JSON map. Unknown listeners are silently ignored. Note that STUNner makes no specific effort to reconcile conflicting NodePorts: whenever the selected NodePort is unavailable Kubernetes will silently reject the Service, which can lead to hard-to-debug failures. Use this feature at your own risk.
 
+1. **Selecting the target port:** Some hardened Kubernetes deployments prohibit containers opening privileged ports (i.e., everything under 1024). This causes problems when one wants to ingest TURN over the standard TCP/TLS port 443. Kubernetes lets Services to choose an arbitrary [target port](https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service) for each service port, which makes it possible to map a particular external port to an arbitrary (potentially non-privileged) port in the containers. In order to enforce a particular target port per listener, add the annotation `stunner.l7mp.io/targetport:` `{listener_name_1:targetport_1,...}` to the corresponding Gateway (the syntax and semantics is the same as those for the nodeport annotation). For instance, the below Gateway would expose the TURN TCP/TLS on port 443, but it would map the egress port to the target port 44321 in the STUNner dataplane container:
+
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: Gateway
+   metadata:
+     name: tls-gateway
+     annotations:
+       stunner.l7mp.io/targetport: "{\"tls-listener\":44321}"
+   spec:
+     gatewayClassName: stunner-gatewayclass
+     listeners:
+     - name: tls-listener
+       port: 443
+       protocol: TURN-TLS
+       tls:
+         certificateRefs:
+           - kind: Secret
+             namespace: stunner
+             name: tls-secret
+   ```
+
 1. **Disabling the exposition of the health-check port:** Some older Kubernetes load-balancer providers required the exposition of the health-check port on LoadBalancer Services for UDP listeners to become externally reachable. Therefore, by default STUNner adds the health-check port (usually set via specific Gateway annotations) to the service-ports in automatically created LoadBalancer services. This has the unfortunate consequence that the health-check port becomes publicly reachable, which is considered a security issue by some, see https://github.com/l7mp/stunner-gateway-operator/issues/49. To prevent STUNner from exposing the health-check port, add the annotation `stunner.l7mp.io/disable-health-check-expose: true` to the corresponding Gateway. Note that this may cause TURN/UDP listeners unreachable on the Gateway, so use this only if you know that this setting will work with your Kubernetes provider.
 
 The below table summarizes the Gateway annotations supported by STUNner.
@@ -230,6 +252,7 @@ The below table summarizes the Gateway annotations supported by STUNner.
 | `stunner.l7mp.io/external-traffic-policy: <string>` | Se the value to `Local` to preserve clients' source IP at the load balancer.                                                                               | `Cluster`      |
 | `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        | False          |
 | `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
+| `stunner.l7mp.io/targetport: <map>`                 | Request a specific target port for particular listeners. Value is a JSON map of listener-targetport key-value pairs.                                       | None           |
 | `stunner.l7mp.io/disable-health-check-expose: true` | Disable the default exposition of the health-check port (if any).                                                                                          | False          |
 
 
