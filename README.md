@@ -151,6 +151,18 @@ way.
   lines of fully open-source code. The server is extremely lightweight: the typical STUNner
   container image size is only 15 Mbytes.
 
+The main uses of STUNner are running a scalable STUN service in Kubernetes to make it possible for
+clients to create peer-to-peer WebRTC media connections between themselves (the so called
+[*headless deployment
+model*](https://github.com/l7mp/stunner/blob/main/docs/DEPLOYMENT.md#headless-deployment-model)),
+or as a scalable TURN gateway service for load-balancing clients' media connections across a pool
+of WebRTC media servers hosted in Kubernetes pods (called the [*media-plane deployment
+model*](https://github.com/l7mp/stunner/blob/main/docs/DEPLOYMENT.md#media-plane-deployment-model)). While
+both use cases are fully supported, below we concentrate on the latter use case: deploying STUNner
+as a media gateway (see [our blog
+post](https://medium.com/l7mp-technologies/deploying-a-scalable-stun-service-in-kubernetes-c7b9726fa41d)
+to learn how to deploy a STUN service with STUNner).
+
 ## Getting Started
 
 STUNner comes with a [Helm](https://helm.sh) chart to fire up a fully functional STUNner-based
