@@ -141,7 +141,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		l.Conns = append(l.Conns, conn)
 
 	default:
-		return fmt.Errorf("internal error: unknown listener protocol " + l.Proto.String())
+		return fmt.Errorf("internal error: unknown listener protocol %q", l.Proto.String())
 	}
 
 	// start the TURN server if there are actual listeners configured
