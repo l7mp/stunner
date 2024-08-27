@@ -67,10 +67,9 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_ENV
       - name: Delete Docker Image Tag
         env:
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
-          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          TOKEN: ${{ env.token }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          curl -s -u "$DOCKER_USER:$DOCKER_TOKEN" \
+          curl -s -H "Authorization: Bearer $TOKEN" \
             -X DELETE "https://hub.docker.com/v2/repositories/l7mp/stunner/tags/pr-$PR_NUMBER/" \
             -w "HTTP Response Code: %{http_code}\n"
