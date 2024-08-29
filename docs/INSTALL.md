@@ -39,6 +39,13 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --cre
     --namespace=stunner-system
 ```
 
+After upgrading the operator from the dev channel you may need to manually restart the dataplane
+for each of your Gateways:
+
+```console
+kubectl -n <gateway-namespace> rollout restart deployment <gateway-name>
+```
+
 ### Legacy mode
 
 In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times.
