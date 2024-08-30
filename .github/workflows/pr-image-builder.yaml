@@ -35,7 +35,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            l7mp/stunner:pr-${{ github.event.pull_request.number }}
+            l7mp/stunnerd:pr-${{ github.event.pull_request.number }}
 
       - name: Comment on PR
         if: success() && github.event_name == 'pull_request'
@@ -43,7 +43,7 @@ jobs:
         with:
           script: |
             const prNumber = context.issue.number;
-            const comment = `The Docker image for this pull request (#${prNumber}) has been successfully built and pushed to DockerHub as \`docker.io/l7mp/stunner:pr-${prNumber}\`.`;
+            const comment = `The Docker image for this pull request (#${prNumber}) has been successfully built and pushed to DockerHub as \`docker.io/l7mp/stunnerd:pr-${prNumber}\`.`;
             github.rest.issues.createComment({
               issue_number: prNumber,
               owner: context.repo.owner,
@@ -71,5 +71,5 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           curl -s -H "Authorization: Bearer $TOKEN" \
-            -X DELETE "https://hub.docker.com/v2/repositories/l7mp/stunner/tags/pr-$PR_NUMBER/" \
+            -X DELETE "https://hub.docker.com/v2/repositories/l7mp/stunnerd/tags/pr-$PR_NUMBER/" \
             -w "HTTP Response Code: %{http_code}\n"
