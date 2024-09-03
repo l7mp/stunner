@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/turn/v3"
+	"github.com/pion/turn/v4"
 )
 
 // UsernameSeparator is the separator character used in time-windowed TURN authentication as

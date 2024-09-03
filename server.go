@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/pion/dtls/v2"
-	"github.com/pion/turn/v3"
+	"github.com/pion/dtls/v3"
+	"github.com/pion/turn/v4"
 	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/internal/object"
