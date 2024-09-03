@@ -10,7 +10,7 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3/test"
-	"github.com/pion/turn/v3"
+	"github.com/pion/turn/v4"
 	"github.com/stretchr/testify/assert"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"

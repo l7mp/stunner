@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
-	"github.com/pion/turn/v3"
+	"github.com/pion/turn/v4"
 
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"

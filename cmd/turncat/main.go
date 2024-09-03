@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/turn/v3"
+	"github.com/pion/turn/v4"
 	flag "github.com/spf13/pflag"
 
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"

@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/stdnet"
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
-	"github.com/pion/turn/v3"
+	"github.com/pion/turn/v4"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
