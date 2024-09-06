@@ -9,7 +9,6 @@ theme:
   name: readthedocs
   highlightjs: true
 nav:
-- 'STUNner documentation': 'README.md'
 - 'Why STUNner': 'WHY.md'
 - 'Deployment models': 'DEPLOYMENT.md'
 - 'Concepts': 'CONCEPTS.md'
@@ -19,7 +18,6 @@ nav:
 - 'Authentication': 'AUTH.md'
 - 'Scaling': 'SCALING.md'
 - 'Monitoring': 'MONITORING.md'
-- 'Standalone mode': 'OBSOLETE.md'
 - 'Examples':
   - 'Simple tunnel': 'examples/simple-tunnel/README.md'
   - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
