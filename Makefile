@@ -42,7 +42,7 @@ build: generate fmt vet build-bin
 build-bin:
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerd cmd/stunnerd/main.go
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/turncat cmd/turncat/main.go
-	go build ${GOARGS} -o ${BUILD_DIR}/stunnerctl cmd/stunnerctl/main.go
+	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerctl cmd/stunnerctl/main.go
 
 .PHONY: clean
 clean:
