@@ -243,6 +243,8 @@ STUNner defines the following special annotations:
 
 1. **Disabling the exposition of the health-check port:** Some older Kubernetes load-balancer providers required the exposition of the health-check port on LoadBalancer Services for UDP listeners to become externally reachable. Therefore, by default STUNner adds the health-check port (usually set via specific Gateway annotations) to the service-ports in automatically created LoadBalancer services. This has the unfortunate consequence that the health-check port becomes publicly reachable, which is considered a security issue by some, see https://github.com/l7mp/stunner-gateway-operator/issues/49. To prevent STUNner from exposing the health-check port, add the annotation `stunner.l7mp.io/disable-health-check-expose: true` to the corresponding Gateway. Note that this may cause TURN/UDP listeners unreachable on the Gateway, so use this only if you know that this setting will work with your Kubernetes provider.
 
+1. **Disabling session affinity:** By default STUNner applies the `sessionAffinity: ClientIP` setting on the LB services it creates to expose Gateways. Normally this setting improves stability by ensuring that each TURN session is safely pinned to the same dataplane pod for its entire lifetime. Certain hosted Kubernetes platforms, however, seem to reject UDP LB services that have this setting on, [breaking STUNner deployments](https://github.com/l7mp/stunner/issues/155) on these systems. In order to prevent STUNner from enforcing session affinity on the LB Service corresponding to a Gateway, just set the `stunner.l7mp.io/disable-session-affinity: true` annotation on the Gateway. Otherwise, session affinity is turned on.
+
 The below table summarizes the Gateway annotations supported by STUNner.
 
 | Key/value                                           | Description                                                                                                                                                | Default        |
@@ -254,7 +256,7 @@ The below table summarizes the Gateway annotations supported by STUNner.
 | `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
 | `stunner.l7mp.io/targetport: <map>`                 | Request a specific target port for particular listeners. Value is a JSON map of listener-targetport key-value pairs.                                       | None           |
 | `stunner.l7mp.io/disable-health-check-expose: true` | Disable the default exposition of the health-check port (if any).                                                                                          | False          |
-
+| `stunner.l7mp.io/disable-session-affinity: true`    | Disable session affinity for a Gateway.                                                                                                                    | False          |
 
 ## UDPRoute
 
