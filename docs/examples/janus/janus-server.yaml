@@ -117,7 +117,7 @@ metadata:
   name: janus-web
 data:
   settings.js: |
-    var server = "wss://server-janus_gateway_host.nip.io"
+    var server = "wss://server-ingressserviceip.nip.io"
     var iceServers = [{urls: "turn:stunner_ip:3478?transport=udp", username: "user-1", credential: "pass-1"}]
 ---
 apiVersion: v1
@@ -193,11 +193,11 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-      - client-janus_web_host.nip.io
-      - server-janus_gateway_host.nip.io
+      - client-ingressserviceip.nip.io
+      - server-ingressserviceip.nip.io
     secretName: janus-web-secret-tls
   rules:
-  - host: server-janus_gateway_host.nip.io
+  - host: server-ingressserviceip.nip.io
     http:
       paths:
       - path: /
@@ -207,7 +207,7 @@ spec:
             name: janus-gateway
             port:
               number: 8188
-  - host: client-janus_web_host.nip.io
+  - host: client-ingressserviceip.nip.io
     http:
       paths:
       - path: /
