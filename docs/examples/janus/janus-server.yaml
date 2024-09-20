@@ -117,7 +117,7 @@ metadata:
   name: janus-web
 data:
   settings.js: |
-    var server = "wss://janus_gateway_ip"
+    var server = "wss://server-janus_gateway_host.nip.io"
     var iceServers = [{urls: "turn:stunner_ip:3478?transport=udp", username: "user-1", credential: "pass-1"}]
 ---
 apiVersion: v1
@@ -193,11 +193,11 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-      - janus.gcp-europe-central2.stunner.cc
-      - janus-gateway.gcp-europe-central2.stunner.cc
+      - client-janus_web_host.nip.io
+      - server-janus_gateway_host.nip.io
     secretName: janus-web-secret-tls
   rules:
-  - host: janus-gateway.gcp-europe-central2.stunner.cc
+  - host: server-janus_gateway_host.nip.io
     http:
       paths:
       - path: /
@@ -207,7 +207,7 @@ spec:
             name: janus-gateway
             port:
               number: 8188
-  - host: janus.gcp-europe-central2.stunner.cc
+  - host: client-janus_web_host.nip.io
     http:
       paths:
       - path: /
@@ -217,3 +217,19 @@ spec:
             name: janus-web
             port:
               number: 80
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: info@l7mp.io
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-secret-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---
