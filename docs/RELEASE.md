@@ -24,7 +24,7 @@ Let the new version be vX.Y.Z.
 - `go mod tidy`
 - make sure `go test ./... -count 1` passes
 - make sure `golangci-lint run` passes
-- `git push` if there are local changes
+- `git push` to send the updated `go.mod/go.sum` files
 - release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
   that we can publish the release notes)
 
@@ -38,7 +38,7 @@ Let the new version be vX.Y.Z.
 - `go mod tidy`
 - make sure `make test` passes
 - make sure `golangci-lint run` passes
-- `git push` if there are local changes
+- `git push` to send the updated `go.mod/go.sum` files
 - release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
   that we can publish the release notes)
 
