@@ -33,6 +33,11 @@ In this tutorial we deploy [Janus Gateway](https://github.com/meetecho/janus-gat
 
 In the below example, STUNner will be installed into the identically named namespace (`stunner`), while Janus and the Ingress gateway will live in the `default` namespace.
 
+### Docker images
+
+Janus does not come with an official Docker image; thus, we built one using a self-made Dockerfile based on the available documents in the official [Janus repository](https://github.com/meetecho/janus-gateway). Actually, we've made two Dockerfiles. One for the Janus Gateway server and one for the Janus Web Demos. The [Janus Gateway server Dockerfile](./DOCKERFILE-janus-gateway) should be ran in the root directory of the [Janus repository](https://github.com/meetecho/janus-gateway). The Janus Web Demos Dockerfile should be used in the `/html` directory of the [same repository](https://github.com/meetecho/janus-gateway/tree/master/html). The images (`l7mp/janus-gateway:v1.2.4` and `l7mp/janus-web:latest`) used in the following demo are hosted on Docker Hub under the L7MP organization.
+
+
 ### TLS certificates
 
 As mentioned above, the Janus WebRTC server will need a valid TLS cert, which means it must run behind an existing DNS domain name backed by a CA signed TLS certificate. This is simple if you have your own domain, but if you don't then [nip.io](https://nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and obtain a CA signed certificate for Janus. This will allow us to point the domain name `client-<ingress-IP>.nip.io` to an ingress HTTP gateway in our Kubernetes cluster, which will then use some automation (namely, cert-manager) to obtain a valid CA signed cert.
