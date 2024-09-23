@@ -17,11 +17,9 @@ The below installation instructions require an operational cluster running a sup
 
 The recommended way (or at least the possible way, [link](https://janus.discourse.group/t/janus-with-kubernetes-demystifying-the-myths/938), [link](https://bugraoz93.medium.com/active-passive-highly-availability-janus-gateway-on-kubernetes-2189256e5525)) to install Janus into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
 
-![WARNING] TODO: figure
-
 The figure below shows Janus deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, Janus is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for Janus, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
-![STUNner Janus integration deployment architecture](../../img/stunner_janus.svg)
+![STUNner Janus integration deployment architecture](../../img/stunner_janus_arch.svg)
 
 In this tutorial we deploy [Janus Gateway](https://github.com/meetecho/janus-gateway/tree/master) with a set of [preimplemented and packaged server plugins](https://janus.conf.meetecho.com/docs/pluginslist.html) for media exchange, a [Janus Web Demo](https://github.com/meetecho/janus-gateway/tree/master/html), a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the Janus server pool to clients.
 
