@@ -27,9 +27,11 @@ In this tutorial we deploy [Janus Gateway](https://github.com/meetecho/janus-gat
 
 ## Installation
 
-Let's start with a disclaimer. The Janus client-side application must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. In this demo, we will aim to obtain a proper CA-signed certificate (self-signed certificates haven't been tested). Obtaining a valid TLS certificate is a challenge. Thus, the majority of the below installation guide will be about securing client connections to Janus over TLS; as it turns out, once HTTPS is correctly working integrating Janus with STUNner is very simple.
+> [!NOTE]
+>
+> Let's start with a disclaimer. The Janus client-side application must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. In this demo, we will aim to obtain a proper CA-signed certificate (self-signed certificates haven't been tested). Obtaining a valid TLS certificate is a challenge. Thus, the majority of the below installation guide will be about securing client connections to Janus over TLS; as it turns out, once HTTPS is correctly working integrating Janus with STUNner is very simple.
 
-In the below example, STUNner will be installed into the identically named namespace, while Janus and the Ingress gateway will live in the default namespace.
+In the below example, STUNner will be installed into the identically named namespace (`stunner`), while Janus and the Ingress gateway will live in the `default` namespace.
 
 ### TLS certificates
 
@@ -170,7 +172,7 @@ Listeners:
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
-Note that Janus itself will not use STUNner (that would amount to a less efficient [symmetric ICE mode](../../DEPLOYMENT.md)); with the above configuration we are just telling Janus Web to instruct its clients to use STUNner to reach the Janus Gateway server.
+Note that Janus itself will not use STUNner as a TURN server (that would amount to a less efficient [symmetric ICE mode](../../DEPLOYMENT.md)); with the above configuration we are just telling Janus Web to instruct its clients to use STUNner to reach the Janus Gateway server.
 
 We also need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
@@ -195,10 +197,14 @@ Wait until all pods become operational and jump right into testing!
 
 ## Test
 
-After installing everything, execute the following command to retrieve the URL of your fresh Janus demo app:
+After installing everything, execute the following command to retrieve the URL of your freshly deployed Janus demo app:
 
 ```console
 echo client-$INGRESSIP.nip.io
 ```
 
 Copy the URL into your browser, and now you should be greeted with the About page. On the landing page navigate to the Video call plugin demo (`/demos/videocall.html`). Duplicate the tab and register two users in the system and make a call.  If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a separate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the Janus Gateway server deployed in you Kubernetes cluster.
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
