@@ -186,7 +186,7 @@ minutes.
 
 The simplest way to deploy STUNner is through [Helm](https://helm.sh). STUNner configuration
 parameters are available for customization as [Helm
-Values](https://helm.sh/docs/chart_template_guide/values_files). 
+Values](https://helm.sh/docs/chart_template_guide/values_files).
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
@@ -256,7 +256,7 @@ stunner` if it does not exist.
      namespace: stunner
    spec:
      realm: stunner.l7mp.io
-     authRef: 
+     authRef:
        name: stunner-auth-secret
        namespace: stunner
    EOF
@@ -315,7 +315,7 @@ stunner` if it does not exist.
    Gateway. This occurs by attaching a
    [UDPRoute](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.UDPRoute)
    resource to the Gateway by setting the `parentRef` to the Gateway's name and specifying the
-   target service in the `backendRef`. 
+   target service in the `backendRef`.
 
    The below UDPRoute will configure STUNner to [route client
    connections](/docs/GATEWAY.md#udproute) received on the Gateway called `udp-gateway` to the
@@ -374,7 +374,7 @@ Listeners:
 ```
 
 As it turns out, STUNner has successfully assigned a public IP and port to our Gateway and set the
-STUN/TURN credentials based on the GatewayConfig. 
+STUN/TURN credentials based on the GatewayConfig.
 
 ### Testing
 
@@ -571,14 +571,19 @@ applications into Kubernetes.
   obtain a valid TLS certificate to secure your signaling connections, courtesy of the
   [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
+* [Video-conferencing with Janus](/docs/examples/janus/README.md): This tutorial helps you deploy a
+  fully fledged [Janus](https://janus.conf.meetecho.com/) video-conferencing service into Kubernetes
+  behind STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
+  connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
+  Encrypt](https://letsencrypt.org).
 * [Video-conferencing with Jitsi](/docs/examples/jitsi/README.md): This tutorial helps you deploy a
   fully fledged [Jitsi](https://jitsi.org) video-conferencing service into Kubernetes behind
   STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
   connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
-* [Video-conferencing with mediasoup](/docs/examples/mediasoup/README.md): This tutorial helps you deploy
-  the [mediasoup](https://mediasoup.org/) WebRTC media server behind STUNner. The docs also show how to
-  obtain a valid TLS certificate to secure your signaling connections, courtesy of the
+* [Video-conferencing with mediasoup](/docs/examples/mediasoup/README.md): This tutorial helps you
+  deploy the [mediasoup](https://mediasoup.org/) WebRTC media server behind STUNner. The docs also
+  show how to obtain a valid TLS certificate to secure your signaling connections, courtesy of the
   [cert-manager](https://cert-manager.io) project, [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
 * [Cloud-gaming with Cloudretro](/docs/examples/cloudretro/README.md): This tutorial lets you play Super
