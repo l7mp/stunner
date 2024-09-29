@@ -41,7 +41,7 @@ Janus does not come with an official Docker image; thus, we built one using a se
 
 ### Ingress and Cert manager installation
 
-To ingest secured traffic into the cluster, you need to install some required resources. Please follow the instructions in [this section](../TLS.md#installation).
+To ingest secured traffic into the cluster, you need to install some resources. Please follow the instructions in [this section](../TLS.md#installation) to install Ingress and Cert manager.
 
 ### STUNner
 
