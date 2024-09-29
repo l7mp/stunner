@@ -12,7 +12,7 @@ Some WebRTC servers will need a valid TLS cert, which means it must run behind a
 
 > [!NOTE]
 >
-> By default, the examples and the commands included are setup for the case you don't have your own domain.
+> By default, the examples and the commands included are set up in case you don't have your domain.
 
 ### If you don't have your own domain
 
@@ -79,7 +79,7 @@ Note that public wildcard DNS domains might run into [rate limiting](https://let
 If you work with certificates you must be aware that signing a certificate request takes some time and it differs for every CA (certificate authority). If you sense there is a problem with the certificate being signed or issued, you can check it directly and see what is going on.
 
 First, you'll need to find the certificate and its related resources in your cluster.
-```bash
+```console
 kubectl get certificate -A
 
 kubectl get certificaterequests.cert-manager.io -A
@@ -88,7 +88,7 @@ kubectl get certificatesigningrequests.certificates.k8s.io
 ```
 
 To find more information about them
-```bash
+```console
 kubectl describe certificate <certificate> -A
 
 kubectl describe certificaterequests.cert-manager.io <cert-request> -A
