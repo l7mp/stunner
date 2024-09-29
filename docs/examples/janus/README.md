@@ -47,13 +47,7 @@ To ingest secured traffic into the cluster, you need to install some resources. 
 
 Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](janus-server.yaml) packaged with STUNner.
 
-Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
-```
+To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the Janus Gateway pods.
 
