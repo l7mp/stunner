@@ -11,7 +11,11 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-The below installation instructions require an operational cluster running a supported version of Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes services should support this). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach your WebRTC infra. As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
+See prerequisites [here](../../INSTALL.md#prerequisites).
+
+> [!NOTE]
+>
+> As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
 
 ## Setup
 
