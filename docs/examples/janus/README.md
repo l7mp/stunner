@@ -159,7 +159,7 @@ After installing everything, execute the following command to retrieve the URL o
 echo client-$INGRESSIP.nip.io
 ```
 
-Copy the URL into your browser, and now you should be greeted with the About page. On the landing page navigate to the Video call plugin demo (`/demos/videocall.html`). Duplicate the tab and register two users in the system and make a call.  If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a separate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the Janus Gateway server deployed in you Kubernetes cluster.
+Copy the URL into your browser, and now you should be greeted with the About page. On the landing page navigate to the Video call plugin demo (`/demos/videocall.html`). Duplicate the tab and register two users in the system and make a call. If everything is set up correctly, you should be able to connect to a room. If you repeat the procedure in a separate browser tab you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the Janus Gateway server deployed in you Kubernetes cluster.
 
 # Help
 
