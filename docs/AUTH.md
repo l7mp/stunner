@@ -66,7 +66,7 @@ kubectl -n stunner create secret generic stunner-auth-secret --from-literal=type
     --from-literal=username=my-user --from-literal=password=my-password
 ```
 
-Then, we update the [GatewayConfig](REFERENCE.md) to refer STUNner to this Secret for setting authentication credentials.
+Then, we update the [GatewayConfig](GATEWAY.md) to refer STUNner to this Secret for setting authentication credentials.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
