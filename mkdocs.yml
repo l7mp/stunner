@@ -21,14 +21,14 @@ nav:
 - 'Examples':
   - 'Simple tunnel': 'examples/simple-tunnel/README.md'
   - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
-  - 'Kurento one to one call': 'examples/kurento-one2one-call/README.md'
-  - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
   - 'LiveKit': 'examples/livekit/README.md'
   - 'Janus': 'examples/janus/README.md'
   - 'Jitsi': 'examples/jitsi/README.md'
   - 'mediasoup': 'examples/mediasoup/README.md'
   - 'CloudRetro': 'examples/cloudretro/README.md'
   - 'N.eko': 'examples/neko/README.md'
+  - 'Kurento one to one call': 'examples/kurento-one2one-call/README.md'
+  - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
   - 'Benchmark': 'examples/benchmark/README.md'
 - 'CMD':
   - 'stunnerctl': 'cmd/stunnerctl.md'

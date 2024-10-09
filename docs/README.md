@@ -36,14 +36,14 @@
 
 ### Media-plane deployment model
 
-* [One to one video call with Kurento](examples/kurento-one2one-call)
-* [Magic mirror with Kurento](examples/kurento-magic-mirror/README.md)
 * [Video-conferencing with LiveKit](examples/livekit/README.md)
 * [Video-conferencing with mediasoup](examples/mediasoup/README.md)
 * [Video-conferencing with Janus](examples/janus/README.md)
 * [Video-conferencing with Jitsi](examples/jitsi/README.md)
 * [Cloud-gaming with CloudRetro](examples/cloudretro/README.md)
 * [Remote desktop access with Neko](examples/neko/README.md)
+* [One to one video call with Kurento](examples/kurento-one2one-call)
+* [Magic mirror with Kurento](examples/kurento-magic-mirror/README.md)
 
 ## Manuals
 

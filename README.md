@@ -555,17 +555,6 @@ applications into Kubernetes.
 
 ### Media-plane deployment model
 
-* [One to one video call with Kurento](/docs/examples/kurento-one2one-call/README.md): This tutorial
-  shows how to use STUNner to connect WebRTC clients to a media server deployed into Kubernetes
-  behind STUNner in the [media-plane deployment model](/docs/DEPLOYMENT.md). All this happens
-  *without* modifying the media server code in any way, just by adding 5-10 lines of
-  straightforward JavaScript to configure clients to use STUNner as the TURN server.
-* [Magic mirror with Kurento](/docs/examples/kurento-magic-mirror/README.md): This tutorial has been
-  adopted from the [Kurento](https://www.kurento.org) [magic
-  mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
-  demo, deploying a basic WebRTC loopback server behind STUNner with some media processing
-  added. In particular, the application uses computer vision and augmented reality techniques to
-  add a funny hat on top of faces.
 * [Video-conferencing with LiveKit](/docs/examples/livekit/README.md): This tutorial helps you deploy
   the [LiveKit](https://livekit.io) WebRTC media server behind STUNner. The docs also show how to
   obtain a valid TLS certificate to secure your signaling connections, courtesy of the
@@ -595,6 +584,17 @@ applications into Kubernetes.
   providing an ingress gateway service to a remote desktop application. We use
   [neko.io](https://neko.m1k1o.net) to run a browser in a secure container inside the Kubernetes
   cluster, and stream the desktop to clients via STUNner.
+* [One to one video call with Kurento](/docs/examples/kurento-one2one-call/README.md): This tutorial
+  shows how to use STUNner to connect WebRTC clients to a media server deployed into Kubernetes
+  behind STUNner in the [media-plane deployment model](/docs/DEPLOYMENT.md). All this happens
+  *without* modifying the media server code in any way, just by adding 5-10 lines of
+  straightforward JavaScript to configure clients to use STUNner as the TURN server.
+* [Magic mirror with Kurento](/docs/examples/kurento-magic-mirror/README.md): This tutorial has been
+  adopted from the [Kurento](https://www.kurento.org) [magic
+  mirror](https://doc-kurento.readthedocs.io/en/stable/tutorials/node/tutorial-magicmirror.html)
+  demo, deploying a basic WebRTC loopback server behind STUNner with some media processing
+  added. In particular, the application uses computer vision and augmented reality techniques to
+  add a funny hat on top of faces.
 
 ## Documentation
 
