@@ -20,9 +20,15 @@ Some WebRTC servers will need a valid TLS cert, which means it must run behind a
 
 ### If you have your own domain
 
+We use `nip.io` to "own a domain" in some examples. To replace it with your own domain, you must locate the corresponding lines in the specific mediaserver's configuration file and overwrite them.
+
 > [!NOTE]
 >
-> Do not forget to create a new DNS record pointing to your ingress' IP address!
+> Although they might look similar, every mediaserver has a different configuration. You might need to (re)configure more things in one mediaserver than another.
+
+> [!NOTE]
+>
+> Make sure to set up your Ingress correctly and do not forget to create a new DNS record pointing to your Ingress' IP address!
 
 ## Installation
 
