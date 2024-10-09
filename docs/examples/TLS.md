@@ -1,6 +1,6 @@
 # TLS
 
-This documentation sums up the the TLS and certificate issues you will encounter deploying the examples.
+This documentation sums up the TLS and certificate issues you will encounter deploying the examples.
 
 ## The issue
 
@@ -12,7 +12,7 @@ Some WebRTC servers will need a valid TLS cert, which means it must run behind a
 
 > [!NOTE]
 >
-> By default, the examples and the commands included are set up in case you don't have your domain.
+> By default, the examples and commands snippets assume you don't own a domain.
 
 ### If you don't have your own domain
 
@@ -81,17 +81,13 @@ If you work with certificates you must be aware that signing a certificate reque
 First, you'll need to find the certificate and its related resources in your cluster.
 ```console
 kubectl get certificate -A
-
 kubectl get certificaterequests.cert-manager.io -A
-
 kubectl get certificatesigningrequests.certificates.k8s.io
 ```
 
 To find more information about them
 ```console
 kubectl describe certificate <certificate> -A
-
 kubectl describe certificaterequests.cert-manager.io <cert-request> -A
-
 kubectl describe certificatesigningrequests.certificates.k8s.io <cert-signing-request>
 ```
