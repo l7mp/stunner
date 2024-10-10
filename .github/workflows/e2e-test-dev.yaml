@@ -38,7 +38,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
-          version: v3.14.2
+          version: v3.16.2
 
       - name: Install STUNner
         run: |
