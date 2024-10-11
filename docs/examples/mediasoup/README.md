@@ -11,7 +11,12 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-The below installation instructions require an operational cluster running a supported version of Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes services should support this). Otherwise, STUNner will not be able to allocate a public IP address for clients to reach your WebRTC infra. As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io when using local/private IPs](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on, you will learn more about why this is crucial above.
+See prerequisites [here](../../INSTALL.md#prerequisites).
+
+> [!NOTE]
+>
+> As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
+
 
 ## Setup
 
@@ -43,80 +48,21 @@ with an additional environment variable we can load the pod's private IP into th
 
 ## Installation
 
-Let's start with a disclaimer. The mediasoup demo example must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. According to the [documentation](https://github.com/versatica/mediasoup-demo/blob/a59c6ab8e50fb950c3df54f4b85167a4e3f8497a/README.md?plain=1#L96) mediasoup should work with self-signed certs, however this haven't been tested. In the following we will deploy mediasoup configured with a valid signed TLS certificate. This will have the unfortunate consequence that the majority of the below installation guide will be about securing client connections to mediasoup over TLS; as it turns out, once HTTPS is correctly working integrating mediasoup with STUNner is very simple.
+> [!NOTE]
+>
+> Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
 
-In the below example, STUNner will be installed into the identically named namespace, while mediasoup and the Ingress gateway will live in the default namespace.
+In the below example, STUNner will be installed into the identically named namespace (`stunner`), while mediasoup and the Ingress gateway will live in the `default` namespace.
 
-### TLS certificates
+### Ingress and Cert manager installation
 
-As mentioned above, the mediasoup server will need a valid TLS cert, which means it must run behind an existing DNS domain name backed by a CA signed TLS certificate. This is simple if you have your own domain, but if you don't then [nip.io](https://nip.io) provides a dead simple wildcard DNS for any IP address. We will use this to "own a domain" and obtain a CA signed certificate for mediasoup. This will allow us to point the domain name `client-<ingress-IP>.nip.io` to an ingress HTTP gateway in our Kubernetes cluster, which will then use some automation (namely, cert-manager) to obtain a valid CA signed cert.
-
-Note that public wildcard DNS domains might run into [rate limiting](https://letsencrypt.org/docs/rate-limits/) issues. If this occurs you can try [alternative services](https://moss.sh/free-wildcard-dns-services/) instead of `nip.io`.
-
-### Ingress
-
-The first step of obtaining a valid cert is to install a Kubernetes Ingress: this will be used during the validation of our certificates and to terminate client TLS encrypted contexts.
-
-Install an ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but this is not required.
-
-```console
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm install ingress-nginx ingress-nginx/ingress-nginx
-```
-
-Wait until Kubernetes assigns an external IP to the Ingress.
-
-```console
-until [ -n "$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-```
-
-Store the Ingress IP address Kubernetes assigned to our Ingress; this will be needed later when we configure the validation pipeline for our TLS certs.
-
-```console
-kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-export INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
-```
-
-### Cert manager
-
-We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management.
-
-Add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
-
-```console
-helm repo add cert-manager https://charts.jetstack.io
-helm repo update
-helm install cert-manager jetstack/cert-manager --namespace cert-manager \
-    --create-namespace --set global.leaderElection.namespace=cert-manager \
-    --set installCRDs=true --timeout 600s
-```
-
-At this point we have all the necessary boilerplate set up to automate TLS issuance for mediasoup.
+To ingest secured traffic into the cluster, you need to install some resources. Please follow the instructions in [this section](../TLS.md#installation) to install Ingress and Cert manager.
 
 ### STUNner
 
-Now comes the fun part.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](mediasoup-server.yaml) packaged with STUNner.
 
-Install the STUNner gateway operator and STUNner via [Helm](https://github.com/l7mp/stunner-helm):
-
-Legacy mode:
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
-helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-system
-```
-
-Managed mode (recommended):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
-```
+To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the mediasoup server pods.
 
