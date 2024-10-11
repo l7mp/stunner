@@ -19,6 +19,7 @@ nav:
 - 'Scaling': 'SCALING.md'
 - 'Monitoring': 'MONITORING.md'
 - 'Examples':
+  - 'Configuring TLS for examples': 'examples/TLS.md'
   - 'Simple tunnel': 'examples/simple-tunnel/README.md'
   - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
   - 'LiveKit': 'examples/livekit/README.md'
