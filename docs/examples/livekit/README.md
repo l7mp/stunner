@@ -33,7 +33,7 @@ In this tutorial we deploy a video room example using [LiveKit's React SDK](http
 >
 > Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
 
-In the below example, STUNner will be installed into the identically named namespace, while LiveKit and the Ingress gateway will live in the default namespace.
+In the below example, STUNner will be installed into the identically named namespace (`stunner`), while LiveKit and the Ingress gateway will live in the `default` namespace.
 
 ### Ingress and Cert manager installation
 
