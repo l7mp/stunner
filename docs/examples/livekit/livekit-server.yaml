@@ -84,8 +84,7 @@ data:
       port_range_end: 60000
       port_range_start: 50000
       tcp_port: 7801
-      stun_servers:
-        - stunner_ip:3478
+      stun_servers: []
       turn_servers:
       - credential: pass-1
         host: stunner_ip
