@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus
+  labels:
+    app.kubernetes.io/name: nexus
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4000
+      targetPort: 4000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: nexus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus
+  labels:
+    app.kubernetes.io/name: nexus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexus
+    spec:
+      terminationGracePeriodSeconds: 18000 # 5 hours
+      containers:
+        - name: nexus
+          image: "l7mp/nexus"
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: SECRET_KEY_BASE
+            value: f0e01531666a6ccd5b15879a3c00a15f8feaaea86230cf35d96fe0b8e468bc553549e47edb737a4d1530d1c56a3a7a3827443e1bd00aa46adb44dc6aa087ff9f
+          - name: PHX_SERVER
+            value: "1"
+          - name: PHX_HOST
+            value: ingressserviceip.nip.io
+          - name: ADMIN_USERNAME
+            value: admin
+          - name: ADMIN_PASSWORD
+            value: admin
+          - name: ICE_PORT_RANGE
+            value: 62000-63000
+          - name: NEXUS_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+---
+# Ingress for both Nexus
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nexus
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+      - ingressserviceip.nip.io
+    secretName: nexus-secret-tls
+  rules:
+  - host: ingressserviceip.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nexus
+            port:
+              number: 4000
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: info@l7mp.io
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-secret-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+---

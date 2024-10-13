@@ -25,6 +25,7 @@ nav:
   - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
   - 'LiveKit': 'examples/livekit/README.md'
   - 'Janus': 'examples/janus/README.md'
+  - 'Elixir WebRTC': 'examples/elixir-webrtc/README.md'
   - 'Jitsi': 'examples/jitsi/README.md'
   - 'mediasoup': 'examples/mediasoup/README.md'
   - 'CloudRetro': 'examples/cloudretro/README.md'
