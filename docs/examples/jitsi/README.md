@@ -41,7 +41,7 @@ To ingest secured traffic into the cluster, you need to install some resources. 
 
 ### STUNner
 
-Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](livekit-server.yaml) packaged with STUNner.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](jitsi-server.yaml) packaged with STUNner.
 
 To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
