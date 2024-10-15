@@ -84,7 +84,8 @@ data:
       port_range_end: 60000
       port_range_start: 50000
       tcp_port: 7801
-      stun_servers: []
+      stun_servers:
+      - stunner_ip:3478
       turn_servers:
       - credential: pass-1
         host: stunner_ip
@@ -212,10 +213,10 @@ metadata:
   name: tls-example-ingress
   namespace: default
   annotations:
-    kubernetes.io/ingress.class:  "nginx"
+    # kubernetes.io/ingress.class:  "nginx"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  # ingressClassName: nginx
+  ingressClassName: nginx
   tls:
   - hosts:
       - client-ingressserviceip.nip.io
