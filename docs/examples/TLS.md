@@ -97,3 +97,7 @@ kubectl describe certificate <certificate> -A
 kubectl describe certificaterequests.cert-manager.io <cert-request> -A
 kubectl describe certificatesigningrequests.certificates.k8s.io <cert-signing-request>
 ```
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).

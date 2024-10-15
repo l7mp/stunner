@@ -148,3 +148,7 @@ echo $INGRESSIP.nip.io
 ```
 
 Copy the URL into your browser, and now you should be greeted with the Jitsi webpage. In the landing page you should create a room first. After you created a room you can set your username and join the room. On another page you have to open this page again and you should see the previously created room in the list. You only have to connect this room with another user.
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).

@@ -215,3 +215,7 @@ Stop `turncat` and wipe all Kubernetes configuration.
 kubectl delete -f docs/examples/simple-tunnel/iperf-server.yaml
 kubectl delete -f docs/examples/simple-tunnel/iperf-stunner.yaml
 ```
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
