@@ -24,6 +24,8 @@ The recommended way to install mediasoup ([link](https://mediasoup.discourse.gro
 
 The figure below shows mediasoup deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, mediasoup is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for mediasoup, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
 
+![STUNner mediasoup integration deployment architecture](../../img/stunner_mediasoup.svg)
+
 In this tutorial we deploy a video room example using [mediasoup's demo application](https://github.com/versatica/mediasoup-demo/) with slight modifications (more on these below), the [mediasoup server](https://github.com/versatica/mediasoup/) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the mediasoup server pool to clients.
 
 ### Modifications on the mediasoup demo
