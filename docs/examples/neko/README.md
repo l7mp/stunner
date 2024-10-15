@@ -15,19 +15,13 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](/docs/INSTALL.md) to set up STUNner.
+See prerequisites [here](../../INSTALL.md#prerequisites).
 
 ### Quick installation
 
 The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](neko.yaml) packaged with STUNner.
 
-Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
-```
+To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
