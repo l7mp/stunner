@@ -37,7 +37,7 @@ In the below example, STUNner will be installed into the identically named names
 
 ### Ingress and Cert manager installation
 
-To ingest secured traffic into the cluster, you need to install some resources. Please follow the instructions in [this section](../TLS.md#installation) to install Ingress and Cert manager.
+To ingest secured traffic into the cluster, you need to install additional resources. Please follow the instructions in [this section](../TLS.md#installation) to install an Ingress and the Cert manager.
 
 ### STUNner
 
