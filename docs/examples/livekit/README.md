@@ -11,11 +11,16 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-See prerequisites [here](../../INSTALL.md#prerequisites).
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+* a [Cert-manager](../TLS.md#cert-manager) to secure traffic.
 
 > [!NOTE]
 >
-> As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
+> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `default` namespace under the `livekit-secret-tls` name.
+
 
 ## Setup
 
@@ -27,23 +32,10 @@ The figure below shows LiveKit deployed into regular Kubernetes pods behind STUN
 
 In this tutorial we deploy a video room example using [LiveKit's React SDK](https://github.com/livekit/livekit-react/tree/master/example), the [LiveKit server](https://github.com/livekit/livekit) for media exchange, a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the LiveKit server pool to clients.
 
-## Installation
-
-> [!NOTE]
->
-> Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
-
-In the below example, STUNner will be installed into the identically named namespace (`stunner`), while LiveKit and the Ingress gateway will live in the `default` namespace.
-
-### Ingress and Cert manager installation
-
-To ingest secured traffic into the cluster, you need to install additional resources. Please follow the instructions in [this section](../TLS.md#installation) to install an Ingress and the Cert manager.
 
 ### STUNner
 
 Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](livekit-server.yaml) packaged with STUNner.
-
-To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Configure STUNner to act as a STUN/TURN server to clients, and route all received media to the LiveKit server pods.
 
