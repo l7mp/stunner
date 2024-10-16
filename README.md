@@ -565,6 +565,12 @@ applications into Kubernetes.
   behind STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
   connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
   Encrypt](https://letsencrypt.org).
+* [Video-conferencing with Elixir WebRTC](/docs/examples/elixir-webrtc/README.md): This tutorial helps
+  you deploy a fully fledged [Elixir WebRTC](https://elixir-webrtc.org/) video-conferencing room called
+  [Nexus](https://github.com/elixir-webrtc/apps/tree/master/nexus) into Kubernetes
+  behind STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling
+  connections, using [cert-manager](https://cert-manager.io), [nip.io](https://nip.io) and [Let's
+  Encrypt](https://letsencrypt.org).
 * [Video-conferencing with Jitsi](/docs/examples/jitsi/README.md): This tutorial helps you deploy a
   fully fledged [Jitsi](https://jitsi.org) video-conferencing service into Kubernetes behind
   STUNner. The docs also show how to obtain a valid TLS certificate to secure your signaling

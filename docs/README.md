@@ -39,6 +39,7 @@
 * [Video-conferencing with LiveKit](examples/livekit/README.md)
 * [Video-conferencing with mediasoup](examples/mediasoup/README.md)
 * [Video-conferencing with Janus](examples/janus/README.md)
+* [Video-conferencing with Elixir WebRTC](examples/elixir-webrtc/README.md)
 * [Video-conferencing with Jitsi](examples/jitsi/README.md)
 * [Cloud-gaming with CloudRetro](examples/cloudretro/README.md)
 * [Remote desktop access with Neko](examples/neko/README.md)

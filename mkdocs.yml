@@ -24,6 +24,7 @@ nav:
   - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
   - 'LiveKit': 'examples/livekit/README.md'
   - 'Janus': 'examples/janus/README.md'
+  - 'Elixir WebRTC': 'examples/elixir-webrtc/README.md'
   - 'Jitsi': 'examples/jitsi/README.md'
   - 'mediasoup': 'examples/mediasoup/README.md'
   - 'CloudRetro': 'examples/cloudretro/README.md'
