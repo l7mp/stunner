@@ -39,7 +39,7 @@ kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.in
 STUNNERIP=$(kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
-> **Note**
+> [!NOTE]
 > This IP should be accessible from your browser. If that "public IP" is behind a NAT, you can overwrite it with the actual public IP that routes to the service by hand (e.g. `STUNNERIP=<your public IP>`).
 
 We need to give this public IP the Neko configuration in the `NEKO_ICESERVERS` environment variable, inside the `json` content (basically this will tell you browser to use STUNner as a STUN/TURN server).
