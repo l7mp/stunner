@@ -11,19 +11,15 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-See prerequisites [here](../../INSTALL.md#prerequisites).
-
-## Installation
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+* a [Cert-manager](../TLS.md#cert-manager) to secure traffic.
 
 > [!NOTE]
 >
-> Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
-
-In the below example, STUNner will be installed into the identically named namespace (`stunner`), while Nexus and the Ingress gateway will live in the `default` namespace.
-
-### Ingress and Cert manager installation
-
-To ingest secured traffic into the cluster, you need to install additional resources. Please follow the instructions in [this section](../TLS.md#installation) to install an Ingress and the Cert manager.
+> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `default` namespace under the `nexus-secret-tls` name.
 
 ### STUNner
 

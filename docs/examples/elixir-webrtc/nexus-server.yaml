@@ -33,7 +33,7 @@ spec:
       terminationGracePeriodSeconds: 18000 # 5 hours
       containers:
         - name: nexus
-          image: "l7mp/nexus"
+          image: "l7mp/l7mp/elixir-webrtc-nexus"
           imagePullPolicy: IfNotPresent
           env:
           - name: SECRET_KEY_BASE
