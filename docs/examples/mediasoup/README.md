@@ -11,14 +11,18 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-See prerequisites [here](../../INSTALL.md#prerequisites).
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+* a [Cert-manager](../TLS.md#cert-manager) to secure traffic.
 
 > [!NOTE]
 >
-> As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
+> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `default` namespace under the `mediasoup-demo-tls` name.
 
 
-## Setup
+## Description
 
 The recommended way to install mediasoup ([link](https://mediasoup.discourse.group/t/server-in-kubernetes-with-turn/3434),[link](https://www.reddit.com/r/kubernetes/comments/sdkhwn/deploying_mediasoup_webrtc_sfu_in_kubernetes/)) into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
 
@@ -47,18 +51,6 @@ with an additional environment variable we can load the pod's private IP into th
 ```
 
 - Added the parsing of url parameters to configure TURN server and a simple if/else in server/app/lib/RoomClient.js. The mediasoup clients will use the configured TURN server to gather the ICE candidates. Example: https://mediasoup-demo.example.com/?enableIceServer=yes&iceServerHost=100.100.100.100&iceServerPort=3478&iceServerProto=udp&iceServerUser=user-1&iceServerPass=pass-1
-
-## Installation
-
-> [!NOTE]
->
-> Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
-
-In the below example, STUNner will be installed into the identically named namespace (`stunner`), while mediasoup and the Ingress gateway will live in the `default` namespace.
-
-### Ingress and Cert manager installation
-
-To ingest secured traffic into the cluster, you need to install additional resources. Please follow the instructions in [this section](../TLS.md#installation) to install an Ingress and the Cert manager.
 
 ### STUNner
 
