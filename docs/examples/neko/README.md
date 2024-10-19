@@ -15,13 +15,14 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-See prerequisites [here](../../INSTALL.md#prerequisites).
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster.
 
 ### Quick installation
 
 The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](neko.yaml) packaged with STUNner.
-
-To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
