@@ -11,13 +11,17 @@ In this demo you will learn to:
 
 ## Prerequisites
 
-See prerequisites [here](../../INSTALL.md#prerequisites).
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+* a [Cert-manager](../TLS.md#cert-manager) to secure traffic.
 
 > [!NOTE]
 >
-> As a regrettable exception, Minikube is unfortunately not supported for this demo. The reason is that [Let's Encrypt certificate issuance is not available with nip.io](https://medium.com/@EmiiKhaos/there-is-no-possibility-that-you-can-get-lets-encrypt-certificate-with-nip-io-7483663e0c1b); later on you will learn more about why this is crucial above.
+> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `default` namespace under the `janus-web-secret-tls` name.
 
-## Setup
+## Description
 
 The recommended way (or at least the possible way, [link](https://janus.discourse.group/t/janus-with-kubernetes-demystifying-the-myths/938), [link](https://bugraoz93.medium.com/active-passive-highly-availability-janus-gateway-on-kubernetes-2189256e5525)) to install Janus into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
 
@@ -27,21 +31,9 @@ The figure below shows Janus deployed into regular Kubernetes pods behind STUNne
 
 In this tutorial we deploy [Janus Gateway](https://github.com/meetecho/janus-gateway/tree/master) with a set of [preimplemented and packaged server plugins](https://janus.conf.meetecho.com/docs/pluginslist.html) for media exchange, a [Janus Web Demo](https://github.com/meetecho/janus-gateway/tree/master/html), a Kubernetes Ingress gateway to secure signaling connections and handle TLS, and STUNner as a media gateway to expose the Janus server pool to clients.
 
-## Installation
-
-> [!NOTE]
->
-> Let's start with a disclaimer. Securing connection between the user and the server is a must. Read more about TLS [here](../TLS.md).
-
-In the below example, STUNner will be installed into the identically named namespace (`stunner`), while Janus and the Ingress gateway will live in the `default` namespace.
-
 ### Docker images
 
 Janus does not come with an official Docker image; thus, we built one using a self-made Dockerfile based on the available documents in the official [Janus repository](https://github.com/meetecho/janus-gateway). Actually, we've made two Dockerfiles. One for the Janus Gateway server and one for the Janus Web Demos. The [Janus Gateway server Dockerfile](./DOCKERFILE-janus-gateway) should be ran in the root directory of the [Janus repository](https://github.com/meetecho/janus-gateway). The Janus Web Demos Dockerfile should be used in the `/html` directory of the [same repository](https://github.com/meetecho/janus-gateway/tree/master/html). The images (`l7mp/janus-gateway:v1.2.4` and `l7mp/janus-web:latest`) used in the following demo are hosted on Docker Hub under the L7MP organization.
-
-### Ingress and Cert manager installation
-
-To ingest secured traffic into the cluster, you need to install additional resources. Please follow the instructions in [this section](../TLS.md#installation) to install an Ingress and the Cert manager.
 
 ### STUNner
 
