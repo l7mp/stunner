@@ -18,7 +18,7 @@ In this demo you will learn the following steps to:
 To run this example, you need:
 * a [Kubernetes cluster](../../INSTALL.md#prerequisites),
 * a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
-* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster.
+* optionally, an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster.
 
 ### Quick installation
 
