@@ -36,7 +36,7 @@ We use `nip.io` to "own a domain" in some examples. To replace it with your own 
 
 The first step of secured traffic ingestion is obtaining a valid cert by installing a Kubernetes Ingress: this will be used during the validation of our certificates and to terminate client TLS encrypted contexts.
 
-Install an Ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but this is not required.
+Install an Ingress controller into your cluster. We used the official [nginx ingress](https://github.com/kubernetes/ingress-nginx), but other Ingress implementations might work (check their documentation for install steps).
 
 ```console
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
