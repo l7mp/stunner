@@ -296,3 +296,7 @@ Delete the demo deployment using the below command:
 kubectl delete -f docs/examples/direct-one2one-call/direct-one2one-call-server.yaml
 kubectl delete -f docs/examples/direct-one2one-call/direct-one2one-call-stunner.yaml
 ```
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
