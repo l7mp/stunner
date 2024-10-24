@@ -18,7 +18,7 @@ The tutorial assumes a fresh STUNner installation; see the [STUNner installation
 
 ### Setup
 
-In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside the cluster and perform a speed test from the local console. We will use the [`turncat`](../../cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner acting as a STUN/TURN gateway.
+In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside the cluster and perform a speed test from the local console. We will use the [`turncat`](../../cmd/turncat.md) client utility to tunnel test traffic to the iperf server via STUNner acting as a STUN/TURN gateway.
 
 ![STUNner benchmarks setup](../../img/stunner_benchmark.svg)
 
@@ -158,7 +158,7 @@ We will need to learn the ClusterIP assigned by Kubernetes to the `iperf-server`
 export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}")
 ```
 
-Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat` is clever enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
+Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat` is clever enough to [parse the running STUNner configuration](../../cmd/turncat.md) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
 
 ``` console
 bin/turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener \
