@@ -401,7 +401,7 @@ a heartwarming welcome message.
    ```
 
 1. We also need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy
-   STUN/TURN client called [`turncat`](cmd/turncat/README.md) for this purpose. Once
+   STUN/TURN client called [`turncat`](docs/cmd/turncat.md) for this purpose. Once
    [installed](cmd/turncat/README.md#installation), you can fire up `turncat` to listen on the
    standard input and send everything it receives to STUNner. Type any input and press Enter, and
    you should see a nice greeting from your cluster!

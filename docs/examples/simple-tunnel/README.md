@@ -18,7 +18,7 @@ The tutorial assumes a fresh STUNner installation; see the [STUNner installation
 
 ### Setup
 
-In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside the cluster and perform a speed test from the local console. We will use the [`turncat`](../../cmd/turncat) client utility to tunnel test traffic to the iperf server via STUNner acting as a STUN/TURN gateway.
+In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside the cluster and perform a speed test from the local console. We will use the [`turncat`](../../cmd/turncat.md) client utility to tunnel test traffic to the iperf server via STUNner acting as a STUN/TURN gateway.
 
 ![STUNner benchmarks setup](../../img/stunner_benchmark.svg)
 
