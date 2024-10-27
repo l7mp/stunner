@@ -63,6 +63,22 @@ helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner
 helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
 ```
 
+### Skip install CRDs
+
+You can install the STUNner chart without the Gateway API CRDs and STUNner CRDs with the `--skip-crds` flag. However, ensure that the CRDs are already present in the cluster, as the STUNner Gateway Operator will fail to start without them.
+
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
+    --namespace=stunner-system --skip-crds
+```
+
+To manually install the CRDs:
+
+```console
+kubectl apply -k github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.0.0
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner-gateway-operator/crds/stunner-crd.yaml
+```
+
 ## Customization
 
 The Helm charts let you fine-tune STUNner features, including [compute resources](#resources) provisioned for `stunnerd` pods, [UDP multithreading](#udp-multithreading), and[graceful shutdown](#graceful-shutdown).
