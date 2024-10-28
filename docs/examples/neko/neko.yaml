@@ -35,7 +35,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         - name: NEKO_ICESERVERS
-          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp"], "username": "user-1", "credential": "pass-1","iceTransportPolicy": "all"}]'
+          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp"], "username": "user-1", "credential": "pass-1"}]'
         ports:
         - name: http
           containerPort: 8080
