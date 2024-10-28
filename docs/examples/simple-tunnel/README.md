@@ -158,7 +158,7 @@ We will need to learn the ClusterIP assigned by Kubernetes to the `iperf-server`
 export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}")
 ```
 
-Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat` is clever enough to [parse the running STUNner configuration](../../cmd/turncat) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
+Next, set up `turncat` to listen on `UDP:127.0.0.1:5000` and tunnel connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `turncat` is clever enough to [parse the running STUNner configuration](../../cmd/turncat.md) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
 
 ``` console
 bin/turncat --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener \
@@ -215,3 +215,7 @@ Stop `turncat` and wipe all Kubernetes configuration.
 kubectl delete -f docs/examples/simple-tunnel/iperf-server.yaml
 kubectl delete -f docs/examples/simple-tunnel/iperf-stunner.yaml
 ```
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).

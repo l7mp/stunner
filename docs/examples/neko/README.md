@@ -15,19 +15,14 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](/docs/INSTALL.md) to set up STUNner.
+To run this example, you need:
+* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+* optionally, an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster.
 
 ### Quick installation
 
 The simplest way to deploy the demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the [manifest](neko.yaml) packaged with STUNner.
-
-Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
-```
 
 Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
 
@@ -45,7 +40,7 @@ kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.in
 STUNNERIP=$(kubectl get service udp-gateway -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
-> **Note**
+> [!NOTE]
 > This IP should be accessible from your browser. If that "public IP" is behind a NAT, you can overwrite it with the actual public IP that routes to the service by hand (e.g. `STUNNERIP=<your public IP>`).
 
 We need to give this public IP the Neko configuration in the `NEKO_ICESERVERS` environment variable, inside the `json` content (basically this will tell you browser to use STUNner as a STUN/TURN server).

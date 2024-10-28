@@ -28,7 +28,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-
     --namespace=stunner-system
 ```
 
-And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunenrd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec).
+And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec).
 
 ### Development version
 
@@ -61,6 +61,22 @@ You can install multiple legacy STUNner dataplanes side-by-side, provided that t
 ```console
 helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod
 helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
+```
+
+### Skip install CRDs
+
+You can install the STUNner chart without the Gateway API CRDs and STUNner CRDs with the `--skip-crds` flag. However, ensure that the CRDs are already present in the cluster, as the STUNner Gateway Operator will fail to start without them.
+
+```console
+helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
+    --namespace=stunner-system --skip-crds
+```
+
+To manually install the CRDs:
+
+```console
+kubectl apply -k github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.0.0
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner-gateway-operator/crds/stunner-crd.yaml
 ```
 
 ## Customization

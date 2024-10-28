@@ -165,3 +165,7 @@ Notice that the average packets/second rate will be slightly lower in case of a 
 
 * It is advised to repeat the measurment with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200. Small packet sizes result lower effective throughput (when packet drop is < 1%).
 * Measuring [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) with `iperf` requires the clocks at the iperf client and server to be synchronized.  Without this the results may be corrupted, and you may even see negative latencies.
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).

@@ -15,11 +15,7 @@ In this demo you will learn how to:
 
 ## Prerequisites
 
-The below installation instructions require an operational cluster running a supported version of
-Kubernetes (>1.22). Most hosted or private Kubernetes cluster services will work, but make sure
-that the cluster comes with a functional load-balancer integration (all major hosted Kubernetes
-services should support this). Otherwise, STUNner will not be able to allocate a public IP address
-for clients to reach your WebRTC infra.
+See prerequisites [here](../../INSTALL.md#prerequisites).
 
 You will need a basic familiarity [with the CloudRetro
 architecture](https://webrtchacks.com/open-source-cloud-gaming-with-webrtc), especially the concept
@@ -79,12 +75,7 @@ the CloudRetro servers running on a private pod IP address. That is where STUNne
 
 ### STUNner
 
-First we install STUNner gateway operator with helm ([more info](https://github.com/l7mp/stunner-helm)):
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner
-```
+First we install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
 Wait until all the necessary resources are up and running, then you are ready to continue.
 
@@ -242,3 +233,7 @@ kubectl delete -f cloudretro-setup-coordinator.yaml
 kubectl delete -f cloudretro-setup-workers.yaml
 kubectl delete -f cloudretro-stunner-cleanup.yaml
 ```
+
+# Help
+
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
