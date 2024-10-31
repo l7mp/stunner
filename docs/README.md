@@ -28,7 +28,7 @@
 
 ### Basics
 
-* [Deploying a UDP echo service behind](examples/udp-echo)
+* [Deploying a UDP echo service behind STUNner](examples/udp-echo)
 * [Opening a UDP tunnel via STUNner](examples/simple-tunnel)
 
 ### Headless deployment model
