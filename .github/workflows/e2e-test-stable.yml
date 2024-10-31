@@ -11,17 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-
-      - name: Download modules
-        run: go mod download
-      - name: Go install
-        run: go install
-      - name: Build turncat
-        run: CGO_ENABLED=0 go build -ldflags="-w -s" -o turncat cmd/turncat/main.go
+      - name: Install turncat
+        run: |
+          URL=`wget -q -O - https://api.github.com/repos/l7mp/stunner/releases/latest  |  jq -r '.assets[] | select(.name | contains ("turncat")) | select(.name | contains ("linux")) | select(.name | contains ("amd64"))  | .browser_download_url'`
+          wget $URL -O turncat
+          chmod a+x turncat
 
       - name: Start minikube
         uses: medyagh/setup-minikube@master
