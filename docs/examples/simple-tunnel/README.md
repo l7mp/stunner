@@ -1,8 +1,6 @@
-# STUNner Tutorial
+# STUNner Tutorial: STUNner benchmark with iperf
 
-# Open a tunnel via STUNner
-
-This tutorial shows how to tunnel an external connection via STUNner to a UDP service deployed into Kubernetes. The tutorial can also be used to quickly check a STUNner installation.
+This tutorial shows how to make a simple benchmark via STUNner to evaluate your cloud provider's UDP and TCP stack.
 
 In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
