@@ -104,7 +104,7 @@ metadata:
   labels:
     app.kubernetes.io/name: livekit-server
     app.kubernetes.io/instance: livekit
-    app.kubernetes.io/version: "v1.4.2"
+    app.kubernetes.io/version: "v1.8.0"
 spec:
   type: LoadBalancer
   ports:
@@ -127,7 +127,7 @@ metadata:
   labels:
     app.kubernetes.io/name: livekit-server
     app.kubernetes.io/instance: livekit
-    app.kubernetes.io/version: "v1.4.2"
+    app.kubernetes.io/version: "v1.8.0"
 spec:
   replicas: 1
   selector:
@@ -147,7 +147,7 @@ spec:
       terminationGracePeriodSeconds: 18000 # 5 hours
       containers:
         - name: livekit-server
-          image: "livekit/livekit-server:v1.4.2"
+          image: "livekit/livekit-server:v1.8.0"
           imagePullPolicy: IfNotPresent
           args: ["--disable-strict-config"]
           env:
