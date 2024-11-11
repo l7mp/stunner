@@ -96,7 +96,7 @@ You have to modify the ICE config to use STUNner with the given credentials in t
 
 # change to:
 
-  const pcConfig = { iceServers: [{ urls: 'turn:<STUNNERIP>:3478?transport=udp', username: 'user-1', credential: 'pass-1',iceTransportPolicy: 'relay'}] };
+  const pcConfig = { iceServers: [{ urls: 'turn:<STUNNERIP>:3478?transport=udp', username: 'user-1', credential: 'pass-1'}], iceTransportPolicy: 'relay' };
 ```
 
 `lib/nexus/peer.ex`:
@@ -106,7 +106,8 @@ You have to modify the ICE config to use STUNner with the given credentials in t
 
 # change to:
 
-  ice_servers: [%{urls: "turn:<STUNNERIP>:3478?transport=udp", "username": "user-1", "credential": "pass-1", "iceTransportPolicy": "relay"}],
+  ice_servers: [%{urls: "turn:<STUNNERIP>:3478?transport=udp", "username": "user-1", "credential": "pass-1"}],
+  ice_transport_policy: :relay,
 ```
 
 Now rebuild the Docker image, and push it into your image repository:
