@@ -56,9 +56,11 @@ type RelayGen struct {
 
 	// Logger is a logger factory we can use to generate per-listener relay loggers.
 	Logger *logger.LeveledLoggerFactory
+
+	telemetry *telemetry.Telemetry
 }
 
-func NewRelayGen(l *object.Listener, logger *logger.LeveledLoggerFactory) *RelayGen {
+func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger *logger.LeveledLoggerFactory) *RelayGen {
 	return &RelayGen{
 		Listener:     l,
 		RelayAddress: l.Addr,
@@ -66,6 +68,7 @@ func NewRelayGen(l *object.Listener, logger *logger.LeveledLoggerFactory) *Relay
 		ClusterCache: lru.New(ClusterCacheSize),
 		Net:          l.Net,
 		Logger:       logger,
+		telemetry:    t,
 	}
 }
 
@@ -86,7 +89,7 @@ func (r *RelayGen) AllocatePacketConn(network string, requestedPort int) (net.Pa
 		return nil, nil, err
 	}
 
-	conn = NewPortRangePacketConn(conn, r.PortRangeChecker,
+	conn = NewPortRangePacketConn(conn, r.PortRangeChecker, r.telemetry,
 		r.Logger.NewLogger(fmt.Sprintf("relay-%s", r.Listener.Name)))
 
 	relayAddr, ok := conn.LocalAddr().(*net.UDPAddr)
@@ -145,18 +148,20 @@ func (s *Stunner) GenPortRangeChecker(g *RelayGen) PortRangeChecker {
 type PortRangePacketConn struct {
 	net.PacketConn
 	checker      PortRangeChecker
-	log          logging.LeveledLogger
 	readDeadline time.Time
+	telemetry    *telemetry.Telemetry
 	lock         sync.Mutex
+	log          logging.LeveledLogger
 }
 
 // NewPortRangePacketConn decorates a PacketConn with filtering on a target port range. Errors are reported per listener name.
-func NewPortRangePacketConn(c net.PacketConn, checker PortRangeChecker, log logging.LeveledLogger) net.PacketConn {
+func NewPortRangePacketConn(c net.PacketConn, checker PortRangeChecker, t *telemetry.Telemetry, log logging.LeveledLogger) net.PacketConn {
 	// cluster add/sub connection is not tracked
 	// AddConnection(n, t)
 	r := PortRangePacketConn{
 		PacketConn: c,
 		checker:    checker,
+		telemetry:  t,
 		log:        log,
 	}
 
@@ -172,8 +177,8 @@ func (c *PortRangePacketConn) WriteTo(p []byte, peerAddr net.Addr) (int, error) 
 
 	n, err := c.PacketConn.WriteTo(p, peerAddr)
 	if n > 0 {
-		telemetry.IncrementBytes(cluster.Name, telemetry.ClusterType, telemetry.Outgoing, uint64(n))
-		telemetry.IncrementPackets(cluster.Name, telemetry.ClusterType, telemetry.Outgoing, 1)
+		c.telemetry.IncrementBytes(cluster.Name, telemetry.ClusterType, telemetry.Outgoing, uint64(n))
+		c.telemetry.IncrementPackets(cluster.Name, telemetry.ClusterType, telemetry.Outgoing, 1)
 	}
 
 	return n, err
@@ -204,8 +209,8 @@ func (c *PortRangePacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 		}
 
 		if n > 0 {
-			telemetry.IncrementBytes(cluster.Name, telemetry.ClusterType, telemetry.Incoming, uint64(n))
-			telemetry.IncrementPackets(cluster.Name, telemetry.ClusterType, telemetry.Incoming, 1)
+			c.telemetry.IncrementBytes(cluster.Name, telemetry.ClusterType, telemetry.Incoming, uint64(n))
+			c.telemetry.IncrementPackets(cluster.Name, telemetry.ClusterType, telemetry.Incoming, 1)
 		}
 
 		return n, peerAddr, nil

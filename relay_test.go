@@ -35,9 +35,6 @@ func getChecker(minPort, maxPort int) PortRangeChecker {
 }
 
 func TestPortRangePacketConn(t *testing.T) {
-	telemetry.Init()
-	defer telemetry.Close()
-
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
 
@@ -53,6 +50,10 @@ func TestPortRangePacketConn(t *testing.T) {
 		return
 	}
 
+	tm, err := telemetry.New(telemetry.Callbacks{}, false, loggerFactory.NewLogger("metric"))
+	assert.NoError(t, err, "should succeed")
+	defer tm.Close()
+
 	t.Run("LoopbackOnValidPort", func(t *testing.T) {
 		log.Debug("Creating base socket")
 		addr := "127.0.0.1:15000"
@@ -61,7 +62,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -91,7 +92,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -120,7 +121,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("Creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(15000, 15000), log)
+		conn := NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
@@ -145,9 +146,6 @@ func TestPortRangePacketConn(t *testing.T) {
 
 // BenchmarkPortRangePacketConn sends lots of invalid packets: this is mostly for testing the logger
 func BenchmarkPortRangePacketConn(b *testing.B) {
-	telemetry.Init()
-	defer telemetry.Close()
-
 	loggerFactory := logger.NewLoggerFactory(connTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 	//	relayLog := loggerFactory.WithRateLimiter(.25, 1).NewLogger("relay")
@@ -159,6 +157,10 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 		b.Fatalf("Cannot allocate vnet: %s", err.Error())
 	}
 
+	tm, err := telemetry.New(telemetry.Callbacks{}, false, loggerFactory.NewLogger("metric"))
+	assert.NoError(b, err, "should succeed")
+	defer tm.Close()
+
 	log.Debug("Creating base socket")
 	addr := "127.0.0.1:25000"
 	baseConn, err := nw.ListenPacket("udp", addr)
@@ -168,7 +170,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	msg := "PING!"
 
 	log.Debug("Creating filtered packet conn wrappeer socket")
-	conn := WithCounter(NewPortRangePacketConn(baseConn, getChecker(15000, 15000), relayLog))
+	conn := WithCounter(NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, relayLog))
 	if err != nil {
 		b.Fatalf("Cannot create port-range packetconn: %s", err.Error())
 	}

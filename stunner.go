@@ -29,6 +29,7 @@ type Stunner struct {
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
 	udpThreadNum                                               int
+	telemetry                                                  *telemetry.Telemetry
 	logger                                                     *logger.LeveledLoggerFactory
 	log                                                        logging.LeveledLogger
 	net                                                        transport.Net
@@ -101,13 +102,20 @@ func NewStunner(options Options) *Stunner {
 	s.clusterManager = manager.NewManager("cluster-manager",
 		object.NewClusterFactory(r, logger), logger)
 
+	telemetryCallbacks := telemetry.Callbacks{
+		GetAllocationCount: func() int64 { return s.GetActiveConnections() },
+	}
+	t, err := telemetry.New(telemetryCallbacks, s.dryRun, logger.NewLogger("metrics"))
+	if err != nil {
+		log.Errorf("Could not initialize metric provider: %s", err.Error())
+		return nil
+	}
+	s.telemetry = t
+
 	if !s.dryRun {
 		s.resolver.Start()
-		telemetry.Init()
-		telemetry.RegisterAllocationMetric(s.log, s.GetActiveConnections)
 	}
 
-	// TODO: remove this when STUNner gains self-managed dataplanes
 	s.ready = true
 
 	return s
@@ -275,16 +283,15 @@ func (s *Stunner) Close() {
 		}
 	}
 
-	telemetry.UnregisterAllocationMetric(s.log)
-	if !s.dryRun {
-		telemetry.Close()
+	if err := s.telemetry.Close(); err != nil { // blocks until finished
+		s.log.Errorf("Could not shutdown metric provider cleanly: %s", err.Error())
 	}
 
 	s.resolver.Close()
 }
 
 // GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
-func (s *Stunner) GetActiveConnections() float64 {
+func (s *Stunner) GetActiveConnections() int64 {
 	count := s.AllocationCount()
-	return float64(count)
+	return int64(count)
 }

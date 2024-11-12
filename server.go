@@ -31,7 +31,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
 
-	relay := NewRelayGen(l, s.logger)
+	relay := NewRelayGen(l, s.telemetry, s.logger)
 	relay.PortRangeChecker = s.GenPortRangeChecker(relay)
 
 	permissionHandler := s.NewPermissionHandler(l)
@@ -40,7 +40,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 	switch l.Proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := util.NewPacketConnPool(l.Name, l.Net, s.udpThreadNum)
+		socketPool := util.NewPacketConnPool(l.Name, l.Net, s.udpThreadNum, s.telemetry)
 
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
@@ -68,7 +68,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 			return fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
 
-		tcpListener = telemetry.NewListener(tcpListener, l.Name, telemetry.ListenerType)
+		tcpListener = telemetry.NewListener(tcpListener, l.Name, telemetry.ListenerType, s.telemetry)
 
 		conn := turn.ListenerConfig{
 			Listener:              tcpListener,
@@ -96,7 +96,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 			return fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
 
-		tlsListener = telemetry.NewListener(tlsListener, l.Name, telemetry.ListenerType)
+		tlsListener = telemetry.NewListener(tlsListener, l.Name, telemetry.ListenerType, s.telemetry)
 
 		conn := turn.ListenerConfig{
 			Listener:              tlsListener,
@@ -129,7 +129,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 			return fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
 
-		dtlsListener = telemetry.NewListener(dtlsListener, l.Name, telemetry.ListenerType)
+		dtlsListener = telemetry.NewListener(dtlsListener, l.Name, telemetry.ListenerType, s.telemetry)
 
 		conn := turn.ListenerConfig{
 			Listener:              dtlsListener,

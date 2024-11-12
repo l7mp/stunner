@@ -19,11 +19,10 @@ import (
 	"github.com/pion/transport/v3/test"
 	"github.com/pion/transport/v3/vnet"
 	"github.com/pion/turn/v4"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/resolver"
-	"github.com/l7mp/stunner/internal/telemetry"
+	telemetrytester "github.com/l7mp/stunner/internal/telemetry/tester"
 	"github.com/l7mp/stunner/pkg/logger"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -32,12 +31,17 @@ import (
 	cfgclient "github.com/l7mp/stunner/pkg/config/client"
 )
 
-var stunnerTestLoglevel string = "all:ERROR"
+const (
+	// timeout  = 200 * time.Millisecond
+	// interval = 50 * time.Millisecond
 
-// var stunnerTestLoglevel string = stnrv1.DefaultLogLevel
-// var stunnerTestLoglevel string = "all:INFO"
-// var stunnerTestLoglevel string = "all:TRACE"
-// var stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
+	stunnerTestLoglevel string = "all:ERROR"
+
+	// stunnerTestLoglevel string = stnrv1.DefaultLogLevel
+	// stunnerTestLoglevel string = "all:INFO"
+	// stunnerTestLoglevel string = "all:TRACE"
+	// 	stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
+)
 
 var certPem, keyPem, _ = GenerateSelfSignedKey()
 var certPem64 = base64.StdEncoding.EncodeToString(certPem)
@@ -176,7 +180,7 @@ func stunnerEchoTest(conf echoTestConfig) {
 			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
 		}
 	}
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	client.Close()
 }
 
@@ -655,7 +659,7 @@ type StunnerTestClusterConfig struct {
 	config         stnrv1.StunnerConfig
 	echoServerAddr string
 	result         bool
-	tester         func(t *testing.T)
+	tester         func(h *telemetrytester.Tester)
 }
 
 var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
@@ -1198,34 +1202,36 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
-		tester: func(t *testing.T) {
-			c := telemetry.ListenerConnsTotal
-			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+		tester: func(h *telemetrytester.Tester) {
+			// stunner_listener_connections_total
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
 
-			g := telemetry.ListenerConnsActive
-			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+			// stunner_listener_connections
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
 
-			c = telemetry.ListenerPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+			// stunner_listener_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 20)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 20)
 
-			c = telemetry.ListenerBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+			// stunner_listener_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 20)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 20)
 
-			c = telemetry.ClusterPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+			// stunner_cluster_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx"), 20)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx"), 20)
 
-			c = telemetry.ClusterBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+			// stunner_cluster_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx"), 20)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx"), 20)
 		},
 	},
 	{
@@ -1265,34 +1271,36 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
-		tester: func(t *testing.T) {
-			c := telemetry.ListenerConnsTotal
-			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+		tester: func(h *telemetrytester.Tester) {
+			// stunner_listener_connections_total
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
 
-			g := telemetry.ListenerConnsActive
-			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+			// stunner_listener_connections
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
 
-			c = telemetry.ListenerPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+			// stunner_listener_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 200)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 200)
 
-			c = telemetry.ListenerBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+			// stunner_listener_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 2000)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 2000)
 
-			c = telemetry.ClusterPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+			// stunner_cluster_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx"), 200)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx"), 200)
 
-			c = telemetry.ClusterBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+			// stunner_cluster_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx"), 2000)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx"), 2000)
 		},
 	},
 	{
@@ -1328,34 +1336,36 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         false,
-		tester: func(t *testing.T) {
-			c := telemetry.ListenerConnsTotal
-			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+		tester: func(h *telemetrytester.Tester) {
+			// stunner_listener_connections_total
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
 
-			g := telemetry.ListenerConnsActive
-			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+			// stunner_listener_connections
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
 
-			c = telemetry.ListenerPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500)) // signaling+data
-			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(50))     // just signaling
+			// stunner_listener_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 500) // signaling+data
+			assert.Less(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 50)     // just signaling
 
-			c = telemetry.ListenerBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(1000)) // signaling+data
-			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(1000))    // just signaling
+			// stunner_listener_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 1000) // signaling+data
+			assert.Less(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 1000)    // just signaling
 
-			c = telemetry.ClusterPacketsTotal
-			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+			// stunner_cluster_packets_total
+			assert.Equal(h, 0, h.CollectAndCount("stunner_cluster_packets_total"))
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx")) // fail
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx")) // fail
 
-			c = telemetry.ClusterBytesTotal
-			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+			// stunner_cluster_bytes_total
+			assert.Equal(h, 0, h.CollectAndCount("stunner_cluster_bytes_total"))
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx")) // fail
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx")) // fail
 		},
 	},
 	{
@@ -1391,34 +1401,36 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         false,
-		tester: func(t *testing.T) {
-			c := telemetry.ListenerConnsTotal
-			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+		tester: func(h *telemetrytester.Tester) {
+			// stunner_listener_connections_total
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
 
-			g := telemetry.ListenerConnsActive
-			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+			// stunner_listener_connections
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
 
-			c = telemetry.ListenerPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500)) // signaling+data
-			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(50))     // just signaling
+			// stunner_listener_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 500) // signaling+data
+			assert.Less(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 50)     // just signaling
 
-			c = telemetry.ListenerBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(1000)) // signaling+data
-			assert.LessOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(1000))    // just signaling
+			// stunner_listener_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 1000) // signaling+data
+			assert.Less(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 1000)    // just signaling
 
-			c = telemetry.ClusterPacketsTotal
-			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+			// stunner_cluster_packets_total
+			assert.Equal(h, 0, h.CollectAndCount("stunner_cluster_packets_total"))
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx")) // fail
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx")) // fail
 
-			c = telemetry.ClusterBytesTotal
-			assert.Equal(t, 0, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")))
-			assert.Equal(t, float64(0), testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")))
+			// stunner_cluster_bytes_total
+			assert.Equal(h, 0, h.CollectAndCount("stunner_cluster_bytes_total"))
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx")) // fail
+			assert.Equal(h, 0, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx")) // fail
 		},
 	},
 	{
@@ -1458,34 +1470,36 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 		},
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
-		tester: func(t *testing.T) {
-			c := telemetry.ListenerConnsTotal
-			assert.Equal(t, 1, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(c.WithLabelValues("udp")))
+		tester: func(h *telemetrytester.Tester) {
+			// stunner_listener_connections_total
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
 
-			g := telemetry.ListenerConnsActive
-			assert.Equal(t, 1, testutil.CollectAndCount(g), "ListenerConnsTotal")
-			assert.Equal(t, float64(1), testutil.ToFloat64(g.WithLabelValues("udp")))
+			// stunner_listener_connections
+			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
+			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
 
-			c = telemetry.ListenerPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(500))
+			// stunner_listener_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 200)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 200)
 
-			c = telemetry.ListenerBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("udp", "tx")), float64(2000))
+			// stunner_listener_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 2000)
+			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 2000)
 
-			c = telemetry.ClusterPacketsTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(500))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(500))
+			// stunner_cluster_packets_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_packets_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx"), 200)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx"), 200)
 
-			c = telemetry.ClusterBytesTotal
-			assert.Equal(t, 2, testutil.CollectAndCount(c), "ListenerConnsTotal")
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "rx")), float64(2000))
-			assert.GreaterOrEqual(t, testutil.ToFloat64(c.WithLabelValues("echo-server-cluster", "tx")), float64(2000))
+			// stunner_cluster_bytes_total
+			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_bytes_total"))
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx"), 2000)
+			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx"), 2000)
 		},
 	},
 	// TODO: implement port-range filtering for DNS clusters
@@ -1590,6 +1604,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			stunner := NewStunner(Options{
 				LogLevel:         stunnerTestLoglevel,
 				SuppressRollback: true,
+				DryRun:           false,
 				Resolver:         mockDns,
 				Net:              v.podnet,
 			})
@@ -1620,7 +1635,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			stunnerEchoFloodTest(testConfig)
 
 			if c.tester != nil {
-				c.tester(t)
+				c.tester(telemetrytester.New(stunner.telemetry, t))
 			}
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -1632,6 +1647,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 
 func stunnerEchoFloodTest(conf echoTestConfig) {
 	t := conf.t
+	t.Helper()
 	log := conf.loggerFactory.NewLogger("test")
 
 	client, err := turn.NewClient(&turn.ClientConfig{
