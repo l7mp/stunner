@@ -75,7 +75,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-
 To manually install the CRDs:
 
 ```console
-kubectl apply -k github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.0.0
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/standard-install.yaml
 kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner-gateway-operator/crds/stunner-crd.yaml
 ```
 
