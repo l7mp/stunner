@@ -46,6 +46,6 @@ build-bin:
 
 .PHONY: clean
 clean:
-	echo 'Use "make generate` to autogenerate server code' > pkg/server/server.go
-	echo 'Use "make generate` to autogenerate client code' > pkg/client/client.go
-	echo 'Use "make generate` to autogenerate client code' > pkg/types/types.go
+	# echo 'Use "make generate" to autogenerate server code' > pkg/server/server.go
+	# echo 'Use "make generate" to autogenerate client code' > pkg/client/client.go
+	# echo 'Use "make generate" to autogenerate client code' > pkg/types/types.go
