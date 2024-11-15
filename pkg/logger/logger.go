@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/pion/logging"
 	"golang.org/x/time/rate"
@@ -42,6 +43,7 @@ type LeveledLoggerFactory struct {
 	DefaultLogLevel logging.LogLevel
 	ScopeLevels     map[string]logging.LogLevel
 	Loggers         map[string]*RateLimitedLogger
+	lock            sync.RWMutex
 }
 
 // NewLoggerFactory sets up a scoped logger for STUNner.
@@ -67,6 +69,9 @@ func (f *LeveledLoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 
 // SetLevel sets the loglevel.
 func (f *LeveledLoggerFactory) SetLevel(levelSpec string) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	levels := strings.Split(levelSpec, ",")
 	for _, s := range levels {
 		scopedLevel := strings.SplitN(s, ":", 2)
@@ -88,7 +93,6 @@ func (f *LeveledLoggerFactory) SetLevel(levelSpec string) {
 			f.DefaultLogLevel = l
 			continue
 		}
-
 		f.ScopeLevels[scope] = l
 	}
 
@@ -109,6 +113,9 @@ func (f *LeveledLoggerFactory) SetLevel(levelSpec string) {
 
 // GetLevel gets the loglevel for the given scope.
 func (f *LeveledLoggerFactory) GetLevel(scope string) string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+
 	logLevel := f.DefaultLogLevel
 	scopeLevel, found := f.ScopeLevels[scope]
 	if found {
@@ -178,6 +185,9 @@ func NewRateLimitedLoggerForScope(scope string, level logging.LogLevel, writer i
 
 // newLogger knows how to emit rate-limited loggers.
 func (f *LeveledLoggerFactory) newLogger(scope string, limit rate.Limit, burst int) *RateLimitedLogger {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	logger, found := f.Loggers[scope]
 	if found {
 		return logger
