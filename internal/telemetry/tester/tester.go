@@ -26,6 +26,8 @@ func New(reader sdkmetric.Reader, t *testing.T) *Tester {
 
 // CollectAndCount returns the number of metrics with the given name and attributes
 func (h *Tester) CollectAndCount(name string) int {
+	h.Helper()
+
 	metrics := &metricdata.ResourceMetrics{}
 	err := h.Collect(context.Background(), metrics)
 	assert.NoError(h, err, "failed to collect metrics: %v")
@@ -48,6 +50,8 @@ func (h *Tester) CollectAndCount(name string) int {
 
 // CollectAndGetInt returns the value of the metric with given name and attributes.
 func (h *Tester) CollectAndGetInt(name string, attrs ...string) int {
+	h.Helper()
+
 	assert.True(h, len(attrs)%2 == 0, "odd number of attribute key-value pairs")
 
 	metrics := &metricdata.ResourceMetrics{}
@@ -83,6 +87,8 @@ func (h *Tester) CollectAndGetInt(name string, attrs ...string) int {
 
 // CollectAndDump returns the metrics with the given name and attributes as a string.
 func (h *Tester) CollectAndDump(name string, attrs ...string) string {
+	h.Helper()
+
 	metrics := &metricdata.ResourceMetrics{}
 	if err := h.Collect(context.Background(), metrics); err != nil {
 		return ""
