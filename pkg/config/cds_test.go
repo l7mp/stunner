@@ -27,7 +27,7 @@ const stunnerLogLevel = "all:ERROR"
 
 // run on random port
 func getRandCDSAddr() string {
-	rndPort := rand.Intn(10000) + 50000
+	rndPort := rand.Intn(10000) + 20000
 	return fmt.Sprintf(":%d", rndPort)
 }
 
