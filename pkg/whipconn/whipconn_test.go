@@ -1,8 +1,8 @@
-package icetester
+package whipconn
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/assert"
 
 	slogger "github.com/l7mp/stunner/pkg/logger"
@@ -20,20 +19,13 @@ var (
 	testerLogLevel = "all:WARN"
 	// testerLogLevel = "all:TRACE"
 	// testerLogLevel = "all:INFO"
-	addr                           = "localhost:12345"
-	timeout                        = 5 * time.Second
-	interval                       = 50 * time.Millisecond
-	logger   logging.LoggerFactory = slogger.NewLoggerFactory(testerLogLevel)
-	log      logging.LeveledLogger = logger.NewLogger("test")
+	addr                                = "localhost:12345"
+	timeout                             = 5 * time.Second
+	interval                            = 50 * time.Millisecond
+	defaultConfig                       = Config{Token: "whiptoken"}
+	logger        logging.LoggerFactory = slogger.NewLoggerFactory(testerLogLevel)
+	log           logging.LeveledLogger = logger.NewLogger("test")
 )
-
-// func init() {
-// 	// setup a fast pinger so that we get a timely error notification
-// 	PingPeriod = 500 * time.Millisecond
-// 	PongWait = 800 * time.Millisecond
-// 	WriteWait = 200 * time.Millisecond
-// 	RetryPeriod = 250 * time.Millisecond
-// }
 
 func echoTest(t *testing.T, conn net.Conn, content string) {
 	t.Helper()
@@ -50,13 +42,14 @@ func echoTest(t *testing.T, conn net.Conn, content string) {
 
 var testerTestCases = []struct {
 	name   string
+	config *Config
 	tester func(t *testing.T, ctx context.Context, l *Listener)
 }{
 	{
 		name: "Basic connectivity",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
 			log.Debug("Creating dialer")
-			d := NewDialer(webrtc.Configuration{}, logger)
+			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
@@ -71,13 +64,24 @@ var testerTestCases = []struct {
 			assert.NoError(t, clientConn.Close(), "client conn close")
 		},
 	}, {
+		name: "Invalid bearer token refused",
+		tester: func(t *testing.T, ctx context.Context, l *Listener) {
+			log.Debug("Creating dialer")
+			d := NewDialer(Config{Token: "dummy-token"}, logger)
+			assert.NotNil(t, d)
+
+			log.Debug("Dialing")
+			_, err := d.DialContext(ctx, addr)
+			assert.Error(t, err)
+		},
+	}, {
 		name: "Closing dialer does not close client connection",
 		tester: func(t *testing.T, serverCtx context.Context, l *Listener) {
 			// a new context for the dialer
 			dialerCtx, dialerCancel := context.WithCancel(context.Background())
 
 			log.Debug("Creating dialer")
-			d := NewDialer(webrtc.Configuration{}, logger)
+			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
@@ -97,20 +101,20 @@ var testerTestCases = []struct {
 		name: "Client side close closes server",
 		tester: func(t *testing.T, serverCtx context.Context, l *Listener) {
 			log.Debug("Creating dialer")
-			d := NewDialer(webrtc.Configuration{}, logger)
+			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
 			clientConn, err := d.DialContext(serverCtx, addr)
 			assert.NoError(t, err)
 
-			assert.Eventually(t, func() bool { return l.activeConns == 1 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
 
 			log.Debug("Closing client connection")
 			assert.NoError(t, clientConn.Close())
 
 			// should close the server conn too
-			assert.Eventually(t, func() bool { return l.activeConns == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
 		},
 	}, {
 		name: "Server side close closes client",
@@ -119,24 +123,21 @@ var testerTestCases = []struct {
 			defer clientCancel()
 
 			log.Debug("Creating dialer")
-			d := NewDialer(webrtc.Configuration{}, logger)
+			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
 			clientConn, err := d.DialContext(clientCtx, addr)
 			assert.NoError(t, err)
 
-			assert.Eventually(t, func() bool { return l.activeConns == 1 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
 
 			log.Debug("Closing server connections")
 			for _, lConn := range l.Conns() {
-				// log.Infof("------------ %s", lConn.String())
 				assert.NoError(t, lConn.Close())
 			}
 
-			log.Info("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-
-			assert.Eventually(t, func() bool { return l.activeConns == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
 
 			// should close the client conn too
 			assert.Eventually(t, func() bool { return clientConn.(*dialerConn).closed == true }, timeout, interval)
@@ -145,7 +146,7 @@ var testerTestCases = []struct {
 		name: "Multiple connections",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
 			log.Debug("Creating dialer")
-			d := NewDialer(webrtc.Configuration{}, logger)
+			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing: creating 5 connections")
@@ -172,13 +173,44 @@ var testerTestCases = []struct {
 			wg.Wait()
 			close(connChan)
 
-			assert.Eventually(t, func() bool { return l.activeConns == 5 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 5 }, timeout, interval)
 
 			for c := range connChan {
 				c.Close()
 			}
 
-			assert.Eventually(t, func() bool { return l.activeConns == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
+		},
+	}, {
+		name: "Closing invalid resource fails",
+		tester: func(t *testing.T, ctx context.Context, l *Listener) {
+			uri := fmt.Sprintf("http://%s/whip/dummy-id", addr)
+			req, err := http.NewRequest("DELETE", uri, nil)
+			assert.NoError(t, err)
+			req.Header.Add("Authorization", "Bearer "+defaultConfig.Token)
+
+			r, err := http.DefaultClient.Do(req)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusNotFound, r.StatusCode)
+		},
+	}, {
+		name:   "Connecting with custom path",
+		config: &Config{Endpoint: "/custompath"},
+		tester: func(t *testing.T, ctx context.Context, l *Listener) {
+			log.Debug("Creating dialer")
+			d := NewDialer(Config{Endpoint: "/custompath"}, logger)
+			assert.NotNil(t, d)
+
+			log.Debug("Dialing")
+			clientConn, err := d.DialContext(ctx, addr)
+			assert.NoError(t, err)
+
+			log.Debug("Echo test round 1")
+			echoTest(t, clientConn, "test1")
+			log.Debug("Echo test round 2")
+			echoTest(t, clientConn, "test2")
+
+			assert.NoError(t, clientConn.Close(), "client conn close")
 		},
 	},
 }
@@ -192,8 +224,13 @@ func TestTesterConn(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
+			config := defaultConfig
+			if c.config != nil {
+				config = *c.config
+			}
+
 			log.Debug("Creating listener")
-			listener, err := NewListener(addr, webrtc.Configuration{}, logger)
+			listener, err := NewListener(addr, config, logger)
 			assert.NoError(t, err)
 			l = listener
 			assert.NotNil(t, l)
@@ -208,7 +245,7 @@ func TestTesterConn(t *testing.T) {
 
 					log.Debug("Accepting server connection")
 
-					// responder
+					// readloop
 					go func() {
 						buf := make([]byte, 100)
 						for {
@@ -221,28 +258,12 @@ func TestTesterConn(t *testing.T) {
 							assert.NoError(t, err)
 						}
 					}()
-
-					// closer
-					go func() {
-						<-ctx.Done()
-
-						if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) &&
-							!errors.Is(err, http.ErrServerClosed) {
-							t.Error("server conn close")
-						}
-
-						// close listener
-						l.Close() //nolint
-					}()
 				}
 			}()
 
 			c.tester(t, ctx, l)
-		})
 
-		log.Debug("Waiting for connections to close")
-		if l != nil {
-			assert.Eventually(t, func() bool { return l.activeConns == 0 }, timeout, interval)
-		}
+			l.Close() //nolint
+		})
 	}
 }
