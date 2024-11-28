@@ -143,7 +143,7 @@ func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 	return &c
 }
 
-// LoadConfig loads a configuration from an origin. This is a shim wrapper around ConfigOrigin.Load.
+// LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.
 func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
 	client, err := client.New(origin, s.name, s.logger)
 	if err != nil {
@@ -153,12 +153,12 @@ func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
 	return client.Load()
 }
 
-// WatchConfig watches a configuration from an origin. This is a shim wrapper around ConfigOrigin.Watch.
-func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv1.StunnerConfig) error {
+// WatchConfig watches a configuration from an origin. This is a shim wrapper around configclient.Watch.
+func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	client, err := client.New(origin, s.name, s.logger)
 	if err != nil {
 		return err
 	}
 
-	return client.Watch(ctx, ch)
+	return client.Watch(ctx, ch, suppressDelete)
 }

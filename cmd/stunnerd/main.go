@@ -142,8 +142,8 @@ func main() {
 			configOrigin = cdsAddr.Addr
 		}
 
-		log.Infof("Watching configuration at origin %q", configOrigin)
-		if err := st.WatchConfig(ctx, configOrigin, conf); err != nil {
+		log.Infof("Watching configuration at origin %q (ignoring delete-config updates)", configOrigin)
+		if err := st.WatchConfig(ctx, configOrigin, conf, true); err != nil {
 			log.Errorf("Could not run config watcher: %s", err.Error())
 			os.Exit(1)
 		}
@@ -195,11 +195,9 @@ func main() {
 				c.Admin.LogLevel = logLevel
 			}
 
-			// we have working stunnerd: reconcile
 			log.Debug("Initiating reconciliation")
-			err := st.Reconcile(c)
-			log.Trace("Reconciliation ready")
-			if err != nil {
+
+			if err := st.Reconcile(c); err != nil {
 				if e, ok := err.(stnrv1.ErrRestarted); ok {
 					log.Debugf("Reconciliation ready: %s", e.Error())
 				} else {
@@ -207,6 +205,8 @@ func main() {
 						"(running configuration unchanged): %s", err.Error())
 				}
 			}
+
+			log.Trace("Reconciliation ready")
 		}
 	}
 }

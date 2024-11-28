@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
@@ -18,10 +18,9 @@ import (
 )
 
 var (
-	// ConfigDeletionUpdateDelay is the delay between deleting a config from the server and
-	// sending the corresponing zero-config to the client. Set this to zero to suppress sending
-	// the zero-config all together.
-	ConfigDeletionUpdateDelay = 5 * time.Second
+	// SuppressConfigDeletion allows the server to suppress config deletions all together. Used
+	// mostly for testing.
+	SuppressConfigDeletion = false
 )
 
 // Server is a generic config discovery server implementation.
@@ -60,11 +59,15 @@ func (s *Server) Start(ctx context.Context) error {
 	handler := api.NewStrictHandler(s, []api.StrictMiddlewareFunc{s.WSUpgradeMiddleware})
 	api.HandlerFromMux(handler, s.router)
 	s.Server = &http.Server{Addr: s.addr, Handler: s.router}
+	l, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		return fmt.Errorf("CDS server failed to listen: %w", err)
+	}
 
 	go func() {
 		s.log.Info("Starting CDS server", "address", s.addr, "patch", s.patch != nil)
 
-		err := s.ListenAndServe()
+		err := s.Serve(l)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) || errors.Is(err, http.ErrServerClosed) {
 				s.log.Info("Closing config discovery server")
@@ -83,21 +86,11 @@ func (s *Server) Start(ctx context.Context) error {
 		for {
 			select {
 			case c := <-s.configCh:
+				s.log.V(2).Info("Sending config update event", "config-id", c.Id)
 				s.broadcastConfig(c)
-
 			case c := <-s.deleteCh:
-				s.log.V(2).Info("Initiating deleyed config deletion", "id", c.Id)
-
-				go func() {
-					select {
-					case <-ctx.Done():
-						return
-					case <-time.After(ConfigDeletionUpdateDelay):
-						s.configCh <- Config{Id: c.Id, Config: c.Config}
-						return
-					}
-				}()
-
+				s.log.V(2).Info("Sending config delete event", "config-id", c.Id)
+				s.broadcastConfig(c)
 			case <-ctx.Done():
 				return
 			}
@@ -135,9 +128,10 @@ func (s *Server) GetConnTrack() *ConnTrack {
 
 // RemoveClient forcefully closes a client connection. This is used mainly for testing.
 func (s *Server) RemoveClient(id string) {
-	if c := s.conns.Get(id); c != nil {
-		s.log.V(1).Info("Forcefully removing client connection", "client", id)
-		s.closeConn(c)
+	if conn := s.conns.Get(id); conn != nil {
+		s.log.V(1).Info("Forcefully removing client connection", "config-id", id,
+			"client", conn.RemoteAddr().String())
+		s.closeConn(conn)
 	}
 }
 
@@ -156,6 +150,7 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 			// drop anything we receive
 			_, _, err := conn.ReadMessage()
 			if err != nil {
+				s.closeConn(conn)
 				return
 			}
 		}
@@ -211,8 +206,7 @@ func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
 		return
 	}
 
-	s.log.V(2).Info("Sending configuration to client", "client", conn.Id(),
-		"config", c.String())
+	s.log.V(2).Info("Sending configuration to client", "client", conn.Id())
 
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
 		s.log.Error(err, "Error sending config update", "client", conn.Id())

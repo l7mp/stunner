@@ -66,7 +66,7 @@ func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1
 	id := fmt.Sprintf("%s/%s", namespace, name)
 	c := s.configs.Get(id)
 	if c == nil {
-		s.log.V(1).Info("GetV1ConfigNamespaceName: Config not found", "client", id)
+		s.log.V(1).Info("GetV1ConfigNamespaceName: Config not found", "config-id", id)
 		return api.GetV1ConfigNamespaceName404JSONResponse{
 			Code:    http.StatusNotFound,
 			Message: fmt.Sprintf("Config not found for ID %q", id),

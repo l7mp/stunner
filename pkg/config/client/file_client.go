@@ -66,15 +66,15 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 
 // Watch watches a configuration file for changes. If no file exists at the given path, it will
 // periodically retry until the file appears.
-func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	if w.configFile == "" {
-		return errors.New("Uninitialized config file path")
+		return errors.New("uninitialized config file path")
 	}
 
 	go func() {
 		for {
 			// try to watch
-			if err := w.Poll(ctx, ch); err != nil {
+			if err := w.Poll(ctx, ch, suppressDelete); err != nil {
 				w.log.Warnf("Error loading config file %q: %s",
 					w.configFile, err.Error())
 			} else {
@@ -92,7 +92,7 @@ func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerC
 
 // Poll watches the config file and emits new configs on the specified channel. Returns an error if
 // further action is needed (tryWatchConfig is to be started) or nil on normal exit.
-func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	w.log.Tracef("configWatcher")
 
 	// create a new watcher
@@ -160,7 +160,12 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 			// suppress repeated events
 			if c.DeepEqual(&prev) {
-				w.log.Debugf("Ignoring recurrent notify event for the same config file")
+				w.log.Debug("Ignoring recurrent notify event for the same config file")
+				continue
+			}
+
+			if suppressDelete && IsConfigDeleted(c) {
+				w.log.Info("Ignoring deleted configuration")
 				continue
 			}
 

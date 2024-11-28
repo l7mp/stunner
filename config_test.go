@@ -154,7 +154,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	defer cancel()
 
 	url := "file://" + file
-	err = stunner.WatchConfig(ctx, url, conf)
+	err = stunner.WatchConfig(ctx, url, conf, false)
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
@@ -269,7 +269,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	defer cancel()
 
 	url := "file://" + file
-	err = stunner.WatchConfig(ctx, url, conf)
+	err = stunner.WatchConfig(ctx, url, conf, false)
 	assert.NoError(t, err, "creating config watcher")
 
 	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
@@ -410,7 +410,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	defer close(conf)
 
 	log.Debug("init config poller")
-	assert.NoError(t, stunner.WatchConfig(ctx, origin, conf), "creating config poller")
+	assert.NoError(t, stunner.WatchConfig(ctx, origin, conf, true), "creating config poller")
 
 	c2, ok := <-conf
 	assert.True(t, ok, "config emitted")

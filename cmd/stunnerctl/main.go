@@ -173,7 +173,7 @@ func runConfig(_ *cobra.Command, args []string) error {
 
 	confChan := make(chan *stnrv1.StunnerConfig, 8)
 	if watch {
-		err := cds.Watch(ctx, confChan)
+		err := cds.Watch(ctx, confChan, false)
 		if err != nil {
 			close(confChan)
 			return err

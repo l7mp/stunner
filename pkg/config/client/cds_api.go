@@ -36,10 +36,12 @@ type CdsApi interface {
 	// Get loads the config(s) from the API endpoint.
 	Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error)
 	// Watch watches config(s) from the API endpoint of a CDS server. If the server is not
-	// available watch will retry, and if the connection goes away it will create a new one.
-	Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
+	// available watch will retry, and if the connection goes away it will create a new one. If
+	// set, the suppressDelete instructs the API to ignore config delete updates from the
+	// server.
+	Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error
 	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
-	Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error
+	Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error
 	logging.LeveledLogger
 }
 
@@ -98,14 +100,14 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error
 	return decodeConfigList(r.Body)
 }
 
-func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("WATCH: watching all configs from CDS server %s", a.wsURI)
-	return watch(ctx, a, ch)
+	return watch(ctx, a, ch, suppressDelete)
 }
 
-func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("POLL: polling all configs from CDS server %s", a.wsURI)
-	return poll(ctx, a, ch)
+	return poll(ctx, a, ch, suppressDelete)
 }
 
 // ConfigsNamespaceAPI is the API for listing all configs in a namespace.
@@ -163,16 +165,16 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig,
 	return decodeConfigList(r.Body)
 }
 
-func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("WATCH: watching all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
-	return watch(ctx, a, ch)
+	return watch(ctx, a, ch, suppressDelete)
 }
 
-func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("POLL: polling all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
-	return poll(ctx, a, ch)
+	return poll(ctx, a, ch, suppressDelete)
 }
 
 type ConfigNamespaceNameAPI struct {
@@ -231,22 +233,22 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 	return decodeConfig(r.Body)
 }
 
-func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("WATCH: watching config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
-	return watch(ctx, a, ch)
+	return watch(ctx, a, ch, suppressDelete)
 }
 
-func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig) error {
+func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
-	return poll(ctx, a, ch)
+	return poll(ctx, a, ch, suppressDelete)
 }
 
-func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
+func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	go func() {
 		for {
-			if err := poll(ctx, a, ch); err != nil {
+			if err := poll(ctx, a, ch, suppressDelete); err != nil {
 				_, wsuri := a.Endpoint()
 				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
 			} else {
@@ -265,7 +267,7 @@ func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error
 // ////////////
 // API workers
 // ////////////
-func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error {
+func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	_, url := a.Endpoint()
 	a.Tracef("poll: trying to open connection to CDS server at %s", url)
 
@@ -354,6 +356,11 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 				continue
 			}
 
+			if suppressDelete && IsConfigDeleted(c) {
+				a.Infof("Ignoring delete configuration update from %q", url)
+				continue
+			}
+
 			a.Debugf("new config received from %q: %q", url, c.String())
 
 			ch <- c
@@ -363,7 +370,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig) error 
 	// wait fo cancel
 	for {
 		defer func() {
-			a.Infof("closing connection for client %s", conn.RemoteAddr().String())
+			a.Infof("closing connection to server %s", conn.RemoteAddr().String())
 			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
 			conn.Close()
 			closePinger <- struct{}{}

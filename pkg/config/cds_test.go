@@ -51,9 +51,7 @@ func TestServerLoad(t *testing.T) {
 	testLog := logger.NewLogger("test")
 
 	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+	server.SuppressConfigDeletion = true
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -144,11 +142,6 @@ func TestServerPoll(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
-	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -178,15 +171,15 @@ func TestServerPoll(t *testing.T) {
 	defer close(ch3)
 
 	go func() {
-		err = client1.Poll(ctx, ch1)
+		err = client1.Poll(ctx, ch1, false)
 		assert.NoError(t, err, "client 1 cancelled")
 	}()
 	go func() {
-		err = client2.Poll(ctx, ch2)
+		err = client2.Poll(ctx, ch2, false)
 		assert.NoError(t, err, "client 2 cancelled")
 	}()
 	go func() {
-		err = client3.Poll(ctx, ch2)
+		err = client3.Poll(ctx, ch2, false)
 		assert.NoError(t, err, "client 3 cancelled")
 	}()
 
@@ -253,11 +246,6 @@ func TestServerWatch(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
-	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
-
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testCDSAddr := getRandCDSAddr()
@@ -285,11 +273,11 @@ func TestServerWatch(t *testing.T) {
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
 	defer clientCancel()
-	err = client1.Watch(clientCtx, ch1)
+	err = client1.Watch(clientCtx, ch1, false)
 	assert.NoError(t, err, "client 1 watch")
-	err = client2.Watch(clientCtx, ch2)
+	err = client2.Watch(clientCtx, ch2, false)
 	assert.NoError(t, err, "client 2 watch")
-	err = client3.Watch(clientCtx, ch3)
+	err = client3.Watch(clientCtx, ch3, false)
 	assert.NoError(t, err, "client 3 watch")
 
 	s := watchConfig(ch1, 150*time.Millisecond)
@@ -435,11 +423,6 @@ func TestServerWatchBootstrap(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
-	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
-
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
 
@@ -479,7 +462,7 @@ func TestServerWatchBootstrap(t *testing.T) {
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
 	defer clientCancel()
-	err = client1.Watch(clientCtx, ch1)
+	err = client1.Watch(clientCtx, ch1, false)
 	assert.NoError(t, err, "client 1 watch")
 
 	s := watchConfig(ch1, 1500*time.Millisecond)
@@ -534,11 +517,6 @@ func TestServerAPI(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
-	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = time.Millisecond
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
-
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 
 	testCDSAddr := getRandCDSAddr()
@@ -570,13 +548,13 @@ func TestServerAPI(t *testing.T) {
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
 	defer clientCancel()
-	err = client1.Watch(clientCtx, ch1)
+	err = client1.Watch(clientCtx, ch1, false)
 	assert.NoError(t, err, "client 1 watch")
-	err = client2.Watch(clientCtx, ch2)
+	err = client2.Watch(clientCtx, ch2, false)
 	assert.NoError(t, err, "client 2 watch")
-	err = client3.Watch(clientCtx, ch3)
+	err = client3.Watch(clientCtx, ch3, false)
 	assert.NoError(t, err, "client 3 watch")
-	err = client4.Watch(clientCtx, ch4)
+	err = client4.Watch(clientCtx, ch4, false)
 	assert.NoError(t, err, "client 4 watch")
 
 	s := watchConfig(ch1, 50*time.Millisecond)
@@ -877,6 +855,9 @@ func TestServerAPI(t *testing.T) {
 	s = watchConfig(ch4, 50*time.Millisecond)
 	assert.Nil(t, s)
 
+	// switch config deletions on
+	server.SuppressConfigDeletion = false
+
 	testLog.Debug("--------------------------------")
 	testLog.Debug("Update1: ns1/gw1 + ns3/gw1      ")
 	testLog.Debug("--------------------------------")
@@ -953,8 +934,11 @@ func TestServerAPI(t *testing.T) {
 	assert.NotNil(t, s1)
 	s2 = watchConfig(ch2, 50*time.Millisecond)
 	assert.NotNil(t, s2)
-	assert.True(t, s1.DeepEqual(sc1), "deepeq")
-	assert.True(t, client.IsConfigDeleted(s2), "deepeq") // deleted!
+	// we do not know the order
+	assert.True(t, s1.DeepEqual(sc1) || s2.DeepEqual(sc1), "config-deepeq")
+	assert.True(t, client.IsConfigDeleted(s1) || client.IsConfigDeleted(s2), "deleted") // deleted
+	// assert.True(t, s1.DeepEqual(sc1), "deepeq")
+	// assert.True(t, client.IsConfigDeleted(s2), "deepeq") // deleted!
 
 	// no config from client3 watch
 	s = watchConfig(ch3, 50*time.Millisecond)
@@ -974,13 +958,11 @@ func TestClientReconnect(t *testing.T) {
 	zlogger := zapr.NewLogger(z)
 	log := zlogger.WithName("tester")
 
-	// suppress deletions
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
-
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
+
+	// suppress deletions
+	server.SuppressConfigDeletion = true
 
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
@@ -1002,7 +984,7 @@ func TestClientReconnect(t *testing.T) {
 
 	clientCtx, clientCancel := context.WithCancel(context.Background())
 	defer clientCancel()
-	err = client1.Watch(clientCtx, ch1)
+	err = client1.Watch(clientCtx, ch1, false)
 	assert.NoError(t, err, "client 1 watch")
 
 	s := watchConfig(ch1, 150*time.Millisecond)
@@ -1055,10 +1037,8 @@ func TestServerUpdate(t *testing.T) {
 	logger := logger.NewLoggerFactory(stunnerLogLevel)
 	testLog := logger.NewLogger("test")
 
-	// make sure deletions are suppressed
-	deleteDelay := server.ConfigDeletionUpdateDelay
-	server.ConfigDeletionUpdateDelay = 0
-	defer func() { server.ConfigDeletionUpdateDelay = deleteDelay }()
+	// suppress deletions
+	server.SuppressConfigDeletion = true
 
 	serverCtx, serverCancel := context.WithCancel(context.Background())
 	defer serverCancel()
@@ -1141,6 +1121,112 @@ func TestServerUpdate(t *testing.T) {
 	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
 }
 
+// Test various combinations of server-side "drop-delete" (server.SuppressConfigDeletion=true) and
+// client-side "drop-delete" (client.Watch(..., suppressDelete=true)).
+func TestDeleteConfigAPI(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	saved := server.SuppressConfigDeletion
+	server.SuppressConfigDeletion = false
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	defer serverCancel()
+
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
+	srv := server.New(testCDSAddr, nil, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
+	assert.NoError(t, err, "start")
+
+	testLog.Debug("create client")
+	c, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	assert.NoError(t, err, "client")
+
+	ch := make(chan *stnrv1.StunnerConfig, 8)
+	defer close(ch)
+
+	for _, testCase := range []struct {
+		name                         string
+		serverDropDel, clientDropDel bool
+		tester                       func(t *testing.T)
+	}{
+		{
+			name:          "server sends delete - client handles delete",
+			serverDropDel: false,
+			clientDropDel: false,
+			tester: func(t *testing.T) {
+				conf := watchConfig(ch, 50*time.Millisecond)
+				assert.NotNil(t, conf, "config")
+				assert.True(t, client.IsConfigDeleted(conf))
+			},
+		},
+		{
+			name:          "server suppresses delete - client handles delete",
+			serverDropDel: true,
+			clientDropDel: false,
+			tester: func(t *testing.T) {
+				conf := watchConfig(ch, 50*time.Millisecond)
+				assert.Nil(t, conf, "config")
+			},
+		},
+		{
+			name:          "server sends delete - client suppresses delete",
+			serverDropDel: false,
+			clientDropDel: true,
+			tester: func(t *testing.T) {
+				conf := watchConfig(ch, 50*time.Millisecond)
+				assert.Nil(t, conf, "config")
+			},
+		},
+		{
+			name:          "server suppresses delete - client suppresses delete",
+			serverDropDel: true,
+			clientDropDel: true,
+			tester: func(t *testing.T) {
+				conf := watchConfig(ch, 50*time.Millisecond)
+				assert.Nil(t, conf, "config")
+			},
+		},
+	} {
+		testLog.Debugf("------------------------- %s ----------------------", testCase.name)
+
+		server.SuppressConfigDeletion = testCase.serverDropDel
+
+		clientCtx, clientCancel := context.WithCancel(context.Background())
+		err = c.Watch(clientCtx, ch, testCase.clientDropDel)
+		assert.NoError(t, err, "client watch")
+
+		conf := watchConfig(ch, 25*time.Millisecond)
+		assert.Nil(t, conf, "noconfig")
+
+		testLog.Trace("Adding config")
+		testConf := testConfig("ns1/gw1", "realm1")
+		err = srv.UpdateConfig([]server.Config{testConf})
+		assert.NoError(t, err, "update")
+
+		conf = watchConfig(ch, 50*time.Millisecond)
+		assert.NotNil(t, conf)
+		assert.Equal(t, *testConf.Config, *conf)
+
+		testLog.Trace("Deleting config")
+		err = srv.UpdateConfig([]server.Config{})
+		assert.NoError(t, err, "update")
+		testCase.tester(t)
+
+		clientCancel()
+	}
+
+	server.SuppressConfigDeletion = saved
+}
+
 // func TestServerPatcher(t *testing.T) {
 // 	zc := zap.NewProductionConfig()
 // 	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
@@ -1206,7 +1292,7 @@ func TestServerUpdate(t *testing.T) {
 // 	ch1 := make(chan *stnrv1.StunnerConfig, 8)
 // 	defer close(ch1)
 
-// 	err = watcher1.Watch(watchCtx, ch1)
+// 	err = watcher1.Watch(watchCtx, ch1, false)
 // 	assert.NoError(t, err, "client watch")
 
 // 	s := watchConfig(ch1, 100*time.Millisecond)
@@ -1219,7 +1305,7 @@ func TestServerUpdate(t *testing.T) {
 // 	ch2 := make(chan *stnrv1.StunnerConfig, 8)
 // 	defer close(ch2)
 
-// 	err = watcher2.Watch(watchCtx, ch2)
+// 	err = watcher2.Watch(watchCtx, ch2, false)
 // 	assert.NoError(t, err, "client watch")
 
 // 	s = watchConfig(ch2, 100*time.Millisecond)

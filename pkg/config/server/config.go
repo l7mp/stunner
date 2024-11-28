@@ -28,23 +28,18 @@ func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
 	s.configCh <- Config{Id: id, Config: cpy}
 }
 
-// DeleteConfig removes a config from the client. Theoretically, this should send the client a
-// zero-config immediately. However, in order to avoid that a client being removed and entering the
+// DeleteConfig removes a config from clients by sending a zero-config. Clients may decide to
+// ignore the delete operation by (1) using client.IsConfigDeleted() to identify whether a config
+// is being deleted and (2) selectively ignoring config delete updates based on the result. This is
+// needed, e.g., in stunnerd, in order to avoid that a client being removed and entering the
 // graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with all active
-// connections allocated to them, we actually delay sending the zeroconfig with a configurable time
-// (default is 5 sec, but a zero delay will suppress sending the zero-config all together). This
-// should allow the client comfortable time to enter the grafeul shutdown cycle. Note that clients
-// should stop actively reconciling config updates once they initiated graceful shutdown for this
-// to work.
+// connections allocated to them.
 func (s *Server) DeleteConfig(id string) {
 	s.configs.Delete(id)
-	if ConfigDeletionUpdateDelay == 0 {
-		s.log.Info("Suppressing config update for deleted config", "client", id)
+	if SuppressConfigDeletion {
+		s.log.Info("Suppressing config update for deleted config", "config-id", id)
 		return
 	}
-
-	s.log.Info("Delaying config update for deleted config", "client", id,
-		"delay", ConfigDeletionUpdateDelay)
 
 	s.deleteCh <- Config{Id: id, Config: client.ZeroConfig(id)}
 }
@@ -60,11 +55,11 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		for _, newC := range newConfigs {
 			if oldC.Id == newC.Id {
 				if !oldC.Config.DeepEqual(newC.Config) {
-					s.log.V(2).Info("Updating config", "client", newC.Id, "config",
+					s.log.V(2).Info("Updating config", "config-id", newC.Id, "config",
 						newC.Config.String())
 					s.UpsertConfig(newC.Id, newC.Config)
 				} else {
-					s.log.V(2).Info("Config not updated", "client", newC.Id,
+					s.log.V(2).Info("Config unchanged", "config-id", newC.Id,
 						"old-config", oldC.Config.String(),
 						"new-config", newC.Config.String())
 				}
@@ -74,7 +69,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("Removing config", "client", oldC.Id)
+			s.log.V(2).Info("Removing config", "config-id", oldC.Id)
 			s.DeleteConfig(oldC.Id)
 		}
 	}
@@ -89,7 +84,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("Adding config", "client", newC.Id, "config", newC.Config)
+			s.log.V(2).Info("Adding config", "config-id", newC.Id, "config", newC.Config)
 			s.UpsertConfig(newC.Id, newC.Config)
 		}
 	}
