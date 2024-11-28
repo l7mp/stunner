@@ -373,7 +373,7 @@ func TestLogger(t *testing.T) {
 			// t.Logf("-------------- Running test: %s -------------", c.name)
 
 			// create
-			loggerFactory := NewLoggerFactory(c.defaultLogLevel)
+			loggerFactory := NewLoggerFactory(c.defaultLogLevel).(*LeveledLoggerFactory)
 			loggerFactory.Writer = logBuffer
 			logreset()
 
@@ -554,7 +554,7 @@ func TestRateLimitedLogger(t *testing.T) {
 			// t.Logf("-------------- Running test: %s -------------", c.name)
 
 			// create
-			loggerFactory := NewLoggerFactory(c.level).WithRateLimiter(c.limit, c.burst)
+			loggerFactory := NewRateLimitedLoggerFactory(NewLoggerFactory(c.level), c.limit, c.burst)
 			loggerFactory.Writer = logBuffer
 			logreset()
 

@@ -13,6 +13,7 @@ import (
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
 // Number of log events per second reported at ERROR, WARN and INFO loglevel (logging at DEBUG and
@@ -155,7 +156,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		AuthHandler:       s.NewAuthHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,
-		LoggerFactory:     s.logger.WithRateLimiter(LogRateLimit, LogBurst),
+		LoggerFactory:     logger.NewRateLimitedLoggerFactory(s.logger, LogRateLimit, LogBurst),
 	})
 	if err != nil {
 		return fmt.Errorf("cannot set up TURN server for listener %s: %w",

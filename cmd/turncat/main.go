@@ -34,7 +34,7 @@ var (
 	cdsConfigFlags  *cdsclient.CDSConfigFlags
 	log             logging.LeveledLogger
 	defaultDuration time.Duration
-	loggerFactory   *logger.LeveledLoggerFactory
+	loggerFactory   logger.LoggerFactory
 
 	version    = "dev"
 	commitHash = "n/a"

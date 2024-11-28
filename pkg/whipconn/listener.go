@@ -17,7 +17,7 @@ import (
 )
 
 var _ net.Listener = &Listener{}
-var _ net.Conn = &listenerConn{}
+var _ net.Conn = &ListenerConn{}
 
 type Listener struct {
 	api          *webrtc.API
@@ -25,8 +25,8 @@ type Listener struct {
 	addr         string
 	server       *http.Server
 	errCh        chan error
-	connCh       chan *listenerConn
-	conns        map[string]*listenerConn
+	connCh       chan *ListenerConn
+	conns        map[string]*ListenerConn
 	lock         sync.Mutex
 	logger       logging.LoggerFactory
 	log, connLog logging.LeveledLogger
@@ -37,33 +37,34 @@ func NewListener(addr string, config Config, logger logging.LoggerFactory) (*Lis
 	e := webrtc.SettingEngine{}
 	e.DetachDataChannels()
 
-	if config.Endpoint == "" {
-		config.Endpoint = whipEndpoint
+	if config.WHIPEndpoint == "" {
+		config.WHIPEndpoint = WhipEndpoint
 	}
 
 	l := &Listener{
 		addr:    addr,
 		config:  config,
-		api:     webrtc.NewAPI(webrtc.WithSettingEngine(e)),
+		api:     webrtc.NewAPI(webrtc.WithSettingEngine(e), webrtc.WithMediaEngine(&webrtc.MediaEngine{})),
 		errCh:   make(chan error, 5),
-		connCh:  make(chan *listenerConn, 128),
-		conns:   map[string]*listenerConn{},
+		connCh:  make(chan *ListenerConn, 128),
+		conns:   map[string]*ListenerConn{},
 		logger:  logger,
 		log:     logger.NewLogger("whip-listener"),
 		connLog: logger.NewLogger("whip-conn"),
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/config", l.configHandler)
+	mux.HandleFunc("GET /config", l.configGetHandler)
+	mux.HandleFunc("POST /config", l.configPostHandler)
 
-	deletePatternWithoutSlash := fmt.Sprintf("DELETE %s/{resourceId}", config.Endpoint)
+	deletePatternWithoutSlash := fmt.Sprintf("DELETE %s/{resourceId}", config.WHIPEndpoint)
 	mux.HandleFunc(deletePatternWithoutSlash, l.whipDeleteHandler)
-	deletePatternWithSlash := fmt.Sprintf("DELETE %s/{resourceId}/{$}", config.Endpoint)
+	deletePatternWithSlash := fmt.Sprintf("DELETE %s/{resourceId}/{$}", config.WHIPEndpoint)
 	mux.HandleFunc(deletePatternWithSlash, l.whipDeleteHandler)
 
-	requestPatternWithoutSlash := fmt.Sprintf("POST %s", config.Endpoint)
+	requestPatternWithoutSlash := fmt.Sprintf("POST %s", config.WHIPEndpoint)
 	mux.HandleFunc(requestPatternWithoutSlash, l.whipRequestHandler)
-	requestPatternWithSlash := fmt.Sprintf("POST %s/{$}", config.Endpoint)
+	requestPatternWithSlash := fmt.Sprintf("POST %s/{$}", config.WHIPEndpoint)
 	mux.HandleFunc(requestPatternWithSlash, l.whipRequestHandler)
 
 	c, err := net.Listen("tcp", addr)
@@ -115,27 +116,64 @@ func (l *Listener) Close() error {
 	return l.server.Close()
 }
 
-func (l *Listener) configHandler(w http.ResponseWriter, r *http.Request) {
-	l.log.Tracef("New Config request from client %s", r.RemoteAddr)
+func (l *Listener) configGetHandler(w http.ResponseWriter, r *http.Request) {
+	l.log.Infof("New Config GET request from client %s", r.RemoteAddr)
 
-	var config Config
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		l.log.Errorf("Failed to decode config request %w from client %s: %s",
-			r.RemoteAddr, config, err.Error())
+	if r.Header.Get("Content-Type") != "application/json" {
+		err := fmt.Errorf("Expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
+		l.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	l.config = config
+	if err := json.NewEncoder(w).Encode(l.config); err != nil {
+		l.log.Errorf("Failed to encode config %#v for client %s: %s",
+			l.config, r.RemoteAddr, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// Note: is is unsafe to update the whip endpoint without restarting the listener
+func (l *Listener) configPostHandler(w http.ResponseWriter, r *http.Request) {
+	l.log.Infof("New Config POST request from client %s", r.RemoteAddr)
+
+	if r.Header.Get("Content-Type") != "application/json" {
+		err := fmt.Errorf("Expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
+		l.log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var config Config
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		l.log.Errorf("Failed to decode config request %#v from client %s: %s",
+			config, r.RemoteAddr, err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	l.config.ICEServers = config.ICEServers
+	if config.ICETransportPolicy != l.config.ICETransportPolicy {
+		l.config.ICETransportPolicy = config.ICETransportPolicy
+	}
+	if config.BearerToken != "" {
+		l.config.BearerToken = config.BearerToken
+	}
+	if config.WHIPEndpoint != "" {
+		l.log.Debugf("Ignoring WHIP endpoint in received config: %s", config.WHIPEndpoint)
+	}
+
+	l.log.Infof("Using new config: %#v", l.config)
 }
 
 func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
-	l.log.Tracef("New WHIP POST request from client %s", r.RemoteAddr)
+	l.log.Infof("New WHIP POST request from client %s", r.RemoteAddr)
 
 	// Check bearer token
-	if l.config.Token != "" {
-		if token := r.Header.Get("Authorization"); token != "Bearer "+l.config.Token {
-			err := fmt.Errorf("unauthorized WHIP request from client %s", r.RemoteAddr)
+	if l.config.BearerToken != "" {
+		if token := r.Header.Get("Authorization"); token != "Bearer "+l.config.BearerToken {
+			err := fmt.Errorf("Unauthorized WHIP request from client %s", r.RemoteAddr)
 			l.errCh <- err
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -158,7 +196,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn := &listenerConn{
+	conn := &ListenerConn{
 		listener: l,
 		log:      l.connLog,
 	}
@@ -172,7 +210,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 		l.errCh <- fmt.Errorf("failed to create a PeerConnection: %w", err)
 		return
 	}
-	conn.peerConn = peerConn
+	conn.PeerConn = peerConn
 
 	peerConn.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
 		conn.log.Debugf("PeerConnection state for client %s has changed: %s", r.RemoteAddr, p.String())
@@ -195,7 +233,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 				l.errCh <- fmt.Errorf("failed to detach DataChannel: %w", err)
 				return
 			}
-			conn.dataConn = raw
+			conn.DataConn = raw
 			conn.started = true
 
 			l.log.Infof("Creating new connection for client %s", r.RemoteAddr)
@@ -235,7 +273,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// WHIP expects a Location header: the hash of our local SDP
 	resourceId := resourceHash(sdp)
-	conn.resourceUrl = makeResourceURL(l.config.Endpoint, resourceId)
+	conn.ResourceUrl = makeResourceURL(l.config.WHIPEndpoint, resourceId)
 	w.Header().Add("Location", resourceId)
 
 	// WHIP+WHEP expects a HTTP Status Code of 201
@@ -246,7 +284,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *Listener) whipDeleteHandler(w http.ResponseWriter, r *http.Request) {
-	l.log.Tracef("New WHIP DELETE request from client %s for resource id %q",
+	l.log.Infof("New WHIP DELETE request from client %s for resource id %q",
 		r.RemoteAddr, r.PathValue("resourceId"))
 
 	resourceId := r.PathValue("resourceId")
@@ -279,27 +317,27 @@ func (_ *Listener) Addr() net.Addr {
 	return nil
 }
 
-func (l *Listener) Conns() []*listenerConn {
+func (l *Listener) GetConns() []*ListenerConn {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	ret := []*listenerConn{}
+	ret := []*ListenerConn{}
 	for _, c := range l.conns {
 		ret = append(ret, c)
 	}
 	return ret
 }
 
-type listenerConn struct {
-	resourceUrl     string
+type ListenerConn struct {
+	ResourceUrl     string
 	listener        *Listener
-	peerConn        *webrtc.PeerConnection
+	PeerConn        *webrtc.PeerConnection
 	dataChan        *webrtc.DataChannel
-	dataConn        datachannel.ReadWriteCloser
+	DataConn        datachannel.ReadWriteCloser
 	started, closed bool
 	log             logging.LeveledLogger
 }
 
-func (c *listenerConn) Close() error {
+func (c *ListenerConn) Close() error {
 	c.log.Tracef("Closing WHIP listener connection %s", c.String())
 
 	if c.closed {
@@ -309,14 +347,14 @@ func (c *listenerConn) Close() error {
 
 	// Close the datachannel
 	var err error
-	if c.dataChan.ReadyState() == webrtc.DataChannelStateOpen {
-		if err = c.dataConn.Close(); err != nil {
+	if c.dataChan != nil && c.dataChan.ReadyState() == webrtc.DataChannelStateOpen {
+		if err = c.DataConn.Close(); err != nil {
 			c.log.Debugf("Error closing DataChannel: %s", err.Error())
 		}
 	}
 
 	// Close the peer connection
-	err = c.peerConn.Close()
+	err = c.PeerConn.Close()
 	if err != nil {
 		c.log.Debugf("Error closing PeerConnection: %s", err.Error())
 	}
@@ -331,22 +369,22 @@ func (c *listenerConn) Close() error {
 	return err
 }
 
-func (c *listenerConn) Read(b []byte) (int, error) {
-	return c.dataConn.Read(b)
+func (c *ListenerConn) Read(b []byte) (int, error) {
+	return c.DataConn.Read(b)
 }
 
-func (c *listenerConn) Write(b []byte) (int, error) {
-	return c.dataConn.Write(b)
+func (c *ListenerConn) Write(b []byte) (int, error) {
+	return c.DataConn.Write(b)
 }
 
 // TODO: implement
-func (c *listenerConn) LocalAddr() net.Addr                { return nil }
-func (c *listenerConn) RemoteAddr() net.Addr               { return nil }
-func (c *listenerConn) SetDeadline(t time.Time) error      { return nil }
-func (c *listenerConn) SetReadDeadline(t time.Time) error  { return nil }
-func (c *listenerConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c *ListenerConn) LocalAddr() net.Addr                { return nil }
+func (c *ListenerConn) RemoteAddr() net.Addr               { return nil }
+func (c *ListenerConn) SetDeadline(t time.Time) error      { return nil }
+func (c *ListenerConn) SetReadDeadline(t time.Time) error  { return nil }
+func (c *ListenerConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // String returns a unique identifier for the connection based on the underlying signaling connection.
-func (c *listenerConn) String() string {
-	return c.resourceUrl
+func (c *ListenerConn) String() string {
+	return c.ResourceUrl
 }

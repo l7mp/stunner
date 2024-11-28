@@ -22,6 +22,7 @@ const (
 	DefaultMetricsPort     int = 8080
 	DefaultHealthCheckPort int = 8086
 	DefaultAuthServicePort int = 8088
+	DefaultICETesterPort   int = 8089
 )
 
 // Label/annotation defaults

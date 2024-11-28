@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -210,7 +211,7 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 		return PodInfo{}, fmt.Errorf("too many CDS servers")
 	}
 
-	return d.portfwd(ctx, &pods.Items[0], cdsFlags.Port)
+	return d.PortFwd(ctx, &pods.Items[0], cdsFlags.Port)
 }
 
 // DiscoverK8sStunnerdPods discovers the stunnerd pods in a Kubernetes cluster, opens a
@@ -296,7 +297,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 			defer wg.Done()
 			pod := pods.Items[j]
 
-			p, err := d.portfwd(ctx, &pod, podFlags.Port)
+			p, err := d.PortFwd(ctx, &pod, podFlags.Port)
 			if err != nil {
 				d.log.Errorf("Failed to create port-forwarder to stunnerd pod %s/%s: %s",
 					pod.GetNamespace(), pod.GetName(), err.Error())
@@ -355,10 +356,33 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 		d.log.Infof("Mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
 	}
 
-	return d.portfwd(ctx, &pods.Items[0], authFlags.Port)
+	return d.PortFwd(ctx, &pods.Items[0], authFlags.Port)
 }
 
-func (d *PodConnector) portfwd(ctx context.Context, pod *corev1.Pod, port int) (PodInfo, error) {
+// DiscoverK8sPod discovers an arbitrary pod.
+func DiscoverK8sPod(ctx context.Context, k8sFlags *cliopt.ConfigFlags, namespace, labelSelector string, port int, log logging.LeveledLogger) (PodInfo, error) {
+	d, err := NewK8sDiscoverer(k8sFlags, log)
+	if err != nil {
+		return PodInfo{}, fmt.Errorf("Failed to K8s discovery client: %w", err)
+	}
+
+	pods, err := d.cs.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return PodInfo{}, fmt.Errorf("Failed to query Kubernetes API server: %w", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return PodInfo{}, errors.New("No pod found")
+	}
+
+	if len(pods.Items) > 1 {
+		d.log.Infof("Mulitple (%d) pods found, using the first one", len(pods.Items))
+	}
+
+	return d.PortFwd(ctx, &pods.Items[0], port)
+}
+
+func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (PodInfo, error) {
 	p := PodInfo{
 		Name:      pod.GetName(),
 		Namespace: pod.GetNamespace(),

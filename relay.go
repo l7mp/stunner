@@ -55,12 +55,12 @@ type RelayGen struct {
 	Net transport.Net
 
 	// Logger is a logger factory we can use to generate per-listener relay loggers.
-	Logger *logger.LeveledLoggerFactory
+	Logger logger.LoggerFactory
 
 	telemetry *telemetry.Telemetry
 }
 
-func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger *logger.LeveledLoggerFactory) *RelayGen {
+func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger logger.LoggerFactory) *RelayGen {
 	return &RelayGen{
 		Listener:     l,
 		RelayAddress: l.Addr,

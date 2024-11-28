@@ -10,13 +10,13 @@ import (
 
 const (
 	messageSize  = 2048
-	whipEndpoint = "/whip"
+	WhipEndpoint = "/whip"
 )
 
 type Config struct {
-	ICEServers         []webrtc.ICEServer
-	ICETransportPolicy webrtc.ICETransportPolicy
-	Token, Endpoint    string
+	ICEServers                []webrtc.ICEServer
+	ICETransportPolicy        webrtc.ICETransportPolicy
+	BearerToken, WHIPEndpoint string
 }
 
 func makeURL(addr, endpoint string) *url.URL {

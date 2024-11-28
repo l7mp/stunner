@@ -1,26 +1,18 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"os/signal"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pion/logging"
 	"github.com/spf13/cobra"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/util/jsonpath"
-	"sigs.k8s.io/yaml"
 
-	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/internal/icetester"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -31,20 +23,31 @@ import (
 // get config for stunner/udp-gateway in yaml format: stunnerctl -n stunner get config udp-gateway --output yaml
 
 var (
-	output              string
-	watch, all, verbose bool
-	k8sConfigFlags      *cliopt.ConfigFlags
-	cdsConfigFlags      *cdsclient.CDSConfigFlags
-	authConfigFlags     *cdsclient.AuthConfigFlags
-	podConfigFlags      *cdsclient.PodConfigFlags
-	loggerFactory       *logger.LeveledLoggerFactory
-	log                 logging.LeveledLogger
+	output, iceTesterImage, loglevel  string
+	watch, all, verbose, forceCleanup bool
+	k8sConfigFlags                    *cliopt.ConfigFlags
+	cdsConfigFlags                    *cdsclient.CDSConfigFlags
+	authConfigFlags                   *cdsclient.AuthConfigFlags
+	podConfigFlags                    *cdsclient.PodConfigFlags
+	iceTesterTimeout                  time.Duration
+	iceTesterPacketRate               int
+
+	loggerFactory logger.LoggerFactory
+	log           logging.LeveledLogger
 
 	rootCmd = &cobra.Command{
 		Use:               "stunnerctl",
 		Short:             "A command line utility to inspect STUNner dataplane .",
 		Long:              "The stunnerctl tool is a CLI for inspecting, watching and troublehssooting STUNner gateways",
 		DisableAutoGenTag: true,
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
+			if verbose {
+				loglevel = "all:TRACE"
+			}
+
+			loggerFactory = logger.NewLoggerFactory(loglevel)
+			log = loggerFactory.NewLogger("stunnerctl")
+		},
 	}
 )
 
@@ -52,7 +55,7 @@ var (
 	configCmd = &cobra.Command{
 		Use:               "config",
 		Aliases:           []string{"stunner-config"},
-		Short:             "Get or watch dataplane configs",
+		Short:             "Get or watch dataplane configs of a gateway",
 		Args:              cobra.RangeArgs(0, 1),
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -63,9 +66,9 @@ var (
 		},
 	}
 	statusCmd = &cobra.Command{
-		Use:               "status",
+		Use:               "status [gateway]",
 		Aliases:           []string{"dataplane-status"},
-		Short:             "Read status from dataplane pods",
+		Short:             "Read status from dataplane pods for a gateway",
 		Args:              cobra.RangeArgs(0, 1),
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -78,11 +81,22 @@ var (
 	authCmd = &cobra.Command{
 		Use:               "auth",
 		Aliases:           []string{"get-credential"},
-		Short:             "Obtain authenticaction credentials to a gateway",
+		Short:             "Obtain authenticaction credentials for a gateway",
 		Args:              cobra.RangeArgs(0, 1),
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := runAuth(cmd, args); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		},
+	}
+	iceTestCmd = &cobra.Command{
+		Use:               "icetest [udp, tcp, ...]",
+		Short:             "Test ICE connectivity with the specified transports",
+		DisableAutoGenTag: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := runICETest(cmd, args); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
 			}
@@ -93,7 +107,8 @@ var (
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&all, "all-namespaces", "a", false, "Consider all namespaces")
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "summary", "Output format, either json, yaml, summary or jsonpath=template")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging, identical to -l all:DEBUG")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging, identical to -l all:DEBUG (overrides -l)")
+	rootCmd.PersistentFlags().StringVarP(&loglevel, "loglevel", "l", "all:WARN", "Set loglevel (format: <scope>:<level>, overrides: PION_LOG_*, default: all:WARN)")
 
 	// Kubernetes config flags: persistent, all commands
 	k8sConfigFlags = cliopt.NewConfigFlags(true)
@@ -114,10 +129,24 @@ func init() {
 	authConfigFlags = cdsclient.NewAuthConfigFlags()
 	authConfigFlags.AddFlags(authCmd.Flags())
 
+	// ICE test: uses CDS and auth args
+	cdsConfigFlags.AddFlags(iceTestCmd.Flags())
+	authConfigFlags.AddFlags(iceTestCmd.Flags())
+
+	// ICE test timeout
+	iceTestCmd.Flags().IntVarP(&iceTesterPacketRate, "packet-rate", "r", 50,
+		"Packet rate [pkts/sec], 0 means flood test (Default: 50)")
+	iceTestCmd.Flags().DurationVarP(&iceTesterTimeout, "timeout", "t", icetester.DefaultICETesterTimeout,
+		"Timeout")
+	iceTestCmd.Flags().StringVar(&iceTesterImage, "ice-tester-image", icetester.DefaultICETesterImage,
+		"Default icetester container image")
+	iceTestCmd.Flags().BoolVar(&forceCleanup, "force-cleanup", false, "Remove tester namespace if it exists")
+
 	// Add commands
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(iceTestCmd)
 }
 
 func main() {
@@ -125,291 +154,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)
 		os.Exit(1)
 	}
-}
-
-func runConfig(_ *cobra.Command, args []string) error {
-	loglevel := "all:WARN"
-	if verbose {
-		loglevel = "all:TRACE"
-	}
-	loggerFactory = logger.NewLoggerFactory(loglevel)
-	log = loggerFactory.NewLogger("stunnerctl")
-
-	gwNs := "default"
-	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
-		gwNs = *k8sConfigFlags.Namespace
-	}
-
-	jsonQuery, output, err := ParseJSONPathFlag(output)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	log.Debug("Searching for CDS server")
-	pod, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
-		loggerFactory.NewLogger("cds-fwd"))
-	if err != nil {
-		return fmt.Errorf("error searching for CDS server: %w", err)
-	}
-
-	log.Debugf("Connecting to CDS server: %s", pod.String())
-	var cds cdsclient.CdsApi
-	cdslog := loggerFactory.NewLogger("cds-client")
-	if all {
-		cds, err = cdsclient.NewAllConfigsAPI(pod.Addr, cdslog)
-	} else if len(args) == 0 {
-		cds, err = cdsclient.NewConfigsNamespaceAPI(pod.Addr, gwNs, cdslog)
-	} else {
-		gwName := args[0]
-		cds, err = cdsclient.NewConfigNamespaceNameAPI(pod.Addr, gwNs, gwName, cdslog)
-	}
-
-	if err != nil {
-		return fmt.Errorf("error creating CDS client: %w", err)
-	}
-
-	confChan := make(chan *stnrv1.StunnerConfig, 8)
-	if watch {
-		err := cds.Watch(ctx, confChan, false)
-		if err != nil {
-			close(confChan)
-			return err
-		}
-
-		go func() {
-			sigs := make(chan os.Signal, 1)
-			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-			<-sigs
-			close(confChan)
-		}()
-	} else {
-		resp, err := cds.Get(ctx)
-		if err != nil {
-			close(confChan)
-			return err
-		}
-		for _, c := range resp {
-			confChan <- c
-		}
-
-		close(confChan)
-	}
-
-	for c := range confChan {
-		if cdsclient.IsConfigDeleted(c) {
-			fmt.Printf("Gateway: %s <deleted>\n", c.Admin.Name)
-			continue
-		}
-		switch output {
-		case "yaml":
-			if out, err := yaml.Marshal(c); err != nil {
-				return err
-			} else {
-				fmt.Println(string(out))
-			}
-		case "json":
-			if out, err := json.Marshal(c); err != nil {
-				return err
-			} else {
-				fmt.Println(string(out))
-			}
-		case "jsonpath":
-			values, err := jsonQuery.FindResults(c)
-			if err != nil {
-				return err
-			}
-
-			if len(values) == 0 || len(values[0]) == 0 {
-				fmt.Println("<none>")
-			}
-
-			for arrIx := range values {
-				for valIx := range values[arrIx] {
-					fmt.Printf("%v\n", values[arrIx][valIx].Interface())
-				}
-			}
-		case "summary":
-			fmt.Print(c.Summary())
-		default:
-			fmt.Println(c.String())
-		}
-	}
-
-	return nil
-}
-
-func runStatus(_ *cobra.Command, args []string) error {
-	loglevel := "all:WARN"
-	if verbose {
-		loglevel = "all:TRACE"
-	}
-	loggerFactory = logger.NewLoggerFactory(loglevel)
-	log = loggerFactory.NewLogger("stunnerctl")
-
-	jsonQuery, output, err := ParseJSONPathFlag(output)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	gwNs := "default"
-	extraLog := "in namespace default"
-	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
-		gwNs = *k8sConfigFlags.Namespace
-		extraLog = fmt.Sprintf("in namespace %s", gwNs)
-	}
-	// --all-namespaces overrides -n
-	if all {
-		gwNs = ""
-		extraLog = "in all namespaces"
-	}
-
-	gw := ""
-	if len(args) > 0 {
-		gw = args[0]
-	}
-	if gwNs != "" && gw != "" {
-		extraLog += fmt.Sprintf("for gateway %s", gw)
-	}
-
-	log.Debug("Searching for dataplane pods " + extraLog)
-	pods, err := cdsclient.DiscoverK8sStunnerdPods(ctx, k8sConfigFlags, podConfigFlags,
-		gwNs, gw, loggerFactory.NewLogger("stunnerd-fwd"))
-	if err != nil {
-		return fmt.Errorf("error searching for stunnerd pods: %w", err)
-	}
-
-	for _, pod := range pods {
-		client := http.Client{
-			Timeout: 5 * time.Second,
-		}
-		url := fmt.Sprintf("http://%s/status", pod.Addr)
-		res, err := client.Get(url)
-		if err != nil {
-			log.Errorf("Error querying status for stunnerd pod at URL %q on %s: %s",
-				url, pod.String(), err.Error())
-			continue
-		}
-
-		if res.StatusCode != http.StatusOK {
-			log.Errorf("Status query failed on %s with HTTP error code %s",
-				pod.String(), res.Status)
-			continue
-		}
-
-		s := stnrv1.StunnerStatus{}
-		err = json.NewDecoder(res.Body).Decode(&s)
-		if err != nil {
-			log.Errorf("Could not decode status response: %s", err.Error())
-			continue
-		}
-
-		switch output {
-		case "yaml":
-			if out, err := yaml.Marshal(s); err != nil {
-				return err
-			} else {
-				fmt.Println(string(out))
-			}
-		case "json":
-			if out, err := json.Marshal(s); err != nil {
-				return err
-			} else {
-				fmt.Println(string(out))
-			}
-		case "jsonpath":
-			values, err := jsonQuery.FindResults(s)
-			if err != nil {
-				return err
-			}
-
-			if len(values) == 0 || len(values[0]) == 0 {
-				fmt.Println("<none>")
-			}
-
-			for arrIx := range values {
-				for valIx := range values[arrIx] {
-					fmt.Printf("%v\n", values[arrIx][valIx].Interface())
-				}
-			}
-		case "summary":
-			fallthrough
-		default:
-			if pod.Proxy {
-				fmt.Printf("%s/%s:\n\t%s\n", pod.Namespace, pod.Name, s.Summary())
-			} else {
-				fmt.Printf("%s:\n\t%s\n", pod.Addr, s.Summary())
-			}
-		}
-	}
-
-	return nil
-}
-
-func runAuth(cmd *cobra.Command, args []string) error {
-	loglevel := "all:WARN"
-	if verbose {
-		loglevel = "all:TRACE"
-	}
-	loggerFactory = logger.NewLoggerFactory(loglevel)
-	log = loggerFactory.NewLogger("stunnerctl")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	log.Debug("Searching for authentication server")
-	pod, err := cdsclient.DiscoverK8sAuthServer(ctx, k8sConfigFlags, authConfigFlags,
-		loggerFactory.NewLogger("auth-fwd"))
-	if err != nil {
-		return fmt.Errorf("error searching for auth service: %w", err)
-	}
-
-	u := url.URL{
-		Scheme: "http",
-		Host:   pod.Addr,
-		Path:   "/ice",
-	}
-	q := u.Query()
-	q.Set("service", "turn")
-	u.RawQuery = q.Encode()
-
-	if authConfigFlags.TurnAuth {
-		// enforce TURN credential format
-		u.Path = ""
-	}
-
-	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
-		q := u.Query()
-		q.Set("namespace", *k8sConfigFlags.Namespace)
-		if len(args) > 0 {
-			q.Set("gateway", args[0])
-		}
-		u.RawQuery = q.Encode()
-	}
-
-	log.Debugf("Querying to authentication server %s using URL %q", pod.String(), u.String())
-	res, err := http.Get(u.String())
-	if err != nil {
-		return fmt.Errorf("error querying auth service %s: %w", pod.String(), err)
-	}
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP error querying auth service %s: expected status %d, got %d",
-			pod.String(), http.StatusOK, res.StatusCode)
-	}
-
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("cannot read HTTP response: %w", err)
-	}
-
-	fmt.Println(string(b))
-
-	return nil
 }
 
 // ////////////////////////

@@ -30,7 +30,7 @@ type Stunner struct {
 	resolver                                                   resolver.DnsResolver
 	udpThreadNum                                               int
 	telemetry                                                  *telemetry.Telemetry
-	logger                                                     *logger.LeveledLoggerFactory
+	logger                                                     logger.LoggerFactory
 	log                                                        logging.LeveledLogger
 	net                                                        transport.Net
 	ready, shutdown                                            bool

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -35,6 +36,8 @@ type LoggerFactory interface {
 	SetLevel(levelSpec string)
 	// GetLevel gets the loglevel for the given scope.
 	GetLevel(scope string) string
+	// SetWriter decorates a logger factory with a writer.
+	SetWriter(w io.Writer)
 }
 
 // LeveledLoggerFactory defines levels by scopes and creates new LeveledLoggers that can dynamically change their own loglevels.
@@ -47,12 +50,14 @@ type LeveledLoggerFactory struct {
 }
 
 // NewLoggerFactory sets up a scoped logger for STUNner.
-func NewLoggerFactory(levelSpec string) *LeveledLoggerFactory {
+func NewLoggerFactory(levelSpec string) LoggerFactory {
 	logger := LeveledLoggerFactory{}
 	logger.DefaultLogLevel = logging.LogLevelError
 	logger.ScopeLevels = make(map[string]logging.LogLevel)
 	logger.Loggers = make(map[string]*RateLimitedLogger)
-	logger.Writer = os.Stdout
+
+	// Set writer
+	logger.SetWriter(os.Stdout)
 
 	// resets all child loggers
 	logger.SetLevel(levelSpec)
@@ -65,6 +70,11 @@ func (f *LeveledLoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 	logger := f.newLogger(scope, DefaultRateLimit, DefaultBurstSize)
 	logger.DisableRateLimiter()
 	return logger
+}
+
+// SetWriter sets the writer underlying the logger.
+func (f *LeveledLoggerFactory) SetWriter(w io.Writer) {
+	f.Writer = w
 }
 
 // SetLevel sets the loglevel.
@@ -137,9 +147,13 @@ type RateLimitedLoggerFactory struct {
 
 // WithRateLimiter decorates a logger factory with a rate-limiter. All loggers emitted by the
 // factory will be automatically rate-limited.
-func (f *LeveledLoggerFactory) WithRateLimiter(limit rate.Limit, burst int) *RateLimitedLoggerFactory {
+func NewRateLimitedLoggerFactory(logger LoggerFactory, limit rate.Limit, burst int) *RateLimitedLoggerFactory {
+	leveledF, ok := logger.(*LeveledLoggerFactory)
+	if !ok {
+		return nil // this will blow up
+	}
 	return &RateLimitedLoggerFactory{
-		LeveledLoggerFactory: f,
+		LeveledLoggerFactory: leveledF,
 		Limit:                limit,
 		Burst:                burst,
 	}
@@ -253,27 +267,51 @@ func (w *RateLimitedWriter) Write(p []byte) (int, error) {
 // RateLimiter is a token bucket that can be disabled.
 type RateLimiter struct {
 	*rate.Limiter
-	EnableRateLimiterd bool
+	Enabled bool
 }
 
 func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
 	return &RateLimiter{
-		Limiter:            rate.NewLimiter(r, b),
-		EnableRateLimiterd: false,
+		Limiter: rate.NewLimiter(r, b),
+		Enabled: false,
 	}
 }
 
 func (l *RateLimiter) EnableRateLimiter() {
-	l.EnableRateLimiterd = true
+	l.Enabled = true
 }
 
 func (l *RateLimiter) DisableRateLimiter() {
-	l.EnableRateLimiterd = false
+	l.Enabled = false
 }
 
 func (l *RateLimiter) Allow() bool {
-	if !l.EnableRateLimiterd {
+	if !l.Enabled {
 		return true
 	}
 	return l.Limiter.Allow()
+}
+
+// AutoFlushWriter wraps a bufio.Writer and ensures that Flush is called after every Write
+// operation.
+type AutoFlushWriter struct {
+	*bufio.Writer
+}
+
+// NewAutoFlushWriter creates a new AutoFlushWriter.
+func NewAutoFlushWriter(w io.Writer) *AutoFlushWriter {
+	return &AutoFlushWriter{
+		Writer: bufio.NewWriter(w),
+	}
+}
+
+// Write writes the data and immediately flushes the buffer
+func (w *AutoFlushWriter) Write(p []byte) (n int, err error) {
+	n, err = w.Writer.Write(p)
+	if err != nil {
+		return n, err
+	}
+
+	err = w.Flush()
+	return n, err
 }

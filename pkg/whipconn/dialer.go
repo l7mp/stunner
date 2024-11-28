@@ -17,7 +17,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
-var _ net.Conn = &dialerConn{}
+var _ net.Conn = &DialerConn{}
 
 type Dialer struct {
 	config       Config
@@ -27,23 +27,31 @@ type Dialer struct {
 }
 
 func NewDialer(config Config, logger logging.LoggerFactory) *Dialer {
-	e := webrtc.SettingEngine{}
+	e := webrtc.SettingEngine{LoggerFactory: logger}
 	e.DetachDataChannels()
 
-	if config.Endpoint == "" {
-		config.Endpoint = whipEndpoint
+	if config.WHIPEndpoint == "" {
+		config.WHIPEndpoint = WhipEndpoint
 	}
 
 	return &Dialer{
 		config:  config,
-		api:     webrtc.NewAPI(webrtc.WithSettingEngine(e)),
+		api:     webrtc.NewAPI(webrtc.WithSettingEngine(e), webrtc.WithMediaEngine(&webrtc.MediaEngine{})),
 		logger:  logger,
 		log:     logger.NewLogger("whip-dialer"),
 		connLog: logger.NewLogger("whip-conn"),
 	}
 }
 
+func (d *Dialer) WithSettingEngine(e webrtc.SettingEngine) *Dialer {
+	e.DetachDataChannels() // make sure this is set
+	d.api = webrtc.NewAPI(webrtc.WithSettingEngine(e), webrtc.WithMediaEngine(&webrtc.MediaEngine{}))
+	return d
+}
+
 func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error) {
+	stopped := false
+	defer func() { stopped = true }()
 	peerConn, err := d.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers:         d.config.ICEServers,
 		ICETransportPolicy: d.config.ICETransportPolicy,
@@ -58,7 +66,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to create DataChannel: %w", err)
 	}
 
-	conn := &dialerConn{
+	conn := &DialerConn{
 		dialer:   d,
 		addr:     addr,
 		peerConn: peerConn,
@@ -88,7 +96,11 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	peerConn.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
 		conn.log.Infof("Connection state has changed: %s", p)
 		if p == webrtc.PeerConnectionStateFailed || p == webrtc.PeerConnectionStateClosed {
-			conn.Close() //nolint
+			if stopped {
+				conn.Close() //nolint
+			} else {
+				errCh <- fmt.Errorf("ICE connection terminated with state: %s", p.String())
+			}
 		}
 	})
 
@@ -112,18 +124,17 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 
 	d.log.Debugf("ICE gathering complete: %s", peerConn.LocalDescription().SDP)
 
-	var sdp = []byte(peerConn.LocalDescription().SDP)
-
+	sdp := []byte(peerConn.LocalDescription().SDP)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		makeURL(addr, d.config.Endpoint).String(), bytes.NewBuffer(sdp))
+		makeURL(addr, d.config.WHIPEndpoint).String(), bytes.NewBuffer(sdp))
 	if err != nil {
 		conn.Close() //nolint
 		return nil, fmt.Errorf("unexpected error building HTTP request: %w", err)
 	}
 
 	req.Header.Add("Content-Type", "application/sdp")
-	if d.config.Token != "" {
-		req.Header.Add("Authorization", "Bearer "+d.config.Token)
+	if d.config.BearerToken != "" {
+		req.Header.Add("Authorization", "Bearer "+d.config.BearerToken)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -177,7 +188,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	}
 }
 
-type dialerConn struct {
+type DialerConn struct {
 	dialer     *Dialer
 	addr       string
 	peerConn   *webrtc.PeerConnection
@@ -187,7 +198,7 @@ type dialerConn struct {
 	log        logging.LeveledLogger
 }
 
-func (c *dialerConn) Close() error {
+func (c *DialerConn) Close() error {
 	if c.closed {
 		return nil
 	}
@@ -195,13 +206,13 @@ func (c *dialerConn) Close() error {
 
 	c.log.Trace("Closing WHIP client connection")
 
-	uri := makeURL(c.addr, makeResourceURL(c.dialer.config.Endpoint, c.resourceId))
+	uri := makeURL(c.addr, makeResourceURL(c.dialer.config.WHIPEndpoint, c.resourceId))
 	req, err := http.NewRequest("DELETE", uri.String(), nil)
 	if err != nil {
 		return fmt.Errorf("unexpected error building http request: %w", err)
 	}
-	if c.dialer.config.Token != "" {
-		req.Header.Add("Authorization", "Bearer "+c.dialer.config.Token)
+	if c.dialer.config.BearerToken != "" {
+		req.Header.Add("Authorization", "Bearer "+c.dialer.config.BearerToken)
 	}
 
 	if _, err = http.DefaultClient.Do(req); err != nil {
@@ -216,22 +227,27 @@ func (c *dialerConn) Close() error {
 	return nil
 }
 
-func (c *dialerConn) Read(b []byte) (int, error) {
+func (c *DialerConn) Read(b []byte) (int, error) {
 	return c.dataConn.Read(b)
 }
 
-func (c *dialerConn) Write(b []byte) (int, error) {
+func (c *DialerConn) Write(b []byte) (int, error) {
 	return c.dataConn.Write(b)
 }
 
 // TODO: implement
-func (c *dialerConn) LocalAddr() net.Addr                { return nil }
-func (c *dialerConn) RemoteAddr() net.Addr               { return nil }
-func (c *dialerConn) SetDeadline(t time.Time) error      { return nil }
-func (c *dialerConn) SetReadDeadline(t time.Time) error  { return nil }
-func (c *dialerConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c *DialerConn) LocalAddr() net.Addr                { return nil }
+func (c *DialerConn) RemoteAddr() net.Addr               { return nil }
+func (c *DialerConn) SetDeadline(t time.Time) error      { return nil }
+func (c *DialerConn) SetReadDeadline(t time.Time) error  { return nil }
+func (c *DialerConn) SetWriteDeadline(t time.Time) error { return nil }
 
 // String returns a unique identifier for the connection based on the underlying signaling connection.
-func (c *dialerConn) String() string {
+func (c *DialerConn) String() string {
 	return c.resourceId
+}
+
+// GetPeerConnection returns the PeerConnection underlying the data channnel. Useful for checking ICE candidate status.
+func (c *DialerConn) GetPeerConnection() *webrtc.PeerConnection {
+	return c.peerConn
 }

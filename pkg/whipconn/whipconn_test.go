@@ -1,7 +1,9 @@
 package whipconn
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,19 +12,20 @@ import (
 	"time"
 
 	"github.com/pion/logging"
+	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/assert"
 
 	slogger "github.com/l7mp/stunner/pkg/logger"
 )
 
 var (
-	testerLogLevel = "all:WARN"
+	testerLogLevel = "all:ERROR"
 	// testerLogLevel = "all:TRACE"
 	// testerLogLevel = "all:INFO"
 	addr                                = "localhost:12345"
 	timeout                             = 5 * time.Second
 	interval                            = 50 * time.Millisecond
-	defaultConfig                       = Config{Token: "whiptoken"}
+	defaultConfig                       = Config{BearerToken: "whiptoken"}
 	logger        logging.LoggerFactory = slogger.NewLoggerFactory(testerLogLevel)
 	log           logging.LeveledLogger = logger.NewLogger("test")
 )
@@ -67,12 +70,33 @@ var testerTestCases = []struct {
 		name: "Invalid bearer token refused",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
 			log.Debug("Creating dialer")
-			d := NewDialer(Config{Token: "dummy-token"}, logger)
+			d := NewDialer(Config{BearerToken: "dummy-token"}, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
 			_, err := d.DialContext(ctx, addr)
 			assert.Error(t, err)
+		},
+	}, {
+		name:   "Empty bearer token accepted",
+		config: &Config{BearerToken: ""},
+		tester: func(t *testing.T, ctx context.Context, l *Listener) {
+			log.Debug("Creating dialer")
+			config := defaultConfig
+			config.BearerToken = ""
+			d := NewDialer(config, logger)
+			assert.NotNil(t, d)
+
+			log.Debug("Dialing")
+			clientConn, err := d.DialContext(ctx, addr)
+			assert.NoError(t, err)
+
+			log.Debug("Echo test round 1")
+			echoTest(t, clientConn, "test1")
+			log.Debug("Echo test round 2")
+			echoTest(t, clientConn, "test2")
+
+			assert.NoError(t, clientConn.Close(), "client conn close")
 		},
 	}, {
 		name: "Closing dialer does not close client connection",
@@ -133,14 +157,14 @@ var testerTestCases = []struct {
 			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
 
 			log.Debug("Closing server connections")
-			for _, lConn := range l.Conns() {
+			for _, lConn := range l.GetConns() {
 				assert.NoError(t, lConn.Close())
 			}
 
 			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
 
 			// should close the client conn too
-			assert.Eventually(t, func() bool { return clientConn.(*dialerConn).closed == true }, timeout, interval)
+			assert.Eventually(t, func() bool { return clientConn.(*DialerConn).closed == true }, timeout, interval)
 		},
 	}, {
 		name: "Multiple connections",
@@ -187,7 +211,7 @@ var testerTestCases = []struct {
 			uri := fmt.Sprintf("http://%s/whip/dummy-id", addr)
 			req, err := http.NewRequest("DELETE", uri, nil)
 			assert.NoError(t, err)
-			req.Header.Add("Authorization", "Bearer "+defaultConfig.Token)
+			req.Header.Add("Authorization", "Bearer "+defaultConfig.BearerToken)
 
 			r, err := http.DefaultClient.Do(req)
 			assert.NoError(t, err)
@@ -195,10 +219,10 @@ var testerTestCases = []struct {
 		},
 	}, {
 		name:   "Connecting with custom path",
-		config: &Config{Endpoint: "/custompath"},
+		config: &Config{WHIPEndpoint: "/custompath"},
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
 			log.Debug("Creating dialer")
-			d := NewDialer(Config{Endpoint: "/custompath"}, logger)
+			d := NewDialer(Config{WHIPEndpoint: "/custompath"}, logger)
 			assert.NotNil(t, d)
 
 			log.Debug("Dialing")
@@ -211,6 +235,27 @@ var testerTestCases = []struct {
 			echoTest(t, clientConn, "test2")
 
 			assert.NoError(t, clientConn.Close(), "client conn close")
+		},
+	}, {
+		name: "Failed datachannel connection fails Dial",
+		tester: func(t *testing.T, ctx context.Context, l *Listener) {
+			log.Debug("Creating dialer")
+			// empty ICE servers and forcing relay policy will fail the dialer
+			d := NewDialer(Config{
+				ICEServers:         []webrtc.ICEServer{},
+				ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+				BearerToken:        "whiptoken",
+			}, logger)
+			assert.NotNil(t, d)
+
+			// set agggressive timeouts
+			e := webrtc.SettingEngine{}
+			e.SetICETimeouts(500*time.Millisecond, 1000*time.Millisecond, time.Second)
+			d.WithSettingEngine(e)
+
+			log.Debug("Dialing")
+			_, err := d.DialContext(ctx, addr)
+			assert.Error(t, err)
 		},
 	},
 }
@@ -266,4 +311,64 @@ func TestTesterConn(t *testing.T) {
 			l.Close() //nolint
 		})
 	}
+}
+
+func TestConfigEndpoint(t *testing.T) {
+	log.Debug("Creating listener")
+	l, err := NewListener(addr, defaultConfig, logger)
+	assert.NoError(t, err)
+	assert.NotNil(t, l)
+
+	uri := "http://" + addr + "/config"
+	req, err := http.NewRequest(http.MethodGet, uri, nil)
+	req.Header.Add("Content-Type", "application/json")
+	assert.NoError(t, err)
+	res, err := http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+
+	config := Config{}
+	err = json.NewDecoder(res.Body).Decode(&config)
+	assert.NoError(t, err)
+	assert.Equal(t, defaultConfig.ICEServers, config.ICEServers)
+	assert.Equal(t, defaultConfig.ICETransportPolicy, config.ICETransportPolicy)
+	assert.Equal(t, defaultConfig.BearerToken, config.BearerToken)
+	assert.Equal(t, WhipEndpoint, config.WHIPEndpoint)
+
+	ss := []webrtc.ICEServer{{
+		URLs:       []string{"a", "b"},
+		Username:   "test-user-1",
+		Credential: "test-passwd-1r",
+	}, {
+		URLs:       []string{"c", "d"},
+		Username:   "test-user-2",
+		Credential: "test-passwd-2",
+	}}
+
+	config = Config{
+		ICEServers:         ss,
+		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
+		BearerToken:        "some-token",
+		WHIPEndpoint:       "will-be-ignored",
+	}
+
+	b, err := json.Marshal(config)
+	assert.NoError(t, err)
+	_, err = http.Post(uri, "application/json", bytes.NewReader(b))
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest(http.MethodGet, uri, nil)
+	req.Header.Add("Content-Type", "application/json")
+	assert.NoError(t, err)
+	res, err = http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+
+	newConfig := Config{}
+	err = json.NewDecoder(res.Body).Decode(&newConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, config.ICEServers, newConfig.ICEServers)
+	assert.Equal(t, config.ICETransportPolicy, newConfig.ICETransportPolicy)
+	assert.Equal(t, config.BearerToken, newConfig.BearerToken)
+	assert.Equal(t, WhipEndpoint, newConfig.WHIPEndpoint)
+
+	l.Close() //nolint
 }
