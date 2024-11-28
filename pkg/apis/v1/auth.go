@@ -44,8 +44,7 @@ func (req *AuthConfig) Validate() error {
 	case AuthTypeEphemeral:
 		_, secretFound := req.Credentials["secret"]
 		if !secretFound {
-			return fmt.Errorf("cannot handle auth config for type %s: invalid secret",
-				atype.String())
+			return fmt.Errorf("no secret found in %s auth config", atype.String())
 		}
 	default:
 		return fmt.Errorf("invalid authentication type %q", req.Type)

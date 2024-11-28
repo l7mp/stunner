@@ -146,14 +146,14 @@ func getStunnerConf(uri string) (*stnrv1.StunnerConfig, error) {
 	case "k8s":
 		conf, err := getStunnerConfFromK8s(def)
 		if err != nil {
-			return nil, fmt.Errorf("Could not read running STUNner configuration from "+
+			return nil, fmt.Errorf("could not read running STUNner configuration from "+
 				"Kubernetes: %w", err)
 		}
 		return conf, nil
 	case "turn":
 		conf, err := getStunnerConfFromCLI(def)
 		if err != nil {
-			return nil, fmt.Errorf("Could not generate STUNner configuration from "+
+			return nil, fmt.Errorf("could not generate STUNner configuration from "+
 				"URI %q: %w", uri, err)
 		}
 		return conf, nil
@@ -237,11 +237,11 @@ func getStunnerConfFromCLI(def string) (*stnrv1.StunnerConfig, error) {
 
 	u, err := stunner.ParseUri(uri)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid STUNner URI %q: %s", uri, err)
+		return nil, fmt.Errorf("invalid STUNner URI %q: %s", uri, err)
 	}
 
 	if u.Username == "" || u.Password == "" {
-		return nil, fmt.Errorf("Username/password must be set: '%s'", uri)
+		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
 
 	conf.Listeners[0].PublicAddr = u.Address

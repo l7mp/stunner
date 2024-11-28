@@ -241,7 +241,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	user, passwd, errAuth := t.authGen()
 	if errAuth != nil {
-		return nil, fmt.Errorf("Cannot generate username/password pair for client %s:%s: %s",
+		return nil, fmt.Errorf("failed to generate username/password pair for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), errAuth)
 	}
 
@@ -251,14 +251,14 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	case "turn-udp":
 		t, err := net.ListenPacket(t.serverAddr.Network(), "0.0.0.0:0")
 		if err != nil {
-			return nil, fmt.Errorf("cannot allocate TURN listening packet socket for client %s:%s: %s",
+			return nil, fmt.Errorf("failed to allocate TURN listening packet socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = t
 	case "turn-tcp":
 		c, err := net.Dial(t.serverAddr.Network(), t.serverAddr.String())
 		if err != nil {
-			return nil, fmt.Errorf("cannot allocate TURN socket for client %s:%s: %s",
+			return nil, fmt.Errorf("failed to allocate TURN socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(c)
@@ -271,7 +271,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 			InsecureSkipVerify: t.insecure,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("cannot allocate TURN/TLS socket for client %s:%s: %s",
+			return nil, fmt.Errorf("failed to allocate TURN/TLS socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(c)
@@ -283,7 +283,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 			InsecureSkipVerify: t.insecure,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("cannot allocate TURN/DTLS socket for client %s:%s: %s",
+			return nil, fmt.Errorf("failed to allocate TURN/DTLS socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = turn.NewSTUNConn(conn)
@@ -303,7 +303,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	})
 	if err != nil {
 		turnConn.Close()
-		return nil, fmt.Errorf("Cannot allocate TURN client for client %s:%s: %s",
+		return nil, fmt.Errorf("failed to allocate TURN client for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), err)
 	}
 	conn.turnConn = turnConn
@@ -311,7 +311,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	// Start the TURN client
 	if err = turnClient.Listen(); err != nil {
 		turnConn.Close()
-		return nil, fmt.Errorf("cannot listen on TURN client: %s", err)
+		return nil, fmt.Errorf("failed to listen on TURN client: %s", err)
 
 	}
 	conn.turnClient = turnClient
@@ -320,7 +320,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	serverConn, serverErr := turnClient.Allocate()
 	if serverErr != nil {
 		turnClient.Close()
-		return nil, fmt.Errorf("could not allocate new TURN relay transport for client %s:%s: %s",
+		return nil, fmt.Errorf("failed to allocate TURN relay transport for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), serverErr.Error())
 	}
 	conn.serverConn = serverConn

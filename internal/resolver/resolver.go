@@ -119,7 +119,7 @@ func doResolve(e *serviceEntry) error {
 	if e.cname == "" {
 		cname, err := e.resolver.LookupCNAME(e.ctx, e.domain)
 		if err != nil {
-			return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
+			return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
 				e.domain, err.Error())
 		}
 		e.cname = cname
@@ -127,7 +127,7 @@ func doResolve(e *serviceEntry) error {
 
 	hosts, err := e.resolver.LookupHost(e.ctx, e.domain)
 	if err != nil {
-		return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
+		return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
 			e.domain, err.Error())
 	}
 
@@ -175,7 +175,7 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 
 	e, found := r.register[domain]
 	if !found {
-		return []net.IP{}, fmt.Errorf("Unknown domain name: %q", domain)
+		return []net.IP{}, fmt.Errorf("unknown domain name: %q", domain)
 	}
 
 	e.lock.RLock()

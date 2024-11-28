@@ -11,7 +11,7 @@ import (
 	"github.com/pion/logging"
 )
 
-var errFileTruncated = errors.New("Zero-length config file")
+var errFileTruncated = errors.New("zero-length config file")
 
 var (
 	// Send pings to the CDS server with this period. Must be less than PongWait.
@@ -49,7 +49,7 @@ type Client interface {
 func New(origin string, id string, logger logging.LoggerFactory) (Client, error) {
 	u, err := getURI(origin)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse config origin URI %q: %w", origin, err)
+		return nil, fmt.Errorf("failed to parse config origin URI %q: %w", origin, err)
 	}
 
 	switch strings.ToLower(u.Scheme) {

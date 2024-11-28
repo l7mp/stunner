@@ -237,7 +237,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 	appLabel, err := labels.NewRequirement(stnrv1.DefaultAppLabelKey,
 		selection.Equals, []string{stnrv1.DefaultAppLabelValue})
 	if err != nil {
-		return ps, fmt.Errorf("cannot create app label selector: %w", err)
+		return ps, fmt.Errorf("failed to create app label selector: %w", err)
 	}
 	selector = selector.Add(*appLabel)
 
@@ -245,7 +245,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 		nsLabel, err := labels.NewRequirement(stnrv1.DefaultRelatedGatewayNamespace,
 			selection.Equals, []string{gwNs})
 		if err != nil {
-			return ps, fmt.Errorf("cannot create namespace label selector: %w", err)
+			return ps, fmt.Errorf("failed to create namespace label selector: %w", err)
 		}
 		selector = selector.Add(*nsLabel)
 
@@ -253,7 +253,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 			gwLabel, err := labels.NewRequirement(stnrv1.DefaultRelatedGatewayKey,
 				selection.Equals, []string{gw})
 			if err != nil {
-				return ps, fmt.Errorf("cannot create namespace label selector: %w", err)
+				return ps, fmt.Errorf("failed to create namespace label selector: %w", err)
 			}
 			selector = selector.Add(*gwLabel)
 		}
@@ -344,7 +344,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 		LabelSelector: label,
 	})
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("Failed to query Kubernetes API server: %w", err)
+		return PodInfo{}, fmt.Errorf("failed to query Kubernetes API server: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
@@ -376,7 +376,7 @@ func (d *PodConnector) portfwd(ctx context.Context, pod *corev1.Pod, port int) (
 	d.log.Debugf("Creating a SPDY stream to API server using URL %q", req.URL().String())
 	transport, upgrader, err := spdy.RoundTripperFor(d.config)
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("error getting transport/upgrader from restconfig: %w", err)
+		return PodInfo{}, fmt.Errorf("failed to get transport/upgrader from restconfig: %w", err)
 	}
 
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, req.URL())
@@ -387,12 +387,12 @@ func (d *PodConnector) portfwd(ctx context.Context, pod *corev1.Pod, port int) (
 	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
 	fw, err := portforward.New(dialer, []string{remoteAddr}, stopChan, readyChan, out, errOut)
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("Error creating port-forwarder: %w", err)
+		return PodInfo{}, fmt.Errorf("failed to create port-forwarder: %w", err)
 	}
 
 	go func() {
 		if err := fw.ForwardPorts(); err != nil {
-			d.log.Errorf("Error setting up port-forwarder: %s", err.Error())
+			d.log.Errorf("failed to set up port-forwarder: %s", err.Error())
 			os.Exit(1)
 		}
 	}()

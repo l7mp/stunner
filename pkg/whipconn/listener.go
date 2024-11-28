@@ -68,7 +68,7 @@ func NewListener(addr string, config Config, logger logging.LoggerFactory) (*Lis
 
 	c, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot open WHIP server socket on %s: %w", addr, err)
+		return nil, fmt.Errorf("failed to open WHIP server socket on %s: %w", addr, err)
 	}
 	l.server = &http.Server{Addr: addr, Handler: mux}
 	go func() {
@@ -135,7 +135,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Check bearer token
 	if l.config.Token != "" {
 		if token := r.Header.Get("Authorization"); token != "Bearer "+l.config.Token {
-			err := fmt.Errorf("Unauthorized WHIP request from client %s", r.RemoteAddr)
+			err := fmt.Errorf("unauthorized WHIP request from client %s", r.RemoteAddr)
 			l.errCh <- err
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -143,7 +143,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ctype := r.Header.Get("Content-Type"); ctype != "application/sdp" {
-		err := fmt.Errorf("Invalid WHIP request from client %s, expected Content-Type=application/sdp",
+		err := fmt.Errorf("invalid WHIP request from client %s, expected Content-Type=application/sdp",
 			r.RemoteAddr)
 		l.errCh <- err
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -154,7 +154,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 	offer, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		l.errCh <- fmt.Errorf("Failed to read WHIP request body: %w", err)
+		l.errCh <- fmt.Errorf("failed to read WHIP request body: %w", err)
 		return
 	}
 
@@ -169,7 +169,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 		ICETransportPolicy: l.config.ICETransportPolicy,
 	})
 	if err != nil {
-		l.errCh <- fmt.Errorf("Failed to create a PeerConnection: %w", err)
+		l.errCh <- fmt.Errorf("failed to create a PeerConnection: %w", err)
 		return
 	}
 	conn.peerConn = peerConn
@@ -192,7 +192,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 			raw, dErr := dataChannel.Detach()
 			if dErr != nil {
-				l.errCh <- fmt.Errorf("Failed to detach DataChannel: %w", err)
+				l.errCh <- fmt.Errorf("failed to detach DataChannel: %w", err)
 				return
 			}
 			conn.dataConn = raw
@@ -208,7 +208,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 		Type: webrtc.SDPTypeOffer,
 		SDP:  string(offer),
 	}); err != nil {
-		l.errCh <- fmt.Errorf("Failed to set remote SDP (Offer): %w", err)
+		l.errCh <- fmt.Errorf("failed to set remote SDP (Offer): %w", err)
 		return
 	}
 
@@ -218,10 +218,10 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Create answer
 	answer, err := peerConn.CreateAnswer(nil)
 	if err != nil {
-		l.errCh <- fmt.Errorf("Failed to create SDP (Answer): %w", err)
+		l.errCh <- fmt.Errorf("failed to create SDP (Answer): %w", err)
 		return
 	} else if err = peerConn.SetLocalDescription(answer); err != nil {
-		l.errCh <- fmt.Errorf("Failed to set local SDP (Answer): %w", err)
+		l.errCh <- fmt.Errorf("failed to set local SDP (Answer): %w", err)
 		return
 	}
 

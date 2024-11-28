@@ -45,7 +45,7 @@ func (w *ConfigFileClient) String() string {
 func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 	b, err := os.ReadFile(w.configFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not read config file %q: %s", w.configFile, err.Error())
+		return nil, fmt.Errorf("failed to read config file %q: %s", w.configFile, err.Error())
 	}
 
 	if len(b) == 0 {
@@ -54,7 +54,7 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 
 	c, err := ParseConfig(b)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse config: %w", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
 	if err := c.Validate(); err != nil {
@@ -128,7 +128,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 		case e, ok := <-watcher.Events:
 			if !ok {
-				return errors.New("Config watcher received invalid event")
+				return errors.New("config watcher received invalid event")
 			}
 
 			w.log.Debugf("Received watch event: %s", e.String())
@@ -139,7 +139,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 						config, err.Error())
 				}
 
-				return fmt.Errorf("Config file deleted %q, disabling watcher", e.Op.String())
+				return fmt.Errorf("config file deleted %q, disabling watcher", e.Op.String())
 			}
 
 			if !e.Has(fsnotify.Write) {
@@ -178,7 +178,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 		case err, ok := <-watcher.Errors:
 			if !ok {
-				return errors.New("Config watcher error handler received invalid error")
+				return errors.New("config watcher error handler received invalid error")
 			}
 
 			if err := watcher.Remove(config); err != nil {
@@ -186,7 +186,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 					config, err.Error())
 			}
 
-			return fmt.Errorf("Config watcher error, deactivating: %w", err)
+			return fmt.Errorf("config watcher error, deactivating: %w", err)
 		}
 	}
 }

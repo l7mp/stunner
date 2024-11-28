@@ -34,7 +34,7 @@ func ParseUri(uri string) (*StunnerUri, error) {
 
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid URI '%s': %s", uri, err)
+		return nil, fmt.Errorf("invalid URI '%s': %s", uri, err)
 	}
 
 	s.Address = u.Hostname()
@@ -163,5 +163,5 @@ func getStunnerProtoForURI(u *url.URL) (string, error) {
 		return "TURN-TLS", nil
 	}
 
-	return "", fmt.Errorf("Invalid scheme/protocol in URI %q", u.String())
+	return "", fmt.Errorf("invalid scheme/protocol in URI %q", u.String())
 }

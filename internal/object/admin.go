@@ -198,7 +198,7 @@ func (a *Admin) reconcileMetrics(req *stnrv1.AdminConfig) error {
 		a.log.Tracef("closing metrics server at %s", mEndpoint)
 
 		if err := a.metricsServer.Shutdown(context.Background()); err != nil {
-			return fmt.Errorf("error stopping metrics server at %s: %w",
+			return fmt.Errorf("failed to stop metrics server at %s: %w",
 				mEndpoint, err)
 		}
 		a.metricsServer = nil

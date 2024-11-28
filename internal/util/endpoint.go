@@ -33,11 +33,11 @@ func ParseEndpoint(ep string) (*Endpoint, error) {
 	} else {
 		port, err = strconv.Atoi(m[2])
 		if err != nil {
-			return nil, fmt.Errorf("Invalid port in endpoint %q: %w", ep, err)
+			return nil, fmt.Errorf("invalid port in endpoint %q: %w", ep, err)
 		}
 		endPort, err = strconv.Atoi(m[3])
 		if err != nil {
-			return nil, fmt.Errorf("Invalid end-port in endpoint %q: %w", ep, err)
+			return nil, fmt.Errorf("invalid end-port in endpoint %q: %w", ep, err)
 		}
 		cidr = m[1]
 		hasPort = true
@@ -56,7 +56,7 @@ func ParseEndpoint(ep string) (*Endpoint, error) {
 	// convert to an actual prefix
 	_, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid endpoint %q: %w", ep, err)
+		return nil, fmt.Errorf("invalid endpoint %q: %w", ep, err)
 	}
 
 	return &Endpoint{

@@ -49,13 +49,13 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		ICETransportPolicy: d.config.ICETransportPolicy,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create PeerConnection: %w", err)
+		return nil, fmt.Errorf("failed to create PeerConnection: %w", err)
 	}
 
 	d.log.Trace("Creating DataChannel")
 	dataChannel, err := peerConn.CreateDataChannel("whipconn", nil)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create DataChannel: %w", err)
+		return nil, fmt.Errorf("failed to create DataChannel: %w", err)
 	}
 
 	conn := &dialerConn{
@@ -77,7 +77,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 
 		raw, err := dataChannel.Detach()
 		if err != nil {
-			errCh <- fmt.Errorf("Failed to detach DataChannel: %w", err)
+			errCh <- fmt.Errorf("failed to detach DataChannel: %w", err)
 		}
 		conn.dataConn = raw
 
@@ -95,13 +95,13 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	offer, err := peerConn.CreateOffer(nil)
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Failed to create offer: %w", err)
+		return nil, fmt.Errorf("failed to create offer: %w", err)
 	}
 
 	err = peerConn.SetLocalDescription(offer)
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Failed to set local SDP (Offer): %w", err)
+		return nil, fmt.Errorf("failed to set local SDP (Offer): %w", err)
 	}
 
 	// Block until ICE Gathering is complete, disabling trickle ICE
@@ -118,7 +118,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		makeURL(addr, d.config.Endpoint).String(), bytes.NewBuffer(sdp))
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Unexpected error building HTTP request: %w", err)
+		return nil, fmt.Errorf("unexpected error building HTTP request: %w", err)
 	}
 
 	req.Header.Add("Content-Type", "application/sdp")
@@ -129,7 +129,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Failed to POST WHIP request: %w", err)
+		return nil, fmt.Errorf("failed to POST WHIP request: %w", err)
 	}
 
 	d.log.Tracef("Received POST response with status code: %d", resp.StatusCode)
@@ -142,14 +142,14 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Failed to read HTTP response body: %w", err)
+		return nil, fmt.Errorf("failed to read HTTP response body: %w", err)
 	}
 	defer resp.Body.Close()
 
 	resourceId := resp.Header.Get("Location")
 	if resourceId == "" {
 		conn.Close() //nolint
-		return nil, errors.New("Empty resource id in POST response")
+		return nil, errors.New("empty resource id in POST response")
 	}
 	conn.resourceId = resourceId
 
@@ -160,7 +160,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	err = peerConn.SetRemoteDescription(answer)
 	if err != nil {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("Failed to set remote SDP (Answer): %w", err)
+		return nil, fmt.Errorf("failed to set remote SDP (Answer): %w", err)
 	}
 
 	// Waiting for the connection or errors surfaced from the callbacks
@@ -198,19 +198,19 @@ func (c *dialerConn) Close() error {
 	uri := makeURL(c.addr, makeResourceURL(c.dialer.config.Endpoint, c.resourceId))
 	req, err := http.NewRequest("DELETE", uri.String(), nil)
 	if err != nil {
-		return fmt.Errorf("Unexpected error building http request: %w", err)
+		return fmt.Errorf("unexpected error building http request: %w", err)
 	}
 	if c.dialer.config.Token != "" {
 		req.Header.Add("Authorization", "Bearer "+c.dialer.config.Token)
 	}
 
 	if _, err = http.DefaultClient.Do(req); err != nil {
-		return fmt.Errorf("Failed WHIP DELETE request: %w", err)
+		return fmt.Errorf("failed WHIP DELETE request: %w", err)
 	}
 
 	// Close the peerconnection
 	if err := c.peerConn.Close(); err != nil {
-		return fmt.Errorf("Failed to close PeerConnection: %w", err)
+		return fmt.Errorf("failed to close PeerConnection: %w", err)
 	}
 
 	return nil
