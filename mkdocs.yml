@@ -37,6 +37,7 @@ nav:
   - 'stunnerctl': 'cmd/stunnerctl.md'
   - 'stunnerd': 'cmd/stunnerd.md'
   - 'turncat': 'cmd/turncat.md'
+  - 'icetester': 'cmd/icetester.md'
 plugins:
   - search
   - mkdocstrings:
