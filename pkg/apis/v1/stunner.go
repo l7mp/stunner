@@ -236,8 +236,8 @@ func (s *StunnerStatus) String() string {
 		cs = append(cs, c.String())
 	}
 
-	return fmt.Sprintf("%s/%s/%s/%s/allocs:%d/status=%s",
-		s.Admin.String(), s.Auth.String(), ls, cs, s.AllocationCount, s.Status)
+	return fmt.Sprintf("%s/%s/%s/%s/allocs:%d/status=%s", s.Admin.String(), s.Auth.String(),
+		ls, cs, s.AllocationCount, s.Status)
 }
 
 // String summarizes the status.

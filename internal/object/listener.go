@@ -55,7 +55,7 @@ func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandle
 		getRealm:   realmHandler,
 		Conns:      []any{},
 		logger:     logger,
-		log:        logger.NewLogger(fmt.Sprintf("stunner-listener-%s", req.Name)),
+		log:        logger.NewLogger(fmt.Sprintf("listener-%s", req.Name)),
 	}
 
 	l.log.Tracef("NewListener: %s", req.String())

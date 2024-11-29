@@ -23,7 +23,7 @@ func NewAuth(conf stnrv1.Config, logger logging.LoggerFactory) (Object, error) {
 		return nil, stnrv1.ErrInvalidConf
 	}
 
-	auth := Auth{Log: logger.NewLogger("stunner-auth")}
+	auth := Auth{Log: logger.NewLogger("auth")}
 	auth.Log.Tracef("NewAuth: %s", req.String())
 
 	if err := auth.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
