@@ -50,7 +50,7 @@ jobs:
 
   push_chart:
     name: Push helm charts to the repo
-    needs: push_to_registry
+    needs: push_stunner_to_registry
     uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
     with:
       dev: false
