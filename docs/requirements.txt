@@ -51,13 +51,13 @@ mkdocs-autorefs==1.2.0
     #   mkdocstrings-python
 mkdocs-get-deps==0.2.0
     # via mkdocs
-mkdocstrings[python]==0.26.2
+mkdocstrings[python]==0.27.0
     # via
     #   -r docs/requirements.in
     #   mkdocstrings-python
 mkdocstrings-python==1.12.2
     # via mkdocstrings
-packaging==24.1
+packaging==24.2
     # via mkdocs
 pathspec==0.12.1
     # via mkdocs
@@ -65,7 +65,7 @@ platformdirs==4.3.6
     # via
     #   mkdocs-get-deps
     #   mkdocstrings
-pymdown-extensions==10.11.2
+pymdown-extensions==10.12
     # via mkdocstrings
 python-dateutil==2.9.0.post0
     # via ghp-import
@@ -79,5 +79,5 @@ pyyaml-env-tag==0.1
     # via mkdocs
 six==1.16.0
     # via python-dateutil
-watchdog==5.0.3
+watchdog==6.0.0
     # via mkdocs
