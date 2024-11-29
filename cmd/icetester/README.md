@@ -8,24 +8,24 @@ While `icetester` can be used as a standalone too, the intended use is via `stun
 
 ## Installation
 
-Install `icetest` using the standard Go toolchain and add it to `$PATH`. 
+Install `icetester` using the standard Go toolchain and add it to `$PATH`.
 
 ```console
-go install github.com/l7mp/stunner/cmd/icetest@latest
+go install github.com/l7mp/stunner/cmd/icetester@latest
 ```
 
 Building from source is as easy as it usually gets with Go:
 
 ```console
 cd stunner
-go build -o turncat cmd/turncat/main.go
+go build -o turncat cmd/icetester/main.go
 ```
 
 The containerized version is available as `docker.io/l7mp/icester`.
 
 ## Usage
 
-Deploy a STUNner gateway and test is via UDP and TCP through `stunnerctl`: 
+Deploy a STUNner gateway and test is via UDP and TCP through `stunnerctl`:
 
 ```console
 stunnerctl icetest
