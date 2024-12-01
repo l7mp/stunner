@@ -28,7 +28,7 @@ helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-
     --namespace=stunner-system
 ```
 
-And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1alpha1#DataplaneSpec).
+And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1#DataplaneSpec).
 
 ### Development version
 
@@ -85,7 +85,7 @@ The Helm charts let you fine-tune STUNner features, including [compute resources
 
 ### Resources requests/limits
 
-it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-gateway-operator/values.yaml) resource request and limit is set as follows: 
+it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-gateway-operator/values.yaml) resource request and limit is set as follows:
 
 ```yaml
 resources:
@@ -113,7 +113,6 @@ udpMultithreading:
 
 ### Graceful shutdown
 
-STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunner` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile. 
+STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunner` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile.
 
 The default termination period is set to 3600 seconds (1 hour). To modify, use the `--set stunner.deployment.container.terminationGracePeriodSeconds=<NEW_PERIOD_IN_SECONDS>` flag.
-
