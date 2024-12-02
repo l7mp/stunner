@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/test"
-	"github.com/pion/turn/v2"
+	"github.com/pion/transport/v3/test"
+	"github.com/pion/turn/v4"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -39,35 +39,35 @@ func longTermCredentials(username string, sharedSecret string) (string, error) {
 
 type StunnerTestAuthWithVnet struct {
 	testName   string
-	conf       v1alpha1.StunnerConfig
+	conf       stnrv1.StunnerConfig
 	authCred   func() (string, string)
 	clientAddr string
 }
 
 var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	{
-		testName:   "plaintext",
+		testName:   "static",
 		clientAddr: "1.1.1.1",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "plaintext",
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -75,26 +75,26 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		authCred: func() (string, string) { return "user1", "passwd1" },
 	},
 	{
-		testName: "longterm - plain timestamp in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		testName: "ephemeral - plain timestamp in username",
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
+			Auth: stnrv1.AuthConfig{
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -105,26 +105,26 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - timestamp:userid in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		testName: "ephemeral - timestamp:userid in username",
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
+			Auth: stnrv1.AuthConfig{
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -137,26 +137,26 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - userid:timestamp in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		testName: "ephemeral - userid:timestamp in username",
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
+			Auth: stnrv1.AuthConfig{
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -169,26 +169,26 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 		},
 	},
 	{
-		testName: "longterm - userid:timestamp:ramdom-crap in username",
-		conf: v1alpha1.StunnerConfig{
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+		testName: "ephemeral - userid:timestamp:ramdom-crap in username",
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
-				Type: "longterm",
+			Auth: stnrv1.AuthConfig{
+				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "udp",
+				Protocol: "turn-udp",
 				Addr:     "1.2.3.4",
 				Port:     3478,
 				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -230,7 +230,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c), "starting server")
+			assert.NoError(t, stunner.Reconcile(&c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")

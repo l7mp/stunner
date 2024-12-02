@@ -9,7 +9,6 @@ theme:
   name: readthedocs
   highlightjs: true
 nav:
-- 'README.md'
 - 'Why STUNner': 'WHY.md'
 - 'Deployment models': 'DEPLOYMENT.md'
 - 'Concepts': 'CONCEPTS.md'
@@ -19,21 +18,26 @@ nav:
 - 'Authentication': 'AUTH.md'
 - 'Scaling': 'SCALING.md'
 - 'Monitoring': 'MONITORING.md'
-- 'Standalone mode': 'OBSOLETE.md'
 - 'Examples':
+  - 'Configuring TLS for examples': 'examples/TLS.md'
+  - 'UDP echo': 'examples/udp-echo/README.md'
   - 'Simple tunnel': 'examples/simple-tunnel/README.md'
   - 'Direct one to one call': 'examples/direct-one2one-call/README.md'
+  - 'LiveKit': 'examples/livekit/README.md'
+  - 'Janus': 'examples/janus/README.md'
+  - 'Elixir WebRTC': 'examples/elixir-webrtc/README.md'
+  - 'Jitsi': 'examples/jitsi/README.md'
+  - 'mediasoup': 'examples/mediasoup/README.md'
+  - 'CloudRetro': 'examples/cloudretro/README.md'
+  - 'N.eko': 'examples/neko/README.md'
   - 'Kurento one to one call': 'examples/kurento-one2one-call/README.md'
   - 'Kurento Magic Mirror': 'examples/kurento-magic-mirror/README.md'
-  - 'LiveKit': 'examples/livekit/README.md'
-  - 'Jitsi': 'examples/jitsi/README.md'
-  - 'Cloud Retro': 'examples/cloudretro/README.md'
-  - 'N.eko': 'examples/neko/README.md'
   - 'Benchmark': 'examples/benchmark/README.md'
 - 'CMD':
   - 'stunnerctl': 'cmd/stunnerctl.md'
   - 'stunnerd': 'cmd/stunnerd.md'
   - 'turncat': 'cmd/turncat.md'
+  - 'icetester': 'cmd/icetester.md'
 plugins:
   - search
   - mkdocstrings:
@@ -46,3 +50,11 @@ markdown_extensions:
   - markdown_include.include:
       base_path: .
   - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - gfm_admonition

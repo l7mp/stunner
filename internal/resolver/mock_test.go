@@ -16,7 +16,7 @@ func TestMockResolver(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(resolverTestLoglevel)
 	log := loggerFactory.NewLogger("resolver-test")
 
-	log.Debug("setting up the mock DNS")
+	log.Debug("Setting up the mock DNS")
 	mockDns := NewMockResolver(map[string]([]string){
 		"stunner.l7mp.io":     []string{"1.2.3.4"},
 		"echo-server.l7mp.io": []string{"1.2.3.5"},

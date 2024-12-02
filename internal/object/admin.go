@@ -2,20 +2,18 @@ package object
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
-	// "time"
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	health "github.com/heptiolabs/healthcheck"
-
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 const DefaultAdminObjectName = "DefaultAdmin"
@@ -26,28 +24,57 @@ type Admin struct {
 	DryRun                               bool
 	MetricsEndpoint, HealthCheckEndpoint string
 	metricsServer, healthCheckServer     *http.Server
-	health                               health.Handler
+	health                               *http.ServeMux
 	log                                  logging.LeveledLogger
 }
 
 // NewAdmin creates a new Admin object.
-func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging.LoggerFactory) (Object, error) {
-	req, ok := conf.(*v1alpha1.AdminConfig)
+func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) (Object, error) {
+	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
-		return nil, v1alpha1.ErrInvalidConf
+		return nil, stnrv1.ErrInvalidConf
 	}
 
 	admin := Admin{
 		DryRun: dryRun,
-		health: health.NewHandler(),
+		health: http.NewServeMux(),
 		log:    logger.NewLogger("stunner-admin"),
 	}
 	admin.log.Tracef("NewAdmin: %s", req.String())
 
 	// health checker
 	// liveness probe always succeeds once we got here
-	admin.health.AddLivenessCheck("server-alive", func() error { return nil })
-	admin.health.AddReadinessCheck("server-ready", rc)
+	admin.health.HandleFunc("/live", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}\n")) //nolint:errcheck
+	})
+	// readniness checker calls the checker from the factory
+	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if err := rc(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusServiceUnavailable, err.Error())))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusOK, "READY")))
+		}
+	})
+	// status handler returns the status
+	admin.health.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if js, err := json.Marshal(status()); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusInternalServerError, err.Error())))
+		} else {
+			w.WriteHeader(http.StatusOK)
+			w.Write(js) //nolint:errcheck
+		}
+	})
 
 	if err := admin.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
 		return nil, err
@@ -58,16 +85,16 @@ func NewAdmin(conf v1alpha1.Config, dryRun bool, rc health.Check, logger logging
 
 // Inspect examines whether a configuration change requires a reconciliation (returns true if it
 // does) or restart (returns ErrRestartRequired).
-func (a *Admin) Inspect(old, new, full v1alpha1.Config) (bool, error) {
+func (a *Admin) Inspect(old, new, full stnrv1.Config) (bool, error) {
 	return !old.DeepEqual(new), nil
 }
 
 // Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
 // request.
-func (a *Admin) Reconcile(conf v1alpha1.Config) error {
-	req, ok := conf.(*v1alpha1.AdminConfig)
+func (a *Admin) Reconcile(conf stnrv1.Config) error {
+	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
-		return v1alpha1.ErrInvalidConf
+		return stnrv1.ErrInvalidConf
 	}
 
 	if err := req.Validate(); err != nil {
@@ -96,7 +123,7 @@ func (a *Admin) Reconcile(conf v1alpha1.Config) error {
 
 // ObjectName returns the name of the object.
 func (a *Admin) ObjectName() string {
-	return v1alpha1.DefaultAdminName
+	return stnrv1.DefaultAdminName
 }
 
 // ObjectType returns the type of the object.
@@ -105,14 +132,14 @@ func (a *Admin) ObjectType() string {
 }
 
 // GetConfig returns the configuration of the running object.
-func (a *Admin) GetConfig() v1alpha1.Config {
+func (a *Admin) GetConfig() stnrv1.Config {
 	a.log.Tracef("GetConfig")
 
 	// use a copy when taking the pointer: we don't want anyone downstream messing with our own
 	// copies
 	h := a.HealthCheckEndpoint
 
-	return &v1alpha1.AdminConfig{
+	return &stnrv1.AdminConfig{
 		Name:                a.Name,
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
@@ -143,7 +170,20 @@ func (a *Admin) Close() error {
 	return nil
 }
 
-func (a *Admin) reconcileMetrics(req *v1alpha1.AdminConfig) error {
+// Status returns the status of the object.
+func (a *Admin) Status() stnrv1.Status {
+	s := stnrv1.AdminStatus{
+		Name:                a.Name,
+		LogLevel:            a.LogLevel,
+		MetricsEndpoint:     a.MetricsEndpoint,
+		HealthCheckEndpoint: a.HealthCheckEndpoint,
+	}
+
+	// add licensing status here
+	return &s
+}
+
+func (a *Admin) reconcileMetrics(req *stnrv1.AdminConfig) error {
 	a.log.Trace("reconcileMetrics")
 
 	if a.DryRun {
@@ -158,7 +198,7 @@ func (a *Admin) reconcileMetrics(req *v1alpha1.AdminConfig) error {
 		a.log.Tracef("closing metrics server at %s", mEndpoint)
 
 		if err := a.metricsServer.Shutdown(context.Background()); err != nil {
-			return fmt.Errorf("error stopping metrics server at %s: %w",
+			return fmt.Errorf("failed to stop metrics server at %s: %w",
 				mEndpoint, err)
 		}
 		a.metricsServer = nil
@@ -205,7 +245,7 @@ end:
 }
 
 // req MUST be validated!
-func (a *Admin) reconcileHealthCheck(req *v1alpha1.AdminConfig) error {
+func (a *Admin) reconcileHealthCheck(req *stnrv1.AdminConfig) error {
 	a.log.Trace("reconcileHealthCheck")
 
 	// if req is validated then either
@@ -276,23 +316,24 @@ end:
 // AdminFactory can create now Admin objects
 type AdminFactory struct {
 	dry    bool
-	rc     health.Check
+	rc     ReadinessHandler
+	status StatusHandler
 	logger logging.LoggerFactory
 }
 
 // NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(dryRun bool, rc health.Check, logger logging.LoggerFactory) Factory {
-	return &AdminFactory{dry: dryRun, rc: rc, logger: logger}
+func NewAdminFactory(dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) Factory {
+	return &AdminFactory{dry: dryRun, rc: rc, status: status, logger: logger}
 }
 
 // New can produce a new Admin object from the given configuration. A nil config will create an
 // empty admin object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *AdminFactory) New(conf v1alpha1.Config) (Object, error) {
+func (f *AdminFactory) New(conf stnrv1.Config) (Object, error) {
 	if conf == nil {
 		return &Admin{}, nil
 	}
 
-	return NewAdmin(conf, f.dry, f.rc, f.logger)
+	return NewAdmin(conf, f.dry, f.rc, f.status, f.logger)
 }
 
 func getHealthAddr(e string) string {
@@ -315,7 +356,7 @@ func getHealthAddr(e string) string {
 
 	port := u.Port()
 	if port == "" {
-		port = fmt.Sprintf("%d", v1alpha1.DefaultHealthCheckPort)
+		port = fmt.Sprintf("%d", stnrv1.DefaultHealthCheckPort)
 	}
 
 	return addr + ":" + port
@@ -341,7 +382,7 @@ func getMetricsAddr(e string) (string, string) {
 
 	port := u.Port()
 	if port == "" {
-		port = strconv.Itoa(v1alpha1.DefaultMetricsPort)
+		port = strconv.Itoa(stnrv1.DefaultMetricsPort)
 	}
 	addr = addr + ":" + port
 

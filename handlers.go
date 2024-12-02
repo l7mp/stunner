@@ -7,7 +7,7 @@ import (
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
 )
 
@@ -21,36 +21,36 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 		auth := s.GetAuth()
 
 		switch auth.Type {
-		case v1alpha1.AuthTypePlainText:
-			auth.Log.Infof("plaintext auth request: username=%q realm=%q srcAddr=%v\n",
+		case stnrv1.AuthTypeStatic:
+			auth.Log.Infof("static auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
 			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
-				auth.Log.Debug("plaintext auth request: valid username")
+				auth.Log.Debug("static auth request: valid username")
 				return key, true
 			}
 
-			auth.Log.Info("plaintext auth request: failed: invalid username")
+			auth.Log.Info("static auth request: failed: invalid username")
 			return nil, false
 
-		case v1alpha1.AuthTypeLongTerm:
-			auth.Log.Infof("longterm auth request: username=%q realm=%q srcAddr=%v",
+		case stnrv1.AuthTypeEphemeral:
+			auth.Log.Infof("ephemeral auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
 			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
-				auth.Log.Infof("longterm auth request: failed: %s", err)
+				auth.Log.Infof("ephemeral auth request: failed: %s", err)
 				return nil, false
 			}
 
 			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Infof("longterm auth request: error generating password: %s",
+				auth.Log.Infof("ephemeral auth request: error generating password: %s",
 					err)
 				return nil, false
 			}
 
-			auth.Log.Info("longterm auth request: success")
+			auth.Log.Info("ephemeral auth request: success")
 			return a12n.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:
@@ -67,14 +67,14 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 
 	return func(src net.Addr, peer net.IP) bool {
 		// need auth for logging
-		// dynamic: authHandler might have changed behind ur back
+		// dynamic: authHandler might have changed behind our back
 		auth := s.GetAuth()
 
 		peerIP := peer.String()
-		auth.Log.Debugf("permission handler for listener %q: client %q, peer %q",
-			l.Name, src.String(), peerIP)
-		clusters := s.clusterManager.Keys()
+		auth.Log.Debugf("permission handler for listener %q: client %q, peer %q", l.Name,
+			src.String(), peerIP)
 
+		clusters := s.clusterManager.Keys()
 		for _, r := range l.Routes {
 			auth.Log.Tracef("considering route to cluster %q", r)
 			if util.Member(clusters, r) {
@@ -113,4 +113,9 @@ func (s *Stunner) NewRealmHandler() object.RealmHandler {
 		}
 		return ""
 	}
+}
+
+// NewStatusHandler creates a helper function for printing the status of STUNner.
+func (s *Stunner) NewStatusHandler() object.StatusHandler {
+	return func() stnrv1.Status { return s.Status() }
 }

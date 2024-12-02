@@ -72,16 +72,16 @@ if [[ $platform == "local" ]]; then
     UDP_ECHO_IP="127.0.0.1"
     IPERF_PORT="5000"
 
-    go run ../../cmd/stunnerd/main.go --log=all:INFO \
+    go run ../../../cmd/stunnerd/main.go --log=all:INFO \
     turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} &> /dev/null 2>&1 &
     iperf -s -p 5000 -u -e > log.tmp 2>&1 &
     sleep 2
 
 elif [[ $platform == "k8s" ]]; then
-    STUNNER_PUBLIC_ADDR=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_address)
-    STUNNER_PUBLIC_PORT=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_port)
-    STUNNER_PASSWORD=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.password)
-    STUNNER_USERNAME=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.username)
+    # STUNNER_PUBLIC_ADDR=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_address)
+    # STUNNER_PUBLIC_PORT=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_port)
+    # STUNNER_PASSWORD=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.password)
+    # STUNNER_USERNAME=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.username)
     UDP_ECHO_IP=$(kubectl get svc iperf-server -o jsonpath='{.spec.clusterIP}')
     IPERF_PORT="5000"
 else
@@ -92,8 +92,8 @@ fi
 for i in $(seq "$num_of_processes"); 
 do
     port=$((8999+i))
-    go run ../../cmd/turncat/main.go --log=all:INFO udp://127.0.0.1:$port \
-    turn://"${STUNNER_USERNAME}":"${STUNNER_PASSWORD}"@"${STUNNER_PUBLIC_ADDR}":"${STUNNER_PUBLIC_PORT}" udp://"${UDP_ECHO_IP}":$IPERF_PORT &> /dev/null 2>&1 &
+    go run ../../../cmd/turncat/main.go --log=all:INFO udp://127.0.0.1:$port \
+        k8s://stunner/udp-gateway:udp-listener udp://"${UDP_ECHO_IP}":$IPERF_PORT >/dev/null 2>&1 &
 done
 
 sleep 2

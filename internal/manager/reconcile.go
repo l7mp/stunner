@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/l7mp/stunner/internal/object"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 type ReconcileJob struct {
 	Object               object.Object
-	NewConfig, OldConfig v1alpha1.Config
+	NewConfig, OldConfig stnrv1.Config
 }
 
 type ReconciliationState struct {
@@ -20,7 +20,7 @@ type ReconciliationState struct {
 // PrepareReconciliation prepares the reconciliation of the objects handled by the manager and returns a
 // set of reconciliation jobs to be performed, ErrRestartRequired if the server needs to be
 // restarted, and an error if the config was not accepted. Configuration must be validated.
-func (m *managerImpl) PrepareReconciliation(confs []v1alpha1.Config, stunnerConf v1alpha1.Config) (*ReconciliationState, error) {
+func (m *managerImpl) PrepareReconciliation(confs []stnrv1.Config, stunnerConf stnrv1.Config) (*ReconciliationState, error) {
 	m.log.Tracef("preparing reconciliation")
 
 	state := ReconciliationState{
@@ -134,7 +134,7 @@ func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
 	return nil
 }
 
-func findConfByName(confs []v1alpha1.Config, name string) bool {
+func findConfByName(confs []stnrv1.Config, name string) bool {
 	for _, c := range confs {
 		if c.ConfigName() == name {
 			return true

@@ -24,7 +24,7 @@ done
 
 username=$(kubectl get gatewayconfig -n stunner stunner-gatewayconfig -o jsonpath='{.spec.userName}' --context $secondary_context)
 credential=$(kubectl get gatewayconfig -n stunner stunner-gatewayconfig -o jsonpath='{.spec.password}' --context $secondary_context)
-gwip=$(kubectl get service -n stunner stunner-gateway-udp-gateway-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --context $secondary_context)
+gwip=$(kubectl get service -n stunner udp-gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --context $secondary_context)
 
 kubectl patch configmap -n cloudretro cloudretro-config-c --context $primary_context --patch-file=/dev/stdin <<-EOF
 data:

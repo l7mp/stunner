@@ -25,4 +25,5 @@ go.work
 
 # Our binaries
 turncat
+stunnerctl
 stunnerd

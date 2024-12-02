@@ -8,7 +8,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/internal/object"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Manager stores STUNner objects
@@ -20,7 +20,7 @@ type Manager interface {
 	// Delete deletes the object from the store, may return ErrReturnRequired
 	Delete(o object.Object) error
 	// PrepareReconciliation prepares the reconciliation of the manager
-	PrepareReconciliation(confs []v1alpha1.Config, stunenerConf v1alpha1.Config) (*ReconciliationState, error)
+	PrepareReconciliation(confs []stnrv1.Config, stunenerConf stnrv1.Config) (*ReconciliationState, error)
 	// FinishReconciliation finishes the reconciliation from the specified state
 	FinishReconciliation(state *ReconciliationState) error
 	// Keys returns the names iof all objects in the store in alphabetical order, suitable for iteration

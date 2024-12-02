@@ -1,29 +1,25 @@
 # Performance Benchmarking
 
-With the help of this guide you are able to take performance measurements in your setup using STUNner. Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated.
+This guide will help you to take performance measurements in your setup using STUNner. 
+Both running STUNner locally (outside of Kubernetes) and running STUNner in Kubernetes can be evaluated. 
+You can then compare the locally measured result with the result obtained from Kubernetes and figure out performance bottlenecks. 
 
-Compare the locally measured result to the result measured in Kubernetes and figure out the overhead cost. The extra cost of your cluster's networking may surprise you in terms of extra delay or more packet drops using the same bandwidth.
-
-Locally there is no installation needed, it should take less than a minute to measure.
+Locally there is no installation needed, it should take less than a minute to make a measurements.
 If you have a Kubernetes cluster up and running, the installation and measurement should take a few minutes max.
 
 ## Tools
 
 The tools used in the measurement are the following:
 
-* `iperf` Using to create traffic flows between the clients and server
-* `turncat` Using to open a connection through STUNner to the iperf server
-* `STUNner` Acting as a STUN server towards `turncat` clients
-
-### Caveats
-
-When measuring latency with `iperf` you might be fooled because it is [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) which requires the clocks to be synchronized. This means you might see corrupted latencies such as negative ones.
+* `iperf`: Used for creating traffic flows between the clients and the server.
+* `turncat`: Used for opening a connection through STUNner to the iperf server.
+* `STUNner`: Our TURN server exposed to `turncat` clients.
 
 ## Measurement Setup
 
 ### Local setup
 
-All the components are running locally. All of them are using `127.0.0.1` addresses.
+All the components are running locally using localhost to simulate the network.
 
 ![STUNner benchmark local test architecture](../../img/stunner_benchmark_local.svg)
 
@@ -35,24 +31,13 @@ All the components are running locally. All of them are using `127.0.0.1` addres
 
 ## Prerequisites
 
-You must have [`iperfv2`](https://iperf.fr), [`jq`](https://stedolan.github.io/jq/) and most importantly [Go](https://go.dev/doc/install) installed locally to run this tutorial.
+You must have [`iperfv2`](https://iperf.fr), [`jq`](https://stedolan.github.io/jq/), and [Go](https://go.dev/doc/install) installed locally to run this tutorial. For Kubernetes benchmarks, you also need a running [STUNner installation](/docs/INSTALL.md).
 
 ## Install locally
 
 You are good to go. No installation steps required.
 
 ## Install on Kubernetes
-
-Install it in case you would like to benchmark your Kubernetes setup. If you want to benchmark locally skip this step.
-Note that the benchmarking script does not support the standalone deployment.
-Install the STUNner Gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator -create-namespace --namespace=stunner-system
-helm install stunner stunner/stunner -create-namespace --namespace=stunner
-```
 
 Configure STUNner to act as a STUN server towards [`turncat`](../../cmd/turncat.md) clients, and to let `iperf` client's traffic reach the `iperf` server.
 
@@ -176,10 +161,11 @@ Results
 
 Notice that the average packets/second rate will be slightly lower in case of a hosted Kubernetes cluster than in case of a local `STUNner` installation.
 
-## Tips and Tricks
+## Caveats
 
-* It is advised to repeat the measurment with different packet sizes.
+* It is advised to repeat the measurment with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200. Small packet sizes result lower effective throughput (when packet drop is < 1%).
+* Measuring [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) with `iperf` requires the clocks at the iperf client and server to be synchronized.  Without this the results may be corrupted, and you may even see negative latencies.
 
-Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200.
+# Help
 
-**Effect of packet sizes:** With smallish packets (e.g., 64B), the average packets/second rate will be higher than with largish packets (e.g., 1200B). Small packet sizes result lower effective throughput (when packet drop is < 1%). You should definitely change the arguments to test the performance of your setup ideally.
+STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).

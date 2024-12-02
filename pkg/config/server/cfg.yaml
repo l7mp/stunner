@@ -1,0 +1,9 @@
+package: api
+generate:
+  gorilla-server: true
+  models: true
+  embedded-spec: true
+  strict-server: true
+output: api/server.gen.go
+compatibility:
+  apply-gorilla-middleware-first-to-last: true

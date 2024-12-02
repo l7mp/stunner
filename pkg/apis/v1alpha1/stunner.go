@@ -2,9 +2,29 @@ package v1alpha1
 
 import (
 	"fmt"
-	// "sort"
+	"maps"
 	"strings"
+
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
+
+// Config is the main interface for STUNner configuration objects
+type Config = stnrv1.Config
+
+// AdminConfig holds the administrative configuration.
+type AdminConfig = stnrv1.AdminConfig
+
+// ClusterConfig specifies a set of upstream peers STUNner can open transport relay connections
+// to. There are two address resolution policies. In STATIC clusters the allowed peer IP addresses
+// are explicitly listed in the endpoint list. In STRICT_DNS clusters the endpoints are assumed to
+// be proper DNS domain names. STUNner will resolve each domain name in the background and admits a
+// new connection only if the peer address matches one of the IP addresses returned by the DNS
+// resolver for one of the endpoints. STRICT_DNS clusters are best used with headless Kubernetes
+// services.
+type ClusterConfig = stnrv1.ClusterConfig
+
+// ListenerConfig specifies a server socket on which STUN/TURN connections will be served.
+type ListenerConfig = stnrv1.ListenerConfig
 
 // StunnerConfig specifies the configuration of the the STUnner daemon.
 type StunnerConfig struct {
@@ -169,4 +189,38 @@ func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
 	}
 
 	return ClusterConfig{}, ErrNoSuchCluster
+}
+
+// ConvertToV1 upgrades a v1alpha1 StunnerConfig to a v1.
+func ConvertToV1(sv1a1 *StunnerConfig) (*stnrv1.StunnerConfig, error) {
+	sv1 := stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+	}
+
+	(*stnrv1.AdminConfig)(&sv1a1.Admin).DeepCopyInto(&sv1.Admin)
+
+	// auth needs to be converted
+	at, err := stnrv1.NewAuthType(sv1a1.Auth.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	sv1.Auth = stnrv1.AuthConfig{
+		Type:        at.String(),
+		Realm:       sv1a1.Auth.Realm,
+		Credentials: make(map[string]string),
+	}
+	maps.Copy(sv1.Auth.Credentials, sv1a1.Auth.Credentials)
+
+	sv1.Listeners = make([]stnrv1.ListenerConfig, len(sv1a1.Listeners))
+	for i := range sv1a1.Listeners {
+		(*stnrv1.ListenerConfig)(&sv1a1.Listeners[i]).DeepCopyInto(&sv1.Listeners[i])
+	}
+
+	sv1.Clusters = make([]stnrv1.ClusterConfig, len(sv1a1.Clusters))
+	for i := range sv1a1.Clusters {
+		(*stnrv1.ClusterConfig)(&sv1a1.Clusters[i]).DeepCopyInto(&sv1.Clusters[i])
+	}
+
+	return &sv1, nil
 }

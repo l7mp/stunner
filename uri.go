@@ -7,10 +7,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // StunnerUri is the specification of a STUNner listener URI
@@ -35,7 +34,7 @@ func ParseUri(uri string) (*StunnerUri, error) {
 
 	u, err := url.Parse(uri)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid URI '%s': %s", uri, err)
+		return nil, fmt.Errorf("invalid URI '%s': %s", uri, err)
 	}
 
 	s.Address = u.Hostname()
@@ -45,28 +44,20 @@ func ParseUri(uri string) (*StunnerUri, error) {
 		s.Password = password
 	}
 
-	proto := strings.ToLower(u.Scheme)
-	if proto == "turn" {
-		q := u.Query()
-		if len(q["transport"]) > 0 {
-			proto = strings.ToLower(q["transport"][0])
-		} else {
-			proto = "udp"
-		}
+	proto, err := getStunnerProtoForURI(u)
+	if err != nil {
+		return nil, err
 	}
 	s.Protocol = proto
 
-	port, _ := strconv.Atoi(u.Port())
-	s.Port = port
-
-	switch proto {
-	case "udp", "udp4", "udp6", "dtls":
+	switch strings.ToLower(proto) {
+	case "udp", "udp4", "udp6", "dtls", "turn-udp", "turn-dtls":
 		a, err := net.ResolveUDPAddr("udp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
 		}
 		s.Addr = a
-	case "tcp", "tcp4", "tcp6", "tls":
+	case "tcp", "tcp4", "tcp6", "tls", "turn-tcp", "turn-tls":
 		a, err := net.ResolveTCPAddr("tcp", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
@@ -88,50 +79,47 @@ func ParseUri(uri string) (*StunnerUri, error) {
 		return nil, fmt.Errorf("invalid protocol: %s", proto)
 	}
 
+	defaultPort := 3478
+	if strings.ToLower(proto) == "turn-tls" || strings.ToLower(proto) == "turn-dtls" {
+		defaultPort = 443
+	}
+
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		port = defaultPort
+	}
+	s.Port = port
+
 	return &s, nil
 }
 
-// GetUriFromListener returns a standard TURN URI from a listener config
-func GetUriFromListener(req *v1alpha1.ListenerConfig) (string, error) {
-	proto, err := v1alpha1.NewListenerProtocol(req.Protocol)
+func (u *StunnerUri) String() string {
+	req := stnrv1.ListenerConfig{
+		Protocol:   u.Protocol,
+		PublicAddr: u.Address,
+		PublicPort: u.Port,
+	}
+
+	uri, err := GetStandardURLFromListener(&req)
 	if err != nil {
-		return "", err
+		return ""
 	}
 
-	service, protocol := "", ""
-	switch proto {
-	case v1alpha1.ListenerProtocolUDP:
-		service = "turn"
-		protocol = "udp"
-	case v1alpha1.ListenerProtocolTCP:
-		service = "turn"
-		protocol = "tcp"
-	case v1alpha1.ListenerProtocolDTLS:
-		service = "turns"
-		protocol = "udp"
-	case v1alpha1.ListenerProtocolTLS:
-		service = "turns"
-		protocol = "tcp"
-	}
+	return uri
+}
 
-	addr := req.PublicAddr
-	if addr == "" {
-		// fallback to server addr
-		addr = req.Addr
-	}
+// GetUriFromListener returns a standard TURN URI as per RFC7065from a listener config.
+func GetUriFromListener(req *stnrv1.ListenerConfig) (string, error) {
+	return req.GetListenerURI(true)
+}
 
-	port := req.PublicPort
-	if port == 0 {
-		// fallback to server addr
-		port = req.Port
-	}
-
-	uri := fmt.Sprintf("%s:%s:%d?transport=%s", service, addr, port, protocol)
-	return uri, nil
+// GetStandardURLFromListener returns a standard URL (that can be parsed using net/url) from a listener config.
+func GetStandardURLFromListener(req *stnrv1.ListenerConfig) (string, error) {
+	return req.GetListenerURI(false)
 }
 
 // GetUriFromListener returns a standard TURN URI from a listener config
-func GetTurnUris(req *v1alpha1.StunnerConfig) ([]string, error) {
+func GetTurnUris(req *stnrv1.StunnerConfig) ([]string, error) {
 	ret := []string{}
 	for i := range req.Listeners {
 		uri, err := GetUriFromListener(&req.Listeners[i])
@@ -144,9 +132,36 @@ func GetTurnUris(req *v1alpha1.StunnerConfig) ([]string, error) {
 	return ret, nil
 }
 
-func reuseAddr(network, address string, conn syscall.RawConn) error {
-	return conn.Control(func(descriptor uintptr) {
-		_ = syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-		// syscall.SetsockoptInt(int(descriptor), syscall.SOL_SOCKET, syscall.SO_REUSEPORT, 1)
-	})
+func getStunnerProtoForURI(u *url.URL) (string, error) {
+	scheme := strings.ToLower(u.Scheme)
+	if scheme == "" {
+		scheme = "turn"
+	}
+
+	proto := "udp"
+	q := u.Query()
+	if len(q["transport"]) > 0 {
+		proto = strings.ToLower(q["transport"][0])
+	}
+
+	// fully specified protocol names (ignore "turns" scheme for compatibility)
+	switch proto {
+	case "tls":
+		return "TURN-TLS", nil
+	case "dtls":
+		return "TURN-DTLS", nil
+	}
+
+	// using RFC7065 compatible URIs
+	if scheme == "turn" && proto == "udp" {
+		return "TURN-UDP", nil
+	} else if scheme == "turn" && proto == "tcp" {
+		return "TURN-TCP", nil
+	} else if scheme == "turns" && proto == "udp" {
+		return "TURN-DTLS", nil
+	} else if scheme == "turns" && proto == "tcp" {
+		return "TURN-TLS", nil
+	}
+
+	return "", fmt.Errorf("invalid scheme/protocol in URI %q", u.String())
 }

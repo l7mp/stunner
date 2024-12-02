@@ -2,16 +2,17 @@ package v1alpha1
 
 import (
 	"fmt"
-	"strings"
+
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // AuthType species the type of the STUN/TURN authentication mechanism used by STUNner
-type AuthType int
+type AuthType stnrv1.AuthType
 
 const (
-	AuthTypePlainText AuthType = iota + 1
-	AuthTypeLongTerm
-	AuthTypeUnknown
+	AuthTypePlainText AuthType = AuthType(stnrv1.AuthTypeStatic)
+	AuthTypeLongTerm  AuthType = AuthType(stnrv1.AuthTypeLongTerm)
+	AuthTypeUnknown   AuthType = AuthType(stnrv1.AuthTypeUnknown)
 )
 
 const (
@@ -44,127 +45,10 @@ func (a AuthType) String() string {
 }
 
 // ListenerProtocol specifies the network protocol for a listener
-type ListenerProtocol int
-
-const (
-	ListenerProtocolUDP ListenerProtocol = iota + 1
-	ListenerProtocolTCP
-	ListenerProtocolTLS
-	ListenerProtocolDTLS
-	ListenerProtocolUnknown
-)
-
-const (
-	listenerProtocolUDPStr  = "UDP"
-	listenerProtocolTCPStr  = "TCP"
-	listenerProtocolTLSStr  = "TLS"
-	listenerProtocolDTLSStr = "DTLS"
-)
-
-// NewListenerProtocol parses the protocol specification
-func NewListenerProtocol(raw string) (ListenerProtocol, error) {
-	switch strings.ToUpper(raw) {
-	case listenerProtocolUDPStr:
-		return ListenerProtocolUDP, nil
-	case listenerProtocolTCPStr:
-		return ListenerProtocolTCP, nil
-	case listenerProtocolTLSStr:
-		return ListenerProtocolTLS, nil
-	case listenerProtocolDTLSStr:
-		return ListenerProtocolDTLS, nil
-	default:
-		return ListenerProtocol(ListenerProtocolUnknown),
-			fmt.Errorf("unknown listener protocol: \"%s\"", raw)
-	}
-}
-
-// String returns a string representation of a listener protocol
-func (l ListenerProtocol) String() string {
-	switch l {
-	case ListenerProtocolUDP:
-		return listenerProtocolUDPStr
-	case ListenerProtocolTCP:
-		return listenerProtocolTCPStr
-	case ListenerProtocolTLS:
-		return listenerProtocolTLSStr
-	case ListenerProtocolDTLS:
-		return listenerProtocolDTLSStr
-	default:
-		return "<unknown>"
-	}
-}
+type ListenerProtocol = stnrv1.ListenerProtocol
 
 // ClusterType specifies the cluster address resolution policy
-type ClusterType int
-
-const (
-	ClusterTypeStatic ClusterType = iota + 1
-	ClusterTypeStrictDNS
-	ClusterTypeUnknown
-)
-
-const (
-	clusterTypeStaticStr    = "STATIC"
-	clusterTypeStrictDNSStr = "STRICT_DNS"
-)
-
-func NewClusterType(raw string) (ClusterType, error) {
-	switch strings.ToUpper(raw) {
-	case clusterTypeStaticStr:
-		return ClusterTypeStatic, nil
-	case clusterTypeStrictDNSStr:
-		return ClusterTypeStrictDNS, nil
-	default:
-		return ClusterType(ClusterTypeUnknown), fmt.Errorf("unknown cluster type: \"%s\"", raw)
-	}
-}
-
-func (l ClusterType) String() string {
-	switch l {
-	case ClusterTypeStatic:
-		return clusterTypeStaticStr
-	case ClusterTypeStrictDNS:
-		return clusterTypeStrictDNSStr
-	default:
-		return "<unknown>"
-	}
-}
+type ClusterType = stnrv1.ClusterType
 
 // ClusterProtocol specifies the network protocol for a cluster
-type ClusterProtocol int
-
-const (
-	ClusterProtocolUDP ClusterProtocol = iota + 1
-	ClusterProtocolTCP
-	ClusterProtocolUnknown
-)
-
-const (
-	clusterProtocolUDPStr = "UDP"
-	clusterProtocolTCPStr = "TCP"
-)
-
-// NewClusterProtocol parses the protocol specification
-func NewClusterProtocol(raw string) (ClusterProtocol, error) {
-	switch strings.ToUpper(raw) {
-	case clusterProtocolUDPStr:
-		return ClusterProtocolUDP, nil
-	case clusterProtocolTCPStr:
-		return ClusterProtocolTCP, nil
-	default:
-		return ClusterProtocol(ClusterProtocolUnknown),
-			fmt.Errorf("unknown cluster protocol: \"%s\"", raw)
-	}
-}
-
-// String returns a string representation of a cluster protocol
-func (p ClusterProtocol) String() string {
-	switch p {
-	case ClusterProtocolUDP:
-		return clusterProtocolUDPStr
-	case ClusterProtocolTCP:
-		return clusterProtocolTCPStr
-	default:
-		return "<unknown>"
-	}
-}
+type ClusterProtocol = stnrv1.ClusterProtocol

@@ -3,7 +3,7 @@
 # The following yaml script will install a cloud-retro setup in your Kubernetes cluster
 # with the needed services. With an invalid configuration of course, for this to properly work
 # You need the apply-config.sh minimalistic shell script to update the config with the unclear addresses.
-#  
+#
 # Please not that this will only install the workers. For them to work, you will need a coordinator deployment as well.
 #
 # In short, no touching.
@@ -42,7 +42,7 @@ spec:
     spec:
       containers:
       - name: worker
-        image: valniae/snekyrepo:crdi
+        image: docker.io/valniae/snekyrepo:crdi
         envFrom:
           - configMapRef:
               name: cloudretro-config-w

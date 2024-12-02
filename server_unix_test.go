@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
-
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -18,29 +17,29 @@ const clientNum = 20
 // multithreaded UDP tests
 var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 	{
-		config: v1alpha1.StunnerConfig{
+		config: stnrv1.StunnerConfig{
 			// udp, plaintext
-			ApiVersion: "v1alpha1",
-			Admin: v1alpha1.AdminConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: v1alpha1.AuthConfig{
+			Auth: stnrv1.AuthConfig{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []v1alpha1.ListenerConfig{{
+			Listeners: []stnrv1.ListenerConfig{{
 				Name:       "udp",
-				Protocol:   "udp",
+				Protocol:   "turn-udp",
 				Addr:       "127.0.0.1",
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
 				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []v1alpha1.ClusterConfig{{
+			Clusters: []stnrv1.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
@@ -55,33 +54,34 @@ func TestStunnerMultithreadedUDP(t *testing.T) {
 
 // Benchmark
 func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
-	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
+	//loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 	initSeq := []byte("init-data")
 	testSeq := []byte("benchmark-data")
 
-	log.Debug("creating a stunnerd")
+	log.Debug("Creating a stunnerd")
 	stunner := NewStunner(Options{
 		LogLevel:             stunnerTestLoglevel,
 		SuppressRollback:     true,
 		UDPListenerThreadNum: udpThreadNum, // ignored for anything but UDP
 	})
+	defer stunner.Close()
 
-	log.Debug("starting stunnerd")
-	err := stunner.Reconcile(v1alpha1.StunnerConfig{
-		ApiVersion: "v1alpha1",
-		Admin: v1alpha1.AdminConfig{
+	log.Debug("Starting stunnerd")
+	err := stunner.Reconcile(&stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Auth: v1alpha1.AuthConfig{
+		Auth: stnrv1.AuthConfig{
 			Type: "plaintext",
 			Credentials: map[string]string{
 				"username": "user1",
 				"password": "passwd1",
 			},
 		},
-		Listeners: []v1alpha1.ListenerConfig{{
+		Listeners: []stnrv1.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: proto,
 			Addr:     "127.0.0.1",
@@ -90,7 +90,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 			Key:      keyPem64,
 			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []v1alpha1.ClusterConfig{{
+		Clusters: []stnrv1.ClusterConfig{{
 			Name:      "allow-any",
 			Endpoints: []string{"0.0.0.0/0"},
 		}},
@@ -100,7 +100,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 		b.Fatalf("Failed to start stunnerd: %s", err)
 	}
 
-	log.Debug("creating a sink")
+	log.Debug("Creating a sink")
 	sinkAddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:65432")
 	if err != nil {
 		b.Fatalf("Failed to resolve sink address: %s", err)
@@ -110,6 +110,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	if err != nil {
 		b.Fatalf("Failed to allocate sink: %s", err)
 	}
+	defer sink.Close() //nolint:errcheck
 
 	go func() {
 		buf := make([]byte, 1600)
@@ -125,11 +126,14 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	}()
 
 	log.Debug("creating a turncat client")
-	stunnerURI := fmt.Sprintf("turn://127.0.0.1:23478?transport=%s", proto)
-	clientProto := "tcp"
-	if proto == "udp" || proto == "dtls" {
+	clientProto, turnScheme := "tcp", "turn"
+	if proto == "turn-udp" || proto == "turn-dtls" {
 		clientProto = "udp"
 	}
+	if proto == "turn-tls" || proto == "turn-dtls" {
+		turnScheme = "turns"
+	}
+	stunnerURI := fmt.Sprintf("%s://127.0.0.1:23478?transport=%s", turnScheme, clientProto)
 	testTurncatConfig := TurncatConfig{
 		ListenerAddr:  fmt.Sprintf("%s://127.0.0.1:25000", clientProto),
 		ServerAddr:    stunnerURI,
@@ -143,9 +147,10 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	if err != nil {
 		b.Fatalf("Failed to create turncat client: %s", err)
 	}
+	defer turncat.Close()
 
 	// test with 20 clients
-	log.Debugf("creating %d senders", clientNum)
+	log.Debugf("Creating %d senders", clientNum)
 	clients := make([]net.Conn, clientNum)
 	for i := 0; i < clientNum; i++ {
 		var client net.Conn
@@ -183,12 +188,9 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 
 	time.Sleep(750 * time.Millisecond)
 
-	turncat.Close()
-	stunner.Close()
 	for i := 0; i < clientNum; i++ {
 		clients[i].Close()
 	}
-	sink.Close() //nolint:errcheck
 }
 
 // BenchmarkUDPServer will benchmark the STUNner UDP server with a different number of readloop
@@ -196,7 +198,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 func BenchmarkUDPServer(b *testing.B) {
 	for i := 1; i <= 4; i++ {
 		b.Run(fmt.Sprintf("udp:thread_num=%d", i), func(b *testing.B) {
-			RunBenchmarkServer(b, "udp", i)
+			RunBenchmarkServer(b, "turn-udp", i)
 		})
 	}
 }
@@ -205,7 +207,7 @@ func BenchmarkUDPServer(b *testing.B) {
 // threads. Setup: `client --tcp--> turncat --tcp--> stunner --udp--> sink`
 func BenchmarkTCPServer(b *testing.B) {
 	b.Run("tcp", func(b *testing.B) {
-		RunBenchmarkServer(b, "tcp", 0)
+		RunBenchmarkServer(b, "turn-tcp", 0)
 	})
 }
 
@@ -213,7 +215,7 @@ func BenchmarkTCPServer(b *testing.B) {
 // threads. Setup: `client --tcp--> turncat --tls--> stunner --udp--> sink`
 func BenchmarkTLSServer(b *testing.B) {
 	b.Run("tls", func(b *testing.B) {
-		RunBenchmarkServer(b, "tls", 0)
+		RunBenchmarkServer(b, "turn-tls", 0)
 	})
 }
 
@@ -221,6 +223,6 @@ func BenchmarkTLSServer(b *testing.B) {
 // threads. Setup: `client --udp--> turncat --dtls--> stunner --udp--> sink`
 func BenchmarkDTLSServer(b *testing.B) {
 	b.Run("dtls", func(b *testing.B) {
-		RunBenchmarkServer(b, "dtls", 0)
+		RunBenchmarkServer(b, "turn-dtls", 0)
 	})
 }

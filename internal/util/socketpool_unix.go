@@ -10,25 +10,27 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/pion/transport/v2"
-	"github.com/pion/transport/v2/stdnet"
+	"github.com/l7mp/stunner/internal/telemetry"
+	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v3/stdnet"
 )
 
 // unixPacketConPool implements socketpools for unix with full support for SO_REUSEPORT
 type unixPacketConnPool struct {
 	net.ListenConfig
-	size int
+	listenerName string
+	size         int
+	telemetry    *telemetry.Telemetry
 }
 
 // NewPacketConnPool creates a new packet connection pool. Pooling is disabled if threadNum is zero
 // or if we are running on top of transport.VNet (which does not support reuseport), or if we are
 // on non-unix, see the fallback in socketpool.go.
-func NewPacketConnPool(vnet transport.Net, threadNum int) PacketConnPool {
+func NewPacketConnPool(listenerName string, vnet transport.Net, threadNum int, t *telemetry.Telemetry) PacketConnPool {
 	// default to a single socket for vnet or if udp multithreading is disabled
 	_, ok := vnet.(*stdnet.Net)
 	if ok && threadNum > 0 {
 		return &unixPacketConnPool{
-			size: threadNum,
 			ListenConfig: net.ListenConfig{
 				Control: func(network, address string, conn syscall.RawConn) error {
 					var operr error
@@ -42,9 +44,12 @@ func NewPacketConnPool(vnet transport.Net, threadNum int) PacketConnPool {
 					return operr
 				},
 			},
+			size:         threadNum,
+			listenerName: listenerName,
+			telemetry:    t,
 		}
 	} else {
-		return &defaultPacketConnPool{Net: vnet}
+		return &defaultPacketConnPool{listenerName: listenerName, Net: vnet, telemetry: t}
 	}
 }
 
@@ -59,6 +64,7 @@ func (p *unixPacketConnPool) Make(network, address string) ([]net.PacketConn, er
 			return []net.PacketConn{}, fmt.Errorf("failed to create PacketConn "+
 				"%d at %s (REUSEPORT: %t): %s", i, address, (p.size > 0), err)
 		}
+		conn = telemetry.NewPacketConn(conn, p.listenerName, telemetry.ListenerType, p.telemetry)
 		conns = append(conns, conn)
 	}
 

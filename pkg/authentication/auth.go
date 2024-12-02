@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/turn/v2"
+	"github.com/pion/turn/v4"
 )
 
 // UsernameSeparator is the separator character used in time-windowed TURN authentication as
@@ -72,7 +72,7 @@ func GetLongTermCredential(username string, sharedSecret string) (string, error)
 }
 
 // GenerateAuthKey is a convenience function to easily generate keys in the format used by
-// AuthHandler. Re-exported from `pion/turn/v2` so that our callers will have a single import.
+// AuthHandler. Re-exported from `pion/turn` so that our callers will have a single import.
 func GenerateAuthKey(username, realm, password string) []byte {
 	return turn.GenerateAuthKey(username, realm, password)
 }

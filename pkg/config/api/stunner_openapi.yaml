@@ -1,0 +1,164 @@
+openapi: 3.0.3
+info:
+  title: REST API for STUNner dataplane config
+  description: The STUNner dataplane API exposes a reconfigurable multi-protocol multi-listener TURN service for WebRTC media ingestion.
+  version: 1.0.0
+servers:
+  - url: ""
+tags:
+  - name: STUNner
+    description: 'A Kubernetes media gateway for WebRTC. Contact: info@l7mp.io'
+paths:
+  /api/v1/configs:
+    get:
+      description: API to list or watch config objects in all namespaces.
+      operationId: listV1Configs
+      parameters:
+        - name: watch
+          in: query
+          description: Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.ConfigList'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+  /api/v1/configs/{namespace}:
+    get:
+      description: API to list or watch config objects in a specific namespace.
+      operationId: listV1ConfigsNamespace
+      parameters:
+        - name: namespace
+          in: path
+          description: Namespace of the gateway for which config is requested.
+          required: true
+          schema:
+            type: string
+        - name: watch
+          in: query
+          description: Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.ConfigList'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+  /api/v1/configs/{namespace}/{name}:
+    get:
+      description: API to list or watch config objects for a specific gateway in a specific namespace.
+      operationId: getV1ConfigNamespaceName
+      parameters:
+        - name: namespace
+          in: path
+          description: Namespace of the gateway for which config is requested.
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          description: Name of the gateway for which config is requested.
+          required: true
+          schema:
+            type: string
+        - name: watch
+          in: query
+          description: Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
+          schema:
+            type: boolean
+        - name: node
+          in: query
+          description: Name of the node the client runs on.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Config'
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
+components:
+  schemas:
+    v1.ClientInfo:
+      description: Client description.
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          description: Client id.
+          type: string
+        node:
+          description: Name of the node client is deployed to.
+          type: string
+    v1.ConfigList:
+      description: ConfigList is a list of Configs.
+      type: object
+      required:
+        - version
+        - items
+      properties:
+        version:
+          description: version defines the versioned schema of this object.
+          type: string
+        items:
+          description: Items is the list of Config objects in the list.
+          type: array
+          items:
+            $ref: '#/components/schemas/v1.Config'
+    v1.Config:
+      description: 'Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
+      x-go-type: "stunnerv1.StunnerConfig"
+      x-go-type-import:
+        name: stunnerv1
+        path: "github.com/l7mp/stunner/pkg/apis/v1"
+    v1.Error:
+      description: API error.
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          description: Error code.
+          type: integer
+          format: int32
+        message:
+          description: Error message.
+          type: string

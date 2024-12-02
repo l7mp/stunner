@@ -4,23 +4,22 @@ import (
 	"fmt"
 
 	"github.com/l7mp/stunner/internal/object"
-
-	"github.com/l7mp/stunner/pkg/apis/v1alpha1"
+	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Reconcile handles updates to the STUNner configuration. Some updates are destructive: in this
 // case the returned error contains the names of the objects (usually, listeners) that were
 // restarted during reconciliation (see the documentation of the corresponding STUNner objects for
 // when STUNner may restart after a reconciliation). Reconcile returns nil no objects were
-// restarted, v1alpha1.ErrRestarted to indicate that a shutdown-restart cycle was performed for at
+// restarted, v1.ErrRestarted to indicate that a shutdown-restart cycle was performed for at
 // least one internal object (usually, a listener) for the new config (unless DryRun is enabled),
 // and an error if an error has occurred during reconciliation, in which case it will rollback the
 // last working configuration (unless SuppressRollback is on).
-func (s *Stunner) Reconcile(req v1alpha1.StunnerConfig) error {
+func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
 	return s.reconcileWithRollback(req, false)
 }
 
-func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback bool) error {
+func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bool) error {
 	var errFinal error
 	new, deleted, changed := 0, 0, 0
 
@@ -28,13 +27,13 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 		return err
 	}
 
-	s.log.Debugf("reconciling STUNner for config: %s ", req.String())
+	s.log.Debugf("Reconciling STUNner for config: %s ", req.String())
 
 	rollback := s.GetConfig()
 	toBeStarted, toBeRestarted := []object.Object{}, []object.Object{}
 
 	// admin
-	adminState, err := s.adminManager.PrepareReconciliation([]v1alpha1.Config{&req.Admin}, &req)
+	adminState, err := s.adminManager.PrepareReconciliation([]stnrv1.Config{&req.Admin}, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for admin config: %s",
 			err.Error())
@@ -45,7 +44,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(adminState.DeletedJobQueue)
 
 	// auth
-	authState, err := s.authManager.PrepareReconciliation([]v1alpha1.Config{&req.Auth}, &req)
+	authState, err := s.authManager.PrepareReconciliation([]stnrv1.Config{&req.Auth}, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for auth config: %s",
 			err.Error())
@@ -56,11 +55,11 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(authState.DeletedJobQueue)
 
 	// listener
-	lconf := make([]v1alpha1.Config, len(req.Listeners))
+	lconf := make([]stnrv1.Config, len(req.Listeners))
 	for i := range req.Listeners {
 		lconf[i] = &(req.Listeners[i])
 	}
-	listenerState, err := s.listenerManager.PrepareReconciliation(lconf, &req)
+	listenerState, err := s.listenerManager.PrepareReconciliation(lconf, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for listener config: %s", err.Error())
 	}
@@ -70,11 +69,11 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	deleted += len(listenerState.DeletedJobQueue)
 
 	// cluster
-	cconf := make([]v1alpha1.Config, len(req.Clusters))
+	cconf := make([]stnrv1.Config, len(req.Clusters))
 	for i := range req.Clusters {
 		cconf[i] = &(req.Clusters[i])
 	}
-	clusterState, err := s.clusterManager.PrepareReconciliation(cconf, &req)
+	clusterState, err := s.clusterManager.PrepareReconciliation(cconf, req)
 	if err != nil {
 		return fmt.Errorf("error preparing reconciliation for cluster config: %s", err.Error())
 	}
@@ -86,7 +85,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	// find all objects (listeners) to be restarted and stop each
 	if !s.dryRun {
 		if err := s.stop(toBeRestarted); err != nil {
-			s.log.Errorf("could not stop object: %s", err.Error())
+			s.log.Errorf("Could not stop object: %s", err.Error())
 			errFinal = err
 			if !inRollback {
 				goto rollback
@@ -95,13 +94,13 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 		}
 	}
 
-	s.log.Tracef("reconciliation preparation ready")
+	s.log.Tracef("Reconciliation preparation ready")
 
 	// finish reconciliation
 	// admin
 	err = s.adminManager.FinishReconciliation(adminState)
 	if err != nil {
-		s.log.Errorf("could not reconcile admin config: %s", err.Error())
+		s.log.Errorf("Could not reconcile admin config: %s", err.Error())
 		errFinal = err
 		if !inRollback {
 			goto rollback
@@ -110,13 +109,13 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	}
 	toBeStarted = append(toBeStarted, adminState.ToBeStarted...)
 
-	s.log.Infof("setting loglevel to %q", s.GetAdmin().LogLevel)
+	s.log.Infof("Setting loglevel to %q", s.GetAdmin().LogLevel)
 	s.logger.SetLevel(s.GetAdmin().LogLevel)
 
 	// auth
 	err = s.authManager.FinishReconciliation(authState)
 	if err != nil {
-		s.log.Errorf("could not reconcile auth config: %s", err.Error())
+		s.log.Errorf("Could not reconcile auth config: %s", err.Error())
 		errFinal = err
 		if !inRollback {
 			goto rollback
@@ -128,7 +127,7 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	// listener
 	err = s.listenerManager.FinishReconciliation(listenerState)
 	if err != nil {
-		s.log.Errorf("could not reconcile listener config: %s", err.Error())
+		s.log.Errorf("Could not reconcile listener config: %s", err.Error())
 		errFinal = err
 		if !inRollback {
 			goto rollback
@@ -138,13 +137,13 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	toBeStarted = append(toBeStarted, listenerState.ToBeStarted...)
 
 	if len(s.listenerManager.Keys()) == 0 {
-		s.log.Warn("running with no listeners")
+		s.log.Warn("Running with no listeners")
 	}
 
 	// cluster
 	err = s.clusterManager.FinishReconciliation(clusterState)
 	if err != nil {
-		s.log.Errorf("could not reconcile cluster config: %s", err.Error())
+		s.log.Errorf("Could not reconcile cluster config: %s", err.Error())
 		errFinal = err
 		if !inRollback {
 			goto rollback
@@ -154,13 +153,13 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 	toBeStarted = append(toBeStarted, clusterState.ToBeStarted...)
 
 	if len(s.clusterManager.Keys()) == 0 {
-		s.log.Warn("running with no clusters: all traffic will be dropped")
+		s.log.Warn("Running with no clusters: all traffic will be dropped")
 	}
 
 	// find all objects (listeners) to be started or restarted and start each
 	if !s.dryRun {
 		if err := s.start(toBeStarted, toBeRestarted); err != nil {
-			s.log.Errorf("could not start object: %s", err.Error())
+			s.log.Errorf("Could not start object: %s", err.Error())
 			errFinal = err
 			if !inRollback {
 				goto rollback
@@ -174,11 +173,11 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 		s.ready = true
 	}
 
-	s.log.Infof("reconciliation ready: new objects: %d, changed objects: %d, "+
+	s.log.Infof("Reconciliation ready: new objects: %d, changed objects: %d, "+
 		"deleted objects: %d, started objects: %d, restarted objects: %d",
 		new, changed, deleted, len(toBeStarted), len(toBeRestarted))
 
-	s.log.Info(s.Status())
+	s.log.Infof("New dataplane status: %s", s.Status().String())
 
 	if len(toBeRestarted) > 0 {
 		names := make([]string, len(toBeRestarted))
@@ -186,15 +185,15 @@ func (s *Stunner) reconcileWithRollback(req v1alpha1.StunnerConfig, inRollback b
 			names[i] = fmt.Sprintf("%s: %s", n.ObjectType(), n.ObjectName())
 		}
 
-		return v1alpha1.ErrRestarted{Objects: names}
+		return stnrv1.ErrRestarted{Objects: names}
 	}
 
 	return nil
 
 rollback:
 	if !s.suppressRollback {
-		s.log.Infof("rolling back to previous configuration: %s", rollback.String())
-		return s.reconcileWithRollback(*rollback, true)
+		s.log.Infof("Rolling back to previous configuration: %s", rollback.String())
+		return s.reconcileWithRollback(rollback, true)
 	}
 
 	return errFinal
@@ -208,7 +207,7 @@ func (s *Stunner) stop(restarted []object.Object) error {
 				return err
 			}
 		default:
-			s.log.Errorf("internal error: stop() is not implemented for object %q",
+			s.log.Errorf("Internal error: stop() is not implemented for object %q",
 				o.ObjectName())
 		}
 	}
@@ -224,7 +223,7 @@ func (s *Stunner) start(started, restarted []object.Object) error {
 				return err
 			}
 		default:
-			s.log.Errorf("internal error: start() is not implemented for object %q",
+			s.log.Errorf("Internal error: start() is not implemented for object %q",
 				o.ObjectName())
 		}
 	}

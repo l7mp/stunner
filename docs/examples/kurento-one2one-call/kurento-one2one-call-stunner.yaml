@@ -1,4 +1,4 @@
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: stunner-gatewayclass
@@ -12,7 +12,7 @@ spec:
   description: "STUNner is a WebRTC ingress gateway for Kubernetes"
 
 ---
-apiVersion: stunner.l7mp.io/v1alpha1
+apiVersion: stunner.l7mp.io/v1
 kind: GatewayConfig
 metadata:
   name: stunner-gatewayconfig
@@ -23,7 +23,7 @@ spec:
   password: "pass-1"
 
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -33,10 +33,10 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 
 ---
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: kms-media-plane
@@ -48,4 +48,3 @@ spec:
     - backendRefs:
         - name: kms
           namespace: default
-

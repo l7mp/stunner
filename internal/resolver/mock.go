@@ -63,5 +63,5 @@ func (m *MockResolver) Lookup(domain string) ([]net.IP, error) {
 		}
 	}
 
-	return []net.IP{}, fmt.Errorf("Host %q not found: 3(NXDOMAIN)", domain)
+	return []net.IP{}, fmt.Errorf("host %q not found: 3(NXDOMAIN)", domain)
 }

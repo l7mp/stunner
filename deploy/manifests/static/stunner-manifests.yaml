@@ -6,21 +6,23 @@ metadata:
   namespace: stunner
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: stunner-config-watcher-clusterrole
+  name: stunner-config-watcher-role
+  namespace: stunner
 rules:
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
   verbs: ["get", "watch", "list"]
 ---
-kind: ClusterRoleBinding
+kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: stunner-config-watcher-clusterrolebind
+  name: stunner-config-watcher-rolebind
+  namespace: stunner
 roleRef:
-  kind: ClusterRole
-  name: stunner-config-watcher-clusterrole
+  kind: Role
+  name: stunner-config-watcher-role
   apiGroup: rbac.authorization.k8s.io
 subjects:
 - kind: ServiceAccount
@@ -50,8 +52,8 @@ metadata:
   namespace: stunner
   annotations: 
     app: stunner
-    helm.sh/chart: stunner-0.15.0
-    app.kubernetes.io/version: "0.15.0"  
+    helm.sh/chart: stunner-0.16.0
+    app.kubernetes.io/version: "0.16.0"  
 spec:
   selector:
     matchLabels:
@@ -75,7 +77,7 @@ spec:
       hostNetwork: false
       containers:
       - name: stunnerd
-        image: "l7mp/stunnerd:0.15.0"
+        image: "l7mp/stunnerd:0.16.0"
         imagePullPolicy: IfNotPresent        
         command: ["stunnerd"]
         args: ["-w", "-c", "/etc/stunnerd/stunnerd.conf", "--udp-thread-num=16"]

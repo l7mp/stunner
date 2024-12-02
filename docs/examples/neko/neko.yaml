@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: neko
-        image: m1k1o/neko:firefox
+        image: docker.io/m1k1o/neko:firefox
         env:
         - name: NEKO_SCREEN
           value: 1280x720@30
@@ -35,7 +35,7 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         - name: NEKO_ICESERVERS
-          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp"], "username": "user-1", "credential": "pass-1","iceTransportPolicy": "relay"}]'
+          value: '[{"urls": ["turn:1.1.1.1:3478?transport=udp"], "username": "user-1", "credential": "pass-1"}]'
         ports:
         - name: http
           containerPort: 8080

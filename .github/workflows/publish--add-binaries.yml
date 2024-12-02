@@ -1,0 +1,68 @@
+name: "publish: Add binaries to release assets"
+
+on:
+  workflow_call:
+
+jobs:
+  add_binaries:
+    name: Add binaries to release assets
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            file_end: ""
+          - os: linux
+            arch: arm64
+            file_end: ""
+
+          - os: darwin
+            arch: amd64
+            file_end: ""
+          - os: darwin
+            arch: arm64
+            file_end: ""
+
+          - os: windows
+            arch: amd64
+            file_end: ".exe"
+          - os: windows
+            arch: arm64
+            file_end: ".exe"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: vars
+        run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build binaries
+        run: |
+          export CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }}
+          make build-bin
+          mv bin/turncat turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          mv bin/stunnerctl stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+
+      - name: Release turncat binary
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          tag: ${{ github.ref_name }}
+          asset_name: turncat-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+
+      - name: Release stunnerctl binary
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}
+          tag: ${{ github.ref_name }}
+          asset_name: stunnerctl-v${{ steps.vars.outputs.tag }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.file_end }}

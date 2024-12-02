@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: webrtc-server
-        image: l7mp/direct-one2one-call-server
+        image: docker.io/l7mp/direct-one2one-call-server
         imagePullPolicy: Always
         # image: localhost/l7mp/direct-one2one-call-server
         # imagePullPolicy: Never

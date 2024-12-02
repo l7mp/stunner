@@ -1,4 +1,4 @@
-name: "release"
+name: Release
 
 on:
   push:
@@ -6,16 +6,21 @@ on:
       - 'v[0-9]+.[0-9]+.0'
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to DockerHub
+  run_tests:
+    name: Run tests
+    uses: l7mp/stunner/.github/workflows/test.yml@main
+
+  push_stunner_to_registry:
+    name: Push STUNner image to DockerHub
+    needs: run_tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: l7mp/stunnerd
           tags: |
@@ -23,19 +28,19 @@ jobs:
             type=raw,value=latest
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Build and Push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -44,19 +49,54 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   push_chart:
-    name: Push charts to the web
+    name: Push helm charts to the repo
+    needs: push_stunner_to_registry
+    uses: l7mp/stunner/.github/workflows/publish--push-charts.yml@main
+    with:
+      dev: false
+    secrets: inherit
+
+  push_icetester_to_registry:
+    name: Push icetester image to DockerHub
+    needs: run_tests
+    if: github.repository == 'l7mp/stunner'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Get version
-        id: vars
-        run: echo tag=$(echo ${GITHUB_REF:11}) >> $GITHUB_OUTPUT
-
-      - name: Triggering release workflow in the stunner-helm repo
-        uses: convictional/trigger-workflow-and-wait@v1.6.5
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          github_token: ${{ secrets.WEB_PAT_TOKEN }}
-          owner: l7mp
-          repo: stunner-helm
-          client_payload: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
-          workflow_file_name: publish.yaml
+          images: l7mp/icetester
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile.icetester
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  add_binaries:
+    name: Add binaries to release assets
+    uses: l7mp/stunner/.github/workflows/publish--add-binaries.yml@main
+    needs: run_tests

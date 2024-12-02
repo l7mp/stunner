@@ -85,13 +85,13 @@ func (r *dnsResolverImpl) Register(domain string) error {
 
 // the resolver goroutine
 func startResolver(e *serviceEntry, log logging.LeveledLogger) {
-	log.Infof("resolver thread starting for domain %q, DNS update interval: %v",
+	log.Infof("Resolver thread starting for domain %q, DNS update interval: %v",
 		e.domain, dnsUpdateInterval)
 
 	if err := doResolve(e); err != nil {
-		log.Debugf("initial resolution failed for domain %q: %s", e.domain, err.Error())
+		log.Debugf("Initial resolution failed for domain %q: %s", e.domain, err.Error())
 	}
-	log.Tracef("initial resolution ready for domain %q, found %d endpoints", e.domain,
+	log.Tracef("Initial resolution ready for domain %q, found %d endpoints", e.domain,
 		len(e.hostNames))
 
 	ticker := time.NewTicker(dnsUpdateInterval)
@@ -100,15 +100,15 @@ func startResolver(e *serviceEntry, log logging.LeveledLogger) {
 	for {
 		select {
 		case <-e.ctx.Done():
-			log.Debugf("resolver thread exiting for domain %q", e.domain)
+			log.Debugf("Resolver thread exiting for domain %q", e.domain)
 			return
 		case <-ticker.C:
-			log.Tracef("resolving for domain %q", e.domain)
+			log.Tracef("Resolving for domain %q", e.domain)
 			if err := doResolve(e); err != nil {
-				log.Debugf("resolution failed for domain %q: %s",
+				log.Debugf("Resolution failed for domain %q: %s",
 					e.domain, err.Error())
 			}
-			log.Tracef("periodic resolution ready for domain %q, found %d endpoints", e.domain,
+			log.Tracef("Periodic resolution ready for domain %q, found %d endpoints", e.domain,
 				len(e.hostNames))
 		}
 	}
@@ -119,7 +119,7 @@ func doResolve(e *serviceEntry) error {
 	if e.cname == "" {
 		cname, err := e.resolver.LookupCNAME(e.ctx, e.domain)
 		if err != nil {
-			return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
+			return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
 				e.domain, err.Error())
 		}
 		e.cname = cname
@@ -127,7 +127,7 @@ func doResolve(e *serviceEntry) error {
 
 	hosts, err := e.resolver.LookupHost(e.ctx, e.domain)
 	if err != nil {
-		return fmt.Errorf("Cannot resolve CNAME for domain %q: %s",
+		return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
 			e.domain, err.Error())
 	}
 
@@ -175,7 +175,7 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 
 	e, found := r.register[domain]
 	if !found {
-		return []net.IP{}, fmt.Errorf("Unknown domain name: %q", domain)
+		return []net.IP{}, fmt.Errorf("unknown domain name: %q", domain)
 	}
 
 	e.lock.RLock()
