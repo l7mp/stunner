@@ -33,9 +33,9 @@ As the first step, each client registers a unique username with the application 
 
 In order start the ICE conversation using STUNner as the STUN/TURN server, the browsers will need to learn an ICE server configuration from the application server with STUNner's external IP addresses/ports and the required STUN/TURN credentials. This must happen *before* the PeerConnection is created in the clients: once the PeerConnection is running we can no longer change the ICE configuration.
 
-We solve this problem by (1) generating a new ICE configuration every time a new client registers with the application server and (2) sending the ICE configuration back to the client in the `registerResponse` message. Note that this choice is suboptimal for [time-locked STUNner authentication modes](/doc/AUTH.md) (i.e., the `ephemeral` mode, see below), because clients' STUN/TURN credentials might expire by the time they decide to connect. It is up to the application server developer to make sure that clients' ICE server configuration is periodically updated.
+We solve this problem by (1) generating a new ICE configuration every time a new client registers with the application server and (2) sending the ICE configuration back to the client in the `registerResponse` message. Note that this choice is suboptimal for [time-locked STUNner authentication modes](/docs/AUTH.md) (i.e., the `ephemeral` mode, see below), because clients' STUN/TURN credentials might expire by the time they decide to connect. It is up to the application server developer to make sure that clients' ICE server configuration is periodically updated.
 
-The default STUNner [install](/doc/INSTALL.md) contains a utility called the [STUNner authentication service](https://github.com/l7mp/stunner-auth-service) that is purposed specifically to generate ICE configurations for the application server. The service watches the running STUNner configuration(s) from the Kubernetes API server and makes sure to generate STUN/TURN credentials and ICE server configuration from the most recent STUNner config.
+The default STUNner [install](/docs/INSTALL.md) contains a utility called the [STUNner authentication service](https://github.com/l7mp/stunner-auth-service) that is purposed specifically to generate ICE configurations for the application server. The service watches the running STUNner configuration(s) from the Kubernetes API server and makes sure to generate STUN/TURN credentials and ICE server configuration from the most recent STUNner config.
 
 The full application server code can be found [here](https://github.com/l7mp/kurento-tutorial-node/tree/master/direct-one2one-call); below we summarize the most important steps needed to call the STUNner authentication service in the application to generate an ICE config for each client.
 
@@ -113,7 +113,7 @@ The full application server code can be found [here](https://github.com/l7mp/kur
    ```js
    var iceConfiguration;
    
-   function resgisterResponse(message) {
+   function registerResponse(message) {
      if (message.response == 'accepted') {
        iceConfiguration = message.iceConfiguration;
      }
@@ -190,7 +190,7 @@ spec:
           namespace: stunner
 ```
 
-Noe that the `stunner/udp-gateway` and `stunner/tcp-gateway` Kubernetes Services are automatically created by STUNner to expose your Gateways, here we merely reuse these as backends.
+Note that the `stunner/udp-gateway` and `stunner/tcp-gateway` Kubernetes Services are automatically created by STUNner to expose your Gateways, here we merely reuse these as backends.
 
 ### Check your configuration
 
