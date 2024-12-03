@@ -266,7 +266,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 		// assert.NoError(t, err, "cannot create certificate for TLS client socket")
 		c, err := tls.Dial("tcp", t.serverAddr.String(), &tls.Config{
-			MinVersion:         tls.VersionTLS10,
+			MinVersion:         tls.VersionTLS12,
 			ServerName:         t.serverName,
 			InsecureSkipVerify: t.insecure,
 		})
