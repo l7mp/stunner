@@ -86,7 +86,7 @@ An example for:
 
 The below command will open:
 
-- one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwared to the STUNner public address obtained from STUNner configuration
+- one or more `turncat` clients at `127.0.0.1:90XY` (90XY are ports used for measurement purposes starting from 9000) to open a connection through STUNner to the iperf server. Traffic will be forwarded to the STUNner public address obtained from STUNner configuration
 - an `iperf` client sending its traffic to the turn
 
 `STUNner` and `iperf` are running inside the Kubernetes Cluster.
@@ -107,11 +107,11 @@ An example for:
 The output will be a standard `iperf` server output trimmed to show only the results. There are per-connections results and summarized results.
 
 * **Per-connection results:** The number of connections are set with the `-n` argument of the helper script. Rows starting like `[  4]` show per-connection results (e.g., throughput, jitter, and latency).
-* **Summarized results:** The `[SUM]` row summarizes the amount of transfered data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
+* **Summarized results:** The `[SUM]` row summarizes the amount of transferred data, the effective bandwidth, the rate of the dropped/lost packets and the total number of sent packets and finally the packets/second (pps) rate.
 
 Next, we see an example output for a local measurement and a measurement in Kubernetes.
 
-### Local measurment
+### Local measurement
 
 In a local measurement the output contains a single summarized test.
 You should see a similar output:
@@ -132,7 +132,7 @@ Results
 [SUM] 0.0000-0.9985 sec  5.97 MBytes  50.2 Mbits/sec  5/6265     6269 pps
 ```
 
-### Kubernetes measurment
+### Kubernetes measurement
 
 In case of a Kubernetes measurement, the output contains one or more summarized tests. In case the user reruns the script, `iperf` outputs will be appended. You should see an output similar to this:
 ```
@@ -163,7 +163,7 @@ Notice that the average packets/second rate will be slightly lower in case of a 
 
 ## Caveats
 
-* It is advised to repeat the measurment with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200. Small packet sizes result lower effective throughput (when packet drop is < 1%).
+* It is advised to repeat the measurement with different packet sizes. Recommended packet sizes in bytes are 64, 128, 256, 512, 1024, and 1200. Small packet sizes result lower effective throughput (when packet drop is < 1%).
 * Measuring [measuring one-way latency](https://stackoverflow.com/questions/63793030/iperf2-latency-is-a-two-way-or-one-way-latency) with `iperf` requires the clocks at the iperf client and server to be synchronized.  Without this the results may be corrupted, and you may even see negative latencies.
 
 # Help
