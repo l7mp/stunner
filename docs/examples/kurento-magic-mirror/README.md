@@ -37,7 +37,7 @@ Install the STUNner gateway operator and STUNner ([more info](https://github.com
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
 helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
-helm install stunner stunner/stunner
+helm install stunner stunner/stunner --create-namespace --namespace=stunner
 ```
 
 Install the WebRTC application and Kurento media servers, altogether with the corresponding services and Kubernetes objects (see the content of the yaml for details):
