@@ -11,6 +11,9 @@
 # Additional dev artifacts
 .DS_Store
 
+# IDE and (possibly) user-specific files
+.vscode
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -28,3 +31,4 @@ turncat
 stunnerctl
 stunnerd
 icetester
+
