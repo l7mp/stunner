@@ -23,22 +23,9 @@ In this demo you will learn the following steps to:
 
 ### Prerequisites
 
-Consult the [STUNner installation and configuration guide](../../INSTALL.md) to set up STUNner.
+The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. You need a WebRTC-compatible browser to run this tutorial. Basically any modern browser will do; we usually test our WebRTC applications with Firefox.
 
-### Quick installation
-
-The simplest way to deploy the demo is to clone the [STUNner git
-repository](https://github.com/l7mp/stunner) and deploy the
-[manifest](kurento-magic-mirror-server.yaml) packaged with STUNner.
-
-Install the STUNner gateway operator and STUNner ([more info](https://github.com/l7mp/stunner-helm)):
-
-```console
-helm repo add stunner https://l7mp.io/stunner
-helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system
-helm install stunner stunner/stunner --create-namespace --namespace=stunner
-```
+### Install the Application
 
 Install the WebRTC application and Kurento media servers, altogether with the corresponding services and Kubernetes objects (see the content of the yaml for details):
 
@@ -48,8 +35,9 @@ $ cd stunner
 $ kubectl apply -f docs/examples/kurento-magic-mirror/kurento-magic-mirror-server.yaml
 ```
 
-### Configuration
-Configure STUNner to act as a STUN server towards clients, and to let media reach the media server.
+### STUNner configuration
+
+Next, we configure STUNner to act as a TURN server towards clients, and to let media reach the media server.
 
 ```console
 $ kubectl apply -f docs/examples/kurento-magic-mirror/kurento-magic-mirror-stunner.yaml
@@ -69,7 +57,7 @@ self-signed certificate, and hit the `Start` button.
 
 ### Scaling
 
-This demo uses the AI/ML based computer vision features built into Kubernetes to process media. As
+This demo uses the AI/ML based computer vision features built into Kurento to process media. As
 such, it is fairly hard on the media server CPU. Thanks to STUNner, the media server pool can be
 simply (auto-)scaled with Kubernetes effortlessly.
 
