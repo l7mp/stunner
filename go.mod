@@ -16,6 +16,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pion/datachannel v1.5.9
 	github.com/pion/dtls/v3 v3.0.3
+	github.com/pion/ice/v4 v4.0.2
 	github.com/pion/logging v0.2.2
 	github.com/pion/transport/v3 v3.0.7
 	github.com/pion/turn/v4 v4.0.0
@@ -81,7 +82,6 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/pion/ice/v4 v4.0.2 // indirect
 	github.com/pion/interceptor v0.1.37 // indirect
 	github.com/pion/mdns/v2 v2.0.7 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
@@ -123,4 +123,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-// replace github.com/pion/turn/v2 => github.com/l7mp/turn/v2 v2.0.11
+replace github.com/pion/turn/v4 => github.com/l7mp/turn/v4 v4.0.1-0.20241205140700-99276149099b

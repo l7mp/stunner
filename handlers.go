@@ -2,10 +2,12 @@ package stunner
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
+	"github.com/pion/turn/v4"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
@@ -22,7 +24,7 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 
 		switch auth.Type {
 		case stnrv1.AuthTypeStatic:
-			auth.Log.Infof("static auth request: username=%q realm=%q srcAddr=%v\n",
+			auth.Log.Tracef("static auth request: username=%q realm=%q srcAddr=%v\n",
 				username, realm, srcAddr)
 
 			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
@@ -31,11 +33,11 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 				return key, true
 			}
 
-			auth.Log.Info("static auth request: failed: invalid username")
+			auth.Log.Infof("static auth request: failed: invalid username")
 			return nil, false
 
 		case stnrv1.AuthTypeEphemeral:
-			auth.Log.Infof("ephemeral auth request: username=%q realm=%q srcAddr=%v",
+			auth.Log.Tracef("ephemeral auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
 			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
@@ -45,12 +47,12 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 
 			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Infof("ephemeral auth request: error generating password: %s",
+				auth.Log.Debugf("ephemeral auth request: error generating password: %s",
 					err)
 				return nil, false
 			}
 
-			auth.Log.Info("ephemeral auth request: success")
+			auth.Log.Debug("ephemeral auth request: success")
 			return a12n.GenerateAuthKey(username, auth.Realm, password), true
 
 		default:
@@ -71,7 +73,7 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 		auth := s.GetAuth()
 
 		peerIP := peer.String()
-		auth.Log.Debugf("permission handler for listener %q: client %q, peer %q", l.Name,
+		auth.Log.Tracef("permission handler for listener %q: client %q, peer %q", l.Name,
 			src.String(), peerIP)
 
 		clusters := s.clusterManager.Keys()
@@ -81,14 +83,14 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 				auth.Log.Tracef("considering cluster %q", r)
 				c := s.GetCluster(r)
 				if c.Route(peer) {
-					auth.Log.Infof("permission granted on listener %q for client "+
+					auth.Log.Debugf("permission granted on listener %q for client "+
 						"%q to peer %s via cluster %q", l.Name, src.String(),
 						peerIP, c.Name)
 					return true
 				}
 			}
 		}
-		auth.Log.Debugf("permission denied on listener %q for client %q to peer %s: "+
+		auth.Log.Infof("permission denied on listener %q for client %q to peer %s: "+
 			"no route to endpoint", l.Name, src.String(), peerIP)
 		return false
 	}
@@ -118,4 +120,58 @@ func (s *Stunner) NewRealmHandler() object.RealmHandler {
 // NewStatusHandler creates a helper function for printing the status of STUNner.
 func (s *Stunner) NewStatusHandler() object.StatusHandler {
 	return func() stnrv1.Status { return s.Status() }
+}
+
+var lifecycleEventHandlerConstructor = newLifecycleEventHandlerStub
+
+// NewLifecycleEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
+func (s *Stunner) NewLifecycleEventHandler() turn.EventHandlers {
+	return lifecycleEventHandlerConstructor(s)
+}
+
+// LifecycleEventHandlerStub is a simple stub that logs allocation events.
+func newLifecycleEventHandlerStub(s *Stunner) turn.EventHandlers {
+	return turn.EventHandlers{
+		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
+			status := "REJECTED"
+			if verdict {
+				status = "ACCEPTED"
+			}
+			s.log.Infof("Authentication request: client=%s, method=%s, verdict=%s",
+				dumpClient(src, dst, proto, username, realm), method, status)
+		},
+		OnAllocationCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, reqPort int) {
+			s.log.Infof("Allocation created: client=%s, relay-address=%s, requested-port=%d",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(), reqPort)
+		},
+		OnAllocationDeleted: func(src, dst net.Addr, proto, username, realm string) {
+			s.log.Infof("Allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
+		},
+		OnAllocationError: func(src, dst net.Addr, proto, message string) {
+			s.log.Infof("Allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
+		},
+		OnPermissionCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
+			s.log.Infof("Permission created: client=%s, relay-addr=%s, peer=%s",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
+		},
+		OnPermissionDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
+			s.log.Infof("Permission deleted: client=%s, relay-addr=%s, peer=%s",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
+		},
+		OnChannelCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
+			s.log.Infof("Channel created: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
+				peer.String(), chanNum)
+		},
+		OnChannelDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
+			s.log.Infof("Channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
+				peer.String(), chanNum)
+		},
+	}
+}
+
+func dumpClient(srcAddr, dstAddr net.Addr, protocol, username, realm string) string {
+	return fmt.Sprintf("%s-%s:%s, username=%s, realm=%s", srcAddr.String(), dstAddr.String(),
+		protocol, username, realm)
 }

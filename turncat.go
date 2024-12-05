@@ -349,12 +349,13 @@ func (t *Turncat) deleteConnection(conn *connection) {
 
 	t.log.Infof("Closing client connection to %s", caddr)
 
-	if err := conn.clientConn.Close(); err != nil {
-		t.log.Warnf("Error closing client connection for %s:%s: %s",
-			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
-	}
 	if err := conn.serverConn.Close(); err != nil {
 		t.log.Warnf("Error closing relayed TURN server connection for %s:%s: %s",
+			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
+	}
+
+	if err := conn.clientConn.Close(); err != nil {
+		t.log.Warnf("Error closing client connection for %s:%s: %s",
 			conn.clientAddr.Network(), conn.clientAddr.String(), err.Error())
 	}
 
