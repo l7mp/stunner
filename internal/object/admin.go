@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 )
 
 const DefaultAdminObjectName = "DefaultAdmin"
@@ -25,6 +26,8 @@ type Admin struct {
 	MetricsEndpoint, HealthCheckEndpoint string
 	metricsServer, healthCheckServer     *http.Server
 	health                               *http.ServeMux
+	licenseManager                       licensecfg.ConfigManager
+	licenseConfig                        *stnrv1.LicenseConfig
 	log                                  logging.LeveledLogger
 }
 
@@ -36,9 +39,10 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 	}
 
 	admin := Admin{
-		DryRun: dryRun,
-		health: http.NewServeMux(),
-		log:    logger.NewLogger("stunner-admin"),
+		DryRun:         dryRun,
+		health:         http.NewServeMux(),
+		licenseManager: licensecfg.New(logger.NewLogger("license")),
+		log:            logger.NewLogger("admin"),
 	}
 	admin.log.Tracef("NewAdmin: %s", req.String())
 
@@ -49,6 +53,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("{}\n")) //nolint:errcheck
 	})
+
 	// readniness checker calls the checker from the factory
 	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -63,6 +68,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 				http.StatusOK, "READY")))
 		}
 	})
+
 	// status handler returns the status
 	admin.health.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -118,6 +124,9 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 		return err
 	}
 
+	a.licenseManager.Reconcile(req.LicenseConfig)
+	a.licenseConfig = req.LicenseConfig
+
 	return nil
 }
 
@@ -144,6 +153,7 @@ func (a *Admin) GetConfig() stnrv1.Config {
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: &h,
+		LicenseConfig:       a.licenseConfig,
 	}
 }
 
@@ -177,9 +187,8 @@ func (a *Admin) Status() stnrv1.Status {
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: a.HealthCheckEndpoint,
+		LicensingInfo:       a.licenseManager.Status(),
 	}
-
-	// add licensing status here
 	return &s
 }
 

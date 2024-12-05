@@ -44,7 +44,7 @@ func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger loggin
 		Domains:   []string{},
 		Resolver:  resolver,
 		logger:    logger,
-		log:       logger.NewLogger(fmt.Sprintf("stunner-cluster-%s", req.Name)),
+		log:       logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
 	}
 
 	c.log.Tracef("NewCluster: %s", req.String())

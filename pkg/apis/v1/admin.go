@@ -25,6 +25,18 @@ type AdminConfig struct {
 	// health-checking at `http://0.0.0.0:8086`. Set to a pointer to an empty string to disable
 	// health-checking.
 	HealthCheckEndpoint *string `json:"healthcheck_endpoint,omitempty"`
+	// LicenseConfig describes the licensing info to be used to check subscription status with
+	// the license server.
+	LicenseConfig *LicenseConfig `json:"license_config,omitempty"`
+}
+
+// Licensing info to be used to check subscription status with the license server.
+type LicenseConfig struct {
+	// Key is a comma-separated list of unlocked features plus a time-window during which the
+	// key is considered valid.
+	Key string `json:"key"`
+	// HMAC is a hash-based message authentication code for validating the license key.
+	HMAC string `json:"hmac"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -92,7 +104,25 @@ func (req *AdminConfig) String() string {
 	if req.HealthCheckEndpoint != nil {
 		status = append(status, fmt.Sprintf("health-check=%q", *req.HealthCheckEndpoint))
 	}
+	status = append(status, fmt.Sprintf("license_info=%s", LicensingStatus(req.LicenseConfig)))
+
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
+}
+
+func LicensingStatus(req *LicenseConfig) string {
+	if req != nil {
+		key := "<MISSING>"
+		if req != nil {
+			key = "<SECRET>"
+		}
+		pass := "<MISSING>"
+		if req != nil {
+			pass = "<SECRET>"
+		}
+		return fmt.Sprintf("{key=%s,pass=%s}", key, pass)
+	}
+
+	return "<MISSING>"
 }
 
 // AdminStatus represents the administrative status.
@@ -101,12 +131,12 @@ type AdminStatus struct {
 	LogLevel            string `json:"loglevel,omitempty"`
 	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
-	// licencing status comes here
+	LicensingInfo       string `json:"licensing_info,omitempty"`
 }
 
 // String returns a string reprsentation of the administrative status.
 func (a *AdminStatus) String() string {
-	status := []string{}
+	status := []string{fmt.Sprintf("id=%q", a.Name)}
 	if a.LogLevel != "" {
 		status = append(status, fmt.Sprintf("logLevel=%q", a.LogLevel))
 	}
@@ -116,8 +146,9 @@ func (a *AdminStatus) String() string {
 	if a.HealthCheckEndpoint != "" {
 		status = append(status, fmt.Sprintf("health-check=%q", a.HealthCheckEndpoint))
 	}
+	if a.LicensingInfo != "" {
+		status = append(status, fmt.Sprintf("license-info=%s", a.LicensingInfo))
+	}
 
-	// add licencing status here
-
-	return fmt.Sprintf("%s:{%s}", a.Name, strings.Join(status, ","))
+	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
 }
