@@ -154,7 +154,8 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	t, err := turn.NewServer(turn.ServerConfig{
 		Realm:             s.GetRealm(),
 		AuthHandler:       s.NewAuthHandler(),
-		EventHandlers:     s.NewEventHandler(),
+		EventHandlers:     s.eventHandlers,
+		QuotaHandler:      s.quotaHandler.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,
 		LoggerFactory:     logger.NewRateLimitedLoggerFactory(s.logger, LogRateLimit, LogBurst),

@@ -9,6 +9,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/stdnet"
+	"github.com/pion/turn/v4"
 
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
@@ -32,6 +33,8 @@ type Stunner struct {
 	telemetry                                                  *telemetry.Telemetry
 	logger                                                     logger.LoggerFactory
 	log                                                        logging.LeveledLogger
+	eventHandlers                                              turn.EventHandlers
+	quotaHandler                                               QuotaHandler
 	net                                                        transport.Net
 	ready, shutdown                                            bool
 }
@@ -101,6 +104,8 @@ func NewStunner(options Options) *Stunner {
 		object.NewListenerFactory(vnet, s.NewRealmHandler(), logger), logger)
 	s.clusterManager = manager.NewManager("cluster-manager",
 		object.NewClusterFactory(r, logger), logger)
+	s.eventHandlers = s.NewEventHandler()
+	s.quotaHandler = s.NewQuotaHandler()
 
 	telemetryCallbacks := telemetry.Callbacks{
 		GetAllocationCount: func() int64 { return s.GetActiveConnections() },

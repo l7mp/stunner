@@ -1763,6 +1763,36 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
 		},
 	},
+	{
+		name: "reconcile-test: reconcile user quota",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				UserQuota: 12,
+				LogLevel:  stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{},
+			Clusters:  []stnrv1.ClusterConfig{},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.NoError(t, err, err)
+
+			a := s.GetAdmin()
+			assert.NotNil(t, a, "admin")
+
+			c := a.GetConfig()
+			assert.NotNil(t, c, "admin-getconfig")
+			ca, ok := c.(*stnrv1.AdminConfig)
+			assert.True(t, ok, "adminconfig cast")
+			assert.Equal(t, 12, ca.UserQuota, "quota")
+		},
+	},
 }
 
 // start with default config and then reconcile with the given config

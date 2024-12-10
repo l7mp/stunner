@@ -25,6 +25,9 @@ type AdminConfig struct {
 	// health-checking at `http://0.0.0.0:8086`. Set to a pointer to an empty string to disable
 	// health-checking.
 	HealthCheckEndpoint *string `json:"healthcheck_endpoint,omitempty"`
+	// UserQuota defines the number of permitted TURN allocatoins per username. Affects
+	// allocation created on any listener. Default is 0, meaning no quota is enforced.
+	UserQuota int `json:"user_quota,omitempty"`
 	// LicenseConfig describes the licensing info to be used to check subscription status with
 	// the license server.
 	LicenseConfig *LicenseConfig `json:"license_config,omitempty"`
@@ -69,6 +72,10 @@ func (req *AdminConfig) Validate() error {
 		}
 	}
 
+	if req.UserQuota < 0 {
+		req.UserQuota = 0
+	}
+
 	return nil
 }
 
@@ -104,6 +111,9 @@ func (req *AdminConfig) String() string {
 	if req.HealthCheckEndpoint != nil {
 		status = append(status, fmt.Sprintf("health-check=%q", *req.HealthCheckEndpoint))
 	}
+	if req.UserQuota > 0 {
+		status = append(status, fmt.Sprintf("quota=%d", req.UserQuota))
+	}
 	status = append(status, fmt.Sprintf("license_info=%s", LicensingStatus(req.LicenseConfig)))
 
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
@@ -131,6 +141,7 @@ type AdminStatus struct {
 	LogLevel            string `json:"loglevel,omitempty"`
 	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
+	UserQuota           string `json:"quota,omitempty"`
 	LicensingInfo       string `json:"licensing_info,omitempty"`
 }
 
@@ -146,6 +157,7 @@ func (a *AdminStatus) String() string {
 	if a.HealthCheckEndpoint != "" {
 		status = append(status, fmt.Sprintf("health-check=%q", a.HealthCheckEndpoint))
 	}
+	status = append(status, fmt.Sprintf("quota=%s", a.UserQuota))
 	if a.LicensingInfo != "" {
 		status = append(status, fmt.Sprintf("license-info=%s", a.LicensingInfo))
 	}

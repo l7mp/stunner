@@ -122,6 +122,35 @@ func (s *Stunner) NewStatusHandler() object.StatusHandler {
 	return func() stnrv1.Status { return s.Status() }
 }
 
+// Quota handler
+type QuotaHandler interface {
+	QuotaHandler() turn.QuotaHandler
+}
+
+var quotaHandlerConstructor = newQuotaHandlerStub
+
+// NewUserQuotaHandler creates a quota handler that defaults to a stub.
+func (s *Stunner) NewQuotaHandler() QuotaHandler {
+	return quotaHandlerConstructor(s)
+}
+
+type quotaHandlerStub struct {
+	quotaHandler turn.QuotaHandler
+}
+
+func (q *quotaHandlerStub) QuotaHandler() turn.QuotaHandler {
+	return q.quotaHandler
+}
+
+func newQuotaHandlerStub(_ *Stunner) QuotaHandler {
+	return &quotaHandlerStub{
+		quotaHandler: func(_, _ string, _ net.Addr) (ok bool) {
+			return true
+		},
+	}
+}
+
+// Event handlers
 var eventHandlerConstructor = newEventHandlerStub
 
 // NewEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
