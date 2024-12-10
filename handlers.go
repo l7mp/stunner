@@ -122,15 +122,15 @@ func (s *Stunner) NewStatusHandler() object.StatusHandler {
 	return func() stnrv1.Status { return s.Status() }
 }
 
-var lifecycleEventHandlerConstructor = newLifecycleEventHandlerStub
+var eventHandlerConstructor = newEventHandlerStub
 
-// NewLifecycleEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
-func (s *Stunner) NewLifecycleEventHandler() turn.EventHandlers {
-	return lifecycleEventHandlerConstructor(s)
+// NewEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
+func (s *Stunner) NewEventHandler() turn.EventHandlers {
+	return eventHandlerConstructor(s)
 }
 
 // LifecycleEventHandlerStub is a simple stub that logs allocation events.
-func newLifecycleEventHandlerStub(s *Stunner) turn.EventHandlers {
+func newEventHandlerStub(s *Stunner) turn.EventHandlers {
 	return turn.EventHandlers{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
