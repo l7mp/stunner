@@ -156,7 +156,7 @@ Manually hinted public address describes an address that can be bound to a Gatew
 
 | Field   | Type     | Description                                                   | Required |
 |:--------|:--------:|:--------------------------------------------------------------|:--------:|
-| `type`  | `string` | Type of the address. Currently only `IPAddress` is supported. | Yes      |
+| `type`  | `string` | Type of the address, either `IPAddress` (default) or `Hostname`.  | Yes      |
 | `value` | `string` | Address that should be bound to the Gateway's service.        | Yes      |
 
 > [!WARNING]
