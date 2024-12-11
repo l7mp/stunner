@@ -143,7 +143,7 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 | :--- | :---: | :--- | :---: |
 | `gatewayClassName` | `string` | The name of the GatewayClass that provides the root of the hierarchy the Gateway is attached to. | Yes |
 | `listeners` | `list` | The list of TURN listeners. | Yes |
-| `addresses` | `list` | The list of manually hinted external IP addresses for the rendered service (only the first one is used). | No |
+| `addresses` | `list` | The list of manually hinted public addresses (only the first one is used).                                   | No |
 
 > [!WARNING]
 >
@@ -152,7 +152,7 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 > - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
 > - changing the TURN authentication realm will restart *all* TURN listeners.
 
-Manually hinted external address describes an address that can be bound to a Gateway. It is defined by an address type and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will result in the rendered Service's [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array) fields to be set.
+Manually hinted public address describes an address that can be bound to a Gateway. It is defined by an address type, which can be either `IPAddress` (default) or `Hostname`, and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will enforce the use of that address all over STUNner as a public address for the gateway. If the address type specifies an IP address then that address will also be used in the Service created by STUNner to expose the Gateway as a [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array).
 
 | Field   | Type     | Description                                                   | Required |
 |:--------|:--------:|:--------------------------------------------------------------|:--------:|
