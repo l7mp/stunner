@@ -34,6 +34,9 @@ func (req *AuthConfig) Validate() error {
 	req.Type = atype.String()
 
 	switch atype {
+	case AuthTypeNone:
+		// no auth
+
 	case AuthTypeStatic:
 		_, userFound := req.Credentials["username"]
 		_, passFound := req.Credentials["password"]
@@ -91,6 +94,8 @@ func (req *AuthConfig) String() string {
 
 	if atype, err := NewAuthType(req.Type); err == nil {
 		switch atype {
+		case AuthTypeNone:
+			// no auth
 		case AuthTypeStatic:
 			u, userFound := req.Credentials["username"]
 			if userFound {

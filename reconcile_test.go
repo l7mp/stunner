@@ -173,6 +173,34 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 	},
 	{
+		name: "reconcile-test: auth-type=none is OK",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "none",
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:   "default-listener",
+				Addr:   "127.0.0.1",
+				Routes: []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.NoError(t, err, "empty username or password is OK with auth type none")
+			assert.Equal(t, stnrv1.AuthTypeNone, s.GetAuth().Type)
+			authConfig, ok := s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
+			assert.True(t, ok)
+			assert.Empty(t, authConfig.Credentials)
+		},
+	},
+	{
 		name: "reconcile-test: empty listener is fine",
 		config: stnrv1.StunnerConfig{
 			ApiVersion: stnrv1.ApiVersion,
@@ -1945,6 +1973,30 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 }
 
 var testReconcileE2E = []StunnerTestReconcileE2EConfig{
+	{
+		testName: "empty server with no auth", // STUN-server mode
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "none",
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "default-listener",
+				Protocol: "turn-udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+			}},
+			Clusters: []stnrv1.ClusterConfig{},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         false,
+		bindSuccess:     true,
+		allocateSuccess: false,
+		echoResult:      false,
+	},
 	{
 		testName: "initial E2E reconcile test: empty server",
 		config: stnrv1.StunnerConfig{

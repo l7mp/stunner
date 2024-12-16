@@ -18,6 +18,11 @@ import (
 func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
+	// Run witthout auth
+	if s.GetAuth().Type == stnrv1.AuthTypeNone {
+		return nil
+	}
+
 	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
 		// dynamic: auth mode might have changed behind ur back
 		auth := s.GetAuth()

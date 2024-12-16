@@ -9,12 +9,13 @@ import (
 type AuthType int
 
 const (
-	AuthTypeStatic AuthType = iota + 1
+	AuthTypeNone AuthType = iota
+	AuthTypeStatic
 	AuthTypeEphemeral
-	AuthTypeUnknown
 )
 
 const (
+	authTypeNoneStr      = "none"
 	authTypeStaticStr    = "static"
 	authTypeEphemeralStr = "ephemeral"
 	AuthTypePlainText    = AuthTypeStatic
@@ -30,14 +31,18 @@ func NewAuthType(raw string) (AuthType, error) {
 		return AuthTypeStatic, nil
 	case authTypeEphemeralStr, authTypeLongTermStr:
 		return AuthTypeEphemeral, nil
+	case authTypeNoneStr:
+		return AuthTypeNone, nil
 	default:
-		return AuthTypeUnknown, fmt.Errorf("unknown authentication type: \"%s\"", raw)
+		return AuthTypeNone, fmt.Errorf("unknown authentication type: \"%s\"", raw)
 	}
 }
 
 // String returns a string representation for the authentication mechanism.
 func (a AuthType) String() string {
 	switch a {
+	case AuthTypeNone:
+		return authTypeNoneStr
 	case AuthTypeStatic:
 		return authTypeStaticStr
 	case AuthTypeEphemeral:

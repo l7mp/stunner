@@ -12,7 +12,7 @@ type AuthType stnrv1.AuthType
 const (
 	AuthTypePlainText AuthType = AuthType(stnrv1.AuthTypeStatic)
 	AuthTypeLongTerm  AuthType = AuthType(stnrv1.AuthTypeLongTerm)
-	AuthTypeUnknown   AuthType = AuthType(stnrv1.AuthTypeUnknown)
+	AuthTypeUnknown   AuthType = AuthType(stnrv1.AuthTypeNone)
 )
 
 const (

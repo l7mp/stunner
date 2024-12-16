@@ -40,7 +40,7 @@ func longTermCredentials(username string, sharedSecret string) (string, error) {
 type StunnerTestAuthWithVnet struct {
 	testName   string
 	conf       stnrv1.StunnerConfig
-	authCred   func() (string, string)
+	auth       func() (string, string)
 	clientAddr string
 }
 
@@ -72,7 +72,35 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		authCred: func() (string, string) { return "user1", "passwd1" },
+		auth: func() (string, string) { return "user1", "passwd1" },
+	},
+	{
+		testName:   "default auth type: static",
+		clientAddr: "1.1.1.1",
+		conf: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "udp",
+				Protocol: "turn-udp",
+				Addr:     "1.2.3.4",
+				Port:     3478,
+				Routes:   []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		auth: func() (string, string) { return "user1", "passwd1" },
 	},
 	{
 		testName: "ephemeral - plain timestamp in username",
@@ -99,7 +127,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		authCred: func() (string, string) {
+		auth: func() (string, string) {
 			u, p, _ := turn.GenerateLongTermCredentials("my-secret", time.Minute)
 			return u, p
 		},
@@ -129,7 +157,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		authCred: func() (string, string) {
+		auth: func() (string, string) {
 			t := time.Now().Add(time.Minute).Unix()
 			u := fmt.Sprintf("%s:%s", "dummy-user-id", strconv.FormatInt(t, 10))
 			p, _ := longTermCredentials(u, "my-secret")
@@ -161,7 +189,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		authCred: func() (string, string) {
+		auth: func() (string, string) {
 			t := time.Now().Add(time.Minute).Unix()
 			u := fmt.Sprintf("%s:%s", "dummy-user-id", strconv.FormatInt(t, 10))
 			p, _ := longTermCredentials(u, "my-secret")
@@ -193,7 +221,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Endpoints: []string{"0.0.0.0/0"},
 			}},
 		},
-		authCred: func() (string, string) {
+		auth: func() (string, string) {
 			t := time.Now().Add(time.Minute).Unix()
 			u := fmt.Sprintf("%s:%s:random-crap", "dummy-user-id", strconv.FormatInt(t, 10))
 			p, _ := longTermCredentials(u, "my-secret")
@@ -236,7 +264,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
 			assert.NoError(t, err, "cannot create client listening socket")
 
-			u, p := test.authCred()
+			u, p := test.auth()
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),

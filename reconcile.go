@@ -137,7 +137,7 @@ func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bo
 	toBeStarted = append(toBeStarted, listenerState.ToBeStarted...)
 
 	if len(s.listenerManager.Keys()) == 0 {
-		s.log.Warn("Running with no listeners")
+		s.log.Warn("Running with no listeners: gateway unreachable")
 	}
 
 	// cluster
@@ -153,7 +153,7 @@ func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bo
 	toBeStarted = append(toBeStarted, clusterState.ToBeStarted...)
 
 	if len(s.clusterManager.Keys()) == 0 {
-		s.log.Warn("Running with no clusters: all traffic will be dropped")
+		s.log.Warn("Running with no clusters: TURN forwarding to peers not permitted")
 	}
 
 	// find all objects (listeners) to be started or restarted and start each

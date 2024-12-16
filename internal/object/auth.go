@@ -59,6 +59,8 @@ func (auth *Auth) Reconcile(conf stnrv1.Config) error {
 	auth.Type = atype
 	auth.Realm = req.Realm
 	switch atype {
+	case stnrv1.AuthTypeNone:
+		// no auth
 	case stnrv1.AuthTypeStatic:
 		auth.Username = req.Credentials["username"]
 		auth.Password = req.Credentials["password"]
@@ -89,6 +91,8 @@ func (auth *Auth) GetConfig() stnrv1.Config {
 		Credentials: make(map[string]string),
 	}
 	switch auth.Type {
+	case stnrv1.AuthTypeNone:
+		// no auth
 	case stnrv1.AuthTypeStatic:
 		r.Credentials["username"] = auth.Username
 		r.Credentials["password"] = auth.Password
