@@ -123,7 +123,7 @@ func LicensingStatus(req *LicenseConfig) string {
 	if req != nil {
 		key := "<MISSING>"
 		if req != nil {
-			key = "<SECRET>"
+			key = req.Key
 		}
 		pass := "<MISSING>"
 		if req != nil {
