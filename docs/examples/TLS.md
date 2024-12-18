@@ -65,7 +65,7 @@ We use the official [cert-manager](https://cert-manager.io) to automate TLS cert
 Add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
 
 ```console
-helm repo add cert-manager https://charts.jetstack.io
+helm repo add jetstack https://charts.jetstack.io
 helm repo update
 helm install cert-manager jetstack/cert-manager --namespace cert-manager \
     --create-namespace --set global.leaderElection.namespace=cert-manager \
