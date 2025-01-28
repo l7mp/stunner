@@ -13,6 +13,9 @@ var _ ConfigManager = &baseManager{}
 // Feature is an enum of supported features.
 type Feature int
 
+// SubscriptionType is an enum of known subscription types.
+type SubscriptionType int
+
 // Manager is a genetic API for negotiating licensing status.
 type ConfigManager interface {
 	// GetConfig returns the current config, i.e., the ecrpyted key/passphrase pair.
@@ -23,7 +26,7 @@ type ConfigManager interface {
 	// Validate checks whether a client is entitled to use a feature.
 	Validate(feature Feature) bool
 	// SubscriptionType returns the current subscription type (e.g., free, member, enterprise).
-	SubscriptionType() string
+	SubscriptionType() SubscriptionType
 	// Status generates a status string.
 	Status() string
 }
@@ -47,5 +50,5 @@ func newBaseManager(log logging.LeveledLogger) baseManager {
 func (m *baseManager) GetConfig() *stnrv1.LicenseConfig       { return m.config }
 func (m *baseManager) Reconcile(config *stnrv1.LicenseConfig) { m.config = config }
 func (m *baseManager) Validate(feature Feature) bool          { return false }
-func (m *baseManager) SubscriptionType() string               { return "<N/A>" }
+func (m *baseManager) SubscriptionType() SubscriptionType     { return SubscriptionType(0) }
 func (m *baseManager) Status() string                         { return "<N/A>" }

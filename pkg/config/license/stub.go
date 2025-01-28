@@ -23,8 +23,6 @@ func (s *Stub) Reconcile(config *stnrv1.LicenseConfig) {
 	s.baseManager.Reconcile(config)
 }
 
-func (s *Stub) SubscriptionType() string { return "free" }
-
 func (s *Stub) Status() string {
 	return fmt.Sprintf("{tier=%q}", s.SubscriptionType())
 }
