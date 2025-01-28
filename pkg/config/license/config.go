@@ -16,6 +16,29 @@ type Feature int
 // SubscriptionType is an enum of known subscription types.
 type SubscriptionType int
 
+const (
+	SubscriptionTypeNone SubscriptionType = iota
+	SubscriptionTypeFree
+	SubscriptionTypeMember
+	SubscriptionTypeEnterprise
+)
+
+// String stringifies a SubscriptionType.
+func (f SubscriptionType) String() string {
+	switch f {
+	case SubscriptionTypeNone:
+		return "none"
+	case SubscriptionTypeFree:
+		return "free"
+	case SubscriptionTypeMember:
+		return "member"
+	case SubscriptionTypeEnterprise:
+		return "enterprise"
+	default:
+		return "unknown"
+	}
+}
+
 // Manager is a genetic API for negotiating licensing status.
 type ConfigManager interface {
 	// GetConfig returns the current config, i.e., the ecrpyted key/passphrase pair.
@@ -50,5 +73,5 @@ func newBaseManager(log logging.LeveledLogger) baseManager {
 func (m *baseManager) GetConfig() *stnrv1.LicenseConfig       { return m.config }
 func (m *baseManager) Reconcile(config *stnrv1.LicenseConfig) { m.config = config }
 func (m *baseManager) Validate(feature Feature) bool          { return false }
-func (m *baseManager) SubscriptionType() SubscriptionType     { return SubscriptionType(0) }
+func (m *baseManager) SubscriptionType() SubscriptionType     { return SubscriptionTypeNone }
 func (m *baseManager) Status() string                         { return "<N/A>" }
