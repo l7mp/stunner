@@ -192,7 +192,7 @@ func (a *Admin) Status() stnrv1.Status {
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: a.HealthCheckEndpoint,
 		UserQuota:           fmt.Sprintf("%d", a.quota),
-		LicensingInfo:       a.LicenseManager.Status().String(),
+		LicensingInfo:       a.LicenseManager.Status(),
 	}
 	return &s
 }

@@ -44,7 +44,7 @@ type ConfigManager interface {
 	// SubscriptionType returns the current subscription type (e.g., free, member, enterprise).
 	SubscriptionType() SubscriptionType
 	// Status returns the current licensing status.
-	Status() stnrv1.LicenseStatus
+	Status() string
 }
 
 // New creares a new license config manager.
@@ -67,4 +67,4 @@ func (m *baseManager) GetConfig() *stnrv1.LicenseConfig       { return m.config 
 func (m *baseManager) Reconcile(config *stnrv1.LicenseConfig) { m.config = config }
 func (m *baseManager) Validate(_ Feature) bool                { return false }
 func (m *baseManager) SubscriptionType() SubscriptionType     { return NewNilSubscriptionType() }
-func (m *baseManager) Status() stnrv1.LicenseStatus           { return stnrv1.NewEmptyLicenseStatus() }
+func (m *baseManager) Status() string                         { return "{tier:free}" }

@@ -1261,7 +1261,7 @@ func TestLicenseLoad(t *testing.T) {
 	s = stnrv1.LicenseStatus{
 		EnabledFeatures:  []string{"a", "b", "c"},
 		SubscriptionType: "test-tier",
-		ValidUntil:       "forever",
+		LastUpdated:      "never",
 		LastError:        "",
 	}
 	srv.UpdateLicenseStatus(s)

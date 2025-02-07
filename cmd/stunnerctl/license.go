@@ -73,7 +73,7 @@ func runLicense(_ *cobra.Command, args []string) error {
 		fmt.Print(status.Summary())
 
 	default:
-		fmt.Print(status.String())
+		fmt.Println(status.String())
 	}
 
 	return nil
