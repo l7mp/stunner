@@ -9,6 +9,26 @@ tags:
   - name: STUNner
     description: 'A Kubernetes media gateway for WebRTC. Contact: info@l7mp.io'
 paths:
+  /api/v1/license:
+    get:
+      description: |
+        API to obtain the current licensing status of the server. Note that the dataplane gets the
+        licensing info as part of the dataplane config, this API endpoint serves purely informative
+        purposes to get the license info even when there is still no dataplane provisioned.
+      operationId: getV1LicenseStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.LicenseStatus'
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/v1.Error'
   /api/v1/configs:
     get:
       description: API to list or watch config objects in all namespaces.
@@ -142,6 +162,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/v1.Config'
+    v1.LicenseStatus:
+      description: 'LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
+      x-go-type: "stunnerv1.LicenseStatus"
+      x-go-type-import:
+        name: stunnerv1
+        path: "github.com/l7mp/stunner/pkg/apis/v1"
     v1.Config:
       description: 'Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
       x-go-type: "stunnerv1.StunnerConfig"

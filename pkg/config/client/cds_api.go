@@ -20,6 +20,7 @@ const (
 	ConfigNamespaceNameAPIEndpoint = "/api/v1/configs/%s/%s"
 	ConfigsNamespaceAPIEndpoint    = "/api/v1/configs/%s"
 	AllConfigsAPIEndpoint          = "/api/v1/configs"
+	LicenseStatusEndpoint          = "/api/v1/license"
 )
 
 type ConfigList struct {

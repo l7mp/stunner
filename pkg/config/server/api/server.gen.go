@@ -43,6 +43,9 @@ type V1Error struct {
 	Message string `json:"message"`
 }
 
+// V1LicenseStatus LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
+type V1LicenseStatus = stunnerv1.LicenseStatus
+
 // ListV1ConfigsParams defines parameters for ListV1Configs.
 type ListV1ConfigsParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
@@ -75,6 +78,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/configs/{namespace}/{name})
 	GetV1ConfigNamespaceName(w http.ResponseWriter, r *http.Request, namespace string, name string, params GetV1ConfigNamespaceNameParams)
+
+	// (GET /api/v1/license)
+	GetV1LicenseStatus(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -193,6 +199,20 @@ func (siw *ServerInterfaceWrapper) GetV1ConfigNamespaceName(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetV1ConfigNamespaceName(w, r, namespace, name, params)
+	}))
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		handler = siw.HandlerMiddlewares[i](handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetV1LicenseStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetV1LicenseStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetV1LicenseStatus(w, r)
 	}))
 
 	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
@@ -321,6 +341,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/api/v1/configs/{namespace}/{name}", wrapper.GetV1ConfigNamespaceName).Methods("GET")
 
+	r.HandleFunc(options.BaseURL+"/api/v1/license", wrapper.GetV1LicenseStatus).Methods("GET")
+
 	return r
 }
 
@@ -432,6 +454,34 @@ func (response GetV1ConfigNamespaceNamedefaultJSONResponse) VisitGetV1ConfigName
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetV1LicenseStatusRequestObject struct {
+}
+
+type GetV1LicenseStatusResponseObject interface {
+	VisitGetV1LicenseStatusResponse(w http.ResponseWriter) error
+}
+
+type GetV1LicenseStatus200JSONResponse V1LicenseStatus
+
+func (response GetV1LicenseStatus200JSONResponse) VisitGetV1LicenseStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetV1LicenseStatusdefaultJSONResponse struct {
+	Body       V1Error
+	StatusCode int
+}
+
+func (response GetV1LicenseStatusdefaultJSONResponse) VisitGetV1LicenseStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+
+	return json.NewEncoder(w).Encode(response.Body)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -443,6 +493,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/configs/{namespace}/{name})
 	GetV1ConfigNamespaceName(ctx context.Context, request GetV1ConfigNamespaceNameRequestObject) (GetV1ConfigNamespaceNameResponseObject, error)
+
+	// (GET /api/v1/license)
+	GetV1LicenseStatus(ctx context.Context, request GetV1LicenseStatusRequestObject) (GetV1LicenseStatusResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -555,26 +608,52 @@ func (sh *strictHandler) GetV1ConfigNamespaceName(w http.ResponseWriter, r *http
 	}
 }
 
+// GetV1LicenseStatus operation middleware
+func (sh *strictHandler) GetV1LicenseStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetV1LicenseStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetV1LicenseStatus(ctx, request.(GetV1LicenseStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetV1LicenseStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetV1LicenseStatusResponseObject); ok {
+		if err := validResponse.VisitGetV1LicenseStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/+xXTW/cNhD9KwTboyztJikK6NQgCAojhVv4ozkEPnClkcRUIpnhaG3D0H8vhuRKG6+3",
-	"DhAj6NeN4se8x5n3Zrn3srKDswYMeVneS191MKgw3K7zN9Y0uuWPGnyF2pG2RpYyzguHdqtr8EKJi8ur",
-	"MwMoqrCSi4sQR2gvami0gVpoIzoi58uiaDV14yav7FD0Pw6u8DQaA1gQAhSD0qZwf7SFctoX27XM5O1J",
-	"a0/ozoEsZdq7XecXcZQ47u060YOzSEzbqOGzQzKTTlEnS3mMwz7yNGVLFn7Rno5lgtf4rkr0PLKNiPM+",
-	"Z0C0DpA0hKxqgsEfxjnlaQ5BHTwIIuzmI1TkOYO7VY47R/oeoZGl/K5YSlmkOhZLEadMphQqRHXH31tA",
-	"H+AfskkLqXaRVJqDWsTYTJA67RM9ZjSXCLVpQ/YQPo0aoZblhxltx/x6PhAjyJjtt4gWDym9/u1UAC8d",
-	"prSyNRweCHEEr/GJxuKgSJZSG3r5YuGqDUELyNgDeK/ao5HS8tP3DHSWcIfX5APaNPYQ6bKD2Um1IuV6",
-	"ZUCEq98664PTEKLHRlSbHsQw9qRPHFqyle3TJ0sEOMjl1fmZ8IBbXYFoLIr3sDm/fCMGqLUS2rTgGTpc",
-	"SlPPLM/fXlwGSN5+SKba2W0Wj1znq3zFGbQOjHJalvJlvspfJrOFGrGniu26iMfDVAv0eJnJJgeguFFU",
-	"dQlz3weq7wV72ztVQXAZC0JxkNNalpIN+fs6mTDwQDUAAXpZfniI+T6A8HWrTnFKmAFLPm7bQC0QvB2x",
-	"4gIY/qIRgxkHobgmnhDUwI5QdZ2J0dWKIEt7B7sFYSzpRleBYeCrGfnTCHgns12bCreVWWrCnJyknI21",
-	"PSgjp+mateadNT5q/8VqFS1gCEzIp3KuT0DFRx/dvQT8ol4RWl2Q6eeJ+vWdDHONGnt6Ttjo+UcQrwzc",
-	"OqgI6mh+3jNlD9VU3M9amL5aWcI7qLhWi8Ce0NfZbt9TQps3xt4JolUEN+ouaO+m0wsh7QW3FPAE9ayW",
-	"8Ms1i8XsoS7th3CERwS0tKr/xf8vFn8cf50HWAp7JthJ9Iut8TPMzpj1zoN/ojmY03PR+e/Y9C/TaGwN",
-	"YVD1GgwJHI0X8QXyGJyJj6njmfomPeF4P3i1evVNesGZJdHY0dQ5o/7wvJc8inpqCNCoPjwhAXcP8L9D",
-	"H5wyGUnFXjJiL0spWQ6k2sf6y2vxbtwAGiDw6f27b+n4MM75PxepikrBL/Sf+K9hru2ix/QgltP19GcA",
-	"AAD//2H3j/07DwAA",
+	"H4sIAAAAAAAC/+xXS2/cNhD+KwTb41raTVIU0KlBEBRGArfwoznEPnClWYmpRDLD0dqGsf+9GJIr7bMO",
+	"EMdIHzeJj/mGM9985DzI0nbOGjDkZfEgfdlAp8Lncpa9sWaha/6pwJeoHWlrZCHjuHBol7oCL5S4uLw6",
+	"M4CiDDOZuAh2hPaigoU2UAltREPkfJHntaamn2el7fL2587lnnpjAHNCgLxT2uTuzzpXTvt8OZMTeXdS",
+	"2xO6dyALmdYuZ9lF/Eo+bqw60Z2zSOy2Ud3WJjmRTlEjC3nMh03k1WoyRuG99nQsEjzHZ1Wi5S+7EHHc",
+	"ZwyI1gGShhBVTdD5fTunPMwmqIEdI8LOP0FJniO4nmW7g6UfERaykD/kYyrzlMd8TOJqIlMIFaK65/8l",
+	"oA/wu96kiZS76FQag0pE2+wgNdon99ijIUWoTR2ih/C51wiVLD4OaGvPb4YN0YKM0X6LaHHfpde/nwrg",
+	"qf2QlraC/Q3BjuA53rGw2CmShdSGXr4YfdWGoAZk7A68V/VRS2n68XMGd0ZzR475XpdgPFyQov4AH7am",
+	"x0KL+Q9Twoe5Zym1bWe/TalxGLVZ2P1YXDYw6EulSLlWGRCBEHfO+qA/CFF5elTzFkTXt6RPHFqypW3T",
+	"LxcOsJHLq/Mz4QGXugSxsCg+wPz88o3ooNJKaFODZ+iQak0tH+v87cVlgOTl+86UaxEaSkrOsmk25WRb",
+	"B0Y5LQv5MptmL1NcQs75+PlylsftYagGOkx+skkXUNwqKpuEuakOqm0Fp8E7VULQHi4TxUZOq0AqT3/M",
+	"kjQFP1B1QIBeFh93MT8EED5u2SgOCXvA/IvL5lAJBG97LDkBhv+oxyBRnVCcE08IqmOdUFU1Eb2rFMEk",
+	"re3sEoSxpBe6DB4GfzUjf+4B7+VkzahwWjlJVxMHJ/Fzbm0LysjV6oYr0DtrfFSEF9NpFAZDYEI8lXNt",
+	"Aso/+ah5o8EvUtBwAQSabgfqt3cyjC1U39JTwkYlPIB4ZeDOQUlQRUlM1bPDpvxh4MLqq5klvIOSczUS",
+	"7BF+na3XPUa0YWG8UUDUiuBW3Qfu3TZ6dEh7wUILnqAa2BJEZiCL2UAdRZmwhwMEGgX8f/L/i8kfv7+u",
+	"BpgKG0WwpugXl8avMFTGwHf++CcWB/v0VO78d8r0b8NobAXho2w1GBLYGy/iC+QQnIlPzOORehZNOK4H",
+	"r6avnkULziyJhe1NlTHqT097yKOop4YAjWrDExJw3ZZ8XzqYuoTHRM/OSaW+suwRmXtxpzZ16jDWHI2n",
+	"zcSZJeaqolhpwxu4BgoNyrUZLfCDngvNKaS1nd1X8yS2keE9bypntaGI5YXrEdr7YIXbN72Ea+N6jI9+",
+	"sgy51RIFOFiCEbcNhFMhsBJ50vw0thvYoaWKDW12bQ7r9W7b8y1Lahvr+71pVxMZiRBvqx5bWUjJgkOq",
+	"PnSDvRbv+jmgAQKfOqzNSyO2Xpl4Yw2pkoqQw1+4T8y0HRUvtVxydbP6KwAA///YjTDCsxIAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -1227,6 +1227,51 @@ func TestDeleteConfigAPI(t *testing.T) {
 	server.SuppressConfigDeletion = saved
 }
 
+func TestLicenseLoad(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
+	srv := server.New(testCDSAddr, nil, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(ctx)
+	assert.NoError(t, err, "start")
+
+	testLog.Debug("create client")
+	licenseClient, err := client.NewLicenseStatusClient(testCDSAddr, logger.NewLogger("license-client"))
+	assert.NoError(t, err, "new client")
+
+	testLog.Debug("get empty license status")
+	s, err := licenseClient.LicenseStatus(ctx)
+	assert.NoError(t, err, "get")
+	assert.Equal(t, stnrv1.NewEmptyLicenseStatus(), s, "get empty license status")
+
+	testLog.Debug("set server-side license status")
+	s = stnrv1.LicenseStatus{
+		EnabledFeatures:  []string{"a", "b", "c"},
+		SubscriptionType: "test-tier",
+		ValidUntil:       "forever",
+		LastError:        "",
+	}
+	srv.UpdateLicenseStatus(s)
+
+	testLog.Debug("get license status")
+	s2, err := licenseClient.LicenseStatus(ctx)
+	assert.NoError(t, err, "get")
+	assert.Equal(t, s, s2, "get license status")
+}
+
 // func TestServerPatcher(t *testing.T) {
 // 	zc := zap.NewProductionConfig()
 // 	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)

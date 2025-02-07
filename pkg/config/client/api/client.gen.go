@@ -37,6 +37,9 @@ type V1Error struct {
 	Message string `json:"message"`
 }
 
+// V1LicenseStatus LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
+type V1LicenseStatus = stunnerv1.LicenseStatus
+
 // ListV1ConfigsParams defines parameters for ListV1Configs.
 type ListV1ConfigsParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
@@ -139,6 +142,9 @@ type ClientInterface interface {
 
 	// GetV1ConfigNamespaceName request
 	GetV1ConfigNamespaceName(ctx context.Context, namespace string, name string, params *GetV1ConfigNamespaceNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetV1LicenseStatus request
+	GetV1LicenseStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListV1Configs(ctx context.Context, params *ListV1ConfigsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -167,6 +173,18 @@ func (c *Client) ListV1ConfigsNamespace(ctx context.Context, namespace string, p
 
 func (c *Client) GetV1ConfigNamespaceName(ctx context.Context, namespace string, name string, params *GetV1ConfigNamespaceNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetV1ConfigNamespaceNameRequest(c.Server, namespace, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetV1LicenseStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetV1LicenseStatusRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +379,33 @@ func NewGetV1ConfigNamespaceNameRequest(server string, namespace string, name st
 	return req, nil
 }
 
+// NewGetV1LicenseStatusRequest generates requests for GetV1LicenseStatus
+func NewGetV1LicenseStatusRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/license")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -412,6 +457,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetV1ConfigNamespaceNameWithResponse request
 	GetV1ConfigNamespaceNameWithResponse(ctx context.Context, namespace string, name string, params *GetV1ConfigNamespaceNameParams, reqEditors ...RequestEditorFn) (*GetV1ConfigNamespaceNameResponse, error)
+
+	// GetV1LicenseStatusWithResponse request
+	GetV1LicenseStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetV1LicenseStatusResponse, error)
 }
 
 type ListV1ConfigsResponse struct {
@@ -485,6 +533,29 @@ func (r GetV1ConfigNamespaceNameResponse) StatusCode() int {
 	return 0
 }
 
+type GetV1LicenseStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *V1LicenseStatus
+	JSONDefault  *V1Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetV1LicenseStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetV1LicenseStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ListV1ConfigsWithResponse request returning *ListV1ConfigsResponse
 func (c *ClientWithResponses) ListV1ConfigsWithResponse(ctx context.Context, params *ListV1ConfigsParams, reqEditors ...RequestEditorFn) (*ListV1ConfigsResponse, error) {
 	rsp, err := c.ListV1Configs(ctx, params, reqEditors...)
@@ -510,6 +581,15 @@ func (c *ClientWithResponses) GetV1ConfigNamespaceNameWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseGetV1ConfigNamespaceNameResponse(rsp)
+}
+
+// GetV1LicenseStatusWithResponse request returning *GetV1LicenseStatusResponse
+func (c *ClientWithResponses) GetV1LicenseStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetV1LicenseStatusResponse, error) {
+	rsp, err := c.GetV1LicenseStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetV1LicenseStatusResponse(rsp)
 }
 
 // ParseListV1ConfigsResponse parses an HTTP response from a ListV1ConfigsWithResponse call
@@ -612,6 +692,39 @@ func ParseGetV1ConfigNamespaceNameResponse(rsp *http.Response) (*GetV1ConfigName
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest V1Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetV1LicenseStatusResponse parses an HTTP response from a GetV1LicenseStatusWithResponse call
+func ParseGetV1LicenseStatusResponse(rsp *http.Response) (*GetV1LicenseStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetV1LicenseStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest V1LicenseStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest V1Error

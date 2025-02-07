@@ -102,6 +102,19 @@ var (
 			}
 		},
 	}
+	licenseCmd = &cobra.Command{
+		Use:               "license",
+		Aliases:           []string{"license-status"},
+		Short:             "Get licensing status",
+		Args:              cobra.RangeArgs(0, 1),
+		DisableAutoGenTag: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := runLicense(cmd, args); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		},
+	}
 )
 
 func init() {
@@ -114,9 +127,10 @@ func init() {
 	k8sConfigFlags = cliopt.NewConfigFlags(true)
 	k8sConfigFlags.AddFlags(rootCmd.PersistentFlags())
 
-	// CDS server discovery flags: only for "config" command
+	// CDS server discovery flags: for the "config" and "license" commands
 	cdsConfigFlags = cdsclient.NewCDSConfigFlags()
 	cdsConfigFlags.AddFlags(configCmd.Flags())
+	cdsConfigFlags.AddFlags(licenseCmd.Flags())
 
 	// watch flag: only for config
 	configCmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for config updates from server")
@@ -147,6 +161,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(iceTestCmd)
+	rootCmd.AddCommand(licenseCmd)
 }
 
 func main() {

@@ -89,7 +89,7 @@ func runConfig(_ *cobra.Command, args []string) error {
 			if out, err := yaml.Marshal(c); err != nil {
 				return err
 			} else {
-				fmt.Println(string(out))
+				fmt.Print(string(out))
 			}
 		case "json":
 			if out, err := json.Marshal(c); err != nil {

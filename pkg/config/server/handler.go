@@ -20,6 +20,12 @@ type ConfigFilter func(confId string) bool
 // ConfigPatcher is a callback to patch config updates for a client.
 type ConfigPatcher func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error)
 
+// (GET /api/v1/license)
+func (s *Server) GetV1LicenseStatus(ctx context.Context, request api.GetV1LicenseStatusRequestObject) (api.GetV1LicenseStatusResponseObject, error) {
+	s.log.V(1).Info("Handling GetV1LicenseStatus API call")
+	return api.GetV1LicenseStatus200JSONResponse(s.licenseStore.Get()), nil
+}
+
 // (GET /api/v1/configs)
 func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsRequestObject) (api.ListV1ConfigsResponseObject, error) {
 	s.log.V(1).Info("Handling ListV1Configs API call")

@@ -1,8 +1,6 @@
 package license
 
 import (
-	"fmt"
-
 	"github.com/pion/logging"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -21,8 +19,4 @@ func NewStub(log logging.LeveledLogger) ConfigManager {
 func (s *Stub) Reconcile(config *stnrv1.LicenseConfig) {
 	s.log.Tracef("Licensing status update triggered using config %q", stnrv1.LicensingStatus(config))
 	s.baseManager.Reconcile(config)
-}
-
-func (s *Stub) Status() string {
-	return fmt.Sprintf("{tier=%q}", s.SubscriptionType())
 }

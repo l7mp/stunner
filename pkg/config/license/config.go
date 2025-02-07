@@ -2,6 +2,8 @@
 package license
 
 import (
+	"fmt"
+
 	"github.com/pion/logging"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -10,34 +12,25 @@ import (
 var constructor = NewStub
 var _ ConfigManager = &baseManager{}
 
-// Feature is an enum of supported features.
-type Feature int
-
-// SubscriptionType is an enum of known subscription types.
-type SubscriptionType int
-
-const (
-	SubscriptionTypeNone SubscriptionType = iota
-	SubscriptionTypeFree
-	SubscriptionTypeMember
-	SubscriptionTypeEnterprise
-)
-
-// String stringifies a SubscriptionType.
-func (f SubscriptionType) String() string {
-	switch f {
-	case SubscriptionTypeNone:
-		return "none"
-	case SubscriptionTypeFree:
-		return "free"
-	case SubscriptionTypeMember:
-		return "member"
-	case SubscriptionTypeEnterprise:
-		return "enterprise"
-	default:
-		return "unknown"
-	}
+// Feature defines the supported features.
+type Feature interface {
+	fmt.Stringer
 }
+
+type baseFeature struct{} //nolint:unused
+
+func (f baseFeature) String() string { return "N/A" } //nolint:unused
+
+// SubscriptionType is the current subscription type.
+type SubscriptionType interface {
+	fmt.Stringer
+}
+
+type nilSubscriptionType struct{}
+
+func (f nilSubscriptionType) String() string { return "free" }
+
+func NewNilSubscriptionType() *nilSubscriptionType { return &nilSubscriptionType{} }
 
 // Manager is a genetic API for negotiating licensing status.
 type ConfigManager interface {
@@ -50,8 +43,8 @@ type ConfigManager interface {
 	Validate(feature Feature) bool
 	// SubscriptionType returns the current subscription type (e.g., free, member, enterprise).
 	SubscriptionType() SubscriptionType
-	// Status generates a status string.
-	Status() string
+	// Status returns the current licensing status.
+	Status() stnrv1.LicenseStatus
 }
 
 // New creares a new license config manager.
@@ -72,6 +65,6 @@ func newBaseManager(log logging.LeveledLogger) baseManager {
 
 func (m *baseManager) GetConfig() *stnrv1.LicenseConfig       { return m.config }
 func (m *baseManager) Reconcile(config *stnrv1.LicenseConfig) { m.config = config }
-func (m *baseManager) Validate(feature Feature) bool          { return false }
-func (m *baseManager) SubscriptionType() SubscriptionType     { return SubscriptionTypeNone }
-func (m *baseManager) Status() string                         { return "<N/A>" }
+func (m *baseManager) Validate(_ Feature) bool                { return false }
+func (m *baseManager) SubscriptionType() SubscriptionType     { return NewNilSubscriptionType() }
+func (m *baseManager) Status() stnrv1.LicenseStatus           { return stnrv1.NewEmptyLicenseStatus() }

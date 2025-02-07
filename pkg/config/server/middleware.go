@@ -18,6 +18,9 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 		watch := false
 
 		switch operationID {
+		case "GetV1LicenseStatus":
+			return next(ctx, w, r, request)
+
 		case "GetV1ConfigNamespaceName":
 			param, ok := request.(api.GetV1ConfigNamespaceNameRequestObject)
 			if !ok {

@@ -26,14 +26,15 @@ var (
 // Server is a generic config discovery server implementation.
 type Server struct {
 	*http.Server
-	router   *mux.Router
-	addr     string
-	conns    *ConnTrack
-	configs  *ConfigStore
-	configCh chan Config
-	deleteCh chan Config
-	patch    ConfigPatcher
-	log      logr.Logger
+	router       *mux.Router
+	addr         string
+	conns        *ConnTrack
+	configs      *ConfigStore
+	configCh     chan Config
+	deleteCh     chan Config
+	patch        ConfigPatcher
+	licenseStore *LicenseStore
+	log          logr.Logger
 }
 
 // New creates a new config discovery server instance for the specified address.
@@ -43,14 +44,15 @@ func New(addr string, patch ConfigPatcher, logger logr.Logger) *Server {
 	}
 
 	return &Server{
-		router:   mux.NewRouter(),
-		conns:    NewConnTrack(),
-		configs:  NewConfigStore(),
-		configCh: make(chan Config, 8),
-		deleteCh: make(chan Config, 8),
-		addr:     addr,
-		patch:    patch,
-		log:      logger,
+		router:       mux.NewRouter(),
+		conns:        NewConnTrack(),
+		configs:      NewConfigStore(),
+		configCh:     make(chan Config, 8),
+		deleteCh:     make(chan Config, 8),
+		addr:         addr,
+		patch:        patch,
+		licenseStore: NewLicenseStore(),
+		log:          logger,
 	}
 }
 
@@ -65,7 +67,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		s.log.Info("Starting CDS server", "address", s.addr, "patch", s.patch != nil)
+		s.log.Info("Starting CDS server", "address", s.addr, "config-patcher-enabled", s.patch != nil)
 
 		err := s.Serve(l)
 		if err != nil {

@@ -80,7 +80,7 @@ func runStatus(_ *cobra.Command, args []string) error {
 			if out, err := yaml.Marshal(s); err != nil {
 				return err
 			} else {
-				fmt.Println(string(out))
+				fmt.Print(string(out))
 			}
 		case "json":
 			if out, err := json.Marshal(s); err != nil {
