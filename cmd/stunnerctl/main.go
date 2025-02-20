@@ -23,14 +23,14 @@ import (
 // get config for stunner/udp-gateway in yaml format: stunnerctl -n stunner get config udp-gateway --output yaml
 
 var (
-	output, iceTesterImage, loglevel  string
-	watch, all, verbose, forceCleanup bool
-	k8sConfigFlags                    *cliopt.ConfigFlags
-	cdsConfigFlags                    *cdsclient.CDSConfigFlags
-	authConfigFlags                   *cdsclient.AuthConfigFlags
-	podConfigFlags                    *cdsclient.PodConfigFlags
-	iceTesterTimeout                  time.Duration
-	iceTesterPacketRate               int
+	output, iceTesterImage, username, loglevel string
+	watch, all, verbose, forceCleanup          bool
+	k8sConfigFlags                             *cliopt.ConfigFlags
+	cdsConfigFlags                             *cdsclient.CDSConfigFlags
+	authConfigFlags                            *cdsclient.AuthConfigFlags
+	podConfigFlags                             *cdsclient.PodConfigFlags
+	iceTesterTimeout                           time.Duration
+	iceTesterPacketRate                        int
 
 	loggerFactory logger.LoggerFactory
 	log           logging.LeveledLogger
@@ -142,6 +142,8 @@ func init() {
 	// Auth discovery flags: only for "auth" command
 	authConfigFlags = cdsclient.NewAuthConfigFlags()
 	authConfigFlags.AddFlags(authCmd.Flags())
+	authCmd.Flags().StringVarP(&username, "username", "u", "",
+		"User id for generating an ephemeral credential (Default is empty username)")
 
 	// ICE test: uses CDS and auth args
 	cdsConfigFlags.AddFlags(iceTestCmd.Flags())

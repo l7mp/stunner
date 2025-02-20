@@ -40,6 +40,9 @@ func runAuth(_ *cobra.Command, args []string) error {
 	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
 		q := u.Query()
 		q.Set("namespace", *k8sConfigFlags.Namespace)
+		if username != "" {
+			q.Set("username", username)
+		}
 		if len(args) > 0 {
 			q.Set("gateway", args[0])
 		}
