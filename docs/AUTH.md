@@ -2,6 +2,8 @@
 
 STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner.
 
+Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features (only available in premium tiers), in which case it runs with no authentication (`authType:none`). Refer to the [user guide](PREMIUM.md) for the details.
+
 ## The long-term credential mechanism
 
 STUNner relies on the STUN [long-term credential

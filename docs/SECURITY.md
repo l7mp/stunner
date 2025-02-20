@@ -92,11 +92,11 @@ By default, STUNner uses a single static username/password pair for all clients 
 
 For production deployments we recommend the `ephemeral` authentication mode, which uses per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for configuring STUNner with `ephemeral` authentication.
 
+Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol (only available in the premium tiers), in which case it needs no authentication. Refer to the [user guide](PREMIUM.md) for the details.
+
 ## Access control
 
-STUNner requires the user to explicitly open up external access to internal services by specifying
-a proper UDPRoute. For instance, the below UDPRoute allows access *only* to the `media-server`
-service in the `media-plane` namespace, and nothing else.
+STUNner requires the user to explicitly open up external access to internal services by specifying a proper UDPRoute. For instance, the below UDPRoute allows access *only* to the `media-server` service in the `media-plane` namespace, and nothing else.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -151,3 +151,7 @@ The trick in STUNner is that both the TURN relay transport address and the media
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP address of all STUNner pods and all media server pods. This should pose no major security risk though: remember, none of these private IP addresses can be reached externally. The attack surface can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE mode](DEPLOYMENT.md#symmetric-ice-mode).
 
 Nevertheless, if worried about information exposure then STUNner may not be the best option at the moment. In later releases, we plan to implement a feature to obscure the relay transport addresses returned by STUNner. Please file an issue if you think this limitation is a blocker for your use case.
+
+## User quota (only available in the premium version)
+
+In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM.md) for the details.

@@ -136,6 +136,20 @@ The `status` sub-command reports the status of the dataplane pods for a gateway,
   TERMINATING
   ```
 
+### License status
+
+STUNner requires a valid license to unlock premium features. The below will report STUNner's license status:
+
+```console
+stunnerctl license
+License status:
+    Subscription type: member
+    Enabled features: DaemonSet, STUNServer, ...
+    Last updated: ...
+```
+   
+This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license.
+
 ### Authentication
 
 The `auth` sub-command can be used to obtain a TURN credential or a full ICE server config for connecting to a specific gateway. The authentication service API is usually served by a separate [STUNner authentication server](https://github.com/l7mp/stunner-auth-service) deployed alongside the gateway operator. The main use of this command is to feed an ICE agent manually with the ICE server config to connect to a specific STUNner gateway.
@@ -144,14 +158,22 @@ The `auth` sub-command can be used to obtain a TURN credential or a full ICE ser
 
   ``` console
   stunnerctl -n stunner auth udp-gateway
-  {"iceServers":[{"credential":"pass-1","urls":["turn:10.104.19.179:3478?transport=udp"],"username":"user-1"}],"iceTransportPolicy":"all"}
+  {"iceServers":[{"credential":"pass-1","urls":["turn:1A.B.C.D:3478?transport=udp"],"username":"user-1"}],"iceTransportPolicy":"all"}
   ```
 
 - Request a plain [TURN credential](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) using the authentication service deployed into the `stunner-system-prod` namespace:
 
   ``` console
   stunnerctl -n stunner auth udp-gateway --auth-turn-credential --auth-service-namespace=stunner-system-prod
-  {"password":"pass-1","ttl":86400,"uris":["turn:10.104.19.179:3478?transport=udp"],"username":"user-1"}
+  {"password":"pass-1","ttl":86400,"uris":["turn:A.B.C.D:3478?transport=udp"],"username":"user-1"}
+```
+
+- Obtain an ICE config for the Gateway `stunner/udp-gateway` and setting the user-id to `my-user`
+  (useful for ephemeral authentication):
+
+  ``` console
+  stunnerctl  -n stunner auth udp-gateway --username my-user
+  {"iceServers":[{"credential":"...=","urls":["turn:A.B.C.D:3478?transport=udp"],"username":"1740150333:my-user"}],"iceTransportPolicy":"all"}
   ```
 
 ### ICE test

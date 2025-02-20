@@ -60,18 +60,20 @@ spec:
 
 Below is a reference of the most important fields of the GatewayConfig [`spec`](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects)
 
-| Field | Type | Description | Required |
-| :--- | :---: | :--- | :---: |
-| `dataplane` | `string` | The name of the Dataplane template to use for provisioning `stunnerd` pods. Default: `default`. | No |
-| `logLevel` | `string` | Logging level for the dataplane pods. Default: `all:INFO`. | No |
-| `realm` | `string` | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No |
-| `authRef` | `reference` | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials. | No |
-| `authType` | `string` | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`. | No |
-| `userName` | `string` | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
-| `password` | `string` | The password for [`static` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
-| `sharedSecret` | `string` | The shared secret for [`ephemeral` authentication](AUTH.md). Valid only if `authRef` is not set. | No |
-| `authLifetime` | `int` | The lifetime of [`ephemeral` authentication](AUTH.md) credentials in seconds. Not used by STUNner.| No |
-| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP address. See more detail [here](https://github.com/l7mp/stunner/issues/32). | No |
+| Field                            | Type                | Description                                                                                                                                                                                                                                    | Required |
+|:---------------------------------|:-------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
+| `dataplane`                      | `string`            | The name of the Dataplane template to use for provisioning `stunnerd` pods. Default: `default`.                                                                                                                                                | No       |
+| `logLevel`                       | `string`            | Logging level for the dataplane pods. Default: `all:INFO`.                                                                                                                                                                                     | No       |
+| `realm`                          | `string`            | The STUN/TURN authentication realm to be used for clients to authenticate with STUNner. The realm must consist of lower case alphanumeric characters or `-` and must start and end with an alphanumeric character. Default: `stunner.l7mp.io`. | No       |
+| `authRef`                        | `reference`         | Reference to a Secret (`namespace` and `name`) that defines the STUN/TURN authentication mechanism and the credentials.                                                                                                                        | No       |
+| `authType`                       | `string`            | Type of the STUN/TURN authentication mechanism. Valid only if `authRef` is not set. Default: `static`.                                                                                                                                         | No       |
+| `userName`                       | `string`            | The username for [`static` authentication](AUTH.md). Valid only if `authRef` is not set.                                                                                                                                                       | No       |
+| `password`                       | `string`            | The password for [`static` authentication](AUTH.md). Valid only if `authRef` is not set.                                                                                                                                                       | No       |
+| `sharedSecret`                   | `string`            | The shared secret for [`ephemeral` authentication](AUTH.md). Valid only if `authRef` is not set.                                                                                                                                               | No       |
+| `authLifetime`                   | `int`               | The lifetime of [`ephemeral` authentication](AUTH.md) credentials in seconds. Not used by STUNner.                                                                                                                                             | No       |
+| `loadBalancerServiceAnnotations` | `map[string]string` | A list of annotations that will go into the LoadBalancer services created automatically by STUNner to obtain a public IP address. See more detail [here](https://github.com/l7mp/stunner/issues/32).                                           | No       |
+| `userQuota`                      | `int`               | Limit the number of allocations per username (**not supported in the free tier**). Default is 0, which means no quota.                                                                                                                         | No       |
+| `stunMode`                       | `bool`              | Toggle STUN-only mode (**not supported in the free tier**). In this mode STUNner responds only to STUN requests; any TURN allocation request is rejected. Default is false.                                                                    | No       |
 
 At least a valid username/password pair *must* be supplied for `static` authentication, or a `sharedSecret` for the `ephemeral` mode, either via an external Secret or inline in the GatewayConfig. External authentication settings override inline settings. Missing both is an error.
 
@@ -251,7 +253,7 @@ The below table summarizes the Gateway annotations supported by STUNner.
 |:----------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------:|
 | `stunner.l7mp.io/service-type: <svc-type>`          | [Type of the Service](https://kubernetes.io/docs/concepts/services-networking/service) per Gateway, either `ClusterIP`, `NodePort`, or `LoadBalancer`.     | `LoadBalancer` |
 | `stunner.l7mp.io/enable-mixed-protocol-lb: <bool>`  | [Mixed protocol load balancer service](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) support. | False          |
-| `stunner.l7mp.io/external-traffic-policy: <string>` | Se the value to `Local` to preserve clients' source IP at the load balancer.                                                                               | `Cluster`      |
+| `stunner.l7mp.io/external-traffic-policy: <string>` | Set the value to `Local` to preserve clients' source IP at the load balancer.                                                                              | `Cluster`      |
 | `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        | False          |
 | `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
 | `stunner.l7mp.io/targetport: <map>`                 | Request a specific target port for particular listeners. Value is a JSON map of listener-targetport key-value pairs.                                       | None           |
@@ -411,6 +413,7 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | `hostNetwork`                   | `bool`     | Deploy the [dataplane](/cmd/stunnerd/README.md) into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                  | No       |
 | `disableHealthCheck`            | `bool`     | Disable health-checking. If true, enable HTTP health-checks on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: true.                                | No       |
 | `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                                                            | No       |
+| `dataplaneResource`             | `string`   | Kubernetes resource type to be used for deploying the dataplane, either a Deployment (default) or DaemonSet (**not supported in the free tier**).                                                                      | No       |
 
 There can be multiple Dataplane resources defined in a cluster, say, one for the production workload and one for development. Use the `spec.dataplane` field in the GatewayConfig to choose the Dataplane per each STUNner install.
 
