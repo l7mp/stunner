@@ -5,16 +5,14 @@
 #    pip-compile docs/requirements.in
 #
 click==8.1.8
-    # via
-    #   mkdocs
-    #   mkdocstrings
+    # via mkdocs
 colorama==0.4.6
     # via griffe
 ghp-import==2.1.0
     # via mkdocs
-griffe==1.5.4
+griffe==1.6.0
     # via mkdocstrings-python
-jinja2==3.1.5
+jinja2==3.1.6
     # via
     #   mkdocs
     #   mkdocstrings
@@ -45,27 +43,25 @@ mkdocs==1.6.1
     #   -r docs/requirements.in
     #   mkdocs-autorefs
     #   mkdocstrings
-mkdocs-autorefs==1.3.0
+mkdocs-autorefs==1.4.1
     # via
     #   mkdocstrings
     #   mkdocstrings-python
 mkdocs-get-deps==0.2.0
     # via mkdocs
-mkdocstrings[python]==0.27.0
+mkdocstrings[python]==0.29.0
     # via
     #   -r docs/requirements.in
     #   mkdocstrings-python
-mkdocstrings-python==1.13.0
+mkdocstrings-python==1.16.5
     # via mkdocstrings
 packaging==24.2
     # via mkdocs
 pathspec==0.12.1
     # via mkdocs
 platformdirs==4.3.6
-    # via
-    #   mkdocs-get-deps
-    #   mkdocstrings
-pymdown-extensions==10.14
+    # via mkdocs-get-deps
+pymdown-extensions==10.14.3
     # via mkdocstrings
 python-dateutil==2.9.0.post0
     # via ghp-import
