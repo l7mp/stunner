@@ -12,10 +12,11 @@ In this demo you will learn to:
 ## Prerequisites
 
 To run this example, you need:
-* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
-* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
-* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
-* a [Cert-manager](../TLS.md#cert-manager) to automate TLS certificate management.
+
+- a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+- a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+- an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+- a [Cert-manager](../TLS.md#cert-manager) to automate TLS certificate management.
 
 > [!NOTE]
 >
@@ -34,7 +35,7 @@ In this tutorial we deploy a video room example using [mediasoup's demo applicat
 
 ### Modifications on the mediasoup demo
 
-Below are the modification that has been done starting from [mediasoup-demo](https://github.com/versatica/mediasoup-demo/): 
+Below are the modification that has been done starting from [mediasoup-demo](https://github.com/versatica/mediasoup-demo/):
 
 - Added a multistage Dockerfile
 
@@ -42,7 +43,7 @@ Below are the modification that has been done starting from [mediasoup-demo](htt
   - stage 1: build the image for the mediasoup-server and copy the mediasoup-client file
 
 - Added a simple script that gathers the internal/private IP of the running pod, this is not foolproof, however,
-with an additional environment variable we can load the pod's private IP into the code  
+with an additional environment variable we can load the pod's private IP into the code
 
 - Added the following in server.js in the function "async function createExpressApp()" to serve the mediasoup-client file
 
@@ -111,7 +112,7 @@ export STUNNERIP=$(kubectl get service udp-gateway -n stunner-system -o jsonpath
 
 The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. However, there is a slight issue. In this deployment it's not the server that instructs the clients to use STUNner but the user itself. Obviously, it is not the optimal way but for the sake of the demo purpose we keep it that way. In case anyone would want to create a production ready deployment, they would need to add extra capabilities to the mediasoup server:
 - first to make sure turn servers can be configured in the server's config.js file
-- second to make sure that clients can fetch (or get automatically) the configured turn servers from the mediasoup server 
+- second to make sure that clients can fetch (or get automatically) the configured turn servers from the mediasoup server
 
 We need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
 
@@ -145,7 +146,7 @@ echo "https://mediasoup-$INGRESSIP.nip.io:443?enableIceServer=yes&iceServerHost=
 
 Opening the output in a browser should get the mediasoup client demo app
 
-In case you changed something additionally in the STUNner configuration during deployment watch out for the URL parameters: 
+In case you changed something additionally in the STUNner configuration during deployment watch out for the URL parameters:
   - `enableIceServer` must be `yes` in order to use STUNner as a TURN server
   - `iceServerHost` should point to the public IP that was allocated for the STUNner load balancer service
   - `iceServerPort` is the port of your TURN server configured in the Gateway resource

@@ -12,10 +12,11 @@ In this demo you will learn to:
 ## Prerequisites
 
 To run this example, you need:
-* a [Kubernetes cluster](../../INSTALL.md#prerequisites),
-* a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
-* an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
-* a [Cert-manager](../TLS.md#cert-manager) to automate TLS certificate management.
+
+- a [Kubernetes cluster](../../INSTALL.md#prerequisites),
+- a [deployed STUNner](../../INSTALL.md#installation-1) (presumably the latest stable version),
+- an [Ingress controller](../TLS.md#ingress) to ingest traffic into the cluster,
+- a [Cert-manager](../TLS.md#cert-manager) to automate TLS certificate management.
 
 > [!NOTE]
 >
