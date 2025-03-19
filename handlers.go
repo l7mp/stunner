@@ -177,7 +177,10 @@ const (
 
 // TURN offload handler.
 type OffloadHandler interface {
+	// OffloadHandler manages offload requests.
 	OffloadHandler(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16, event OffloadEventType)
+	// Close closes the offload handler.
+	Close() error
 }
 
 // NewOffloadHandler creates a offload handler that defaults to a stub.
@@ -192,6 +195,8 @@ type offloadHandlerStub struct{}
 
 func (o *offloadHandlerStub) OffloadHandler(_, _ net.Addr, _, _, _ string, _, _ net.Addr, _ uint16, _ OffloadEventType) {
 }
+
+func (o *offloadHandlerStub) Close() error { return nil }
 
 func newOffloadHandlerStub(_ *Stunner) OffloadHandler {
 	return &offloadHandlerStub{}

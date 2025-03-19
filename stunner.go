@@ -297,6 +297,10 @@ func (s *Stunner) Close() {
 		}
 	}
 
+	if err := s.offloadHandler.Close(); err != nil {
+		s.log.Errorf("Could not shutdown offload handler cleanly: %s", err.Error())
+	}
+
 	if err := s.telemetry.Close(); err != nil { // blocks until finished
 		s.log.Errorf("Could not shutdown metric provider cleanly: %s", err.Error())
 	}
