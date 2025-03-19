@@ -36,6 +36,7 @@ type Stunner struct {
 	log                                                        logging.LeveledLogger
 	eventHandlers                                              turn.EventHandlers
 	quotaHandler                                               QuotaHandler
+	offloadHandler                                             OffloadHandler
 	net                                                        transport.Net
 	ready, shutdown                                            bool
 }
@@ -107,6 +108,7 @@ func NewStunner(options Options) *Stunner {
 		object.NewClusterFactory(r, logger), logger)
 	s.eventHandlers = s.NewEventHandler()
 	s.quotaHandler = s.NewQuotaHandler()
+	s.offloadHandler = s.NewOffloadHandler()
 
 	telemetryCallbacks := telemetry.Callbacks{
 		GetAllocationCount: func() int64 { return s.GetActiveConnections() },

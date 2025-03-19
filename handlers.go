@@ -127,18 +127,28 @@ func (s *Stunner) NewStatusHandler() object.StatusHandler {
 	return func() stnrv1.Status { return s.Status() }
 }
 
-// Quota handler
+// AllocationEventType is a helper type to administer allocations.
+type AllocationEventType int
+
+const (
+	AllocationCreated AllocationEventType = iota + 1
+	AllocationDeleted
+)
+
+// Quota handler handles user quotas.
 type QuotaHandler interface {
+	AllocationHandler(src, dst net.Addr, proto, username, realm string, event AllocationEventType)
 	QuotaHandler() turn.QuotaHandler
 }
-
-var quotaHandlerConstructor = newQuotaHandlerStub
 
 // NewUserQuotaHandler creates a quota handler that defaults to a stub.
 func (s *Stunner) NewQuotaHandler() QuotaHandler {
 	return quotaHandlerConstructor(s)
 }
 
+var quotaHandlerConstructor = newQuotaHandlerStub
+
+// quotaHandlerStub is a stub quota handler that does nothing.
 type quotaHandlerStub struct {
 	quotaHandler turn.QuotaHandler
 }
@@ -146,6 +156,8 @@ type quotaHandlerStub struct {
 func (q *quotaHandlerStub) QuotaHandler() turn.QuotaHandler {
 	return q.quotaHandler
 }
+
+func (q *quotaHandlerStub) AllocationHandler(_, _ net.Addr, _, _, _ string, _ AllocationEventType) {}
 
 func newQuotaHandlerStub(_ *Stunner) QuotaHandler {
 	return &quotaHandlerStub{
@@ -155,16 +167,38 @@ func newQuotaHandlerStub(_ *Stunner) QuotaHandler {
 	}
 }
 
-// Event handlers
-var eventHandlerConstructor = newEventHandlerStub
+// OffloadEventType is a helper type to administer offload events.
+type OffloadEventType int
+
+const (
+	ChannnelOffloadCreated OffloadEventType = iota + 1
+	ChannnelOffloadDeleted
+)
+
+// TURN offload handler.
+type OffloadHandler interface {
+	OffloadHandler(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16, event OffloadEventType)
+}
+
+// NewOffloadHandler creates a offload handler that defaults to a stub.
+func (s *Stunner) NewOffloadHandler() OffloadHandler {
+	return offloadHandlerConstructor(s)
+}
+
+var offloadHandlerConstructor = newOffloadHandlerStub
+
+// offloadHandlerStub is a stub offload handler that does nothing.
+type offloadHandlerStub struct{}
+
+func (o *offloadHandlerStub) OffloadHandler(_, _ net.Addr, _, _, _ string, _, _ net.Addr, _ uint16, _ OffloadEventType) {
+}
+
+func newOffloadHandlerStub(_ *Stunner) OffloadHandler {
+	return &offloadHandlerStub{}
+}
 
 // NewEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
 func (s *Stunner) NewEventHandler() turn.EventHandlers {
-	return eventHandlerConstructor(s)
-}
-
-// LifecycleEventHandlerStub is a simple stub that logs allocation events.
-func newEventHandlerStub(s *Stunner) turn.EventHandlers {
 	return turn.EventHandlers{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
@@ -177,9 +211,13 @@ func newEventHandlerStub(s *Stunner) turn.EventHandlers {
 		OnAllocationCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, reqPort int) {
 			s.log.Infof("Allocation created: client=%s, relay-address=%s, requested-port=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), reqPort)
+
+			s.quotaHandler.AllocationHandler(src, dst, proto, username, realm, AllocationCreated)
 		},
 		OnAllocationDeleted: func(src, dst net.Addr, proto, username, realm string) {
 			s.log.Infof("Allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
+
+			s.quotaHandler.AllocationHandler(src, dst, proto, username, realm, AllocationDeleted)
 		},
 		OnAllocationError: func(src, dst net.Addr, proto, message string) {
 			s.log.Infof("Allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
@@ -196,11 +234,15 @@ func newEventHandlerStub(s *Stunner) turn.EventHandlers {
 			s.log.Infof("Channel created: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
+
+			s.offloadHandler.OffloadHandler(src, dst, proto, username, realm, relayAddr, peer, chanNum, ChannnelOffloadCreated)
 		},
 		OnChannelDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
 			s.log.Infof("Channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
+
+			s.offloadHandler.OffloadHandler(src, dst, proto, username, realm, relayAddr, peer, chanNum, ChannnelOffloadDeleted)
 		},
 	}
 }
