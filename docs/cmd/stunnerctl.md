@@ -24,6 +24,8 @@ cd stunner
 go build -o stunnerctl cmd/stunnerctl/main.go
 ```
 
+Or download the binary from the [releases](https://github.com/l7mp/stunner/releases) page.
+
 ## Usage
 
 Type `stunnerctl` to get a glimpse of the sub-commands and features provided.
