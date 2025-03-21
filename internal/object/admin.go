@@ -214,9 +214,10 @@ func (a *Admin) Close() error {
 
 // Status returns the status of the object.
 func (a *Admin) Status() stnrv1.Status {
-	offloadIntfs := ""
-	if a.offload != stnrv1.OffloadEngineNone && len(a.offloadIntfs) > 0 {
-		offloadIntfs = strings.Join(a.offloadIntfs, ",")
+	intfs := ""
+	adminConf := a.GetConfig().(*stnrv1.AdminConfig)
+	if adminConf.OffloadEngine != "None" && len(adminConf.OffloadInterfaces) > 0 {
+		intfs = strings.Join(adminConf.OffloadInterfaces, ",")
 	}
 	s := stnrv1.AdminStatus{
 		Name:                a.Name,
@@ -224,7 +225,7 @@ func (a *Admin) Status() stnrv1.Status {
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: a.HealthCheckEndpoint,
 		UserQuota:           fmt.Sprintf("%d", a.quota),
-		OffloadStatus:       fmt.Sprintf("offload=%s%s", a.offload.String(), offloadIntfs),
+		OffloadStatus:       fmt.Sprintf("%s[%s]", adminConf.OffloadEngine, intfs),
 		LicensingInfo:       a.LicenseManager.Status(),
 	}
 	return &s

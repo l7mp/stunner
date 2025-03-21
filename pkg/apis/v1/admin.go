@@ -143,7 +143,7 @@ func (req *AdminConfig) String() string {
 		if req.OffloadEngine != "None" && len(req.OffloadInterfaces) > 0 {
 			intfs = fmt.Sprintf("<%s>", strings.Join(req.OffloadInterfaces, ","))
 		}
-		status = append(status, fmt.Sprintf("offload=%s%s", req.OffloadEngine, intfs))
+		status = append(status, fmt.Sprintf("offload=%s[%s]", req.OffloadEngine, intfs))
 	}
 	status = append(status, fmt.Sprintf("license_info=%s", LicensingStatus(req.LicenseConfig)))
 
