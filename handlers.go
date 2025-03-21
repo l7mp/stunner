@@ -167,20 +167,20 @@ func newQuotaHandlerStub(_ *Stunner) QuotaHandler {
 	}
 }
 
-// OffloadEventType is a helper type to administer offload events.
-type OffloadEventType int
-
-const (
-	ChannnelOffloadCreated OffloadEventType = iota + 1
-	ChannnelOffloadDeleted
-)
-
 // TURN offload handler.
 type OffloadHandler interface {
-	// OffloadHandler manages offload requests.
-	OffloadHandler(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16, event OffloadEventType)
+	// Start starts the offload handler.
+	Start() error
 	// Close closes the offload handler.
 	Close() error
+	// HandleChannelCreate creates an offload.
+	HandleChannelCreate(net.Addr, net.Addr, string, string, string, net.Addr, net.Addr, uint16, string, string)
+	// HandleChannelDelete removes an offload.
+	HandleChannelDelete(net.Addr, net.Addr, string, string, string, net.Addr, net.Addr, uint16)
+	// Stats can be used to surface statistics from the offload engine for a particular
+	// listener or cluster. Note that the engine reports to the telemetry system autonomously,
+	// so this is only used for status queries.
+	Stats(name string, marker stnrv1.StatType) stnrv1.OffloadDirStat
 }
 
 // NewOffloadHandler creates a offload handler that defaults to a stub.
@@ -191,63 +191,87 @@ func (s *Stunner) NewOffloadHandler() OffloadHandler {
 var offloadHandlerConstructor = newOffloadHandlerStub
 
 // offloadHandlerStub is a stub offload handler that does nothing.
-type offloadHandlerStub struct{}
+type offloadHandlerStub struct{ s *Stunner }
 
-func (o *offloadHandlerStub) OffloadHandler(_, _ net.Addr, _, _, _ string, _, _ net.Addr, _ uint16, _ OffloadEventType) {
+func (o *offloadHandlerStub) Start() error { return nil }
+func (o *offloadHandlerStub) Close() error { return nil }
+func (o *offloadHandlerStub) HandleChannelCreate(_, _ net.Addr, _, _, _ string, _, _ net.Addr, _ uint16, _, _ string) {
+}
+func (o *offloadHandlerStub) HandleChannelDelete(_, _ net.Addr, _, _, _ string, _, _ net.Addr, _ uint16) {
+}
+func (o *offloadHandlerStub) Stats(_ string, _ stnrv1.StatType) stnrv1.OffloadDirStat {
+	return stnrv1.OffloadDirStat{}
 }
 
-func (o *offloadHandlerStub) Close() error { return nil }
-
-func newOffloadHandlerStub(_ *Stunner) OffloadHandler {
-	return &offloadHandlerStub{}
+func newOffloadHandlerStub(s *Stunner) OffloadHandler {
+	return &offloadHandlerStub{s: s}
 }
 
 // NewEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
-func (s *Stunner) NewEventHandler() turn.EventHandlers {
+func (s *Stunner) NewEventHandler(l *object.Listener) turn.EventHandlers {
 	return turn.EventHandlers{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
 			if verdict {
 				status = "ACCEPTED"
 			}
-			s.log.Infof("Authentication request: client=%s, method=%s, verdict=%s",
+			s.log.Debugf("Authentication request: client=%s, method=%s, verdict=%s",
 				dumpClient(src, dst, proto, username, realm), method, status)
 		},
 		OnAllocationCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, reqPort int) {
-			s.log.Infof("Allocation created: client=%s, relay-address=%s, requested-port=%d",
+			s.log.Debugf("Allocation created: client=%s, relay-address=%s, requested-port=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), reqPort)
 
 			s.quotaHandler.AllocationHandler(src, dst, proto, username, realm, AllocationCreated)
 		},
 		OnAllocationDeleted: func(src, dst net.Addr, proto, username, realm string) {
-			s.log.Infof("Allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
+			s.log.Debugf("Allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
 
 			s.quotaHandler.AllocationHandler(src, dst, proto, username, realm, AllocationDeleted)
 		},
 		OnAllocationError: func(src, dst net.Addr, proto, message string) {
-			s.log.Infof("Allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
+			s.log.Debugf("Allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
 		},
 		OnPermissionCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
-			s.log.Infof("Permission created: client=%s, relay-addr=%s, peer=%s",
+			s.log.Debugf("Permission created: client=%s, relay-addr=%s, peer=%s",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
 		},
 		OnPermissionDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
-			s.log.Infof("Permission deleted: client=%s, relay-addr=%s, peer=%s",
+			s.log.Debugf("Permission deleted: client=%s, relay-addr=%s, peer=%s",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
 		},
 		OnChannelCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
-			s.log.Infof("Channel created: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+			// listener and cluster needed for monitoring
+			listener := l.Name
+			cluster := ""
+			peerAddr, ok := peer.(*net.UDPAddr)
+			if ok {
+				clusters := s.clusterManager.Keys()
+				for _, r := range l.Routes {
+					if util.Member(clusters, r) {
+						c := s.GetCluster(r)
+						if c.Route(peerAddr.IP) {
+							cluster = c.Name
+							break
+						}
+					}
+				}
+			}
+
+			s.log.Debugf("Channel created: listener=%s, cluster=%s, client=%s, relay-addr=%s, "+
+				"peer=%s, channel-num=%d", listener, cluster,
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
 
-			s.offloadHandler.OffloadHandler(src, dst, proto, username, realm, relayAddr, peer, chanNum, ChannnelOffloadCreated)
+			s.offloadHandler.HandleChannelCreate(src, dst, proto, username, realm, relayAddr,
+				peer, chanNum, listener, cluster)
 		},
 		OnChannelDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
-			s.log.Infof("Channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+			s.log.Debugf("Channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
 
-			s.offloadHandler.OffloadHandler(src, dst, proto, username, realm, relayAddr, peer, chanNum, ChannnelOffloadDeleted)
+			s.offloadHandler.HandleChannelDelete(src, dst, proto, username, realm, relayAddr, peer, chanNum)
 		},
 	}
 }

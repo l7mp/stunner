@@ -94,11 +94,11 @@ func TestServerLoad(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -200,11 +200,11 @@ func TestServerPoll(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -297,11 +297,11 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -326,15 +326,15 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
-	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc3.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
 	// poll should have fed the configs to the channels
@@ -379,13 +379,13 @@ func TestServerWatch(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.Nil(t, sc2, "get 2")
 	sc3 = srv.GetConfigStore().Get("ns1/gw3")
 	assert.NotNil(t, sc3, "get 3")
-	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc3.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq 3")
 
 	s = watchConfig(ch1, 50*time.Millisecond)
@@ -447,11 +447,11 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc3 := srv.GetConfigStore().Get("ns1/gw3")
 	assert.Nil(t, sc3, "get 3")
@@ -482,11 +482,11 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 
 	s = watchConfig(ch1, 500*time.Millisecond)
@@ -579,11 +579,11 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq 1")
 	sc2 := srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq 2")
 
 	testLog.Debug("load")
@@ -594,27 +594,32 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, scs, 2, "load 1")
 	co := findConfById(scs, "ns1/gw1")
 	assert.NotNil(t, co, "c1")
+	assert.NoError(t, co.Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, co.DeepEqual(sc1), "deepeq")
 	co = findConfById(scs, "ns2/gw1")
 	assert.NotNil(t, co, "c2")
+	assert.NoError(t, co.Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, co.DeepEqual(sc2), "deepeq")
 
 	// ns1 client should yield 1 config
 	scs, err = client2.Get(clientCtx)
 	assert.NoError(t, err, "load 2")
 	assert.Len(t, scs, 1, "load 2")
+	assert.NoError(t, scs[0].Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// ns2 client should yield 1 config
 	scs, err = client3.Get(clientCtx)
 	assert.NoError(t, err, "load 3")
 	assert.Len(t, scs, 1, "load 3")
+	assert.NoError(t, scs[0].Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, scs[0].DeepEqual(sc2), "deepeq")
 
 	// ns1/gw1 client should yield 1 config
 	scs, err = client4.Get(clientCtx)
 	assert.NoError(t, err, "load 4")
 	assert.Len(t, scs, 1, "load 4")
+	assert.NoError(t, scs[0].Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// two configs from client1 watch
@@ -664,15 +669,17 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
+	configNs2Gw1 := &stnrv1.StunnerConfig{}
+	co.DeepCopyInto(configNs2Gw1)
 	sc3 := srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
-	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc3.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc3
@@ -681,33 +688,42 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, scs, 3, "load 1")
 	co = findConfById(scs, "ns1/gw1")
 	assert.NotNil(t, co, "c1")
+	assert.NoError(t, co.Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, co.DeepEqual(sc1), "deepeq")
 	co = findConfById(scs, "ns2/gw1")
 	assert.NotNil(t, co, "c2")
+	assert.NoError(t, co.Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, co.DeepEqual(sc2), "deepeq")
 	co = findConfById(scs, "ns1/gw2")
 	assert.NotNil(t, co, "c3")
+	assert.NoError(t, co.Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, co.DeepEqual(sc3), "deepeq")
 
 	// ns1 client should yield 2 configs
 	scs, err = client2.Get(clientCtx)
 	assert.NoError(t, err, "load 2")
 	assert.Len(t, scs, 2, "load 2")
-	assert.NotNil(t, findConfById(scs, "ns1/gw1"))
-	assert.True(t, findConfById(scs, "ns1/gw1").DeepEqual(sc1), "deepeq")
-	assert.NotNil(t, findConfById(scs, "ns1/gw2"))
-	assert.True(t, findConfById(scs, "ns1/gw2").DeepEqual(sc3), "deepeq")
+	sc1 = findConfById(scs, "ns1/gw1")
+	assert.NotNil(t, sc1)
+	assert.NoError(t, sc1.Validate(), "valid") // validate needed for deepequal to pass
+	assert.True(t, sc1.DeepEqual(sc1), "deepeq")
+	sc2 = findConfById(scs, "ns1/gw2")
+	assert.NotNil(t, sc2)
+	assert.NoError(t, sc2.Validate(), "valid") // validate needed for deepequal to pass
+	assert.True(t, sc2.DeepEqual(sc3), "deepeq")
 
 	// ns2 client should yield 1 config
 	scs, err = client3.Get(clientCtx)
 	assert.NoError(t, err, "load 3")
 	assert.Len(t, scs, 1, "load 3")
-	assert.True(t, scs[0].DeepEqual(sc2), "deepeq")
+	assert.NoError(t, scs[0].Validate(), "valid") // validate needed for deepequal to pass
+	assert.True(t, scs[0].DeepEqual(configNs2Gw1), "deepeq")
 
 	// ns1/gw1 client should yield 1 config
 	scs, err = client4.Get(clientCtx)
 	assert.NoError(t, err, "load 4")
 	assert.Len(t, scs, 1, "load 4")
+	assert.NoError(t, scs[0].Validate(), "valid") // validate needed for deepequal to pass
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// 2 configs from client1 watch
@@ -765,15 +781,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc3 = srv.GetConfigStore().Get("ns1/gw2")
 	assert.NotNil(t, sc3, "get 3")
-	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc3.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c3.Config.DeepEqual(sc3), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc3
@@ -782,12 +798,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, scs, 3, "load 1")
 	co = findConfById(scs, "ns1/gw1")
 	assert.NotNil(t, co, "c1")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc1), "deepeq")
 	co = findConfById(scs, "ns2/gw1")
 	assert.NotNil(t, co, "c2")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc2), "deepeq")
 	co = findConfById(scs, "ns1/gw2")
 	assert.NotNil(t, co, "c3")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc3), "deepeq")
 
 	// ns1 client should yield 2 configs
@@ -795,20 +814,24 @@ func TestServerAPI(t *testing.T) {
 	assert.NoError(t, err, "load 2")
 	assert.Len(t, scs, 2, "load 2")
 	assert.NotNil(t, findConfById(scs, "ns1/gw1"))
+	assert.NoError(t, findConfById(scs, "ns1/gw1").Validate(), "valid") // cds config store does not validate
 	assert.True(t, findConfById(scs, "ns1/gw1").DeepEqual(sc1), "deepeq")
 	assert.NotNil(t, findConfById(scs, "ns1/gw2"))
+	assert.NoError(t, findConfById(scs, "ns1/gw2").Validate(), "valid") // cds config store does not validate
 	assert.True(t, findConfById(scs, "ns1/gw2").DeepEqual(sc3), "deepeq")
 
 	// ns2 client should yield 1 config
 	scs, err = client3.Get(clientCtx)
 	assert.NoError(t, err, "load 3")
 	assert.Len(t, scs, 1, "load 3")
+	assert.NoError(t, scs[0].Validate(), "valid") // cds config store does not validate
 	assert.True(t, scs[0].DeepEqual(sc2), "deepeq")
 
 	// ns1/gw1 client should yield 1 config
 	scs, err = client4.Get(clientCtx)
 	assert.NoError(t, err, "load 4")
 	assert.Len(t, scs, 1, "load 4")
+	assert.NoError(t, scs[0].Validate(), "valid") // cds config store does not validate
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// 3 configs from client1 watch
@@ -871,15 +894,15 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, cs, 3, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 	sc2 = srv.GetConfigStore().Get("ns2/gw1")
 	assert.NotNil(t, sc2, "get 2")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c2.Config.DeepEqual(sc2), "deepeq")
 	sc4 := srv.GetConfigStore().Get("ns3/gw1")
 	assert.NotNil(t, sc3, "get 3")
-	assert.NoError(t, sc3.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc3.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c4.Config.DeepEqual(sc4), "deepeq")
 
 	// all-configs should result sc1 and sc2 and sc4
@@ -888,30 +911,36 @@ func TestServerAPI(t *testing.T) {
 	assert.Len(t, scs, 3, "load 1")
 	co = findConfById(scs, "ns1/gw1")
 	assert.NotNil(t, co, "c1")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc1), "deepeq")
 	co = findConfById(scs, "ns2/gw1")
 	assert.NotNil(t, co, "c2")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc2), "deepeq")
 	co = findConfById(scs, "ns3/gw1")
 	assert.NotNil(t, co, "c4")
+	assert.NoError(t, co.Validate(), "valid") // cds config store does not validate
 	assert.True(t, co.DeepEqual(sc4), "deepeq")
 
 	// ns1 client should yield 1 config
 	scs, err = client2.Get(clientCtx)
 	assert.NoError(t, err, "load 2")
 	assert.Len(t, scs, 1, "load 2")
+	assert.NoError(t, scs[0].Validate(), "valid") // cds config store does not validate
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// ns2 client should yield 1 config
 	scs, err = client3.Get(clientCtx)
 	assert.NoError(t, err, "load 3")
 	assert.Len(t, scs, 1, "load 3")
+	assert.NoError(t, scs[0].Validate(), "valid") // cds config store does not validate
 	assert.True(t, scs[0].DeepEqual(sc2), "deepeq")
 
 	// ns1/gw1 client should yield 1 config
 	scs, err = client4.Get(clientCtx)
 	assert.NoError(t, err, "load 4")
 	assert.Len(t, scs, 1, "load 4")
+	assert.NoError(t, scs[0].Validate(), "valid") // cds config store does not validate
 	assert.True(t, scs[0].DeepEqual(sc1), "deepeq")
 
 	// 2 configs from client1 watch
@@ -999,7 +1028,7 @@ func TestClientReconnect(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("ns1/gw1")
 	assert.NotNil(t, sc1, "get 1")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, c1.Config.DeepEqual(sc1), "deepeq")
 
 	// poll should have fed the config to the channels
@@ -1061,7 +1090,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 := srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 
 	// reapply - no change
@@ -1073,7 +1102,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 1, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 
 	// add another config
@@ -1089,11 +1118,11 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc1.DeepEqual(oldC), "deepeq")
 	sc2 := srv.GetConfigStore().Get("stunner/tcp-gateway")
 	assert.NotNil(t, sc2, "get")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
 
 	// add a cluster
@@ -1113,11 +1142,11 @@ func TestServerUpdate(t *testing.T) {
 	assert.Len(t, cs, 2, "snapshot len")
 	sc1 = srv.GetConfigStore().Get("stunner/udp-gateway")
 	assert.NotNil(t, sc1, "get")
-	assert.NoError(t, sc1.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc1.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc1.DeepEqual(newC), "deepeq")
 	sc2 = srv.GetConfigStore().Get("stunner/tcp-gateway")
 	assert.NotNil(t, sc2, "get")
-	assert.NoError(t, sc2.Validate(), "valid") // loaders validate
+	assert.NoError(t, sc2.Validate(), "valid") // cds config store does not validate
 	assert.True(t, sc2.DeepEqual(tcpC), "deepeq")
 }
 
@@ -1421,11 +1450,10 @@ func watchConfig(ch chan *stnrv1.StunnerConfig, d time.Duration) *stnrv1.Stunner
 }
 
 func findConfById(cs []*stnrv1.StunnerConfig, id string) *stnrv1.StunnerConfig {
-	for _, c := range cs {
-		if c != nil && c.Admin.Name == id {
-			return c
+	for i := range cs {
+		if cs[i] != nil && cs[i].Admin.Name == id {
+			return cs[i]
 		}
-
 	}
 
 	return nil

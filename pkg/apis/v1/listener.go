@@ -180,4 +180,15 @@ func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 	return uri, nil
 }
 
-type ListenerStatus = ListenerConfig
+type ListenerStatus struct {
+	*ListenerConfig
+	Stats OffloadDirStat `json:"stats"`
+}
+
+// String stringifies the configuration.
+func (req *ListenerStatus) String() string {
+	status := req.ListenerConfig.String()
+	status += fmt.Sprintf(",offload(rx/tx): %d/%d pkts %d/%d bytes",
+		req.Stats.Rx.Pkts, req.Stats.Tx.Pkts, req.Stats.Rx.Bytes, req.Stats.Tx.Bytes)
+	return status
+}

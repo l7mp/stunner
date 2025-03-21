@@ -22,12 +22,13 @@ type Cluster struct {
 	Domains   []string
 	Resolver  resolver.DnsResolver // for strict DNS
 
-	logger logging.LoggerFactory
-	log    logging.LeveledLogger
+	getStats OffloadStatsHandler
+	logger   logging.LoggerFactory
+	log      logging.LeveledLogger
 }
 
 // NewCluster creates a new cluster.
-func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger logging.LoggerFactory) (Object, error) {
+func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*stnrv1.ClusterConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
@@ -43,6 +44,7 @@ func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, logger loggin
 		Endpoints: []*util.Endpoint{},
 		Domains:   []string{},
 		Resolver:  resolver,
+		getStats:  offloadStatsHandler,
 		logger:    logger,
 		log:       logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
 	}
@@ -166,7 +168,10 @@ func (c *Cluster) Close() error {
 
 // Status returns the status of the object.
 func (c *Cluster) Status() stnrv1.Status {
-	return c.GetConfig()
+	return &stnrv1.ClusterStatus{
+		ClusterConfig: c.GetConfig().(*stnrv1.ClusterConfig),
+		Stats:         c.getStats(c.Name, stnrv1.ClusterStat),
+	}
 }
 
 // Route decides whether a peer IP appears among the permitted endpoints of a cluster.
@@ -218,13 +223,18 @@ func (c *Cluster) Match(peer net.IP, port int) bool {
 
 // ClusterFactory can create now Cluster objects
 type ClusterFactory struct {
-	resolver resolver.DnsResolver
-	logger   logging.LoggerFactory
+	resolver            resolver.DnsResolver
+	offloadStatsHandler OffloadStatsHandler
+	logger              logging.LoggerFactory
 }
 
 // NewClusterFactory creates a new factory for Cluster objects
-func NewClusterFactory(resolver resolver.DnsResolver, logger logging.LoggerFactory) Factory {
-	return &ClusterFactory{resolver: resolver, logger: logger}
+func NewClusterFactory(resolver resolver.DnsResolver, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) Factory {
+	return &ClusterFactory{
+		resolver:            resolver,
+		offloadStatsHandler: offloadStatsHandler,
+		logger:              logger,
+	}
 }
 
 // New can produce a new Cluster object from the given configuration. A nil config will create an
@@ -234,5 +244,5 @@ func (f *ClusterFactory) New(conf stnrv1.Config) (Object, error) {
 		return &Cluster{}, nil
 	}
 
-	return NewCluster(conf, f.resolver, f.logger)
+	return NewCluster(conf, f.resolver, f.offloadStatsHandler, f.logger)
 }

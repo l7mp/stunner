@@ -32,5 +32,8 @@ type ReadinessHandler = func() error
 // RealmHandler is a callback that allows an object to find out the authentication realm.
 type RealmHandler = func() string
 
+// OffloadStatsHandler is a callback that allows an object to load the offload statistics.
+type OffloadStatsHandler = func(name string, marker stnrv1.StatType) stnrv1.OffloadDirStat
+
 // StatusHandler is a callback that allows an object to obtain the status of STUNNer.
 type StatusHandler = func() stnrv1.Status

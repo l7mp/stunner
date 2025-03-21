@@ -114,7 +114,8 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 
 	newConf := &stnrv1.StunnerConfig{}
 	err = yaml.Unmarshal(file, newConf)
-	assert.NoError(t, err, "unmarschal config from file")
+	assert.NoError(t, err, "unmarshal config from file")
+	assert.NoError(t, newConf.Validate(), "validate")
 
 	ok := newConf.DeepEqual(c)
 	assert.True(t, ok, "config file roundtrip")

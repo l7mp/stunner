@@ -114,4 +114,15 @@ func (req *ClusterConfig) String() string {
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }
 
-type ClusterStatus = ClusterConfig
+type ClusterStatus struct {
+	*ClusterConfig
+	Stats OffloadDirStat `json:"stats"`
+}
+
+// String stringifies the configuration.
+func (req *ClusterStatus) String() string {
+	status := req.ClusterConfig.String()
+	status += fmt.Sprintf(",offload(rx/tx): %d/%d pkts %d/%d bytes",
+		req.Stats.Rx.Pkts, req.Stats.Tx.Pkts, req.Stats.Rx.Bytes, req.Stats.Tx.Bytes)
+	return status
+}

@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -27,6 +29,8 @@ type Admin struct {
 	metricsServer, healthCheckServer     *http.Server
 	health                               *http.ServeMux
 	quota                                int
+	offload                              stnrv1.OffloadMode
+	offloadIntfs                         []string
 	LicenseManager                       licensecfg.ConfigManager
 	licenseConfig                        *stnrv1.LicenseConfig
 	log                                  logging.LeveledLogger
@@ -43,6 +47,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		DryRun:         dryRun,
 		health:         http.NewServeMux(),
 		LicenseManager: licensecfg.New(logger.NewLogger("license")),
+		offload:        stnrv1.OffloadEngineNone,
 		log:            logger.NewLogger("admin"),
 	}
 	admin.log.Tracef("NewAdmin: %s", req.String())
@@ -56,7 +61,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 	})
 
 	// readniness checker calls the checker from the factory
-	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, req *http.Request) {
+	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if err := rc(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -71,7 +76,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 	})
 
 	// status handler returns the status
-	admin.health.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+	admin.health.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if js, err := json.Marshal(status()); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -93,7 +98,25 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 // Inspect examines whether a configuration change requires a reconciliation (returns true if it
 // does) or restart (returns ErrRestartRequired).
 func (a *Admin) Inspect(old, new, full stnrv1.Config) (bool, error) {
-	return !old.DeepEqual(new), nil
+	oldConf, ok := old.(*stnrv1.AdminConfig)
+	if !ok {
+		return false, stnrv1.ErrInvalidConf
+	}
+
+	newConf, ok := new.(*stnrv1.AdminConfig)
+	if !ok {
+		return false, stnrv1.ErrInvalidConf
+	}
+
+	changed := !oldConf.DeepEqual(newConf)
+
+	// restart the admin object if the offload engine or the interfaces change
+	var restart error
+	if oldConf.OffloadEngine != newConf.OffloadEngine ||
+		!reflect.DeepEqual(oldConf.OffloadInterfaces, newConf.OffloadInterfaces) {
+		restart = ErrRestartRequired
+	}
+	return changed, restart
 }
 
 // Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
@@ -127,6 +150,9 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 
 	a.quota = req.UserQuota
 
+	a.offload, _ = stnrv1.NewOffloadEngine(req.OffloadEngine)
+	a.offloadIntfs = req.OffloadInterfaces
+
 	a.LicenseManager.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
@@ -157,6 +183,8 @@ func (a *Admin) GetConfig() stnrv1.Config {
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: &h,
 		UserQuota:           a.quota,
+		OffloadEngine:       a.offload.String(),
+		OffloadInterfaces:   a.offloadIntfs,
 		LicenseConfig:       a.licenseConfig,
 	}
 }
@@ -186,12 +214,17 @@ func (a *Admin) Close() error {
 
 // Status returns the status of the object.
 func (a *Admin) Status() stnrv1.Status {
+	offloadIntfs := ""
+	if a.offload != stnrv1.OffloadEngineNone && len(a.offloadIntfs) > 0 {
+		offloadIntfs = strings.Join(a.offloadIntfs, ",")
+	}
 	s := stnrv1.AdminStatus{
 		Name:                a.Name,
 		LogLevel:            a.LogLevel,
 		MetricsEndpoint:     a.MetricsEndpoint,
 		HealthCheckEndpoint: a.HealthCheckEndpoint,
 		UserQuota:           fmt.Sprintf("%d", a.quota),
+		OffloadStatus:       fmt.Sprintf("offload=%s%s", a.offload.String(), offloadIntfs),
 		LicensingInfo:       a.LicenseManager.Status(),
 	}
 	return &s

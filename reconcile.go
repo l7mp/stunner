@@ -202,9 +202,15 @@ rollback:
 func (s *Stunner) stop(restarted []object.Object) error {
 	for _, o := range restarted {
 		switch l := o.(type) {
+		// The TURN server underlying a listener may need to be restarted.
 		case *object.Listener:
 			if err := l.Close(); err != nil {
 				return err
+			}
+		// The admin object needs to be restarted of the offload changes.
+		case *object.Admin:
+			if err := s.offloadHandler.Close(); err != nil {
+				s.log.Errorf("Failed to close offload handler: %s", err.Error())
 			}
 		default:
 			s.log.Errorf("Internal error: stop() is not implemented for object %q",
@@ -218,9 +224,15 @@ func (s *Stunner) stop(restarted []object.Object) error {
 func (s *Stunner) start(started, restarted []object.Object) error {
 	for _, o := range append(started, restarted...) {
 		switch l := o.(type) {
+		// The TURN server underlying a listener may need to be restarted.
 		case *object.Listener:
 			if err := s.StartServer(l); err != nil {
 				return err
+			}
+		// The admin object needs to be restarted of the offload changes.
+		case *object.Admin:
+			if err := s.offloadHandler.Start(); err != nil {
+				s.log.Errorf("Failed to start offload handler: %s", err.Error())
 			}
 		default:
 			s.log.Errorf("Internal error: start() is not implemented for object %q",

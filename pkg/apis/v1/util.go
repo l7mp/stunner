@@ -148,7 +148,8 @@ func NewClusterType(raw string) (ClusterType, error) {
 	case clusterTypeStrictDNSStr:
 		return ClusterTypeStrictDNS, nil
 	default:
-		return ClusterType(ClusterTypeUnknown), fmt.Errorf("unknown cluster type: \"%s\"", raw)
+		return ClusterType(ClusterTypeUnknown),
+			fmt.Errorf("unknown cluster type: \"%s\"", raw)
 	}
 }
 
@@ -200,4 +201,76 @@ func (p ClusterProtocol) String() string {
 	default:
 		return "<unknown>"
 	}
+}
+
+// OffloadEngine specifies the type of TURN offload mode.
+type OffloadMode int
+
+const (
+	OffloadEngineNone OffloadMode = iota
+	OffloadEngineXDP
+	OffloadEngineTC
+	OffloadEngineAuto
+)
+
+const (
+	offloadEngineNoneStr = "none"
+	offloadEngineXDPStr  = "XDP"
+	offloadEngineTCStr   = "TC"
+	offloadEngineAutoStr = "Auto"
+)
+
+// NewOffloadEngine parses the offload mode.
+func NewOffloadEngine(raw string) (OffloadMode, error) {
+	switch strings.ToLower(raw) {
+	case strings.ToLower(offloadEngineNoneStr):
+		return OffloadEngineNone, nil
+	case strings.ToLower(offloadEngineXDPStr):
+		return OffloadEngineXDP, nil
+	case strings.ToLower(offloadEngineTCStr):
+		return OffloadEngineTC, nil
+	case strings.ToLower(offloadEngineAutoStr):
+		return OffloadEngineAuto, nil
+	default:
+		return OffloadEngineNone,
+			fmt.Errorf("unknown offload mode: %q", raw)
+	}
+}
+
+// String returns a string representation of a cluster protocol.
+func (p OffloadMode) String() string {
+	switch p {
+	case OffloadEngineNone:
+		return offloadEngineNoneStr
+	case OffloadEngineXDP:
+		return offloadEngineXDPStr
+	case OffloadEngineTC:
+		return offloadEngineTCStr
+	case OffloadEngineAuto:
+		return offloadEngineAutoStr
+	default:
+		return "<unknown>"
+	}
+}
+
+type StatType int
+
+const (
+	// ListenerStat is a marker used to signal that the caller wants the listener statistics.
+	ListenerStat StatType = iota + 1
+	// ClusterStat is a marker used to signal that the caller wants the cluster statistics.
+	ClusterStat
+)
+
+// OffloadStatMap defines the TX/RX offload statistics for a particular listener or cluster.
+type OffloadDirStat struct {
+	Rx OffloadStatInfo `json:"rx"`
+	Tx OffloadStatInfo `json:"tx"`
+}
+
+// OffloadStatInfo holds the statistics for a listener or cluster in RX or TX direction.
+type OffloadStatInfo struct {
+	Pkts          uint64 `json:"pkts"`
+	Bytes         uint64 `json:"bytes"`
+	TimestampLast uint64 `json:"timestamp"`
 }

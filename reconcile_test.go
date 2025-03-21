@@ -1821,6 +1821,68 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, 12, ca.UserQuota, "quota")
 		},
 	},
+	{
+		name: "reconcile-test: reconcile offload mode",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				OffloadEngine: "XDP",
+				LogLevel:      stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "none",
+			},
+			Listeners: []stnrv1.ListenerConfig{},
+			Clusters:  []stnrv1.ClusterConfig{},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.Error(t, err, "restarted") // changing the offload mode requires a restart
+			e, ok := err.(stnrv1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Len(t, e.Objects, 1, "restarted object")
+			assert.Contains(t, e.Objects, "admin: default-admin-config")
+
+			a := s.GetAdmin()
+			assert.NotNil(t, a, "admin")
+
+			c := a.GetConfig()
+			assert.NotNil(t, c, "admin-getconfig")
+			ca, ok := c.(*stnrv1.AdminConfig)
+			assert.True(t, ok, "adminconfig cast")
+			assert.Equal(t, "XDP", ca.OffloadEngine, "offload")
+		},
+	},
+	{
+		name: "reconcile-test: reconcile offload interfaces (sorted)",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				OffloadEngine:     "TC",
+				OffloadInterfaces: []string{"c", "a", "b"}, // badly sorted
+				LogLevel:          stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "none",
+			},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.Error(t, err, "restarted") // changing the offload interfaces requires a restart
+			e, ok := err.(stnrv1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Len(t, e.Objects, 1, "restarted object")
+			assert.Contains(t, e.Objects, "admin: default-admin-config")
+
+			a := s.GetAdmin()
+			assert.NotNil(t, a, "admin")
+
+			c := a.GetConfig()
+			assert.NotNil(t, c, "admin-getconfig")
+			ca, ok := c.(*stnrv1.AdminConfig)
+			assert.True(t, ok, "adminconfig cast")
+			assert.Equal(t, "TC", ca.OffloadEngine, "offload")
+			assert.Equal(t, []string{"a", "b", "c"}, ca.OffloadInterfaces, "offload intfs")
+		},
+	},
 }
 
 // start with default config and then reconcile with the given config
@@ -2870,6 +2932,53 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
+		echoResult:      false,
+	},
+	{
+		testName: "changing the offload mode induces a restart",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				OffloadEngine: "XDP",
+				LogLevel:      stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{},
+			Clusters:  []stnrv1.ClusterConfig{},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     false,
+		allocateSuccess: false,
+		echoResult:      false,
+	},
+	{
+		testName: "changing offload interfaces induces a restart",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				OffloadEngine:     "XDP",
+				OffloadInterfaces: []string{"eth0"},
+				LogLevel:          stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{},
+			Clusters:  []stnrv1.ClusterConfig{},
+		},
+		echoServerAddr:  "1.2.3.5:5678",
+		restart:         true,
+		bindSuccess:     false,
+		allocateSuccess: false,
 		echoResult:      false,
 	},
 }

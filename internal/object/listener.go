@@ -31,12 +31,13 @@ type Listener struct {
 	Routes                 []string
 	Net                    transport.Net
 	getRealm               RealmHandler
+	getStats               OffloadStatsHandler
 	logger                 logging.LoggerFactory
 	log                    logging.LeveledLogger
 }
 
 // NewListener creates a new listener. Requires a server restart (returns ErrRestartRequired)
-func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) (Object, error) {
+func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandler, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) (Object, error) {
 	req, ok := conf.(*stnrv1.ListenerConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
@@ -53,6 +54,7 @@ func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandle
 		PublicPort: req.PublicPort,
 		Net:        net,
 		getRealm:   realmHandler,
+		getStats:   offloadStatsHandler,
 		Conns:      []any{},
 		logger:     logger,
 		log:        logger.NewLogger(fmt.Sprintf("listener-%s", req.Name)),
@@ -251,23 +253,28 @@ func (l *Listener) Close() error {
 
 // Status returns the status of the object.
 func (l *Listener) Status() stnrv1.Status {
-	return l.GetConfig()
+	return &stnrv1.ListenerStatus{
+		ListenerConfig: l.GetConfig().(*stnrv1.ListenerConfig),
+		Stats:          l.getStats(l.Name, stnrv1.ListenerStat),
+	}
 }
 
 // ///////////
 // ListenerFactory can create now Listener objects
 type ListenerFactory struct {
-	net          transport.Net
-	realmHandler RealmHandler
-	logger       logging.LoggerFactory
+	net                 transport.Net
+	realmHandler        RealmHandler
+	offloadStatsHandler OffloadStatsHandler
+	logger              logging.LoggerFactory
 }
 
 // NewListenerFactory creates a new factory for Listener objects
-func NewListenerFactory(net transport.Net, realmHandler RealmHandler, logger logging.LoggerFactory) Factory {
+func NewListenerFactory(net transport.Net, realmHandler RealmHandler, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) Factory {
 	return &ListenerFactory{
-		net:          net,
-		realmHandler: realmHandler,
-		logger:       logger,
+		net:                 net,
+		realmHandler:        realmHandler,
+		offloadStatsHandler: offloadStatsHandler,
+		logger:              logger,
 	}
 }
 
@@ -278,5 +285,5 @@ func (f *ListenerFactory) New(conf stnrv1.Config) (Object, error) {
 		return &Listener{}, nil
 	}
 
-	return NewListener(conf, f.net, f.realmHandler, f.logger)
+	return NewListener(conf, f.net, f.realmHandler, f.offloadStatsHandler, f.logger)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -28,6 +29,12 @@ type AdminConfig struct {
 	// UserQuota defines the number of permitted TURN allocatoins per username. Affects
 	// allocation created on any listener. Default is 0, meaning no quota is enforced.
 	UserQuota int `json:"user_quota,omitempty"`
+	// OffloadEngine defines the dataplane offload mode, either "None", "XDP", "TC", or
+	// "Auto". Set to "Auto" to let STUNner find the optimal offload mode. Default is "None".
+	OffloadEngine string `json:"offload_engine,omitempty"`
+	// OffloadInterfaces explicitly specifies the interfaces on which to enable the offload
+	// engine. Empty list means to enable offload on all interfaces (this is the default).
+	OffloadInterfaces []string `json:"offload_interfaces,omitempty"`
 	// LicenseConfig describes the licensing info to be used to check subscription status with
 	// the license server.
 	LicenseConfig *LicenseConfig `json:"license_config,omitempty"`
@@ -76,6 +83,21 @@ func (req *AdminConfig) Validate() error {
 		req.UserQuota = 0
 	}
 
+	// Normalize
+	if req.OffloadEngine == "" {
+		req.OffloadEngine = OffloadEngineNone.String()
+	}
+	t, err := NewOffloadEngine(req.OffloadEngine)
+	if err != nil {
+		return err
+	}
+	req.OffloadEngine = t.String()
+
+	if req.OffloadInterfaces == nil {
+		req.OffloadInterfaces = []string{}
+	}
+	sort.Strings(req.OffloadInterfaces)
+
 	return nil
 }
 
@@ -94,6 +116,8 @@ func (req *AdminConfig) DeepEqual(other Config) bool {
 func (req *AdminConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*AdminConfig)
 	*ret = *req
+	ret.OffloadInterfaces = make([]string, len(req.OffloadInterfaces))
+	copy(ret.OffloadInterfaces, req.OffloadInterfaces)
 }
 
 // String stringifies the configuration.
@@ -113,6 +137,13 @@ func (req *AdminConfig) String() string {
 	}
 	if req.UserQuota > 0 {
 		status = append(status, fmt.Sprintf("quota=%d", req.UserQuota))
+	}
+	if req.OffloadEngine != "" {
+		intfs := ""
+		if req.OffloadEngine != "None" && len(req.OffloadInterfaces) > 0 {
+			intfs = fmt.Sprintf("<%s>", strings.Join(req.OffloadInterfaces, ","))
+		}
+		status = append(status, fmt.Sprintf("offload=%s%s", req.OffloadEngine, intfs))
 	}
 	status = append(status, fmt.Sprintf("license_info=%s", LicensingStatus(req.LicenseConfig)))
 
@@ -142,6 +173,7 @@ type AdminStatus struct {
 	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
 	UserQuota           string `json:"quota,omitempty"`
+	OffloadStatus       string `json:"offload,omitempty"`
 	LicensingInfo       string `json:"licensing_info,omitempty"`
 }
 
@@ -160,6 +192,9 @@ func (a *AdminStatus) String() string {
 	status = append(status, fmt.Sprintf("quota=%s", a.UserQuota))
 	if a.LicensingInfo != "" {
 		status = append(status, fmt.Sprintf("license-info=%s", a.LicensingInfo))
+	}
+	if a.OffloadStatus != "" {
+		status = append(status, fmt.Sprintf("offload=%s", a.OffloadStatus))
 	}
 
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))

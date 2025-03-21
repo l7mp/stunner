@@ -9,7 +9,6 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v3"
 	"github.com/pion/transport/v3/stdnet"
-	"github.com/pion/turn/v4"
 
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
@@ -34,7 +33,6 @@ type Stunner struct {
 	telemetry                                                  *telemetry.Telemetry
 	logger                                                     logger.LoggerFactory
 	log                                                        logging.LeveledLogger
-	eventHandlers                                              turn.EventHandlers
 	quotaHandler                                               QuotaHandler
 	offloadHandler                                             OffloadHandler
 	net                                                        transport.Net
@@ -98,17 +96,20 @@ func NewStunner(options Options) *Stunner {
 		net:              vnet,
 	}
 
+	s.offloadHandler = s.NewOffloadHandler()
+	statsHandler := func(name string, marker stnrv1.StatType) stnrv1.OffloadDirStat {
+		return s.offloadHandler.Stats(name, marker)
+	}
+
 	s.adminManager = manager.NewManager("admin-manager",
 		object.NewAdminFactory(options.DryRun, s.NewReadinessHandler(), s.NewStatusHandler(), logger), logger)
 	s.authManager = manager.NewManager("auth-manager",
 		object.NewAuthFactory(logger), logger)
 	s.listenerManager = manager.NewManager("listener-manager",
-		object.NewListenerFactory(vnet, s.NewRealmHandler(), logger), logger)
+		object.NewListenerFactory(vnet, s.NewRealmHandler(), statsHandler, logger), logger)
 	s.clusterManager = manager.NewManager("cluster-manager",
-		object.NewClusterFactory(r, logger), logger)
-	s.eventHandlers = s.NewEventHandler()
+		object.NewClusterFactory(r, statsHandler, logger), logger)
 	s.quotaHandler = s.NewQuotaHandler()
-	s.offloadHandler = s.NewOffloadHandler()
 
 	telemetryCallbacks := telemetry.Callbacks{
 		GetAllocationCount: func() int64 { return s.GetActiveConnections() },
