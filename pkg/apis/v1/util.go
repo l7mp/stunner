@@ -214,7 +214,7 @@ const (
 )
 
 const (
-	offloadEngineNoneStr = "none"
+	offloadEngineNoneStr = "None"
 	offloadEngineXDPStr  = "XDP"
 	offloadEngineTCStr   = "TC"
 	offloadEngineAutoStr = "Auto"
