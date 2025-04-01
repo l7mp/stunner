@@ -45,7 +45,7 @@ func runConfig(_ *cobra.Command, args []string) error {
 		cds, err = cdsclient.NewConfigsNamespaceAPI(pod.Addr, gwNs, cdslog)
 	} else {
 		gwName := args[0]
-		cds, err = cdsclient.NewConfigNamespaceNameAPI(pod.Addr, gwNs, gwName, cdslog)
+		cds, err = cdsclient.NewConfigNamespaceNameAPI(pod.Addr, gwNs, gwName, "", cdslog)
 	}
 
 	if err != nil {

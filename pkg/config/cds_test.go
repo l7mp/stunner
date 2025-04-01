@@ -66,12 +66,12 @@ func TestServerLoad(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
 	assert.NoError(t, err, "client 2")
 	// nonexistent
-	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("load: error")
@@ -155,11 +155,11 @@ func TestServerPoll(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("poll: no result")
@@ -256,11 +256,11 @@ func TestServerWatch(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New(testCDSAddr, "ns1/gw3", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("watch: no result")
@@ -434,7 +434,7 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("bootstrap")
@@ -533,7 +533,7 @@ func TestServerAPI(t *testing.T) {
 	assert.NoError(t, err, "client 2")
 	client3, err := client.NewConfigsNamespaceAPI(testCDSAddr, "ns2", logger.NewLogger("ns-config-client-ns2"))
 	assert.NoError(t, err, "client 3")
-	client4, err := client.NewConfigNamespaceNameAPI(testCDSAddr, "ns1", "gw1", logger.NewLogger("gw-config-client"))
+	client4, err := client.NewConfigNamespaceNameAPI(testCDSAddr, "ns1", "gw1", "", logger.NewLogger("gw-config-client"))
 	assert.NoError(t, err, "client 4")
 
 	testLog.Debug("watch: no result")
@@ -1004,7 +1004,7 @@ func TestClientReconnect(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("watch: no result")
@@ -1176,7 +1176,7 @@ func TestDeleteConfigAPI(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	c, err := client.New(testCDSAddr, "ns1/gw1", logger)
+	c, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
 	assert.NoError(t, err, "client")
 
 	ch := make(chan *stnrv1.StunnerConfig, 8)
@@ -1254,6 +1254,135 @@ func TestDeleteConfigAPI(t *testing.T) {
 	}
 
 	server.SuppressConfigDeletion = saved
+}
+
+func TestServerLoadWithNodeName(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	// suppress deletions
+	server.SuppressConfigDeletion = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
+	patcher := func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error) {
+		// rewrite the realm to the node name
+		if node != "" {
+			conf.Auth.Realm = node
+		}
+		return conf, nil
+	}
+	srv := server.New(testCDSAddr, patcher, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(ctx)
+	assert.NoError(t, err, "start")
+
+	time.Sleep(20 * time.Millisecond)
+
+	testLog.Debug("create client")
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "node1", logger)
+	assert.NoError(t, err, "client 1")
+	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
+	assert.NoError(t, err, "client 2")
+
+	testLog.Debug("load: error")
+	c, err := client1.Load()
+	assert.Error(t, err, "load")
+	assert.Nil(t, c, "conf")
+	c, err = client2.Load()
+	assert.Error(t, err, "load")
+	assert.Nil(t, c, "conf")
+
+	c1 := testConfig("ns1/gw1", "realm1")
+	c2 := testConfig("ns1/gw2", "realm1")
+	err = srv.UpdateConfig([]server.Config{c1, c2})
+	assert.NoError(t, err, "update")
+
+	testLog.Debug("load: config ok")
+	c, err = client1.Load()
+	assert.NoError(t, err, "load")
+	assert.Equal(t, "node1", c.Auth.Realm, "node name 1")
+	c.Auth.Realm = "realm1" // reset
+	assert.True(t, c.DeepEqual(c1.Config), "deepeq")
+	c, err = client2.Load()
+	assert.NoError(t, err, "load")
+	assert.Equal(t, "realm1", c.Auth.Realm, "node name 1") // node node: no patch
+	assert.True(t, c.DeepEqual(c2.Config), "deepeq")
+}
+
+func TestServerWatchWithNodeName(t *testing.T) {
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	log := zlogger.WithName("tester")
+
+	logger := logger.NewLoggerFactory(stunnerLogLevel)
+	testLog := logger.NewLogger("test")
+
+	serverCtx, serverCancel := context.WithCancel(context.Background())
+	defer serverCancel()
+
+	testCDSAddr := getRandCDSAddr()
+	testLog.Debugf("create server on %s", testCDSAddr)
+	patcher := func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error) {
+		// rewrite the realm to the node name
+		if node != "" {
+			conf.Auth.Realm = node
+		}
+		return conf, nil
+	}
+	srv := server.New(testCDSAddr, patcher, log)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(serverCtx)
+	assert.NoError(t, err, "start")
+
+	testLog.Debug("create client")
+	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	assert.NoError(t, err, "client 1")
+	client2, err := client.New(testCDSAddr, "ns1/gw2", "node2", logger)
+	assert.NoError(t, err, "client 2")
+
+	testLog.Debug("watch: no result")
+	ch1 := make(chan *stnrv1.StunnerConfig, 8)
+	defer close(ch1)
+	ch2 := make(chan *stnrv1.StunnerConfig, 8)
+	defer close(ch2)
+
+	clientCtx, clientCancel := context.WithCancel(context.Background())
+	defer clientCancel()
+	err = client1.Watch(clientCtx, ch1, false)
+	assert.NoError(t, err, "client 1 watch")
+	err = client2.Watch(clientCtx, ch2, false)
+	assert.NoError(t, err, "client 2 watch")
+
+	testLog.Debug("poll")
+	c1 := testConfig("ns1/gw1", "realm1")
+	c2 := testConfig("ns1/gw2", "realm1")
+	err = srv.UpdateConfig([]server.Config{c1, c2})
+	assert.NoError(t, err, "update")
+
+	// poll should have fed the configs to the channels
+	s := watchConfig(ch1, 500*time.Millisecond)
+	assert.NotNil(t, s, "config 1")
+	assert.Equal(t, "realm1", s.Auth.Realm, "node name 1")
+	assert.True(t, s.DeepEqual(c1.Config), "deepeq 1")
+	s = watchConfig(ch2, 500*time.Millisecond)
+	assert.NotNil(t, s, "config 2")
+	assert.Equal(t, "node2", s.Auth.Realm, "node name 2")
+	s.Auth.Realm = "realm1" // reset
+	assert.True(t, s.DeepEqual(c2.Config), "deepeq 2")
 }
 
 func TestLicenseLoad(t *testing.T) {
@@ -1417,25 +1546,6 @@ func testConfig(id, realm string) server.Config {
 	_ = c.Validate() // make sure deepeq works
 	return server.Config{Id: id, Config: c}
 }
-
-// func testConfigListener(id, realm, addr string) server.Config {
-// 	c := client.ZeroConfig(id)
-// 	c.Auth.Realm = realm
-// 	c.Listeners = []stnrv1.ListenerConfig{{
-// 		Name: "l-1",
-// 		Addr: addr,
-// 		Port: 1,
-// 	}, {
-// 		Name: "l-2",
-// 		Port: 2,
-// 	}, {
-// 		Name: "l-3",
-// 		Addr: "101.102.103.104",
-// 		Port: 3,
-// 	}}
-// 	_ = c.Validate() // make sure deepeq works
-// 	return server.Config{Id: id, Config: c}
-// }
 
 // wait for some configurable time for a watch element
 func watchConfig(ch chan *stnrv1.StunnerConfig, d time.Duration) *stnrv1.StunnerConfig {

@@ -14,28 +14,32 @@ import (
 // specific gateway. Use the CDSAPI to access the general CDS client set.
 type CDSClient struct {
 	CdsApi
-	addr, id string
+	addr, id, node string
 }
 
 // NewCDSClient creates a config discovery service client that can be used to load or watch STUNner
 // configurations from a CDS remote server.
-func NewCDSClient(addr, id string, logger logging.LeveledLogger) (Client, error) {
+func NewCDSClient(addr, id, node string, logger logging.LeveledLogger) (Client, error) {
 	ps := strings.Split(id, "/")
 	if len(ps) != 2 {
 		return nil, fmt.Errorf("invalid id: %q", id)
 	}
 
-	client, err := NewConfigNamespaceNameAPI(addr, ps[0], ps[1], logger)
+	client, err := NewConfigNamespaceNameAPI(addr, ps[0], ps[1], node, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CDSClient{CdsApi: client, addr: addr, id: id}, nil
+	return &CDSClient{CdsApi: client, addr: addr, id: id, node: node}, nil
 }
 
 // String outputs the status of the client.
 func (p *CDSClient) String() string {
-	return fmt.Sprintf("config discovery client %q: using server %s", p.id, p.addr)
+	node := ""
+	if p.node != "" {
+		node = fmt.Sprintf(" (node: %s)", p.node)
+	}
+	return fmt.Sprintf("config discovery client %q%s: using server %s", p.id, node, p.addr)
 }
 
 // Load grabs a new configuration from the config doscovery server.

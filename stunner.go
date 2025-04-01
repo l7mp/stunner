@@ -35,6 +35,7 @@ type Stunner struct {
 	log                                                        logging.LeveledLogger
 	quotaHandler                                               QuotaHandler
 	offloadHandler                                             OffloadHandler
+	node                                                       string
 	net                                                        transport.Net
 	ready, shutdown                                            bool
 }
@@ -93,6 +94,7 @@ func NewStunner(options Options) *Stunner {
 		dryRun:           options.DryRun,
 		resolver:         r,
 		udpThreadNum:     udpThreadNum,
+		node:             options.NodeName,
 		net:              vnet,
 	}
 

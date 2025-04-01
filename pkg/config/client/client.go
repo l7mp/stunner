@@ -46,7 +46,7 @@ type Client interface {
 // New creates a generic config client. Origin is either a network address in the form
 // "<IP>:<port>" or a proper HTTP/WS URI, in which case a CDS client is returned, or a proper file
 // URL "file://<path>/<filename>" in which case a config file watcher is returned.
-func New(origin string, id string, logger logging.LoggerFactory) (Client, error) {
+func New(origin string, id, node string, logger logging.LoggerFactory) (Client, error) {
 	u, err := getURI(origin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config origin URI %q: %w", origin, err)
@@ -54,7 +54,7 @@ func New(origin string, id string, logger logging.LoggerFactory) (Client, error)
 
 	switch strings.ToLower(u.Scheme) {
 	case "http", "ws", "https", "wss":
-		client, err := NewCDSClient(u.String(), id, logger.NewLogger("cds-client"))
+		client, err := NewCDSClient(u.String(), id, node, logger.NewLogger("cds-client"))
 		if err != nil {
 			return nil, err
 		}

@@ -61,6 +61,11 @@ func main() {
 		configOrigin = *config
 	}
 
+	nodeName := ""
+	if node, ok := os.LookupEnv(stnrv1.DefaultEnvVarNodeName); ok {
+		nodeName = node
+	}
+
 	if *id == "" {
 		name, ok1 := os.LookupEnv(stnrv1.DefaultEnvVarName)
 		namespace, ok2 := os.LookupEnv(stnrv1.DefaultEnvVarNamespace)
@@ -73,6 +78,7 @@ func main() {
 		Name:                 *id,
 		LogLevel:             logLevel,
 		DryRun:               *dryRun,
+		NodeName:             nodeName,
 		UDPListenerThreadNum: *udpThreadNum,
 	})
 	defer st.Close()

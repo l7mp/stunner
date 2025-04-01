@@ -39,6 +39,8 @@ type Options struct {
 	// types (TCP, TLS and DTLS) use per-client threads, so this setting affects only UDP
 	// listeners. For more info see https://github.com/pion/turn/pull/295.
 	UDPListenerThreadNum int
+	// NodeName is the name of the Kubernetes node the TURN server is running on (if any).
+	NodeName string
 	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
 	// emulated data-plane.
 	Net transport.Net
@@ -145,7 +147,7 @@ func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.
 func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
-	client, err := client.New(origin, s.name, s.logger)
+	client, err := client.New(origin, s.name, s.node, s.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +157,7 @@ func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
 
 // WatchConfig watches a configuration from an origin. This is a shim wrapper around configclient.Watch.
 func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	client, err := client.New(origin, s.name, s.logger)
+	client, err := client.New(origin, s.name, s.node, s.logger)
 	if err != nil {
 		return err
 	}

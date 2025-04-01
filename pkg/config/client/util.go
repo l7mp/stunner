@@ -44,7 +44,7 @@ func getURI(addr string) (*url.URL, error) {
 }
 
 // wsURI returns a websocket url from a HTTP URI.
-func wsURI(addr, endpoint string) (string, error) {
+func wsURI(addr, endpoint, node string) (string, error) {
 	uri, err := getURI(addr)
 	if err != nil {
 		return "", err
@@ -54,6 +54,9 @@ func wsURI(addr, endpoint string) (string, error) {
 	uri.Path = endpoint
 	v := url.Values{}
 	v.Set("watch", "true")
+	if node != "" {
+		v.Set("node", node)
+	}
 	uri.RawQuery = v.Encode()
 
 	return uri.String(), nil

@@ -61,7 +61,7 @@ func NewAllConfigsAPI(addr string, logger logging.LeveledLogger, opts ...ClientO
 		return nil, err
 	}
 
-	wsuri, err := wsURI(addr, AllConfigsAPIEndpoint)
+	wsuri, err := wsURI(addr, AllConfigsAPIEndpoint, "")
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func NewConfigsNamespaceAPI(addr, namespace string, logger logging.LeveledLogger
 		return nil, err
 	}
 
-	wsuri, err := wsURI(addr, fmt.Sprintf(ConfigsNamespaceAPIEndpoint, namespace))
+	wsuri, err := wsURI(addr, fmt.Sprintf(ConfigsNamespaceAPIEndpoint, namespace), "")
 	if err != nil {
 		return nil, err
 	}
@@ -179,18 +179,18 @@ func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv1.Stunne
 }
 
 type ConfigNamespaceNameAPI struct {
-	addr, namespace, name, httpURI, wsURI string
-	client                                *api.ClientWithResponses
+	addr, namespace, name, node, httpURI, wsURI string
+	client                                      *api.ClientWithResponses
 	logging.LeveledLogger
 }
 
-func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.LeveledLogger, opts ...ClientOption) (CdsApi, error) {
+func NewConfigNamespaceNameAPI(addr, namespace, name, node string, logger logging.LeveledLogger, opts ...ClientOption) (CdsApi, error) {
 	httpuri, err := getURI(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	wsuri, err := wsURI(addr, fmt.Sprintf(ConfigNamespaceNameAPIEndpoint, namespace, name))
+	wsuri, err := wsURI(addr, fmt.Sprintf(ConfigNamespaceNameAPIEndpoint, namespace, name), node)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +204,7 @@ func NewConfigNamespaceNameAPI(addr, namespace, name string, logger logging.Leve
 		addr:          addr,
 		namespace:     namespace,
 		name:          name,
+		node:          node,
 		httpURI:       httpuri.String(),
 		wsURI:         wsuri,
 		client:        client,
@@ -220,6 +221,9 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 		a.namespace, a.name, a.addr)
 
 	var params *api.GetV1ConfigNamespaceNameParams
+	if a.node != "" {
+		params = &api.GetV1ConfigNamespaceNameParams{Node: &a.node}
+	}
 	r, err := a.client.GetV1ConfigNamespaceNameWithResponse(ctx, a.namespace, a.name, params)
 	if err != nil {
 		return []*stnrv1.StunnerConfig{}, err
