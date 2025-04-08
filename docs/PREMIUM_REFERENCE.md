@@ -89,4 +89,28 @@ Set `dataplaneResource: Deployment` to return to the default deployment mode.
 
 ## TURN offload (available only in the enterprise tier)
 
-To be available soon.
+STUNner can offload TURN message processing to its eBPF-based packet processing engine. The offload supports UDP ChannelData message and provides an outstanding bandwidth, delay, and jitter performance boost. This feature requires Linux nodes with elevated access to eBPF/tc (`TC`) or eBPF/XDP (`XDP`) technologies. Both technologies provide outstanding performance; `TC` is supported in most environments (e.g., public clouds), `XDP` is limited to bare metal installations.
+
+The table below overviews the STUNner TURN offload configuration options inside the `Dataplane` object.
+To use the TURN offload feature of STUNNER, you can set the `spec.offloadEngine` in the `Dataplane` object: `TC` means eBPF/TC, `XDP` is eBPF/XDP, `None` disables the offload, and `Auto` tries to apply the best offload engine.
+
+To use eBPF offload, you must also enable elevated rights to your STUNner pods. To achieve this, edit the `spec.containerSecurityContext` field and add the necessary `NET_ADMIN`, `SYS_ADMIN`, `SYS_MODULE` capabilities.
+
+The below will set the dataplane for all gateways using the `default` Dataplane to use the TURN offload and select the best suitable offload engine.
+
+```yaml
+apiVersion: stunner.l7mp.io/v1
+kind: Dataplane
+metadata:
+  name: default
+spec:
+  containerSecurityContext:
+    capabilities:
+      add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_MODULE
+  offload_engine: Auto
+```
+
+Set `offload_engine: None` to disable the TURN offload engine.
