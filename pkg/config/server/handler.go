@@ -4,21 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/l7mp/stunner/pkg/config/server/api"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
+type ConfigList = api.V1ConfigList
+
 // make sure the server satisfies the generate OpenAPI server interface
 var _ api.StrictServerInterface = (*Server)(nil)
-
-// ConfigFilter is a callback to filter config updates for a client.
-type ConfigFilter func(confId string) bool
-
-// ConfigPatcher is a callback to patch config updates for a client.
-type ConfigPatcher func(conf *stnrv1.StunnerConfig, node string) (*stnrv1.StunnerConfig, error)
 
 // (GET /api/v1/license)
 func (s *Server) GetV1LicenseStatus(ctx context.Context, request api.GetV1LicenseStatusRequestObject) (api.GetV1LicenseStatusResponseObject, error) {
@@ -30,12 +25,10 @@ func (s *Server) GetV1LicenseStatus(ctx context.Context, request api.GetV1Licens
 func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsRequestObject) (api.ListV1ConfigsResponseObject, error) {
 	s.log.V(1).Info("Handling ListV1Configs API call")
 
-	configs := s.configs.Snapshot()
+	configs := s.configs.Snapshot() // deepcopies
 	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
 	for _, c := range configs {
-		cpy := stnrv1.StunnerConfig{}
-		c.Config.DeepCopyInto(&cpy)
-		response.Items = append(response.Items, cpy)
+		response.Items = append(response.Items, *c.Config)
 	}
 
 	s.log.V(3).Info("ListV1Configs API handler: ready", "configlist-len", len(configs))
@@ -47,14 +40,11 @@ func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsReq
 func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1ConfigsNamespaceRequestObject) (api.ListV1ConfigsNamespaceResponseObject, error) {
 	s.log.V(1).Info("Handling ListV1ConfigsNamespace API call", "namespace", request.Namespace)
 
-	configs := s.configs.Snapshot()
+	configs := s.configs.Snapshot() // deepcopies
 	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
 	for _, c := range configs {
-		ps := strings.Split(c.Id, "/")
-		if len(ps) == 2 && ps[0] == request.Namespace {
-			cpy := stnrv1.StunnerConfig{}
-			c.Config.DeepCopyInto(&cpy)
-			response.Items = append(response.Items, cpy)
+		if c.Namespace == request.Namespace {
+			response.Items = append(response.Items, *c.Config)
 		}
 	}
 
@@ -69,33 +59,21 @@ func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1
 	s.log.V(1).Info("Handling GetV1ConfigNamespaceName API call", "namespace", namespace,
 		"name", name)
 
-	id := fmt.Sprintf("%s/%s", namespace, name)
-	c := s.configs.Get(id)
-	if c == nil {
-		s.log.V(1).Info("GetV1ConfigNamespaceName: Config not found", "config-id", id)
+	c, ok := s.configs.Get(namespace, name)
+	if !ok {
+		s.log.V(1).Info("GetV1ConfigNamespaceName: Config not found", "namespace", namespace, "name", name)
 		return api.GetV1ConfigNamespaceName404JSONResponse{
 			Code:    http.StatusNotFound,
-			Message: fmt.Sprintf("Config not found for ID %q", id),
+			Message: fmt.Sprintf("Config not found for ID %s/%s", namespace, name),
 		}, nil
 	}
 
-	ret := &stnrv1.StunnerConfig{}
-	c.DeepCopyInto(ret)
-
-	if s.patch != nil && request.Params.Node != nil {
-		conf, err := s.patch(ret, *request.Params.Node)
-		if err != nil {
-			s.log.Error(err, "GetV1ConfigNamespaceName: patch config failed")
-			return api.GetV1ConfigNamespaceName500JSONResponse{
-				Code:    http.StatusInternalServerError,
-				Message: fmt.Sprintf("Config patch failed: %s", err.Error()),
-			}, nil
-		}
-		ret = conf
+	if s.patcher != nil && request.Params.Node != nil {
+		c.Config = s.patcher(c.Config, *request.Params.Node)
+		s.log.V(4).Info("GetV1ConfigNamespaceName: patch config", "config", c.String())
 	}
 
-	s.log.V(3).Info("GetV1ConfigNamespaceName API handler: ready",
-		"config", ret.String())
+	s.log.V(3).Info("GetV1ConfigNamespaceName API handler: ready", "config", c.String())
 
-	return api.GetV1ConfigNamespaceName200JSONResponse(*ret), nil
+	return api.GetV1ConfigNamespaceName200JSONResponse(*c.Config), nil
 }

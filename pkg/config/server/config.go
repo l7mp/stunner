@@ -2,157 +2,295 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
-	"github.com/l7mp/stunner/pkg/config/client"
-	"github.com/l7mp/stunner/pkg/config/client/api"
 )
 
-type ConfigList = api.V1ConfigList
+// ClientFilter lets a client to filter push notifications.
+type ClientFilter[T comparable] func(expectedValue T) bool
+
+func NamespacedName(id string) (string, string, bool) {
+	parts := strings.SplitN(id, "/", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
 
 type Config struct {
-	Id     string
-	Config *stnrv1.StunnerConfig
+	Namespace, Name string
+	Config          *stnrv1.StunnerConfig
 }
 
-func (e Config) String() string {
-	return fmt.Sprintf("id=%s: %s", e.Id, e.Config.String())
+func (c *Config) String() string {
+	return fmt.Sprintf("id=%s/%s: %s", c.Namespace, c.Name, c.Config.String())
 }
 
-// UpsertConfig upserts a single config in the server.
-func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
-	cpy := &stnrv1.StunnerConfig{}
-	c.DeepCopyInto(cpy)
-	s.configs.Upsert(id, cpy)
-	s.configCh <- Config{Id: id, Config: cpy}
+func (c *Config) Id() string {
+	return fmt.Sprintf("%s/%s", c.Namespace, c.Name)
 }
 
-// DeleteConfig removes a config from clients by sending a zero-config. Clients may decide to
-// ignore the delete operation by (1) using client.IsConfigDeleted() to identify whether a config
-// is being deleted and (2) selectively ignoring config delete updates based on the result. This is
-// needed, e.g., in stunnerd, in order to avoid that a client being removed and entering the
-// graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with all active
-// connections allocated to them.
-func (s *Server) DeleteConfig(id string) {
-	s.configs.Delete(id)
-	if SuppressConfigDeletion {
-		s.log.Info("Suppressing config update for deleted config", "config-id", id)
+func (c *Config) DeepCopy() *Config {
+	d := &Config{}
+	*d = *c
+	d.Config = c.Config.DeepCopy()
+	return d
+}
+
+func (c *Config) DeepEqual(d *Config) bool {
+	return c.Namespace == d.Namespace && d.Name == c.Name && c.Config.DeepEqual(d.Config)
+}
+
+// FilterFunc allows clients to filter configs.
+type FilterFunc func(config *Config) bool
+
+// PatchFunc is a callback to patch config updates for a client.
+type PatchFunc func(conf *stnrv1.StunnerConfig) *stnrv1.StunnerConfig
+
+type Subscription[T comparable] struct {
+	topic   string
+	ch      chan *Config
+	filter  ClientFilter[T]
+	patcher PatchFunc
+}
+
+type ConfigStore[T comparable] struct {
+	configs       map[string]map[string]*Config // namespace -> name -> config
+	subscriptions []Subscription[T]
+	mu            sync.RWMutex
+}
+
+func NewConfigStore[T comparable]() *ConfigStore[T] {
+	return &ConfigStore[T]{
+		configs:       make(map[string]map[string]*Config),
+		subscriptions: []Subscription[T]{},
+	}
+}
+
+// Snapshot copies out all configs.
+func (cs *ConfigStore[_]) Snapshot() []*Config {
+	configs := []*Config{}
+
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+	for _, namespaceConfigs := range cs.configs {
+		for _, config := range namespaceConfigs {
+			configs = append(configs, config.DeepCopy())
+		}
+	}
+
+	return configs
+}
+
+// Upsert sets or updates a config and notifies subscribers.
+func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv1.StunnerConfig) {
+	// Suppress Upsert if there is no change
+	if c, ok := cs.Get(namespace, name); ok {
+		if c.Config.DeepEqual(stnrConfig) {
+			return
+		}
+	}
+
+	// Update the config
+	config := &Config{
+		Namespace: namespace,
+		Name:      name,
+		Config:    stnrConfig,
+	}
+
+	cs.mu.Lock()
+	if _, exists := cs.configs[namespace]; !exists {
+		cs.configs[namespace] = make(map[string]*Config)
+	}
+	cs.configs[namespace][name] = config
+
+	// Get a copy of subscriptions to avoid holding the lock during notification
+	subs := make([]Subscription[T], len(cs.subscriptions))
+	copy(subs, cs.subscriptions)
+	cs.mu.Unlock()
+
+	// Notify subscribers
+	for _, sub := range subs {
+		// Check if the config matches the topic
+		if matchesTopic(config, sub.topic) {
+			cs.sendConfig(sub.ch, config, sub.patcher)
+		}
+	}
+}
+
+// Delete removes the config from the store and optionally sends the supplied config (usually a
+// zero-config) to affected clients.
+func (cs *ConfigStore[T]) Delete(namespace, name string, stnrConfig *stnrv1.StunnerConfig) {
+	// Update the config
+	cs.mu.Lock()
+	if configs, exists := cs.configs[namespace]; exists {
+		delete(configs, name)
+		if len(cs.configs[namespace]) == 0 {
+			delete(cs.configs, namespace)
+		}
+	}
+	cs.mu.Unlock()
+
+	if stnrConfig == nil {
 		return
 	}
 
-	s.deleteCh <- Config{Id: id, Config: client.ZeroConfig(id)}
+	// Notify subscribers
+	config := &Config{
+		Namespace: namespace,
+		Name:      name,
+		Config:    stnrConfig,
+	}
+
+	// Get a copy of subscriptions to avoid holding the lock during notification
+	cs.mu.Lock()
+	subs := make([]Subscription[T], len(cs.subscriptions))
+	copy(subs, cs.subscriptions)
+	cs.mu.Unlock()
+
+	// Notify subscribers
+	for _, sub := range subs {
+		// Check if the config matches the topic
+		if matchesTopic(config, sub.topic) {
+			sub.ch <- config
+		}
+	}
 }
 
-// UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
-// particular instance of time and generates an update per each change.
-func (s *Server) UpdateConfig(newConfigs []Config) error {
-	s.log.V(4).Info("Processing config updates", "num-configs", len(newConfigs))
-	oldConfigs := s.configs.Snapshot()
+// Get retrieves a config
+func (cs *ConfigStore[_]) Get(namespace, name string) (*Config, bool) {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
 
-	for _, oldC := range oldConfigs {
-		found := false
-		for _, newC := range newConfigs {
-			if oldC.Id == newC.Id {
-				if !oldC.Config.DeepEqual(newC.Config) {
-					s.log.V(2).Info("Updating config", "config-id", newC.Id, "config",
-						newC.Config.String())
-					s.UpsertConfig(newC.Id, newC.Config)
-				} else {
-					s.log.V(2).Info("Config unchanged", "config-id", newC.Id,
-						"old-config", oldC.Config.String(),
-						"new-config", newC.Config.String())
+	namespaceMap, exists := cs.configs[namespace]
+	if !exists {
+		return nil, false
+	}
+
+	config, exists := namespaceMap[name]
+	if exists {
+		config = config.DeepCopy()
+	}
+
+	return config, exists
+}
+
+// matchesTopic checks if a config matches a topic pattern
+func matchesTopic(config *Config, topic string) bool {
+	switch {
+	case topic == "all":
+		return true
+
+	case strings.HasSuffix(topic, "/*"):
+		// Namespace pattern (e.g., "database/*")
+		namespace := topic[:len(topic)-2]
+		return config.Namespace == namespace
+
+	default:
+		// Specific config (e.g., "database/url")
+		parts := strings.SplitN(topic, "/", 2)
+		if len(parts) == 2 {
+			return config.Namespace == parts[0] && config.Name == parts[1]
+		}
+		return false
+	}
+}
+
+// subscribeToTopic creates a subscription to a topic with an optional filter
+func (cs *ConfigStore[T]) subscribeToTopic(topic string, filter ClientFilter[T], patcher PatchFunc) chan *Config {
+	ch := make(chan *Config, 100)
+
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	// Register the subscription
+	cs.subscriptions = append(cs.subscriptions, Subscription[T]{
+		topic:   topic,
+		ch:      ch,
+		filter:  filter,
+		patcher: patcher,
+	})
+
+	// Make a copy of configs that match the topic to send initial values
+	for _, namespaceConfigs := range cs.configs {
+		for _, config := range namespaceConfigs {
+			if matchesTopic(config, topic) {
+				cs.sendConfig(ch, config, patcher)
+			}
+		}
+	}
+
+	return ch
+}
+
+// SubscribeAll subscribes to all config changes
+func (cs *ConfigStore[T]) SubscribeAll(filter ClientFilter[T], patcher PatchFunc) chan *Config {
+	return cs.subscribeToTopic("all", filter, patcher)
+}
+
+// SubscribeNamespace subscribes to all config changes in a specific namespace
+func (cs *ConfigStore[T]) SubscribeNamespace(namespace string, filter ClientFilter[T], patcher PatchFunc) chan *Config {
+	return cs.subscribeToTopic(fmt.Sprintf("%s/*", namespace), filter, patcher)
+}
+
+// SubscribeConfig subscribes to changes for a specific config
+func (cs *ConfigStore[T]) SubscribeConfig(namespace, name string, filter ClientFilter[T], patcher PatchFunc) chan *Config {
+	return cs.subscribeToTopic(fmt.Sprintf("%s/%s", namespace, name), filter, patcher)
+}
+
+// Unsubscribe removes a subscription
+func (cs *ConfigStore[_]) Unsubscribe(ch chan *Config) {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	for i, sub := range cs.subscriptions {
+		if sub.ch == ch {
+			// Remove by swapping with the last element and truncating
+			cs.subscriptions[i] = cs.subscriptions[len(cs.subscriptions)-1]
+			cs.subscriptions = cs.subscriptions[:len(cs.subscriptions)-1]
+			close(ch)
+			return
+		}
+	}
+}
+
+// Unsubscribe removes a subscription
+func (cs *ConfigStore[T]) UnsubscribeAll() {
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	for _, sub := range cs.subscriptions {
+		close(sub.ch)
+	}
+
+	cs.subscriptions = []Subscription[T]{}
+}
+
+// Push will re-broadcast configs to interested clients.
+func (cs *ConfigStore[T]) Push(arg T) {
+	configs := cs.Snapshot()
+
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+
+	for _, sub := range cs.subscriptions {
+		if sub.filter != nil && sub.filter(arg) {
+			for _, config := range configs {
+				if matchesTopic(config, sub.topic) {
+					cs.sendConfig(sub.ch, config, sub.patcher)
 				}
-				found = true
-				break
 			}
 		}
-
-		if !found {
-			s.log.V(2).Info("Removing config", "config-id", oldC.Id)
-			s.DeleteConfig(oldC.Id)
-		}
-	}
-
-	for _, newC := range newConfigs {
-		found := false
-		for _, oldC := range oldConfigs {
-			if oldC.Id == newC.Id {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			s.log.V(2).Info("Adding config", "config-id", newC.Id, "config", newC.Config)
-			s.UpsertConfig(newC.Id, newC.Config)
-		}
-	}
-
-	return nil
-}
-
-// UpdateLicenseStatus updates the licensing status that is served by the server.
-func (s *Server) UpdateLicenseStatus(status stnrv1.LicenseStatus) {
-	s.log.V(4).Info("Processing license status update", "status", status.String())
-	s.licenseStore.Upsert(status)
-}
-
-type ConfigStore struct {
-	configs map[string]*stnrv1.StunnerConfig
-	lock    sync.RWMutex
-}
-
-func NewConfigStore() *ConfigStore {
-	return &ConfigStore{
-		configs: make(map[string]*stnrv1.StunnerConfig),
 	}
 }
 
-func (t *ConfigStore) Get(id string) *stnrv1.StunnerConfig {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.configs[id]
-}
-
-func (t *ConfigStore) Snapshot() []Config {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	ret := []Config{}
-	for id, c := range t.configs {
-		ret = append(ret, Config{Id: id, Config: c})
+// sendConfig patcher and sends a config to a channel.
+func (cs *ConfigStore[T]) sendConfig(ch chan *Config, config *Config, patcher PatchFunc) {
+	c := config.DeepCopy()
+	if patcher != nil {
+		c.Config = patcher(c.Config)
 	}
-	return ret
-}
-
-func (t *ConfigStore) Upsert(id string, c *stnrv1.StunnerConfig) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.configs[id] = c
-}
-func (t *ConfigStore) Delete(id string) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	delete(t.configs, id)
-}
-
-type LicenseStore struct {
-	status stnrv1.LicenseStatus
-	lock   sync.RWMutex
-}
-
-func NewLicenseStore() *LicenseStore {
-	return &LicenseStore{status: stnrv1.NewEmptyLicenseStatus()}
-}
-
-func (t *LicenseStore) Get() stnrv1.LicenseStatus {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	return t.status
-}
-
-func (t *LicenseStore) Upsert(s stnrv1.LicenseStatus) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.status = s
+	ch <- c
 }

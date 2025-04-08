@@ -6,26 +6,22 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/util"
 )
-
-type ClientConfigPatcher func(conf *stnrv1.StunnerConfig) (*stnrv1.StunnerConfig, error)
 
 // Conn represents a client WebSocket connection.
 type Conn struct {
 	*util.Conn
-	Filter ConfigFilter
-	patch  ClientConfigPatcher
+	ch     chan *Config
+	closed bool
 	cancel context.CancelFunc
 }
 
 // NewConn wraps a WebSocket connection.
-func NewConn(conn *websocket.Conn, filter ConfigFilter, patch ClientConfigPatcher, cancel context.CancelFunc) *Conn {
+func NewConn(conn *websocket.Conn, ch chan *Config, cancel context.CancelFunc) *Conn {
 	return &Conn{
 		Conn:   util.NewConn(conn),
-		Filter: filter,
-		patch:  patch,
+		ch:     ch,
 		cancel: cancel,
 	}
 }

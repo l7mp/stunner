@@ -3,7 +3,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
+	"github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/config/server/api"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -23,22 +22,23 @@ var (
 	SuppressConfigDeletion = false
 )
 
+// ConfigNodePatcher is a callback to patch config updates per node name.
+type ConfigNodePatcher func(conf *stnrv1.StunnerConfig, node string) *stnrv1.StunnerConfig
+
 // Server is a generic config discovery server implementation.
 type Server struct {
 	*http.Server
 	router       *mux.Router
 	addr         string
 	conns        *ConnTrack
-	configs      *ConfigStore
-	configCh     chan Config
-	deleteCh     chan Config
-	patch        ConfigPatcher
+	configs      *ConfigStore[string]
+	patcher      ConfigNodePatcher
 	licenseStore *LicenseStore
 	log          logr.Logger
 }
 
 // New creates a new config discovery server instance for the specified address.
-func New(addr string, patch ConfigPatcher, logger logr.Logger) *Server {
+func New(addr string, patch ConfigNodePatcher, logger logr.Logger) *Server {
 	if addr == "" {
 		addr = stnrv1.DefaultConfigDiscoveryAddress
 	}
@@ -46,12 +46,10 @@ func New(addr string, patch ConfigPatcher, logger logr.Logger) *Server {
 	return &Server{
 		router:       mux.NewRouter(),
 		conns:        NewConnTrack(),
-		configs:      NewConfigStore(),
-		configCh:     make(chan Config, 8),
-		deleteCh:     make(chan Config, 8),
-		addr:         addr,
-		patch:        patch,
+		configs:      NewConfigStore[string](),
 		licenseStore: NewLicenseStore(),
+		addr:         addr,
+		patcher:      patch,
 		log:          logger,
 	}
 }
@@ -67,7 +65,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		s.log.Info("Starting CDS server", "address", s.addr, "config-patcher-enabled", s.patch != nil)
+		s.log.Info("Starting CDS server", "address", s.addr, "config-patcher-enabled", s.patcher != nil)
 
 		err := s.Serve(l)
 		if err != nil {
@@ -81,22 +79,8 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	go func() {
-		defer close(s.configCh)
-		defer close(s.deleteCh)
-		defer s.Close()
-
-		for {
-			select {
-			case c := <-s.configCh:
-				s.log.V(2).Info("Sending config update event", "config-id", c.Id)
-				s.broadcastConfig(c)
-			case c := <-s.deleteCh:
-				s.log.V(2).Info("Sending config delete event", "config-id", c.Id)
-				s.broadcastConfig(c)
-			case <-ctx.Done():
-				return
-			}
-		}
+		<-ctx.Done()
+		s.Close()
 	}()
 
 	return nil
@@ -104,22 +88,18 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Close closes the server and drops all active connections.
 func (s *Server) Close() {
-	// first close the underlying HTTP server so that we do not get any new connnections
+	// close the underlying HTTP server so that we do not get any new connnections
 	s.Server.Close()
-	// then kill all active connections
+	// kill all active connections
 	for _, conn := range s.conns.Snapshot() {
 		s.closeConn(conn)
 	}
-}
-
-// GetConfigChannel returns the channel that can be used to add configs to the server's config
-// store. Use Update to specify more configs at once.
-func (s *Server) GetConfigChannel() chan Config {
-	return s.configCh
+	// remove all subscriptions
+	s.configs.UnsubscribeAll()
 }
 
 // GetConfigStore returns the dataplane configs stores in the server.
-func (s *Server) GetConfigStore() *ConfigStore {
+func (s *Server) GetConfigStore() *ConfigStore[string] {
 	return s.configs
 }
 
@@ -137,95 +117,87 @@ func (s *Server) RemoveClient(id string) {
 	}
 }
 
-func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, operationID string, filter ConfigFilter, patch ClientConfigPatcher) {
-	// since wsConn is hijacked, reqCtx is unreliable in that it may not be canceled when the
-	// connection is closed, so we create our own connection context that we can cancel
-	// explicitly
-	ctx, cancel := context.WithCancel(reqCtx)
-	conn := NewConn(wsConn, filter, patch, cancel)
-	s.conns.Upsert(conn)
-
-	// a dummy reader that drops everything it receives: this must be there for the
-	// WebSocket server to call our pong-handler: conn.Close() will kill this goroutine
-	go func() {
-		for {
-			// drop anything we receive
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				s.closeConn(conn)
-				return
-			}
-		}
-	}()
-
-	conn.SetPingHandler(func(string) error {
-		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
-	})
-
-	s.log.V(1).Info("New config stream connection", "api", operationID, "client", conn.Id())
-
-	// send initial config(list)
-	for _, conf := range s.configs.Snapshot() {
-		if filter(conf.Id) {
-			s.sendConfig(conn, conf.Config)
-		}
-	}
-
-	// wait until client closes the connection or the server is cancelled (which will kill all
-	// the running connections)
-	<-ctx.Done()
-
-	s.log.V(1).Info("Client connection closed", "api", operationID, "client", conn.Id())
-
-	conn.Close()
+// PusNodeConfig updates the config at each known client that is subscribed for updates on a
+// given node. This is useful for force pushing a new config when some node address changes.
+func (s *Server) PushNodeConfig(node string) {
+	s.log.V(4).Info("Pusing configs for node", "node", node)
+	s.configs.Push(node)
 }
 
-// iterate through all connections and send response if needed
-func (s *Server) broadcastConfig(e Config) {
-	for _, conn := range s.conns.Snapshot() {
-		if conn.Filter(e.Id) {
-			s.sendConfig(conn, e.Config)
-		}
+func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
+	s.log.V(4).Info("Upserting config", "config-id", id, "config", c.String())
+	if namespace, name, ok := NamespacedName(id); ok {
+		s.configs.Upsert(namespace, name, c)
 	}
 }
 
-func (s *Server) sendConfig(conn *Conn, e *stnrv1.StunnerConfig) {
-	c := &stnrv1.StunnerConfig{}
-	e.DeepCopyInto(c)
+// DeleteConfig removes a config from clients by sending a zero-config. Clients may decide to
+// ignore the delete operation by (1) using client.IsConfigDeleted() to identify whether a config
+// is being deleted and (2) selectively ignoring config delete updates based on the result. This is
+// needed, e.g., in stunnerd, in order to avoid that a client being removed and entering the
+// graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with all active
+// connections allocated to them.
+func (s *Server) DeleteConfig(id string) {
+	s.log.V(4).Info("Deleting config", "config-id", id)
 
-	if conn.patch != nil {
-		newC, err := conn.patch(c)
-		if err != nil {
-			s.log.Error(err, "Cannot patch config", "event", e.String())
-			return
-		}
-		c = newC
-	}
-
-	json, err := json.Marshal(c)
-	if err != nil {
-		s.log.Error(err, "Cannot JSON serialize config", "event", e.String())
+	namespace, name, ok := NamespacedName(id)
+	if !ok {
 		return
 	}
 
-	s.log.V(2).Info("Sending configuration to client", "client", conn.Id())
-
-	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
-		s.log.Error(err, "Error sending config update", "client", conn.Id())
-		s.closeConn(conn)
+	config := client.ZeroConfig(id)
+	if SuppressConfigDeletion {
+		s.log.Info("Suppressing config update for deleted config", "config-id", id)
+		config = nil
 	}
+
+	s.configs.Delete(namespace, name, config)
 }
 
-func (s *Server) closeConn(conn *Conn) {
-	s.log.V(1).Info("Closing client connection", "client", conn.Id())
+// UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
+// particular instance of time and generates an update per each change.
+func (s *Server) UpdateConfig(newConfigs []Config) error {
+	s.log.V(4).Info("Processing config updates", "num-configs", len(newConfigs))
+	oldConfigs := s.configs.Snapshot()
 
-	conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+	for _, oldC := range oldConfigs {
+		found := false
+		for _, newC := range newConfigs {
+			if oldC.Id() == newC.Id() {
+				if !oldC.Config.DeepEqual(newC.Config) {
+					s.log.V(2).Info("Updating config", "config-id", newC.Id(), "config",
+						newC.Config.String())
+					s.UpsertConfig(newC.Id(), newC.Config)
+				} else {
+					s.log.V(2).Info("Config unchanged", "config-id", newC.Id(),
+						"old-config", oldC.Config.String(),
+						"new-config", newC.Config.String())
+				}
+				found = true
+				break
+			}
+		}
 
-	if conn.cancel != nil {
-		conn.cancel()
-		conn.cancel = nil // make sure we can cancel multiple times
+		if !found {
+			s.log.V(2).Info("Removing config", "config-id", oldC.Id())
+			s.DeleteConfig(oldC.Id())
+		}
 	}
 
-	s.conns.Delete(conn)
-	conn.Close()
+	for _, newC := range newConfigs {
+		found := false
+		for _, oldC := range oldConfigs {
+			if oldC.Id() == newC.Id() {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			s.log.V(2).Info("Adding config", "config-id", newC.Id(), "config", newC.Config)
+			s.UpsertConfig(newC.Id(), newC.Config)
+		}
+	}
+
+	return nil
 }
