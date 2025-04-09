@@ -44,6 +44,7 @@ const (
 	DefaultConfigDiscoveryAddress = ":13478"
 	DefaultEnvVarName             = "STUNNER_NAME"
 	DefaultEnvVarNamespace        = "STUNNER_NAMESPACE"
+	DefaultEnvVarAddr             = "STUNNER_ADDR"
 	DefaultEnvVarNodeName         = "STUNNER_NODENAME"
 	DefaultEnvVarConfigOrigin     = "STUNNER_CONFIG_ORIGIN"
 	DefaultCDSServerAddrEnv       = "CDS_SERVER_ADDR"
