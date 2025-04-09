@@ -10,15 +10,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/zapr"
 	"github.com/gorilla/websocket"
 	"github.com/pion/transport/v3/test"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/yaml"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
+	cdsserver "github.com/l7mp/stunner/pkg/config/server"
 	"github.com/l7mp/stunner/pkg/logger"
 )
+
+var testerLogLevel = zapcore.Level(-10)
+
+// var testerLogLevel = zapcore.DebugLevel
+// var testerLogLevel = zapcore.ErrorLevel
 
 /********************************************
  *
@@ -451,6 +460,129 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
 
 	stunner.Close()
+}
+
+func TestStunnerConfigPatcher(t *testing.T) {
+	lim := test.TimeOut(time.Second * 10)
+	defer lim.Stop()
+
+	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
+	log := loggerFactory.NewLogger("test-poller")
+
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	assert.NoError(t, err, "logger created")
+	zlogger := zapr.NewLogger(z)
+	logger := zlogger.WithName("tester")
+
+	confChan := make(chan *stnrv1.StunnerConfig, 1)
+	defer close(confChan) // must be closed after the context is cancelled
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testCDSAddr := "localhost:63479"
+	log.Debugf("create server on %s", testCDSAddr)
+	// rewrite node address if requested
+	patcher := func(conf *stnrv1.StunnerConfig, node string) *stnrv1.StunnerConfig {
+		if node != "" {
+			for i := range conf.Listeners {
+				if conf.Listeners[i].Addr == "STUNNER_NODE_ADDR" {
+					conf.Listeners[i].Addr = node
+				}
+			}
+		}
+		return conf
+	}
+	srv := cdsserver.New(testCDSAddr, patcher, logger)
+	assert.NotNil(t, srv, "server")
+	err = srv.Start(ctx)
+	assert.NoError(t, err, "start")
+
+	log.Debug("creating a stunnerd")
+	stunner := NewStunner(Options{
+		LogLevel:         stunnerTestLoglevel,
+		Name:             "ns1/tester",
+		NodeName:         "127.1.2.3", // must be a valid IP otherwise reconcile fails
+		SuppressRollback: true,
+		DryRun:           true,
+	})
+	defer stunner.Close()
+
+	log.Debug("starting config watcher")
+	assert.NoError(t, stunner.WatchConfig(ctx, "ws://"+testCDSAddr, confChan, true), "start")
+
+	log.Debug("starting the reconciler thread")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case c := <-confChan:
+				err := stunner.Reconcile(c)
+				if err == ErrRestartRequired {
+					continue
+				}
+				assert.NoError(t, stunner.Reconcile(c), "reconcile")
+			}
+		}
+	}()
+
+	for _, testCase := range []struct {
+		name   string
+		prep   func(c *stnrv1.StunnerConfig, t *testing.T)
+		tester func(c *stnrv1.StunnerConfig) bool
+	}{{
+		name: "default",
+		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) {},
+		tester: func(c *stnrv1.StunnerConfig) bool {
+			return len(c.Listeners) == 1 && c.Listeners[0].Addr == "0.0.0.0"
+		},
+	}, {
+		name: "default w/ IP",
+		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) { c.Listeners[0].Addr = "127.0.0.1" },
+		tester: func(c *stnrv1.StunnerConfig) bool {
+			return len(c.Listeners) == 1 && c.Listeners[0].Addr == "127.0.0.1"
+		},
+	}, {
+		name: "node rewrite",
+		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) { c.Listeners[0].Addr = "STUNNER_NODE_ADDR" },
+		tester: func(c *stnrv1.StunnerConfig) bool {
+			return len(c.Listeners) == 1 && c.Listeners[0].Addr == "127.1.2.3"
+		},
+	}} {
+		testName := fmt.Sprintf("TestStunner_NewDefaultConfig_URI:%s", testCase.name)
+		t.Run(testName, func(t *testing.T) {
+			log.Debugf("-------------- Running test: %s -------------", testName)
+
+			config := &stnrv1.StunnerConfig{
+				ApiVersion: stnrv1.ApiVersion,
+				Admin: stnrv1.AdminConfig{
+					LogLevel: stunnerTestLoglevel,
+				},
+				Auth: stnrv1.AuthConfig{
+					Credentials: map[string]string{
+						"username": "user",
+						"password": "pass",
+					},
+				},
+				Listeners: []stnrv1.ListenerConfig{{
+					Name: "default-listener",
+					Addr: "0.0.0.0",
+				}},
+			}
+			testCase.prep(config, t)
+			assert.NoError(t, srv.UpdateConfig([]cdsserver.Config{{
+				Name:      "tester",
+				Namespace: "ns1",
+				Config:    config,
+			}}), "config server update")
+
+			assert.Eventually(t, func() bool { return testCase.tester(stunner.GetConfig()) },
+				time.Second, 10*time.Millisecond)
+		})
+	}
 }
 
 func TestStunnerURIParser(t *testing.T) {
