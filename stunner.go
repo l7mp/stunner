@@ -19,9 +19,15 @@ import (
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
+// DefaultLogLevel indicates the default log level.
 const DefaultLogLevel = "all:WARN"
 
+// DefaultInstanceId is the default instance id for stunnerd processes.
 var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
+
+// ErrRestartRequired is returned by Reconcile to indicate that some server components have been
+// restarted but otherwise reconciliation occured smoothly. It is safe to ignore this error.
+var ErrRestartRequired = object.ErrRestartRequired
 
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
