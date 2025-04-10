@@ -46,7 +46,7 @@ STUNner will search for the customer key in the Kubernetes Secret named `stunner
      namespace: stunner-system
    type: Opaque
    data:
-     CUSTOMER_KEY: X19kZWJ1Z19jdXNfUkZPU2FHMnNJNWtwNms=
+     CUSTOMER_KEY: X1789iOhjJKJNWtwNms=
    ```
 
    Rewrite `data.CUSTOMER_KEY` with your customer key. In order to prevent Kubernetes from base64-encoding the key, use the `stringData` field instead of `data`: `stringData.CUSTOMER_KEY`. Eventually you should see something like the below:

@@ -1,0 +1,113 @@
+apiVersion: stunner.l7mp.io/v1
+kind: Dataplane
+metadata:
+  name: turn-server-dataplane
+spec:
+  args:
+  - -w
+  - --udp-thread-num=16
+  command:
+  - stunnerd
+  containerSecurityContext:
+    capabilities:
+      add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_MODULE
+  dataplaneResource: Deployment
+  enableMetricsEndpoint: true
+  image: "docker.io/l7mp/stunnerd-premium:dev"
+  # for stable version
+  # image: docker.io/l7mp/stunnerd-premium:latest
+  imagePullPolicy: Always
+  offloadEngine: Auto
+  hostNetwork: true
+  replicas: 1
+  resources:
+    limits:
+      cpu: 2
+      memory: 512Mi
+    requests:
+      cpu: 500m
+      memory: 128Mi
+  terminationGracePeriodSeconds: 3600
+---
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is a WebRTC ingress gateway for Kubernetes"
+---
+
+apiVersion: stunner.l7mp.io/v1
+kind: GatewayConfig
+metadata:
+  name: stunner-gatewayconfig
+  namespace: stunner
+spec:
+  dataplane: turn-server-dataplane
+  authRef:
+    name: stunner-auth-secret
+    namespace: stunner
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: stunner-auth-secret
+  namespace: stunner
+type: Opaque
+stringData:
+  type: static
+  username: user-1
+  password: pass-1
+---
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: turn-server-udp
+  namespace: stunner
+  annotations:
+    stunner.l7mp.io/enable-relay-address-discovery: "true"
+    stunner.l7mp.io/external-traffic-policy: local
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: udp-listener
+      port: 3478
+      protocol: TURN-UDP
+---
+
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: open-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: turn-server-udp
+  rules:
+    - backendRefs:
+        - group: stunner.l7mp.io
+          kind: StaticService
+          name: open-svc
+---
+
+apiVersion: stunner.l7mp.io/v1
+kind: StaticService
+metadata:
+  name: open-svc
+  namespace: stunner
+spec:
+  prefixes:
+    - "0.0.0.0/0"
+          
