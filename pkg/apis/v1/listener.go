@@ -111,7 +111,7 @@ func (req *ListenerConfig) String() string {
 		addr = req.Addr
 	}
 
-	status = append(status, fmt.Sprintf("turn://%s:%d", addr, req.Port))
+	status = append(status, fmt.Sprintf("turn://%s:%d?transport=%s", addr, req.Port, req.Protocol))
 
 	a, p := "-", "-"
 	if req.PublicAddr != "" {

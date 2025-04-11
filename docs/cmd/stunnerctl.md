@@ -24,8 +24,6 @@ cd stunner
 go build -o stunnerctl cmd/stunnerctl/main.go
 ```
 
-Or download the binary from the [releases](https://github.com/l7mp/stunner/releases) page.
-
 ## Usage
 
 Type `stunnerctl` to get a glimpse of the sub-commands and features provided.
@@ -138,6 +136,20 @@ The `status` sub-command reports the status of the dataplane pods for a gateway,
   TERMINATING
   ```
 
+### License status
+
+STUNner requires a valid license to unlock premium features. The below will report STUNner's license status:
+
+```console
+stunnerctl license
+License status:
+    Subscription type: member
+    Enabled features: DaemonSet, STUNServer, ...
+    Last updated: ...
+```
+
+This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license.
+
 ### Authentication
 
 The `auth` sub-command can be used to obtain a TURN credential or a full ICE server config for connecting to a specific gateway. The authentication service API is usually served by a separate [STUNner authentication server](https://github.com/l7mp/stunner-auth-service) deployed alongside the gateway operator. The main use of this command is to feed an ICE agent manually with the ICE server config to connect to a specific STUNner gateway.
@@ -146,15 +158,78 @@ The `auth` sub-command can be used to obtain a TURN credential or a full ICE ser
 
   ``` console
   stunnerctl -n stunner auth udp-gateway
-  {"iceServers":[{"credential":"pass-1","urls":["turn:10.104.19.179:3478?transport=udp"],"username":"user-1"}],"iceTransportPolicy":"all"}
+  {"iceServers":[{"credential":"pass-1","urls":["turn:A.B.C.D:3478?transport=udp"],"username":"user-1"}],"iceTransportPolicy":"all"}
   ```
 
 - Request a plain [TURN credential](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) using the authentication service deployed into the `stunner-system-prod` namespace:
 
   ``` console
   stunnerctl -n stunner auth udp-gateway --auth-turn-credential --auth-service-namespace=stunner-system-prod
-  {"password":"pass-1","ttl":86400,"uris":["turn:10.104.19.179:3478?transport=udp"],"username":"user-1"}
+  {"password":"pass-1","ttl":86400,"uris":["turn:A.B.C.D:3478?transport=udp"],"username":"user-1"}
+```
+
+- Obtain an ICE config for the Gateway `stunner/udp-gateway` and setting the user-id to `my-user`
+  (useful for ephemeral authentication):
+
+  ``` console
+  stunnerctl  -n stunner auth udp-gateway --username my-user
+  {"iceServers":[{"credential":"...=","urls":["turn:A.B.C.D:3478?transport=udp"],"username":"1740150333:my-user"}],"iceTransportPolicy":"all"}
   ```
+
+### ICE test
+
+The `icetest` sub-command can be used to run a full-blown ICE test. This command is intended for
+users to check a STUNner installation and pinpoint installation errors.
+
+The tester will fire up a WHIP server in the cluster, configure a UDP and a TCP gateway to expose
+it, makes a PeerConnection to the WHIP server via the gateways, and performs a quick test by
+sending a set of packets via a data channel created over the PeerConnection and measures loss and
+latency using the packets echoed back by the WHIP server. If successful, the tester will output the
+measured statistics, otherwise it reports the error that stopped the ICE test and provides some
+diagnostics that to help troubleshooting.
+
+- Run a dataplane test over UDP and TCP:
+
+  ``` console
+  stunnerctl icetest
+  Initializing... completed
+  Checking installation... completed
+  Checking Gateway... completed
+  Obtaining ICE server configuration... completed
+  Running asymmetric ICE test over TURN-UDP... completed
+  	Statistics: rate=48.65pps, loss=0/973pkts=0.00%, RTT:mean=20.67ms/median=20.54ms/P95=22.23ms/P99=23.34ms
+  	LocalICECandidates:
+  	  * udp4 relay 10.244.0.24:43988 related 0.0.0.0:43716 (resolved: 10.244.0.24:43988)
+  	RemoteICECandidates:
+  	  * udp4 host 10.244.0.163:35242 (resolved: 10.244.0.163:35242)
+  Running asymmetric ICE test over TURN-TCP... completed
+  	Statistics: rate=48.55pps, loss=0/971pkts=0.00%, RTT:mean=21.00ms/median=20.89ms/P95=22.45ms/P99=23.47ms
+  	LocalICECandidates:
+  	  * udp4 relay 10.244.0.162:45090 related 0.0.0.0:45654 (resolved: 10.244.0.162:45090)
+  	RemoteICECandidates:
+  	  * udp4 host 10.244.0.163:51653 (resolved: 10.244.0.163:51653)
+  Running symmetric ICE test over TURN-UDP... completed
+  	Statistics: rate=48.65pps, loss=0/973pkts=0.00%, RTT:mean=20.63ms/median=20.47ms/P95=21.85ms/P99=23.01ms
+  	LocalICECandidates:
+  	  * udp4 relay 10.244.0.24:47282 related 0.0.0.0:55122 (resolved: 10.244.0.24:47282)
+  	RemoteICECandidates:
+  	  * udp4 relay 10.244.0.24:47367 related 0.0.0.0:51777 (resolved: 10.244.0.24:47367)
+  Running symmetric ICE test over TURN-TCP... completed
+  	Statistics: rate=48.60pps, loss=0/972pkts=0.00%, RTT:mean=24.61ms/median=20.56ms/P95=39.96ms/P99=133.40ms
+  	LocalICECandidates:
+  	  * udp4 relay 10.244.0.162:56555 related 0.0.0.0:42600 (resolved: 10.244.0.162:56555)
+  	RemoteICECandidates:
+  	  * udp4 relay 10.244.0.162:33397 related 10.244.0.163:53124 (resolved: 10.244.0.162:33397)
+  ```
+
+- Clean up the Kubernetes resources the tester might have left behind on a previous run and perform
+  the test only on TURN-UDP with at a rate of 100 packets per second using a 2 minute timeout:
+
+  ``` console
+  stunnerctl icetest  --force-cleanup -packet-rate 100 --timeout 2m udp
+  ```
+
+Run `stunnerctl icetest --help` for further useful command line arguments.
 
 ## License
 

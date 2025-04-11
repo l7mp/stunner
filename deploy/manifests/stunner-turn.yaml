@@ -14,7 +14,7 @@ spec:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_MODULE
-  dataplaneResource: Deployment
+  dataplaneResource: DaemonSet
   enableMetricsEndpoint: true
   image: "docker.io/l7mp/stunnerd-premium:dev"
   # for stable version

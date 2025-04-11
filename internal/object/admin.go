@@ -214,8 +214,8 @@ func (a *Admin) Close() error {
 
 // Status returns the status of the object.
 func (a *Admin) Status() stnrv1.Status {
-	intfs := ""
 	adminConf := a.GetConfig().(*stnrv1.AdminConfig)
+	intfs := "all"
 	if adminConf.OffloadEngine != "None" && len(adminConf.OffloadInterfaces) > 0 {
 		intfs = strings.Join(adminConf.OffloadInterfaces, ",")
 	}

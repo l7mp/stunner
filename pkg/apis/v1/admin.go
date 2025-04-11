@@ -139,7 +139,7 @@ func (req *AdminConfig) String() string {
 		status = append(status, fmt.Sprintf("quota=%d", req.UserQuota))
 	}
 	if req.OffloadEngine != "" {
-		intfs := ""
+		intfs := "all"
 		if req.OffloadEngine != "None" && len(req.OffloadInterfaces) > 0 {
 			intfs = fmt.Sprintf("<%s>", strings.Join(req.OffloadInterfaces, ","))
 		}
