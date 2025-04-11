@@ -58,7 +58,7 @@ const (
 	diagFailedToCreateNamespace = "A namespace for running the test could not be created. This either means that the namespace already exists (e.g., if the icetester could not exit cleanly) or you spefified an existing namespace (the tester refuses to run in an existing namespace in order to avoid interfering with the resources existing there), or the current Kubernetes user does not have enough rigts to create a namespace. Does 'kubectl create namespace my-namespace' work?"
 
 	// install
-	diagFailedToQueryOrCreateArtifacts = "Some Kubernetes resources needed for running the tests could not be queried or created. Typically, this occurs because the Gateway API custom resources or STUNNer's own custom resources have not been installed, or the current Kubernetes user does not have enough rigts to get or create the resource, or some other error occurred."
+	diagFailedToQueryOrCreateArtifacts = "Some Kubernetes resources needed for running the tests could not be queried or created. Typically, this occurs because the Gateway API custom resources or STUNner's own custom resources have not been installed, or the current Kubernetes user does not have enough rigts to get or create the resource, or some other error occurred."
 
 	diagCDSServerUnavailable = "The STUNner gateway operator is not installed or the installation is incomplete. Is the gateway operator pod running? It is usually called 'stunner-gateway-operator-controller-manager-XXX' in the 'stunner-system', or in the namespace you installed STUNner. What is the pod status?"
 

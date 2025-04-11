@@ -81,6 +81,8 @@ type Config struct {
 	ICETesterImage string
 	ForceCleanup   bool
 	PacketRate     int
+	OffloadEngine  v1.OffloadMode
+	AllowNodePort  bool
 
 	Logger logger.LoggerFactory
 }
@@ -100,6 +102,8 @@ type iceTester struct {
 	iceTesterImage        string
 	forceCleanup          bool
 	floodTestSendInterval time.Duration
+	offloadEngine         v1.OffloadMode
+	allowNodePort         bool
 
 	logger logger.LoggerFactory
 	log    logging.LeveledLogger
@@ -135,6 +139,8 @@ func NewICETester(config Config) (*iceTester, error) {
 		iceTesterImage:        image,
 		forceCleanup:          config.ForceCleanup,
 		floodTestSendInterval: sendInterval,
+		offloadEngine:         config.OffloadEngine,
+		allowNodePort:         config.AllowNodePort,
 
 		logger: logr,
 		log:    logr.NewLogger("icetester"),
@@ -377,12 +383,17 @@ func (t *iceTester) Start(ctx context.Context) error {
 			}
 
 			for _, l := range confs[0].Listeners {
-				if l.PublicAddr == "" || l.PublicPort == 0 {
-					return false, nil // no public address yet: retry
+				// prefer LB exposition
+				if l.PublicAddr != "" && l.PublicPort == 3478 {
+					return true, nil
+				}
+				if t.allowNodePort && l.PublicAddr != "" && l.PublicPort != 0 {
+					return true, nil
 				}
 			}
 
-			return true, nil
+			return false, nil
+
 		}, 60*time.Second, 250*time.Millisecond); err != nil {
 			return t.sendEventComplete(EventGatewayAvailable,
 				fmt.Errorf("Failed to find public address for Gateway %s/%s: %w", t.namespace, gw.GetName(), err),

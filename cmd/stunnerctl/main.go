@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 
 	"github.com/l7mp/stunner/internal/icetester"
+	v1 "github.com/l7mp/stunner/pkg/apis/v1"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -23,14 +24,14 @@ import (
 // get config for stunner/udp-gateway in yaml format: stunnerctl -n stunner get config udp-gateway --output yaml
 
 var (
-	output, iceTesterImage, username, loglevel string
-	watch, all, verbose, forceCleanup          bool
-	k8sConfigFlags                             *cliopt.ConfigFlags
-	cdsConfigFlags                             *cdsclient.CDSConfigFlags
-	authConfigFlags                            *cdsclient.AuthConfigFlags
-	podConfigFlags                             *cdsclient.PodConfigFlags
-	iceTesterTimeout                           time.Duration
-	iceTesterPacketRate                        int
+	output, iceTesterImage, iceTesterOffloadEngine, username, loglevel string
+	watch, all, verbose, forceCleanup, allowNodePort                   bool
+	k8sConfigFlags                                                     *cliopt.ConfigFlags
+	cdsConfigFlags                                                     *cdsclient.CDSConfigFlags
+	authConfigFlags                                                    *cdsclient.AuthConfigFlags
+	podConfigFlags                                                     *cdsclient.PodConfigFlags
+	iceTesterTimeout                                                   time.Duration
+	iceTesterPacketRate                                                int
 
 	loggerFactory logger.LoggerFactory
 	log           logging.LeveledLogger
@@ -155,8 +156,13 @@ func init() {
 	iceTestCmd.Flags().DurationVarP(&iceTesterTimeout, "timeout", "t", icetester.DefaultICETesterTimeout,
 		"Timeout")
 	iceTestCmd.Flags().StringVar(&iceTesterImage, "ice-tester-image", icetester.DefaultICETesterImage,
-		"Default icetester container image")
-	iceTestCmd.Flags().BoolVar(&forceCleanup, "force-cleanup", false, "Remove tester namespace if it exists")
+		"Icetester container image")
+	iceTestCmd.Flags().StringVar(&iceTesterOffloadEngine, "offload-mode", v1.OffloadEngineNone.String(),
+		"TURN (UDP) offload mode")
+	iceTestCmd.Flags().BoolVar(&forceCleanup, "force-cleanup", false,
+		"Remove tester namespace if it exists before launching the ICE test")
+	iceTestCmd.Flags().BoolVar(&allowNodePort, "allow-nodeport", false,
+		"Allow connecting to STUNner via a NodePort (may require prior firewall configuration)")
 
 	// Add commands
 	rootCmd.AddCommand(configCmd)

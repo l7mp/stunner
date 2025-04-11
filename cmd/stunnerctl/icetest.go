@@ -48,6 +48,11 @@ func runICETest(_ *cobra.Command, args []string) error {
 		}
 	}
 
+	offloadEngine, err := v1.NewOffloadEngine(iceTesterOffloadEngine)
+	if err != nil {
+		return fmt.Errorf("could not initialize offload engine: %w", err)
+	}
+
 	// Create a buffered logger for the tests
 	logBuffer := &bytes.Buffer{}
 	bufferedLoggerFactory := logger.NewLoggerFactory("all:TRACE") // hardcode highest loglevel
@@ -67,6 +72,8 @@ func runICETest(_ *cobra.Command, args []string) error {
 		ICETesterImage: iceTesterImage,
 		ForceCleanup:   forceCleanup,
 		PacketRate:     iceTesterPacketRate,
+		OffloadEngine:  offloadEngine,
+		AllowNodePort:  allowNodePort,
 
 		Logger: bufferedLoggerFactory,
 	})

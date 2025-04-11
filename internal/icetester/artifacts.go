@@ -249,10 +249,19 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 		{path: []string{"spec", "resources", "requests", "memory"}, value: "256Mi"},
 		{path: []string{"spec", "resources", "limits", "cpu"}, value: "250m"},
 		{path: []string{"spec", "resources", "limits", "memory"}, value: "256Mi"},
+		{path: []string{"spec", "offloadEngine"}, value: t.offloadEngine.String()},
 	} {
 		if err := unstructured.SetNestedField(d.Object, s.value, s.path...); err != nil {
 			return nil, fmt.Errorf("Failed to set field <%s> to %s: %w",
 				strings.Join(s.path, "."), s.value, err)
+		}
+	}
+
+	// offload customizations
+	if t.offloadEngine != v1.OffloadEngineNone {
+		if err := unstructured.SetNestedSlice(d.Object, []any{"NET_ADMIN", "SYS_ADMIN", "SYS_MODULE"},
+			"spec", "containerSecurityContext", "capabilities", "add"); err != nil {
+			return nil, fmt.Errorf("Failed to enable NET_ADMIN capabilities: %w", err)
 		}
 	}
 

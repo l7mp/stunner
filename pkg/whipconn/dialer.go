@@ -51,7 +51,18 @@ func (d *Dialer) WithSettingEngine(e webrtc.SettingEngine) *Dialer {
 
 func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error) {
 	stopped := false
-	defer func() { stopped = true }()
+	var connCh chan any
+	var errCh chan error
+	defer func() {
+		stopped = true
+		if connCh != nil {
+			close(connCh)
+		}
+		if errCh != nil {
+			close(errCh)
+		}
+	}()
+
 	peerConn, err := d.api.NewPeerConnection(webrtc.Configuration{
 		ICEServers:         d.config.ICEServers,
 		ICETransportPolicy: d.config.ICETransportPolicy,
@@ -73,10 +84,8 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		log:      d.connLog,
 	}
 
-	connCh := make(chan any, 1)
-	defer close(connCh)
-	errCh := make(chan error)
-	defer close(errCh)
+	connCh = make(chan any, 1)
+	errCh = make(chan error)
 
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
@@ -116,9 +125,8 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to set local SDP (Offer): %w", err)
 	}
 
-	// Block until ICE Gathering is complete, disabling trickle ICE
-	// we do this because we only can exchange one signaling message
-	// in a production application you should exchange ICE Candidates via OnICECandidate
+	// Block until ICE Gathering is complete, disabling trickle ICE we do this because we only
+	// can exchange one signaling message
 	gatherComplete := webrtc.GatheringCompletePromise(peerConn)
 	<-gatherComplete
 
