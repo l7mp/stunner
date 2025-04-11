@@ -24,14 +24,15 @@ import (
 // get config for stunner/udp-gateway in yaml format: stunnerctl -n stunner get config udp-gateway --output yaml
 
 var (
-	output, iceTesterImage, iceTesterOffloadEngine, username, loglevel string
-	watch, all, verbose, forceCleanup, allowNodePort                   bool
-	k8sConfigFlags                                                     *cliopt.ConfigFlags
-	cdsConfigFlags                                                     *cdsclient.CDSConfigFlags
-	authConfigFlags                                                    *cdsclient.AuthConfigFlags
-	podConfigFlags                                                     *cdsclient.PodConfigFlags
-	iceTesterTimeout                                                   time.Duration
-	iceTesterPacketRate                                                int
+	output, username, loglevel                                     string
+	iceTesterImage, iceTesterOffloadEngine, configRelayAddressNode string
+	watch, all, verbose, forceCleanup, allowNodePort               bool
+	k8sConfigFlags                                                 *cliopt.ConfigFlags
+	cdsConfigFlags                                                 *cdsclient.CDSConfigFlags
+	authConfigFlags                                                *cdsclient.AuthConfigFlags
+	podConfigFlags                                                 *cdsclient.PodConfigFlags
+	iceTesterTimeout                                               time.Duration
+	iceTesterPacketRate                                            int
 
 	loggerFactory logger.LoggerFactory
 	log           logging.LeveledLogger
@@ -135,6 +136,8 @@ func init() {
 
 	// watch flag: only for config
 	configCmd.Flags().BoolVarP(&watch, "watch", "w", false, "Watch for config updates from server")
+	configCmd.Flags().StringVar(&configRelayAddressNode, "node", "",
+		"Perform relay address discovery (if available) with respect to the given node.")
 
 	// Pod discovery flags: only for "status" command
 	podConfigFlags = cdsclient.NewPodConfigFlags()

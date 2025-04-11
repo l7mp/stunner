@@ -205,8 +205,21 @@ func (req *StunnerConfig) Summary() string {
 
 	status += "Listeners:\n"
 	for _, l := range req.Listeners {
+		addr := ""
+		switch l.Addr {
+		case "$STUNNER_ADDR":
+			addr = "<private-pod-ip-addr>"
+		case "__node_address_placeholder":
+			addr = "<node-ip-addr>"
+		case "0.0.0.0":
+			addr = "0.0.0.0"
+		default:
+			addr = l.Addr
+		}
+
 		status += fmt.Sprintf("  - Name: %s\n", l.Name)
 		status += fmt.Sprintf("    Protocol: %s\n", l.Protocol)
+		status += fmt.Sprintf("    Relay address:port: %s:%s\n", strOrNone(addr), intOrNone(l.Port))
 		status += fmt.Sprintf("    Public address:port: %s:%s\n", strOrNone(l.PublicAddr), intOrNone(l.PublicPort))
 		status += fmt.Sprintf("    Routes: [%s]\n", strings.Join(l.Routes, ", "))
 		ep := []string{}
@@ -249,7 +262,15 @@ func (s *StunnerStatus) String() string {
 
 // String summarizes the status.
 func (s *StunnerStatus) Summary() string {
-	return fmt.Sprintf("%s\n\t%s\n\tlisteners:%d/clusters:%d\n\tallocs:%d/status=%s",
-		s.Admin.String(), s.Auth.String(), len(s.Listeners), len(s.Clusters),
+	ls := []string{}
+	for _, l := range s.Listeners {
+		ls = append(ls, l.String())
+	}
+	cs := []string{}
+	for _, c := range s.Clusters {
+		cs = append(cs, c.String())
+	}
+	return fmt.Sprintf("%s\n\t%s\n\tlisteners:%s\n\tclusters:%s\n\tallocs:%d/status=%s",
+		s.Admin.String(), s.Auth.String(), strings.Join(ls, ","), strings.Join(cs, ","),
 		s.AllocationCount, s.Status)
 }

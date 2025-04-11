@@ -103,6 +103,12 @@ func runStatus(_ *cobra.Command, args []string) error {
 					fmt.Printf("%v\n", values[arrIx][valIx].Interface())
 				}
 			}
+		case "string":
+			if pod.Proxy {
+				fmt.Printf("%s/%s:\n\t%s\n", pod.Namespace, pod.Name, s.String())
+			} else {
+				fmt.Printf("%s:\n\t%s\n", pod.Addr, s.String())
+			}
 		case "summary":
 			fallthrough
 		default:
