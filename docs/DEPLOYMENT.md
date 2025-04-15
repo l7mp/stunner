@@ -1,14 +1,16 @@
 # Deployment models
 
 STUNner can be deployed in many different ways, supporting a wide range of operational
-requirements. First, it supports multiple [architectural models](#architectural-models) where it
-can act either as a simple headless STUN/TURN server or a fully fledged ingress gateway in front of
-an entire Kubernetes-based media server pool. Second, when STUNner is configured as an ingress
-gateway then there are multiple [ICE models](#ice-models), based on whether only the client
-connects via STUNner or both clients and media servers use STUNner to set up the media-plane
-connection. Third, STUNner can run in one of several [data plane models](#data-plane-models), based
-on whether the dataplane is automatically provisioned or the user has to manually supply the
-dataplane pods for STUNner.
+requirements. STUNner supports multiple [architectural models](#architectural-models) where it can
+act either as a simple headless STUN/TURN server or a fully fledged ingress gateway in front of an
+entire Kubernetes-based media server pool. In addition, if STUNner is configured as an ingress
+gateway then it can run in one of two [ICE models](#ice-models), based on whether only the
+client connects via STUNner or both clients and media servers use STUNner to set up the media-plane
+connection. 
+
+<!-- Third, STUNner can run in one of several [data plane models](#data-plane-models),
+based --> <!-- on whether the dataplane is automatically provisioned or the user has to manually
+supply the --> <!-- dataplane pods for STUNner. -->
 
 ## Architectural models
 
@@ -129,10 +131,10 @@ internal IP addresses in the ICE candidates from attackers; note that this is no
 but feel free to open an issue if [exposing internal IP addresses](SECURITY.md) is blocking
 you from adopting STUNner.
 
-## Data plane models
+<!-- ## Data plane models -->
 
-STUNner supports two dataplane provisioning modes. In the default *managed* mode, the dataplane
-pods (i.e., the `stunnerd` pods) are provisioned automatically per each Gateway existing in the
-cluster. In the *legacy* mode, the dataplane is supposed to be deployed by the user manually by
-installing the `stunner/stunner` Helm chart into the target namespaces. Legacy mode is considered
-obsolete at this point and it will be removed in a later release.
+<!-- STUNner supports two dataplane provisioning modes. In the default *managed* mode, the dataplane -->
+<!-- pods (i.e., the `stunnerd` pods) are provisioned automatically per each Gateway existing in the -->
+<!-- cluster. In the *legacy* mode, the dataplane is supposed to be deployed by the user manually by -->
+<!-- installing the `stunner/stunner` Helm chart into the target namespaces. Legacy mode is considered -->
+<!-- obsolete at this point and it will be removed in a later release. -->

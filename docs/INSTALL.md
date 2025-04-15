@@ -24,8 +24,7 @@ helm repo update
 The below will install the stable version of STUNner. In particular, the this will install only the STUNner control plane, i.e., the gateway operator and the authentication service, the dataplane will be automatically provisioned by the operator when needed (but see below). We recommend to use the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
-    --namespace=stunner-system
+helm install stunner stunner/stunner --create-namespace --namespace=stunner-system
 ```
 
 And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1#DataplaneSpec).
@@ -35,8 +34,7 @@ And that's all: you don't need to install the dataplane separately, this is hand
 By default, the Helm chart installs the stable version of STUNner. To track the bleeding edge, STUNner provides a `dev` release channel that tracks the latest development version. Use it at your own risk: we do not promise any stability for the dev-channel.
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace \
-    --namespace=stunner-system
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner-system
 ```
 
 After upgrading the operator from the dev channel you may need to manually restart the dataplane
@@ -46,30 +44,29 @@ for each of your Gateways:
 kubectl -n <gateway-namespace> rollout restart deployment <gateway-name>
 ```
 
-### Legacy mode
+<!-- ### Legacy mode -->
 
-In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times.
+<!-- In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times. -->
 
-```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
-    --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy
-helm install stunner stunner/stunner --create-namespace --namespace=stunner
-```
+<!-- ```console -->
+<!-- helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \ -->
+<!--     --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy -->
+<!-- helm install stunner stunner/stunner --create-namespace --namespace=stunner -->
+<!-- ``` -->
 
-You can install multiple legacy STUNner dataplanes side-by-side, provided that the corresponding namespaces are different. For instance, to create a `prod` dataplane installation for your production workload and a `dev` installation for experimentation, the below commands will install two dataplanes, one into the `stunner-prod` and another one into the `stunner-dev` namespace.
+<!-- You can install multiple legacy STUNner dataplanes side-by-side, provided that the corresponding namespaces are different. For instance, to create a `prod` dataplane installation for your production workload and a `dev` installation for experimentation, the below commands will install two dataplanes, one into the `stunner-prod` and another one into the `stunner-dev` namespace. -->
 
-```console
-helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod
-helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev
-```
+<!-- ```console -->
+<!-- helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod -->
+<!-- helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev -->
+<!-- ``` -->
 
 ### Skip install CRDs
 
 You can install the STUNner chart without the Gateway API CRDs and STUNner CRDs with the `--skip-crds` flag. However, ensure that the CRDs are already present in the cluster, as the STUNner Gateway Operator will fail to start without them.
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
-    --namespace=stunner-system --skip-crds
+helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --skip-crds
 ```
 
 To manually install the CRDs:

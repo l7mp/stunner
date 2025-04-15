@@ -49,7 +49,7 @@ A full-fledged Prometheus+Grafana helm chart is available in the [STUNner helm r
 1. Install stunner-gateway-operator with Prometheus support:
 
 ```console
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
+helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
 ```
 
 Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](GATEWAY.md#dataplane) objects.

@@ -191,8 +191,7 @@ Values](https://helm.sh/docs/chart_template_guide/values_files).
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \
-    --namespace=stunner-system
+helm install stunner stunner/stunner --create-namespace --namespace=stunner-system
 ```
 
 Find out more about the charts in the [STUNner-helm repository](https://github.com/l7mp/stunner-helm).
