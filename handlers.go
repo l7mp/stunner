@@ -19,7 +19,7 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 	s.log.Trace("NewAuthHandler")
 
 	// Run witthout auth
-	if s.GetAuth().Type == stnrv1.AuthTypeNone {
+	if a, found := s.authManager.Get(stnrv1.DefaultAuthName); !found || a.(*object.Auth).Type == stnrv1.AuthTypeNone {
 		return nil
 	}
 
