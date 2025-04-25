@@ -5,6 +5,7 @@ Congratulations for subscribing to STUNner premium. You should have received a c
 The below guide will walk you through unlocking STUNner's premium features.
 
 ## Table of Contents
+
 1. [Installation](#installation)
 1. [License validation](#license-validation)
 1. [Checking license status](#checking-license-status)

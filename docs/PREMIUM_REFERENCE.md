@@ -2,7 +2,15 @@
 
 STUNner's premium features are designed to help medium to large scale enterprises to deploy, operate and scale pools of STUN and TURN servers over Kubernetes. Below is a reference of the premium features currently available in STUNner.
 
-## User quota 
+## Table of Contents
+
+1. [User quota](#user-quota)
+1. [STUN server mode](#stun-server-mode)
+1. [Deploying into a DaemonSet](#deploying-into-a-daemonset)
+1. [Relay address discovery](#relay-address-discovery)
+1. [TURN offload](#turn-offload)
+
+## User quota
 
 **Feature:** `UserQuota`. **Availability:** member and enterprise tiers.
 
@@ -43,7 +51,7 @@ stunnerctl -n stunner config udp-gateway -o jsonpath='{.admin.user_quota}' -->
 
 Once the number of allocations created for a user-id reach the configured quota, new allocations will be rejected with an `error 486: Allocation Quota Exceeded` status.
 
-## STUN server mode 
+## STUN server mode
 
 **Feature:** `STUNServer`. **Availability:** member and enterprise tiers.
 
@@ -71,7 +79,7 @@ none
 
 Set `STUNServer: false` to re-enable the TURN protocol engine.
 
-## Deploying the dataplane in a DaemonSet
+## Deploying into a DaemonSet
 
 **Feature:** `DaemonSet`. **Availability:** member and enterprise tiers.
 
@@ -79,7 +87,7 @@ By default, the TURN server pods that run the dataplane for STUNner gateways are
 
 To configure STUNner to run a single STUNner dataplane pod per each node in the Kubernetes cluster, you can set `spec.dataplaneResource` to `DaemonSet` in the [`Dataplane` resource](https://github.com/l7mp/stunner/blob/main/docs/GATEWAY.md#dataplane) corresponding to your Gateway. This will instruct STUNner to re-deploy the dataplane into a [Kubernetes DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset) instead of a Deployment. DaemonSet mode is available in your tier if the `DaemonSet` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
 
-The below will set the dataplane for all gateways using the `default` Dataplane to use a DaemonSet. 
+The below will set the dataplane for all gateways using the `default` Dataplane to use a DaemonSet.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -93,13 +101,13 @@ spec:
 
 Set `dataplaneResource: Deployment` to return to the default deployment mode.
 
-## Relay address discovery 
+## Relay address discovery
 
 **Feature:** `RelayAddressDiscovery`. **Availability:** member and enterprise tiers.
 
 STUNner was designed for a specific use case: ingest real-time media into a Kubernetes cluster and forward incoming connections to a pool of WebRTC media servers deployed into the same cluster. This, however, does not prevent you from leveraging STUNner for other purposes, like as a public TURN server, but this may need some tweaking.
 
-Public TURN servers typically run on a public IP address, which makes it possible for both clients and peers to connect via the server. However, STUNner's TURN servers (the `stunnerd` pods) are by default deployed over private IPs. This is perfectly fine when peers, e.g., WebRTC media servers, are deployed into the same cluster (the pivotal use case for STUNner), but this pretty much makes it impossible to deploy STUNner as a public TURN server since peers will not be able to connect to the private IP of STUNner's TURN servers. (Note that ["symmetric ICE mode"](DEPLOYMENT.md#symmetric-ice-mode) would still work but it may increase STUNner's resource consumption.) 
+Public TURN servers typically run on a public IP address, which makes it possible for both clients and peers to connect via the server. However, STUNner's TURN servers (the `stunnerd` pods) are by default deployed over private IPs. This is perfectly fine when peers, e.g., WebRTC media servers, are deployed into the same cluster (the pivotal use case for STUNner), but this pretty much makes it impossible to deploy STUNner as a public TURN server since peers will not be able to connect to the private IP of STUNner's TURN servers. (Note that ["symmetric ICE mode"](DEPLOYMENT.md#symmetric-ice-mode) would still work but it may increase STUNner's resource consumption.)
 
 <!-- You can experiment with [deploying STUNner into the host-network namespace](GATEWAY.md#dataplane), but most of the time this would not solve the issue either because either Kubernetes will deploy pods running in host-network mode over a private IP address. -->
 
@@ -107,7 +115,7 @@ Relay address discovery, when enabled, will configure STUNner's TURN servers wit
 
 Below is the set of steps to enable relay address discovery:
 
-1. Enable host-network mode. 
+1. Enable host-network mode.
 
    Host-networking will re-deploy the STUNner dataplane to run in the network namespace of Kubernetes nodes, so that it will have access to the node's public IP address (if any). You can enable host-networking by configuring `hostNetwork: true` in the Dataplane spec:
 
@@ -122,8 +130,8 @@ Below is the set of steps to enable relay address discovery:
    ```
 
    Only enable host-networking with the `DaemonSet` feature also enabled, otherwise you will not be able to scale your TURN server pool.
-   
-2. Enable relay address discovery. 
+
+2. Enable relay address discovery.
 
    Relay address discovery mode can be switched on by adding the `stunner.l7mp.io/enable-relay-address-discovery: "true"` annotation on a STUNner Gateway:
 
@@ -131,7 +139,7 @@ Below is the set of steps to enable relay address discovery:
    kubectl annotate --overwrite gateway <your-stunner-gateway> stunner.l7mp.io/enable-relay-address-discovery="true"
    ```
 
-3. Check whether STUNner has successfully discovered the node's public IP. 
+3. Check whether STUNner has successfully discovered the node's public IP.
 
    As usual, the [`stunnerctl`](/docs/cmd/stunnerctl.md) tool comes in handy. The below will load the dataplane configuration for the gateway `<gateway-namespace>/<gateway-name>` with respect to the node `<node-name>` and print the relay address of each TURN listener:
 
@@ -142,7 +150,7 @@ Below is the set of steps to enable relay address discovery:
    ```
 
    The `<relay-address>` above should be the node's public IP for `<node-name>`. You can also request the status directly from the dataplane pods, but in this case parsing the output requires a bit of getting used to:
-   
+
    ```console
    stunnerctl -n <gateway-namespace> status <gateway-name>
    <gateway-namespace>/<gateway-pod>:
@@ -151,10 +159,10 @@ Below is the set of steps to enable relay address discovery:
    listeners: <listener-name>:{turn://<relay-address>:<port>?transport=TURN-UDP...}
    clusters: ...
    ```
-   
+
    Note that depending on your Kubernetes provider's platform your nodes may run without a public IP, or host-networking may not be available at all. Symmetric ICE mode is still be usable as a fallback in such cases.
 
-## TURN offload 
+## TURN offload
 
 **Feature:** `TURNOffload`. **Availability:** only the enterprise tier.
 
