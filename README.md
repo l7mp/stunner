@@ -160,10 +160,11 @@ way.
   your clients will readily start using your Kubernetes-based WebRTC service via STUNner.
 
 * **Carrier-grade performance.** Written in pure Go using the battle-tested
-  [pion/webrtc](https://github.com/pion/webrtc) framework, STUNner is extremely fast and
-  scalable. With STUNner's industry-leading [Linux/eBPF TURN acceleration
-  engine](/docs/PREMIUM_REFERENCE.md#turn-offload) (available only in the enterprise tier) you can
-  get up to 10 Gbps TURN/UDP performance per CPU core(!) at microsecond-scale latency.
+  [pion/webrtc](https://github.com/pion/webrtc) framework, even STUNner's open-source tier is
+  already extremely fast and scalable. But with STUNner's industry-leading [Linux/eBPF TURN
+  acceleration engine](/docs/PREMIUM_REFERENCE.md#turn-offload) enabled (available in the
+  enterprise tier), you can get up to 10 Gbps TURN/UDP performance per CPU core(!) at
+  microsecond-scale latency.
 
 The main use of STUNner is as a [Kubernetes-native gateway
 service](https://github.com/l7mp/stunner/blob/main/docs/DEPLOYMENT.md#media-plane-deployment-model)
