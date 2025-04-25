@@ -1,14 +1,13 @@
 # Getting started with STUNner premium tiers
 
-Congratulations for subscribing to STUNner premium. You should have received a customer key during the subscription procedure; if not, [contact us](mailto:info@l7mp.io). Make sure to save your customer key to a safe place, you will need it every time you (re)deploy STUNner.
+Congratulations for subscribing to STUNner premium. You should have received a customer key during the subscription procedure; [contact us](mailto:info@l7mp.io) if not. Make sure to save the customer key to a safe place, you will need it every time you (re)deploy STUNner.
 
 The below guide will walk you through unlocking STUNner's premium features.
 
-## Getting started
-
-[STUNner](https://github.com/l7mp/stunner) comes in multiple flavors. The open-source [*STUNner free* tier](/README.md) will suit most simple applications. Certain advanced features are however available only in STUNner's paid premium editions. The *STUNner member* tier includes the premium features targeted for small and medium scale operations, while the fully featured *STUNner enterprise* tier is optimized for large-scale deployments.
-
-See [here](https://l7mp.io/#/products) for up-to-date info on how to purchase a license. 
+## Table of Contents
+1. [Installation](#installation)
+1. [License validation](#license-validation)
+1. [Checking license status](#checking-license-status)
 
 ## Installation
 
@@ -83,39 +82,40 @@ STUNner will search for the customer key in the Kubernetes Secret named `stunner
 
    If all goes well, the operator will validate the license associated with your customer key and unlock the premium features available in your tier.
 
-3. Check your license status: The simplest way to check your license status is via the handy [`stunnerctl`](/cmd/stunnerctl/README.md) command line tool:
+## Checking license status
 
-   ```console
-   stunnerctl license
-   License status:
-      Subscription type: member
-      Enabled features: DaemonSet, STUNServer, ...
-      Last updated: ...
-   ```
+The simplest way to check your license status is via the handy [`stunnerctl`](/cmd/stunnerctl/README.md) command line tool:
 
-   This command will connect to your STUNner operator and report the license status. It will also report any errors encountered while validating your license.
+```console
+stunnerctl license
+License status:
+   Subscription type: member
+   Enabled features: DaemonSet, STUNServer, ...
+   Last updated: ...
+```
 
-   It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/cmd/stunnerctl/README.md) command will connect to each dataplane pod deployed into the `stunner` namespace and report the running licensing status.
+This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license.
 
-   ```console
-   stunnerctl -n stunner status
-   stunner/udp-gateway-...:
-           admin:{id="stunner/udp-gateway",logLevel="all:INFO",health-check="http://:8086",quota=0,license-info={tier=enterprise,unlocked-features=TURNOffload,UserQuota,..,valid-until=...}}
-          ...
-   ```
+It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/cmd/stunnerctl/README.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
 
-   Look for the `license-info` field in the above admin status: you should see your subscription tier (e.g., `free`, `member` or `enterprise`) with all the available premium features in `unlocked-features` listed.
+```console
+stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.Name}: {.admin.licensing_info}'
+{tier=enterprise,unlocked-features=[TURNOffload,UserQuota,DaemonSet,STUNServer,RelayAddressDiscovery],valid-until=...}
+...
+```
 
-   If something goes wrong, check the gateway operator logs for lines like the below that should help you debug the problem:
+You should see your subscription tier (e.g., `free`, `member` or `enterprise`) with all the available premium features in `unlocked-features` listed.
 
-   ```
-   kubectl -n stunner-system logs $(kubectl -n stunner-system get pods -l \
-       control-plane=stunner-gateway-operator-controller-manager -o jsonpath='{.items[0].metadata.name}')
-   ...
-   license-mgr     license manager client created  {"server": "https://license.l7mp.io:443", "customer-key-status": "set"}
-   ...
-   license-mgr     new license status      {"subscription-type": "enterprise", "enabled-features": ["DaemonSet", "UserQuota", "STUNServer", "TURNOffload"], "last-updated": "..."}
-   ...
-   ```
+If something goes wrong, check the gateway operator logs for lines like the below that should help you debug the problem:
 
-Make sure to [contact us](mailto:info@l7mp.io) if something goes wrong.
+```
+kubectl -n stunner-system logs $(kubectl -n stunner-system get pods -l \
+    control-plane=stunner-gateway-operator-controller-manager -o jsonpath='{.items[0].metadata.name}')
+...
+license-mgr     license manager client created  {"server": "https://license.l7mp.io:443", "customer-key-status": "set"}
+...
+license-mgr     new license status      {"subscription-type": "enterprise", "enabled-features": ["DaemonSet", "UserQuota", "STUNServer", "TURNOffload"], "last-updated": "..."}
+...
+```
+
+If unsure, [contact us](mailto:info@l7mp.io).

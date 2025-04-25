@@ -125,7 +125,7 @@ type PodConnector struct {
 
 // PodInfo allows to return a full pod descriptor to callers.
 type PodInfo struct {
-	// Name is the name of the pod. Only valid
+	// Name of the pod.
 	Name string
 	// Namespace is the Kubernetes namespace of the pod.
 	Namespace string

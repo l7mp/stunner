@@ -14,7 +14,8 @@
 
 ## Getting started
 
-* [Installation](INSTALL.md)
+* [Installation: Free tier](INSTALL.md)
+* [Installation: Premium tiers](PREMIUM_INSTALL.md)
 
 ## User guides
 
@@ -23,6 +24,7 @@
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
 * [Reference](GATEWAY.md)
+* [Premium feature reference](PREMIUM_REFERENCE.md)
 
 ## Tutorials
 
