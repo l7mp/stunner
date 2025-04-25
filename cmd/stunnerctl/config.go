@@ -21,9 +21,11 @@ func runConfig(_ *cobra.Command, args []string) error {
 		gwNs = *k8sConfigFlags.Namespace
 	}
 
-	jsonQuery, output, err := ParseJSONPathFlag(output)
-	if err != nil {
+	jsonQuery := cdsclient.NewJSONPath()
+	if ok, err := jsonQuery.Parse(output); err != nil {
 		return err
+	} else if ok {
+		output = "jsonpath"
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,20 +101,11 @@ func runConfig(_ *cobra.Command, args []string) error {
 				fmt.Println(string(out))
 			}
 		case "jsonpath":
-			values, err := jsonQuery.FindResults(c)
+			res, err := jsonQuery.Evaluate(c)
 			if err != nil {
 				return err
 			}
-
-			if len(values) == 0 || len(values[0]) == 0 {
-				fmt.Println("<none>")
-			}
-
-			for arrIx := range values {
-				for valIx := range values[arrIx] {
-					fmt.Printf("%v\n", values[arrIx][valIx].Interface())
-				}
-			}
+			fmt.Println(res)
 		case "summary":
 			fmt.Print(c.Summary())
 		default:

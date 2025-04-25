@@ -3,14 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/pion/logging"
 	"github.com/spf13/cobra"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/util/jsonpath"
 
 	"github.com/l7mp/stunner/internal/icetester"
 	v1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -180,53 +177,4 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)
 		os.Exit(1)
 	}
-}
-
-// ////////////////////////
-var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
-
-// k8s.io/kubectl/pkg/cmd/get
-func RelaxedJSONPathExpression(pathExpression string) (string, error) {
-	if len(pathExpression) == 0 {
-		return pathExpression, nil
-	}
-	submatches := jsonRegexp.FindStringSubmatch(pathExpression)
-	if submatches == nil {
-		return "", fmt.Errorf("unexpected path string, expected a 'name1.name2' or '.name1.name2' or '{name1.name2}' or '{.name1.name2}'")
-	}
-	if len(submatches) != 3 {
-		return "", fmt.Errorf("unexpected submatch list: %v", submatches)
-	}
-	var fieldSpec string
-	if len(submatches[1]) != 0 {
-		fieldSpec = submatches[1]
-	} else {
-		fieldSpec = submatches[2]
-	}
-	return fmt.Sprintf("{.%s}", fieldSpec), nil
-}
-
-func ParseJSONPathFlag(output string) (*jsonpath.JSONPath, string, error) {
-	if !strings.HasPrefix(output, "jsonpath") {
-		return nil, output, nil
-	}
-
-	as := strings.Split(output, "=")
-	if len(as) != 2 || as[0] != "jsonpath" {
-		return nil, output, fmt.Errorf("invalid jsonpath output definition %q", output)
-	}
-
-	jsonQuery := jsonpath.New("output")
-
-	// Parse and print jsonpath
-	fields, err := RelaxedJSONPathExpression(as[1])
-	if err != nil {
-		return nil, output, fmt.Errorf("invalid jsonpath query %w", err)
-	}
-
-	if err := jsonQuery.Parse(fields); err != nil {
-		return nil, output, fmt.Errorf("cannor parse jsonpath query %w", err)
-	}
-
-	return jsonQuery, "jsonpath", nil
 }

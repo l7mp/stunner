@@ -15,9 +15,11 @@ import (
 )
 
 func runStatus(_ *cobra.Command, args []string) error {
-	jsonQuery, output, err := ParseJSONPathFlag(output)
-	if err != nil {
+	jsonQuery := cdsclient.NewJSONPath()
+	if ok, err := jsonQuery.Parse(output); err != nil {
 		return err
+	} else if ok {
+		output = "jsonpath"
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,20 +91,11 @@ func runStatus(_ *cobra.Command, args []string) error {
 				fmt.Println(string(out))
 			}
 		case "jsonpath":
-			values, err := jsonQuery.FindResults(s)
+			res, err := jsonQuery.Evaluate(s)
 			if err != nil {
 				return err
 			}
-
-			if len(values) == 0 || len(values[0]) == 0 {
-				fmt.Println("<none>")
-			}
-
-			for arrIx := range values {
-				for valIx := range values[arrIx] {
-					fmt.Printf("%v\n", values[arrIx][valIx].Interface())
-				}
-			}
+			fmt.Println(res)
 		case "string":
 			if pod.Proxy {
 				fmt.Printf("%s/%s:\n\t%s\n", pod.Namespace, pod.Name, s.String())
