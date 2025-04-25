@@ -64,7 +64,6 @@ style via Kubernetes manifests.
 1. [Getting started](#getting-started)
 1. [Usage](#usage)
 1. [Documentation](#documentation)
-1. [Milestones](#milestones)
 
 ## Description
 
@@ -273,21 +272,21 @@ WebRTC service in 5-10 minutes using a purely declarative configuration.
 The documentation of the stable release can be found [here](https://docs.l7mp.io/en/stable). The
 documentation for the latest development release can be found [here](/docs/README.md).
 
-## Milestones
+<!-- ## Milestones -->
 
-* v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials.
-* v0.10: Dataplane: Long-term STUN/TURN credentials and [STUN/TURN over TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt) in standalone mode.
-* v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation.
-* v0.12: Security: Expose TLS/DTLS settings via the Gateway API.
-* v0.13: Observability: Prometheus + Grafana dashboard.
-* v0.15: Performance: Per-allocation CPU load-balancing for UDP
-* v0.16: Management: Managed STUNner dataplane.
-* v0.17: First release candidate: All Gateway and STUNner APIs move to v1.
-* v0.18: Stabilization: Second release candidate.
-* v0.19: The missing pieces: Third release candidate.
-* v0.20: Final stabilization: Fourth stable release candidate
-* v0.21: Towards v1: Fifth stable release candidate
-* v1.0: STUNner goes GA!
+<!-- * v0.9: Demo release: STUNner basic UDP/TURN connectivity + helm chart + tutorials. -->
+<!-- * v0.10: Dataplane: Long-term STUN/TURN credentials and [STUN/TURN over TCP/TLS/DTLS](https://www.rfc-editor.org/rfc/rfc6062.txt) in standalone mode. -->
+<!-- * v0.11: Control plane: Kubernetes gateway operator and dataplane reconciliation. -->
+<!-- * v0.12: Security: Expose TLS/DTLS settings via the Gateway API. -->
+<!-- * v0.13: Observability: Prometheus + Grafana dashboard. -->
+<!-- * v0.15: Performance: Per-allocation CPU load-balancing for UDP -->
+<!-- * v0.16: Management: Managed STUNner dataplane. -->
+<!-- * v0.17: First release candidate: All Gateway and STUNner APIs move to v1. -->
+<!-- * v0.18: Stabilization: Second release candidate. -->
+<!-- * v0.19: The missing pieces: Third release candidate. -->
+<!-- * v0.20: Final stabilization: Fourth stable release candidate -->
+<!-- * v0.21: Towards v1: Fifth stable release candidate -->
+<!-- * v1.0: STUNner goes GA! -->
 
 ## Help
 
