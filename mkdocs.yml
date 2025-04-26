@@ -38,6 +38,9 @@ nav:
   - 'stunnerd': 'cmd/stunnerd.md'
   - 'turncat': 'cmd/turncat.md'
   - 'icetester': 'cmd/icetester.md'
+- 'Premium':
+    'Getting started': 'PREMIUM_INSTALL.md'
+    'Features': 'PREMIUM_REFERENCE.md'
 plugins:
   - search
   - mkdocstrings:
