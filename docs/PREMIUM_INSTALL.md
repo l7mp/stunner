@@ -19,16 +19,22 @@ Use the below Helm chart to deploy the premium version of STUNner:
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner stunner/stunner-premium --create-namespace --namespace=stunner-system
+helm install stunner stunner/stunner-premium --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.customerKey="<YOUR_CUSTOMER_KEY>"
 ```
 
 We recommend you deploy STUNner into the `stunner-system` namespace, this simplifies configuration later. See the [installation guide](INSTALL.md) for more info on customization options for the Helm chart.
 
 ## License validation
 
-In order to unlock the premium features, STUNner will need a valid customer key. You should have received one during the subscription procedure; if not, [contact us](mailto:info@l7mp.io). 
+In order to unlock the premium features, STUNner will need a valid customer key. You should have received one during the subscription procedure; if not, [contact us](mailto:info@l7mp.io).
 
 STUNner will search for the customer key in the Kubernetes Secret named `stunner-gateway-operator-customer-secret` in the namespace where you deployed STUNner (usually `stunner-system`).
+
+> [!NOTE]
+> If you install with no `stunnerGatewayOperator.customerKey` being set, the chart will not create this secret.
+> Create an empty secret with the following command:
+> `kubectl -n stunner-system create secret generic stunner-gateway-operator-customer-secret --from-literal=CUSTOMER_KEY="<YOUR_CUSTOMER_KEY>"`
+
 
 1. Set your customer key: The first step is to update the default Secret created by the Helm chart with your customer key. The simplest way is the manually edit the Secret:
 
