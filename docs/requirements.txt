@@ -10,13 +10,13 @@ colorama==0.4.6
     # via griffe
 ghp-import==2.1.0
     # via mkdocs
-griffe==1.6.0
+griffe==1.7.3
     # via mkdocstrings-python
 jinja2==3.1.6
     # via
     #   mkdocs
     #   mkdocstrings
-markdown==3.7
+markdown==3.8
     # via
     #   markdown-gfm-admonition
     #   markdown-include
@@ -49,17 +49,17 @@ mkdocs-autorefs==1.4.1
     #   mkdocstrings-python
 mkdocs-get-deps==0.2.0
     # via mkdocs
-mkdocstrings[python]==0.29.0
+mkdocstrings[python]==0.29.1
     # via
     #   -r docs/requirements.in
     #   mkdocstrings-python
-mkdocstrings-python==1.16.5
+mkdocstrings-python==1.16.10
     # via mkdocstrings
-packaging==24.2
+packaging==25.0
     # via mkdocs
 pathspec==0.12.1
     # via mkdocs
-platformdirs==4.3.6
+platformdirs==4.3.7
     # via mkdocs-get-deps
 pymdown-extensions==10.14.3
     # via mkdocstrings
