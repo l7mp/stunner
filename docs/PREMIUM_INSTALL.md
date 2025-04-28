@@ -24,6 +24,13 @@ helm install stunner stunner/stunner-premium --create-namespace --namespace=stun
 
 We recommend you deploy STUNner into the `stunner-system` namespace, this simplifies configuration later. See the [installation guide](INSTALL.md) for more info on customization options for the Helm chart.
 
+### Demo video
+
+
+https://github.com/user-attachments/assets/6cbffc95-42f6-4f84-8d62-3a117c5118fc
+
+
+
 ## License validation
 
 In order to unlock the premium features, STUNner will need a valid customer key. You should have received one during the subscription procedure; if not, [contact us](mailto:info@l7mp.io).
@@ -124,5 +131,11 @@ license-mgr     license manager client created  {"server": "https://license.l7mp
 license-mgr     new license status      {"subscription-type": "enterprise", "enabled-features": ["DaemonSet", "UserQuota", "STUNServer", "TURNOffload"], "last-updated": "..."}
 ...
 ```
+
+### Demo video
+
+https://github.com/user-attachments/assets/002ddb6c-2939-4981-af01-fa3949980e76
+
+
 
 If unsure, [contact us](mailto:info@l7mp.io).
