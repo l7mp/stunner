@@ -139,7 +139,7 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	// metrics server reconciliation errors are NOT FATAL: just warn if something goes wrong
 	// but otherwise go on with reconciliation
 	if err := a.reconcileMetrics(req); err != nil {
-		a.log.Warnf("error reconciling metrics server:", err.Error())
+		a.log.Warnf("error reconciling metrics server: %s", err.Error())
 	}
 
 	// health-check server reconciliation errors are FATAL (may break Kubernetes
