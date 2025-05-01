@@ -2,19 +2,20 @@ package v1
 
 // stunnerd defaults
 const (
-	ApiVersion             string = "v1"
-	DefaultStunnerName            = "default-stunnerd"
-	DefaultProtocol               = "turn-udp"
-	DefaultClusterProtocol        = "udp"
-	DefaultPort            int    = 3478
-	DefaultLogLevel               = "all:INFO"
-	DefaultRealm                  = "stunner.l7mp.io"
-	DefaultAuthType               = "static"
-	DefaultMinRelayPort    int    = 1
-	DefaultMaxRelayPort    int    = 1<<16 - 1
-	DefaultClusterType            = "STATIC"
-	DefaultAdminName              = "default-admin-config"
-	DefaultAuthName               = "default-auth-config"
+	ApiVersion                    string = "v1"
+	DefaultStunnerName                   = "default-stunnerd"
+	DefaultProtocol                      = "turn-udp"
+	DefaultClusterProtocol               = "udp"
+	DefaultPort                   int    = 3478
+	DefaultLogLevel                      = "all:INFO"
+	DefaultRealm                         = "stunner.l7mp.io"
+	DefaultAuthType                      = "static"
+	DefaultMinRelayPort           int    = 1
+	DefaultMaxRelayPort           int    = 1<<16 - 1
+	DefaultClusterType                   = "STATIC"
+	DefaultAdminName                     = "default-admin-config"
+	DefaultAuthName                      = "default-auth-config"
+	DefaultNodeAddressPlaceholder        = "__node_address_placeholder" // guaranteed to not parse as a valid IP
 )
 
 // default ports

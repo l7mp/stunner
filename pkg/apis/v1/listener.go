@@ -164,6 +164,10 @@ func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 		// Fallback to server addr
 		addr = req.Addr
 	}
+	if addr == "" || addr == DefaultNodeAddressPlaceholder {
+		// Fallback to localhost as a last resort
+		addr = "0.0.0.0"
+	}
 
 	port := req.PublicPort
 	if port == 0 {
