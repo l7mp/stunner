@@ -41,8 +41,39 @@ Let the new version be vX.Y.Z.
 - `git push` to send the updated `go.mod/go.sum` files
 - release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
   that we can publish the release notes)
-- restore the doc disclaimers ("this doc is for the dev version, see RTD for stable docs") in the
-  stunner repo README.md and docs/README.md
+
+## STUNner premium
+
+- pull-rebase origin/main: `git pull --rebase origin main`
+- pull-rebase stunner/main: `git pull --rebase stunner main` and fix conflicts
+- make sure `go test ./... -count 1` passes
+- make sure `golangci-lint run` passes
+- force-push: `git push --force origin main`
+- release vX.Y.Z on github (so that we can publish the release notes)
+- wait until the CI/CD pipeline goes green (may take a while)
+
+## License manager
+
+- pull-rebase origin/main: `git pull --rebase origin main`
+- bump `github.com/l7mp/stunner-priv` version to vX.Y.Z in the `go.mod`
+- `go mod tidy`
+- make sure `make test` passes
+- make sure `golangci-lint run` passes
+- force-push: `git push --force origin main`
+- release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
+  that we can publish the release notes)
+
+## STUNner gateway operator premium
+
+- pull-rebase origin/main: `git pull --rebase origin main`
+- pull-rebase stunner/main: `git pull --rebase stunner main` and fix conflicts
+- bump `github.com/l7mp/stunner-priv` version to vX.Y.Z in the `go.mod`
+- `go mod tidy`
+- make sure `make test` passes
+- make sure `golangci-lint run` passes
+- force-push: `git push --force origin main`
+- release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
+  that we can publish the release notes)
 
 ## Check latest build
 
