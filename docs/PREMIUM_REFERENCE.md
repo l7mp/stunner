@@ -168,9 +168,11 @@ Below is the set of steps to enable relay address discovery:
 
 User plane TURN message processing may be costly. To cut down CPU usage and latency, STUNner can offload TURN message processing to one of its Linux/eBPF-based kernel packet processing engines. The offload engines support TURN channel processing for UDP, and provide massive bandwidth, delay, and jitter performance boost and can cut down CPU usage by several orders of magnitude.  TURN acceleration is available in your tier if the `TURNOffload` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
 
-STUNner's eBPF offload requires Kubernetes nodes running Linux and elevated privilege access to interact with the eBPF/tc (`TC`) or eBPF/XDP (`XDP`) kernel framework. Both provide outstanding performance: `TC` is supported in most Kubernetes environments (e.g., public clouds), while `XDP` is faster but it is typically limited to bare metal clusters.
+STUNner's eBPF offload requires Kubernetes nodes running Linux and elevated privilege access to interact with the eBPF/tc (`TC`) or eBPF/XDP (`XDP`) kernel framework. Both provide outstanding performance: `TC` is supported in most Kubernetes environments (e.g., public clouds), while `XDP` is faster but it is typically limited to bare metal clusters. For more info on the TURN offload implementation, see the [pion/turn PR](https://github.com/pion/turn/pull/360).
 
 To use the TURN offload feature of STUNner, set the `spec.offloadEngine` in the `Dataplane` custom resource: `TC` means eBPF/TC, `XDP` is eBPF/XDP, `None` falls back to user-space TURN processing, and `Auto` will let STUNner to pick the best offload engine for your platform. You can also manually configure the network interfaces on which STUNner will enable TURN offload via the `spec.offloadInterfaces` in the `Dataplane` spec. This parameter assumes a list of network interface names and an empty list means to enable offload on all interfaces (this is the default). To use eBPF offload, you must also enable elevated rights in your STUNner pods. To achieve this, edit the `spec.containerSecurityContext` field and add the necessary `NET_ADMIN`, `SYS_ADMIN`, `SYS_MODULE` capabilities.
+
+### Configuration
 
 The below will set the dataplane for all gateways using the `default` Dataplane to use the TURN offload on all available network interfaces and select the optimal offload mode.
 
@@ -189,6 +191,8 @@ spec:
   offloadEngine: Auto
 ```
 
+### Testing
+
 The simplest way to test whether eBPF offload was successfully enabled is to deploy a simple STUNner tutorial (like the [iperf-test](/docs/examples/simple-tunnel/README.md) example) and watch for the offload statistics in the output or [`stunnerctl status`](/docs/cmd/stunnerctl.md#status):
 
 ```console
@@ -200,3 +204,22 @@ stunnerctl -n <gateway-namespace> status <gateway-name>
 	clusters: ...
 	allocs:1/status=READY
 ```
+
+You may also check the dataplane logs. The below was logged by `stunnerd` while running `stunnerctl icetest --offload-mode=TC --force-cleanup`:
+
+```
+```
+
+<!-- **eBPF maps:** -->
+<!-- TODO -->
+
+<!-- ## Troubleshooting -->
+
+### Limitations
+
+Effective TURN protocol offload requires some low-level tweaking of the underlying OS kernel. As such, some Kubernetes deployments may support only a limited TURN offload functionality, or even no TURN acceleration at all:
+
+- The offload engine relies on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
+- Loading the eBPF program requires elevated admin privileges that might be not available on arbitrary Kubernetes clusters. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
+- Currently TURN offload only supports UDP TURN channels. Implementing TURN/TCP acceleration and offloading TURN send indications are on the TODO list, reach out to us if you need these features.
+- TURN/XDP offload is disabled for host-local redirects (except the lo interface). Use the TURN/TC engine when host-local redirect is important, like accelerated symmetric ICE mode deployment.

@@ -25,7 +25,6 @@
 * [Security](SECURITY.md)
 * [Reference: Free tier](GATEWAY.md)
 * [Reference: Premium tiers](PREMIUM_REFERENCE.md)
-* [TURN offload](OFFLOAD.md)
 
 ## Tutorials
 
