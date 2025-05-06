@@ -41,6 +41,8 @@ Let the new version be vX.Y.Z.
 - `git push` to send the updated `go.mod/go.sum` files
 - release vX.Y.Z (try to have the same version as the main stunner repo, if possible) on github (so
   that we can publish the release notes)
+- restore the doc disclaimers ("this doc is for the dev version, see RTD for stable docs") in the
+  stunner repo README.md and docs/README.md
 
 ## Check latest build
 
