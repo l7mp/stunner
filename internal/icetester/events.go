@@ -68,7 +68,7 @@ const (
 
 	diagCDSServerConnectionFailed = "The STUNner gateway operator is installed but it is dysfunctional. This often occurs because the Gateway API CRDs are missing or are of the wrong version and thus the operator fails to start, or the operator does not have enough RBAC permissions to access the Kubernetes resources it works on."
 
-	diagPublicAddrNotFound = "At least one Gateway could not be exposed on a public IP/port. This is the most typical problem you will see with STUNner: it usually means that the load-balancer integration in your Kubernetes cluster does not work, or, if you are on NodePorts, none of the Kubernetes nodes have a publicly avaalble external IP (look for ExternalIP in your node status)."
+	diagPublicAddrNotFound = "At least one Gateway could not be exposed on a public IP/port. This is the most typical problem you will see with STUNner: it usually means that the load-balancer integration in your Kubernetes cluster does not work, or, if you are on NodePorts, none of the Kubernetes nodes have a publicly available external IP (look for ExternalIP in your node status)."
 
 	// test
 	diagICETestFailed = "The ICE test has failed. Check the reported error!"
