@@ -226,7 +226,7 @@ diagnostics that to help troubleshooting.
   the test only on TURN-UDP with at a rate of 100 packets per second using a 2 minute timeout:
 
   ``` console
-  stunnerctl icetest  --force-cleanup -packet-rate 100 --timeout 2m udp
+  stunnerctl icetest --force-cleanup --packet-rate 100 --timeout 2m udp
   ```
 
 Run `stunnerctl icetest --help` for further useful command line arguments.
