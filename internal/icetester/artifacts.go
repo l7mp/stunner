@@ -3,6 +3,7 @@ package icetester
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -210,16 +211,25 @@ func newICETesterBackendService(namespace string) *unstructured.Unstructured {
 	}
 }
 
-func newICETesterICETesterResources(ns, iceTesterImage string) []*unstructured.Unstructured {
-	return []*unstructured.Unstructured{
+func newICETesterICETesterResources(ns, iceTesterImage string, protos []v1.ListenerProtocol) []*unstructured.Unstructured {
+	l := []*unstructured.Unstructured{
 		newICETesterGatewayClass(ns),
 		newICETesterGatewayConfig(ns),
-		newICETesterUDPGateway(ns),
-		newICETesterTCPGateway(ns),
+	}
+	if slices.Contains(protos, v1.ListenerProtocolTURNUDP) {
+		l = append(l, newICETesterUDPGateway(ns))
+	}
+	if slices.Contains(protos, v1.ListenerProtocolTURNTCP) {
+		l = append(l, newICETesterTCPGateway(ns))
+	}
+
+	l = append(l, []*unstructured.Unstructured{
 		newICETesterUDPRoute(ns),
 		newICETesterBackendPod(ns, iceTesterImage),
 		newICETesterBackendService(ns),
-	}
+	}...)
+
+	return l
 }
 
 func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructured, error) {

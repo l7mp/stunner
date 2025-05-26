@@ -262,7 +262,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	}
 
 	log.Infof("Inserting tester artifacts")
-	for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage) {
+	for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage, t.transports) {
 		if err := t.safelyRemove(ctx, obj, metav1.GetOptions{}, metav1.DeleteOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
 				fmt.Errorf("Failed to clean up resource %s/%s of kind %s: %w",
@@ -285,7 +285,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			obj.GetName(), obj.GetKind())
 	}
 	defer func() {
-		for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage) {
+		for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage, t.transports) {
 			// do not use ctx: it might have timed out
 			if err := t.delete(context.TODO(), obj, metav1.DeleteOptions{}); err != nil {
 				log.Errorf("Error deleting resource: %s", err.Error())

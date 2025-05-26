@@ -54,7 +54,7 @@ func gwFromProto(proto v1.ListenerProtocol, ns string) *unstructured.Unstructure
 	}
 }
 
-// updateICEServerAddr modifies the cluster-side ICE server config for symmetric ICe tests so that
+// updateICEServerAddr modifies the cluster-side ICE server config for symmetric ICE tests so that
 // the backend will be configured with the gateway as a TURN server
 func (t *iceTester) updateICEServerAddr(ss []webrtc.ICEServer, proto v1.ListenerProtocol) []webrtc.ICEServer {
 	// use service as the TURN server address
