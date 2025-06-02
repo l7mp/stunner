@@ -3,6 +3,7 @@ package icetester
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -118,8 +119,8 @@ func newICETesterTCPGateway(namespace string) *unstructured.Unstructured {
 	}
 }
 
-func newICETesterUDPRoute(namespace string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+func newICETesterUDPRoute(namespace string, protos []v1.ListenerProtocol) *unstructured.Unstructured {
+	r := &unstructured.Unstructured{
 		Object: map[string]any{
 			"apiVersion": "stunner.l7mp.io/v1",
 			"kind":       "UDPRoute",
@@ -128,25 +129,12 @@ func newICETesterUDPRoute(namespace string) *unstructured.Unstructured {
 				"namespace": namespace,
 			},
 			"spec": map[string]any{
-				"parentRefs": []any{
-					map[string]any{
-						"name": "icetest-udp-gateway",
-					},
-					map[string]any{
-						"name": "icetest-tcp-gateway",
-					},
-				},
+				"parentRefs": []any{},
 				"rules": []any{
 					map[string]any{
 						"backendRefs": []any{
 							map[string]any{
 								"name": "icetest-backend",
-							},
-							map[string]any{
-								"name": "icetest-udp-gateway",
-							},
-							map[string]any{
-								"name": "icetest-tcp-gateway",
 							},
 						},
 					},
@@ -154,6 +142,35 @@ func newICETesterUDPRoute(namespace string) *unstructured.Unstructured {
 			},
 		},
 	}
+
+	if slices.Contains(protos, v1.ListenerProtocolTURNUDP) {
+		r = addGWtoUDPRoute("icetest-udp-gateway", r)
+
+	}
+	if slices.Contains(protos, v1.ListenerProtocolTURNTCP) {
+		r = addGWtoUDPRoute("icetest-tcp-gateway", r)
+	}
+
+	return r
+}
+
+func addGWtoUDPRoute(gw string, u *unstructured.Unstructured) *unstructured.Unstructured {
+	if u == nil {
+		return u
+	}
+
+	parentRefs, _, _ := unstructured.NestedSlice(u.Object, "spec", "parentRefs")
+	parentRefs = append(parentRefs, map[string]any{"name": gw})
+	unstructured.SetNestedSlice(u.Object, parentRefs, "spec", "parentRefs") // nolint:errcheck
+
+	rules, _, _ := unstructured.NestedSlice(u.Object, "spec", "rules")
+	rule := rules[0].(map[string]any)
+	backendRefs, _, _ := unstructured.NestedSlice(rule, "backendRefs")
+	backendRefs = append(backendRefs, map[string]any{"name": gw})
+	unstructured.SetNestedSlice(rule, backendRefs, "backendRefs") // nolint:errcheck
+	unstructured.SetNestedSlice(u.Object, rules, "spec", "rules") // nolint:errcheck
+
+	return u
 }
 
 func newICETesterBackendPod(namespace, iceTesterImage string) *unstructured.Unstructured {
@@ -210,16 +227,25 @@ func newICETesterBackendService(namespace string) *unstructured.Unstructured {
 	}
 }
 
-func newICETesterICETesterResources(ns, iceTesterImage string) []*unstructured.Unstructured {
-	return []*unstructured.Unstructured{
+func newICETesterICETesterResources(ns, iceTesterImage string, protos []v1.ListenerProtocol) []*unstructured.Unstructured {
+	l := []*unstructured.Unstructured{
 		newICETesterGatewayClass(ns),
 		newICETesterGatewayConfig(ns),
-		newICETesterUDPGateway(ns),
-		newICETesterTCPGateway(ns),
-		newICETesterUDPRoute(ns),
+	}
+	if slices.Contains(protos, v1.ListenerProtocolTURNUDP) {
+		l = append(l, newICETesterUDPGateway(ns))
+	}
+	if slices.Contains(protos, v1.ListenerProtocolTURNTCP) {
+		l = append(l, newICETesterTCPGateway(ns))
+	}
+
+	l = append(l, []*unstructured.Unstructured{
+		newICETesterUDPRoute(ns, protos),
 		newICETesterBackendPod(ns, iceTesterImage),
 		newICETesterBackendService(ns),
-	}
+	}...)
+
+	return l
 }
 
 func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructured, error) {
