@@ -17,7 +17,7 @@ require (
 	github.com/pion/datachannel v1.5.9
 	github.com/pion/dtls/v3 v3.0.4
 	github.com/pion/ice/v4 v4.0.2
-	github.com/pion/logging v0.2.3
+	github.com/pion/logging v0.2.4
 	github.com/pion/transport/v3 v3.0.7
 	github.com/pion/turn/v4 v4.0.0
 	github.com/pion/webrtc/v4 v4.0.1
@@ -126,5 +126,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 )
 
-// replace github.com/pion/turn/v4 => github.com/l7mp/turn/v4 v4.0.1-0.20241205140700-99276149099b
-replace github.com/pion/turn/v4 => github.com/l7mp/turn/v4 v4.0.1-0.20250129175420-8076eb06efe0
+replace github.com/pion/turn/v4 => github.com/l7mp/turn/v4 v4.0.1-0.20250625111652-be3ef597b45f
