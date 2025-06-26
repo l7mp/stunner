@@ -29,23 +29,10 @@ jobs:
       - name: Go install
         run: go install
       - name: Test
-        run: go test -v -covermode=count
-  coverage:
-    runs-on: ubuntu-latest
-    if: github.repository == 'l7mp/stunner'
-    steps:
-      - name: Install Go
-        if: success()
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Calc coverage
-        run: |
-          go test -v -covermode=count -coverprofile=coverage.out
+        run: go test -v -covermode=count -coverprofile=coverage.out
       - name: Coveralls
         uses: coverallsapp/github-action@v2
+        if: github.repository == 'l7mp/stunner'
         with:
           github-token: ${{ secrets.github_token }}
           file: coverage.out
