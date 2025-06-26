@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/l7mp/stunner/internal/object"
+	cdsclient "github.com/l7mp/stunner/pkg/config/client"
+
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
@@ -168,8 +170,9 @@ func (s *Stunner) reconcileWithRollback(req *stnrv1.StunnerConfig, inRollback bo
 		}
 	}
 
-	// we are "ready" unless we are being shut down
-	if !s.shutdown && !s.ready {
+	// we are "ready" unless we are being shut down, we are not in a rollback nor bootstrapping
+	// with a zero-config
+	if !s.shutdown && !s.ready && !inRollback && !cdsclient.IsZeroConfig(req) {
 		s.ready = true
 	}
 

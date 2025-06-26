@@ -17,13 +17,12 @@ type ConfigSkeleton struct {
 	ApiVersion string `json:"version"`
 }
 
-// ZeroConfig builds a zero configuration useful for bootstrapping STUNner. The minimal config
-// defaults to static authentication with a dummy username and password and opens no listeners or
-// clusters.
-func ZeroConfig(id string) *stnrv1.StunnerConfig {
+// EmptyConfig builds a minimal configuration. The minimal config defaults to static authentication
+// with a dummy username and password and opens no listeners or clusters.
+func EmptyConfig() *stnrv1.StunnerConfig {
 	return &stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
-		Admin:      stnrv1.AdminConfig{Name: id},
+		Admin:      stnrv1.AdminConfig{},
 		Auth: stnrv1.AuthConfig{
 			Type:  "static",
 			Realm: stnrv1.DefaultRealm,
@@ -35,6 +34,25 @@ func ZeroConfig(id string) *stnrv1.StunnerConfig {
 		Listeners: []stnrv1.ListenerConfig{},
 		Clusters:  []stnrv1.ClusterConfig{},
 	}
+}
+
+// ZeroConfig builds a zero configuration used for bootstrapping STUNner.
+func ZeroConfig(id string) *stnrv1.StunnerConfig {
+	c := EmptyConfig()
+	c.Admin = stnrv1.AdminConfig{Name: id}
+	return c
+}
+
+// IsZeroConfig checks whether the given config is a bootstrap config.
+func IsZeroConfig(req *stnrv1.StunnerConfig) bool {
+	c := ZeroConfig(req.Admin.Name)
+	// Set defaults
+	if c.Validate() != nil {
+		return false
+	}
+	// Override loglevel
+	c.Admin.LogLevel = req.Admin.LogLevel
+	return req.DeepEqual(c)
 }
 
 // ParseConfig parses a raw buffer holding a configuration, substituting environment variables for

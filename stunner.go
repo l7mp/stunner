@@ -133,8 +133,6 @@ func NewStunner(options Options) *Stunner {
 		s.resolver.Start()
 	}
 
-	s.ready = true
-
 	return s
 }
 

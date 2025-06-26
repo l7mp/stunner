@@ -554,11 +554,8 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 			})
 
 			assert.False(t, stunner.shutdown, "lifecycle 1: alive")
-			// HACK!
-			assert.True(t, stunner.ready, "lifecycle 1: not-ready")
-			// assert.False(t, stunner.ready, "lifecycle 1: not-ready")
-			assert.True(t, stunner.IsReady(), "lifecycle 1: not-ready")
-			// assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
+			assert.False(t, stunner.ready, "lifecycle 1: not-ready")
+			assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
 
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c), "starting server")
@@ -1866,9 +1863,7 @@ func TestStunnerLifecycle(t *testing.T) {
 		LogLevel: stunnerTestLoglevel,
 	})
 
-	// HACK
-	assert.True(t, s.IsReady(), "empty server not ready")
-	// assert.False(t, s.IsReady(), "empty server not ready")
+	assert.False(t, s.IsReady(), "empty server not ready")
 
 	// health-check empty server
 	_, err := doLivenessCheck("http://127.0.0.1:8086")
@@ -2043,9 +2038,7 @@ func TestStunnerMetrics(t *testing.T) {
 		LogLevel: stunnerTestLoglevel,
 	})
 
-	// HACK
-	assert.True(t, s.IsReady(), "empty server not ready")
-	// assert.False(t, s.IsReady(), "empty server not ready")
+	assert.False(t, s.IsReady(), "empty server not ready")
 
 	log.Debug("starting stunnerd with an empty stunner config")
 	conf := stnrv1.StunnerConfig{
