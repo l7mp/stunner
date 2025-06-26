@@ -1,0 +1,5 @@
+version: "2"
+
+run:
+  timeout: 10m
+  tests: false
