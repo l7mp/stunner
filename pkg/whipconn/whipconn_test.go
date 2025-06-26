@@ -200,7 +200,7 @@ var testerTestCases = []struct {
 			assert.Eventually(t, func() bool { return len(l.conns) == 5 }, timeout, interval)
 
 			for c := range connChan {
-				c.Close()
+				c.Close() //nolint:errcheck
 			}
 
 			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)

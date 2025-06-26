@@ -40,7 +40,7 @@ func GenerateTimeWindowedUsername(startTime time.Time, duration time.Duration, u
 // find the first thing that looks like a UNIX timestamp in the username and use that for checking
 // the time-windowed credential, and reject everything else.
 func CheckTimeWindowedUsername(username string) error {
-	var timestamp = 0
+	timestamp := 0
 	for _, ts := range strings.Split(username, UsernameSeparator) {
 		t, err := strconv.Atoi(ts)
 		if err == nil {

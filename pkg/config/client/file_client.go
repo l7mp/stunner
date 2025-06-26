@@ -100,7 +100,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 	if err != nil {
 		return err
 	}
-	defer watcher.Close()
+	defer watcher.Close() //nolint:errcheck
 
 	config := w.configFile
 	if err := watcher.Add(config); err != nil {

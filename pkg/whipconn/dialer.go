@@ -163,7 +163,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		conn.Close() //nolint
 		return nil, fmt.Errorf("failed to read HTTP response body: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	resourceId := resp.Header.Get("Location")
 	if resourceId == "" {
@@ -188,10 +188,10 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		d.log.Infof("Creating new connection %s", conn.String())
 		return conn, nil
 	case err := <-errCh:
-		conn.Close()
+		conn.Close() //nolint:errcheck
 		return nil, err
 	case <-ctx.Done():
-		conn.Close()
+		conn.Close() //nolint:errcheck
 		return nil, ctx.Err()
 	}
 }

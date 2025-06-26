@@ -282,7 +282,8 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 	}
 	// wrap with a locker to prevent concurrent writes
 	conn := util.NewConn(wc)
-	defer conn.Close() // this will close the poller goroutine
+	// this will close the poller goroutine
+	defer conn.Close() //nolint:errcheck
 
 	a.Infof("connection successfully opened to config discovery server at %s", url)
 
@@ -377,7 +378,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 		defer func() {
 			a.Infof("closing connection to server %s", conn.RemoteAddr().String())
 			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
-			conn.Close()
+			conn.Close()                                        //nolint:errcheck
 			closePinger <- struct{}{}
 			wg.Wait()
 			close(errCh)

@@ -108,6 +108,8 @@ func FloodTest(ctx context.Context, conn net.Conn, interval time.Duration, packe
 
 	// Wait for test duration plus a grace period for receiving remaining packets
 	<-ctx.Done()
+
+	//nolint:errcheck
 	conn.Close() // this will stop the goroutines
 
 	wg.Wait()

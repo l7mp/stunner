@@ -119,7 +119,7 @@ func runICETesterListener(ctx context.Context, addr string, config whipconn.Conf
 	log.Infof("Creating WHIP server listener with config %#v", config)
 	l, err := whipconn.NewListener(addr, config, loggerFactory)
 	if err != nil {
-		return fmt.Errorf("Could not create WHIP server listener: %s", err.Error())
+		return fmt.Errorf("could not create WHIP server listener: %s", err.Error())
 	}
 
 	log.Debug("Creating echo service")
@@ -160,7 +160,7 @@ func runICETesterListener(ctx context.Context, addr string, config whipconn.Conf
 		}
 	}
 
-	l.Close()
+	l.Close() //nolint:errcheck
 
 	return nil
 }

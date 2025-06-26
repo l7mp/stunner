@@ -363,16 +363,16 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 func DiscoverK8sPod(ctx context.Context, k8sFlags *cliopt.ConfigFlags, namespace, labelSelector string, port int, log logging.LeveledLogger) (PodInfo, error) {
 	d, err := NewK8sDiscoverer(k8sFlags, log)
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("Failed to K8s discovery client: %w", err)
+		return PodInfo{}, fmt.Errorf("failed to K8s discovery client: %w", err)
 	}
 
 	pods, err := d.cs.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
-		return PodInfo{}, fmt.Errorf("Failed to query Kubernetes API server: %w", err)
+		return PodInfo{}, fmt.Errorf("failed to query Kubernetes API server: %w", err)
 	}
 
 	if len(pods.Items) == 0 {
-		return PodInfo{}, errors.New("No pod found")
+		return PodInfo{}, errors.New("no pod found")
 	}
 
 	if len(pods.Items) > 1 {

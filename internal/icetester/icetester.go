@@ -159,7 +159,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	k8sConfig, err := t.k8sConfigFlags.ToRESTConfig()
 	if err != nil {
 		return t.sendEventComplete(EventInit,
-			fmt.Errorf("Error building a Kubernetes config: %w", err),
+			fmt.Errorf("error building a Kubernetes config: %w", err),
 			diagK8sConfigUnavailable,
 			nil,
 		)
@@ -169,7 +169,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	cs, err := dynamic.NewForConfig(k8sConfig)
 	if err != nil {
 		return t.sendEventComplete(EventInit,
-			fmt.Errorf("Error creating a Kubernetes client: %w", err),
+			fmt.Errorf("error creating a Kubernetes client: %w", err),
 			diagK8sClientError,
 			nil,
 		)
@@ -193,7 +193,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		if t.forceCleanup {
 			if err := t.safelyRemove(ctx, ns, metav1.GetOptions{}, metav1.DeleteOptions{}); err != nil {
 				return t.sendEventComplete(EventInit,
-					fmt.Errorf("Failed to clean up tester namespace %s (--force-cleanup enforced): %w",
+					fmt.Errorf("failed to clean up tester namespace %s (--force-cleanup enforced): %w",
 						ns.GetName(), err),
 					diagFailedToQueryOrCreateArtifacts,
 					nil,
@@ -201,14 +201,14 @@ func (t *iceTester) Start(ctx context.Context) error {
 			}
 		} else {
 			return t.sendEventComplete(EventInit,
-				fmt.Errorf("Namespace %s already exists, halting test", ns.GetName()),
+				fmt.Errorf("namespace %s already exists, halting test", ns.GetName()),
 				diagNamespaceAlreadyExists,
 				nil,
 			)
 		}
 	} else if !apierrors.IsNotFound(err) {
 		return t.sendEventComplete(EventInit,
-			fmt.Errorf("Error querying testing namespace %s: %w", ns.GetName(), err),
+			fmt.Errorf("error querying testing namespace %s: %w", ns.GetName(), err),
 			diagFailedToCreateNamespace,
 			nil,
 		)
@@ -216,7 +216,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 	if err := t.create(ctx, ns, metav1.CreateOptions{}); err != nil {
 		return t.sendEventComplete(EventInit,
-			fmt.Errorf("Error creating a namespace for running the tests: %w", err),
+			fmt.Errorf("error creating a namespace for running the tests: %w", err),
 			diagFailedToCreateNamespace,
 			nil,
 		)
@@ -232,7 +232,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	d, err := t.makeDataplane(ctx)
 	if err != nil {
 		return t.sendEventComplete(EventInit,
-			fmt.Errorf("Failed to create custom Dataplane: %w", err),
+			fmt.Errorf("failed to create custom Dataplane: %w", err),
 			diagFailedToQueryOrCreateArtifacts,
 			nil,
 		)
@@ -254,7 +254,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	for _, crd := range crdCheckList {
 		if _, err := t.getCRD(ctx, crd, metav1.GetOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
-				fmt.Errorf("Failed to query CRD %s: %w", crd, err),
+				fmt.Errorf("failed to query CRD %s: %w", crd, err),
 				diagFailedToQueryOrCreateArtifacts,
 				nil,
 			)
@@ -265,7 +265,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage, t.transports) {
 		if err := t.safelyRemove(ctx, obj, metav1.GetOptions{}, metav1.DeleteOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
-				fmt.Errorf("Failed to clean up resource %s/%s of kind %s: %w",
+				fmt.Errorf("failed to clean up resource %s/%s of kind %s: %w",
 					obj.GetNamespace(), obj.GetName(), obj.GetKind(), err),
 				diagFailedToQueryOrCreateArtifacts,
 				nil,
@@ -274,7 +274,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 		if err := t.create(ctx, obj, metav1.CreateOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
-				fmt.Errorf("Failed to create resource %s/%s of kind %s: %w",
+				fmt.Errorf("failed to create resource %s/%s of kind %s: %w",
 					obj.GetNamespace(), obj.GetName(), obj.GetKind(), err),
 				diagFailedToQueryOrCreateArtifacts,
 				nil,
@@ -308,7 +308,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
-			fmt.Errorf("Error searching for ICE tester backend pod: %w", err),
+			fmt.Errorf("error searching for ICE tester backend pod: %w", err),
 			diagFailedToQueryOrCreateArtifacts,
 			nil,
 		)
@@ -319,7 +319,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		t.logger.NewLogger("cds-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
-			fmt.Errorf("Error searching for CDS server: %w", err),
+			fmt.Errorf("error searching for CDS server: %w", err),
 			diagCDSServerUnavailable,
 			nil,
 		)
@@ -330,7 +330,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
-			fmt.Errorf("Error searching for auth service: %w", err),
+			fmt.Errorf("error searching for auth service: %w", err),
 			diagAuthServiceUnavailable,
 			nil,
 		)
@@ -351,7 +351,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			t.logger.NewLogger("cds-client"))
 		if err != nil {
 			return t.sendEventComplete(EventGatewayAvailable,
-				fmt.Errorf("Could not connect to CDS server for obtaning the configuration of Gateway %s: %w",
+				fmt.Errorf("could not connect to CDS server for obtaning the configuration of Gateway %s: %w",
 					gw.GetName(), err),
 				diagCDSServerConnectionFailed,
 				nil,
@@ -366,7 +366,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			}
 
 			if len(confs) != 1 {
-				return false, errors.New("Expected exactly one dataplane config") // this should never rhappen
+				return false, errors.New("expected exactly one dataplane config") // this should never rhappen
 			}
 
 			found := false
@@ -377,7 +377,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 				}
 			}
 			if !found {
-				// errors.New("No clusters found")
+				// errors.New("no clusters found")
 				return false, nil // operator not ready yet: retry
 
 			}
@@ -396,7 +396,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 		}, 60*time.Second, 250*time.Millisecond); err != nil {
 			return t.sendEventComplete(EventGatewayAvailable,
-				fmt.Errorf("Failed to find public address for Gateway %s/%s: %w", t.namespace, gw.GetName(), err),
+				fmt.Errorf("failed to find public address for Gateway %s/%s: %w", t.namespace, gw.GetName(), err),
 				diagPublicAddrNotFound,
 				nil,
 			)
@@ -407,7 +407,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		opts := metav1.ListOptions{LabelSelector: makeSelector(map[string]string{"app": "my-app", "some-label": "some-value"})}
 		if err := eventually(ctx, t.podListStatusChecker(opts), 60*time.Second, 250*time.Millisecond); err != nil {
 			return t.sendEventComplete(EventGatewayAvailable,
-				fmt.Errorf("Dataplane pod for Gateway %s/%s not running or ready: %w",
+				fmt.Errorf("dataplane pod for Gateway %s/%s not running or ready: %w",
 					iceTesterPod.GetNamespace(), iceTesterPod.GetName(), err),
 				diagFailedToQueryOrCreateArtifacts,
 				nil,
@@ -442,17 +442,17 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 			req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 			if err != nil {
-				return false, fmt.Errorf("Error preparing auth service request: %w", err)
+				return false, fmt.Errorf("error preparing auth service request: %w", err)
 			}
 
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
-				return false, fmt.Errorf("Failed to query auth service: %w", err)
+				return false, fmt.Errorf("failed to query auth service: %w", err)
 			}
 
 			if res.StatusCode != http.StatusOK {
 				return false, nil
-				// return false, fmt.Errorf("Wrong HTTP status querying auth service: %d", res.StatusCode) // this may return false for a while
+				// return false, fmt.Errorf("wrong HTTP status querying auth service: %d", res.StatusCode) // this may return false for a while
 			}
 
 			var iceconf struct {
@@ -460,7 +460,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 				ICETransportPolicy webrtc.ICETransportPolicy
 			}
 			if err := json.NewDecoder(res.Body).Decode(&iceconf); err != nil { // Handle errors
-				return false, fmt.Errorf("Failed to parse the ICE server config obtained from the auth service: %w", err)
+				return false, fmt.Errorf("failed to parse the ICE server config obtained from the auth service: %w", err)
 			}
 
 			iceServers[proto] = webrtc.Configuration{
@@ -471,7 +471,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			return true, nil
 		}, 10*time.Second, 250*time.Millisecond); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
-				fmt.Errorf("Could not obtain ICE server config for Gateway %s/%s: %w", t.namespace, gw.GetName(), err),
+				fmt.Errorf("could not obtain ICE server config for Gateway %s/%s: %w", t.namespace, gw.GetName(), err),
 				diagCDSServerConnectionFailed,
 				nil,
 			)
@@ -514,35 +514,35 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 				b, err := json.Marshal(listenerConfig)
 				if err != nil {
-					return false, fmt.Errorf("Error preparing config: %w", err) // should never happen
+					return false, fmt.Errorf("error preparing config: %w", err) // should never happen
 				}
 
 				_, err = http.Post(uri.String(), "application/json", bytes.NewReader(b))
 				if err != nil {
-					return false, fmt.Errorf("Failed to POST config: %w", err) // should never happen
+					return false, fmt.Errorf("failed to POST config: %w", err) // should never happen
 				}
 
 				// query back
 				req, err := http.NewRequest(http.MethodGet, uri.String(), nil)
 				if err != nil {
-					return false, fmt.Errorf("Error preparing GET request for querying the config: %w", err)
+					return false, fmt.Errorf("error preparing GET request for querying the config: %w", err)
 				}
 				req.Header.Add("Content-Type", "application/json")
 
 				res, err := http.DefaultClient.Do(req)
 				if err != nil {
-					return false, fmt.Errorf("Failed to GET config: %w", err)
+					return false, fmt.Errorf("failed to GET config: %w", err)
 				}
 
 				err = json.NewDecoder(res.Body).Decode(&listenerConfig)
 				if err != nil {
-					return false, fmt.Errorf("Failed to decode config: %w", err)
+					return false, fmt.Errorf("failed to decode config: %w", err)
 				}
 
 				return true, nil
 			}, 10*time.Second, 250*time.Millisecond); err != nil {
 				return t.sendEventComplete(eventType,
-					fmt.Errorf("Could not update config on ICE tester backend: %w", err),
+					fmt.Errorf("could not update config on ICE tester backend: %w", err),
 					diagICETesterBackendUnavailable,
 					nil,
 				)
@@ -565,7 +565,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 				return true, nil
 			}, 90*time.Second, 1000*time.Millisecond); err != nil {
 				return t.sendEventComplete(EventAsymmetricICETest,
-					fmt.Errorf("Could not send WHIP request to ICE tester backend: %w", err),
+					fmt.Errorf("could not send WHIP request to ICE tester backend: %w", err),
 					diagICETestFailed,
 					map[string]any{"ICETransport": proto.String()})
 			}
@@ -573,14 +573,14 @@ func (t *iceTester) Start(ctx context.Context) error {
 			localSelected, remoteSelected, err := t.getSelectedICECandidates(clientConn)
 			if err != nil {
 				return t.sendEventComplete(eventType,
-					fmt.Errorf("Failed to find selected ICE candidate pair: %w", err),
+					fmt.Errorf("failed to find selected ICE candidate pair: %w", err),
 					diagICETestFailed,
 					map[string]any{"ICETransport": proto.String()})
 			}
 			localCandidates, remoteCandidates, err := t.getICECandidates(clientConn, localSelected, remoteSelected)
 			if err != nil {
 				return t.sendEventComplete(eventType,
-					fmt.Errorf("Failed to find ICE candidates: %w", err),
+					fmt.Errorf("failed to find ICE candidates: %w", err),
 					diagICETestFailed,
 					map[string]any{"ICETransport": proto.String()})
 			}
@@ -590,13 +590,13 @@ func (t *iceTester) Start(ctx context.Context) error {
 			stats, err := FloodTest(timeout, clientConn, t.floodTestSendInterval, floodTestPacketSize)
 			if err != nil {
 				return t.sendEventComplete(eventType,
-					fmt.Errorf("Flood test failed: %w", err),
+					fmt.Errorf("flood test failed: %w", err),
 					diagICETestFailed,
 					map[string]any{"ICETransport": proto.String()})
 			}
 
 			// floodtest closes the connection on normal exit, but not on error
-			clientConn.Close()
+			clientConn.Close() //nolint:errcheck
 
 			///////// EventICETestComplete ready
 			//nolint:errcheck

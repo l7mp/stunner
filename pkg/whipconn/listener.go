@@ -120,7 +120,7 @@ func (l *Listener) configGetHandler(w http.ResponseWriter, r *http.Request) {
 	l.log.Infof("New Config GET request from client %s", r.RemoteAddr)
 
 	if r.Header.Get("Content-Type") != "application/json" {
-		err := fmt.Errorf("Expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
+		err := fmt.Errorf("expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
 		l.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -139,7 +139,7 @@ func (l *Listener) configPostHandler(w http.ResponseWriter, r *http.Request) {
 	l.log.Infof("New Config POST request from client %s", r.RemoteAddr)
 
 	if r.Header.Get("Content-Type") != "application/json" {
-		err := fmt.Errorf("Expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
+		err := fmt.Errorf("expected Content-Type:application/json, got %q", r.Header.Get("Content-Type"))
 		l.log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -173,7 +173,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Check bearer token
 	if l.config.BearerToken != "" {
 		if token := r.Header.Get("Authorization"); token != "Bearer "+l.config.BearerToken {
-			err := fmt.Errorf("Unauthorized WHIP request from client %s", r.RemoteAddr)
+			err := fmt.Errorf("unauthorized WHIP request from client %s", r.RemoteAddr)
 			l.errCh <- err
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
@@ -190,7 +190,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Read the offer from HTTP Request
 	offer, err := io.ReadAll(r.Body)
-	defer r.Body.Close()
+	defer r.Body.Close() //nolint:errcheck
 	if err != nil {
 		l.errCh <- fmt.Errorf("failed to read WHIP request body: %w", err)
 		return
@@ -313,7 +313,7 @@ func (l *Listener) whipDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, fmt.Sprintf("Resource %s deleted", resourceId)) //nolint
 }
 
-func (_ *Listener) Addr() net.Addr {
+func (*Listener) Addr() net.Addr {
 	return nil
 }
 

@@ -573,7 +573,7 @@ func TestRateLimitedLogger(t *testing.T) {
 	}
 }
 
-//nolint:golint,unused
+//nolint:unused
 func loglen() int {
 	return logBuffer.Len()
 }
@@ -584,7 +584,7 @@ func loglenr() int {
 	return l
 }
 
-//nolint:golint,unused
+//nolint:unused
 func logreset() {
 	logBuffer.Reset()
 }

@@ -189,7 +189,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 	time.Sleep(750 * time.Millisecond)
 
 	for i := 0; i < clientNum; i++ {
-		clients[i].Close()
+		clients[i].Close() //nolint:errcheck
 	}
 }
 

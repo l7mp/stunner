@@ -260,7 +260,7 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 	}
 	d, err := t.get(ctx, obj, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query default Dataplane: %w", err)
+		return nil, fmt.Errorf("failed to query default Dataplane: %w", err)
 	}
 
 	// customize
@@ -278,7 +278,7 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 		{path: []string{"spec", "offloadEngine"}, value: t.offloadEngine.String()},
 	} {
 		if err := unstructured.SetNestedField(d.Object, s.value, s.path...); err != nil {
-			return nil, fmt.Errorf("Failed to set field <%s> to %s: %w",
+			return nil, fmt.Errorf("failed to set field <%s> to %s: %w",
 				strings.Join(s.path, "."), s.value, err)
 		}
 	}
@@ -287,12 +287,12 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 	if t.offloadEngine != v1.OffloadEngineNone {
 		if err := unstructured.SetNestedSlice(d.Object, []any{"NET_ADMIN", "SYS_ADMIN", "SYS_MODULE"},
 			"spec", "containerSecurityContext", "capabilities", "add"); err != nil {
-			return nil, fmt.Errorf("Failed to enable NET_ADMIN capabilities: %w", err)
+			return nil, fmt.Errorf("failed to enable NET_ADMIN capabilities: %w", err)
 		}
 	}
 
 	if err := t.createOrUpdate(ctx, d, metav1.GetOptions{}, metav1.CreateOptions{}, metav1.UpdateOptions{}); err != nil {
-		return nil, fmt.Errorf("Failed to create/update tester Dataplane: %w", err)
+		return nil, fmt.Errorf("failed to create/update tester Dataplane: %w", err)
 	}
 
 	return d, nil

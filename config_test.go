@@ -183,7 +183,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// recreate the temp file and write config
 	f, err = os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
 	assert.NoError(t, err, "recreate temp config file")
-	defer os.Remove(file)
+	defer os.Remove(file) //nolint:errcheck
 
 	y, err := yaml.Marshal(c)
 	assert.NoError(t, err, "marshal config file")
@@ -290,7 +290,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	// recreate the temp file and write config
 	f, err = os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
 	assert.NoError(t, err, "recreate temp config file")
-	defer os.Remove(file)
+	defer os.Remove(file) //nolint:errcheck
 
 	err = f.Truncate(0)
 	assert.NoError(t, err, "truncate temp file")
@@ -363,7 +363,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	defer cancel()
 
 	s := &http.Server{Addr: addr}
-	defer s.Close()
+	defer s.Close() //nolint:errcheck
 
 	http.HandleFunc("/api/v1/configs/ns1/tester",
 		func(w http.ResponseWriter, req *http.Request) {
@@ -401,7 +401,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 			case <-req.Context().Done():
 			}
 
-			conn.Close()
+			conn.Close() //nolint:errcheck
 		})
 
 	// serve

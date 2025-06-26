@@ -2105,7 +2105,7 @@ func doHttp(uri string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		return true, nil

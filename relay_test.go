@@ -52,7 +52,7 @@ func TestPortRangePacketConn(t *testing.T) {
 
 	tm, err := telemetry.New(telemetry.Callbacks{}, false, loggerFactory.NewLogger("metric"))
 	assert.NoError(t, err, "should succeed")
-	defer tm.Close()
+	defer tm.Close() //nolint:errcheck
 
 	t.Run("LoopbackOnValidPort", func(t *testing.T) {
 		log.Debug("Creating base socket")
@@ -159,7 +159,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 
 	tm, err := telemetry.New(telemetry.Callbacks{}, false, loggerFactory.NewLogger("metric"))
 	assert.NoError(b, err, "should succeed")
-	defer tm.Close()
+	defer tm.Close() //nolint:errcheck
 
 	log.Debug("Creating base socket")
 	addr := "127.0.0.1:25000"

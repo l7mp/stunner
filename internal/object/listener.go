@@ -244,7 +244,7 @@ func (l *Listener) Close() error {
 	l.Conns = []any{}
 
 	if l.Server != nil {
-		l.Server.Close()
+		l.Server.Close() //nolint:errcheck
 	}
 	l.Server = nil
 

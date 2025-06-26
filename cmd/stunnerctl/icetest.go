@@ -78,7 +78,7 @@ func runICETest(_ *cobra.Command, args []string) error {
 		Logger: bufferedLoggerFactory,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to create ICE tester: %w", err)
+		return fmt.Errorf("failed to create ICE tester: %w", err)
 	}
 
 	// run for at most 5 minutes

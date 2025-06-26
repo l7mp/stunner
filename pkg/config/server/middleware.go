@@ -174,7 +174,7 @@ func (s *Server) closeConn(conn *Conn) {
 	}
 
 	s.conns.Delete(conn)
-	conn.Close()
+	conn.Close() //nolint:errcheck
 
 	s.configs.Unsubscribe(conn.ch)
 }

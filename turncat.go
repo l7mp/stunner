@@ -302,7 +302,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 		LoggerFactory:  t.loggerFactory,
 	})
 	if err != nil {
-		turnConn.Close()
+		turnConn.Close() //nolint:errcheck
 		return nil, fmt.Errorf("failed to allocate TURN client for client %s:%s: %s",
 			clientAddr.Network(), clientAddr.String(), err)
 	}
@@ -310,7 +310,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 
 	// Start the TURN client
 	if err = turnClient.Listen(); err != nil {
-		turnConn.Close()
+		turnConn.Close() //nolint:errcheck
 		return nil, fmt.Errorf("failed to listen on TURN client: %s", err)
 
 	}
@@ -360,7 +360,7 @@ func (t *Turncat) deleteConnection(conn *connection) {
 	}
 
 	conn.turnClient.Close()
-	conn.turnConn.Close()
+	conn.turnConn.Close() //nolint:errcheck
 }
 
 // any error on read/write will delete the connection and terminate the goroutine

@@ -53,11 +53,11 @@ type Options struct {
 func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid URI '%s': %s", uri, err)
+		return nil, fmt.Errorf("invalid URI '%s': %s", uri, err)
 	}
 
 	if u.Username == "" || u.Password == "" {
-		return nil, fmt.Errorf("Username/password must be set: '%s'", uri)
+		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
 
 	h := ""

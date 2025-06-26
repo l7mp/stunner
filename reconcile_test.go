@@ -2026,7 +2026,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 			stunnerEchoTest(testConfig)
 
 			time.Sleep(100 * time.Millisecond)
-			lconn.Close()
+			lconn.Close() //nolint:errcheck
 		})
 	}
 

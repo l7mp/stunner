@@ -89,7 +89,7 @@ func (s *Server) Start(ctx context.Context) error {
 // Close closes the server and drops all active connections.
 func (s *Server) Close() {
 	// close the underlying HTTP server so that we do not get any new connnections
-	s.Server.Close()
+	s.Server.Close() //nolint:errcheck
 	// kill all active connections
 	for _, conn := range s.conns.Snapshot() {
 		s.closeConn(conn)

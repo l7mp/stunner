@@ -65,12 +65,11 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if err := rc(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
 				http.StatusServiceUnavailable, err.Error())
 		} else {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
 				http.StatusOK, "READY")
 		}
 	})
@@ -80,7 +79,7 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if js, err := json.Marshal(status()); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
 				http.StatusInternalServerError, err.Error())
 		} else {
 			w.WriteHeader(http.StatusOK)

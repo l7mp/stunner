@@ -70,7 +70,7 @@ func ParseConfig(c []byte) (*stnrv1.StunnerConfig, error) {
 				publicPort = p
 			}
 		}
-		os.Setenv("STUNNER_PORT", fmt.Sprintf("%d", publicPort))
+		os.Setenv("STUNNER_PORT", fmt.Sprintf("%d", publicPort)) //nolint:errcheck
 	}
 
 	// make sure credentials are not affected by environment substitution
@@ -104,7 +104,7 @@ func parseRaw(c []byte) (*stnrv1.StunnerConfig, error) {
 	if err := yaml.Unmarshal([]byte(c), &k); err != nil {
 		if errJ := json.Unmarshal([]byte(c), &k); err != nil {
 			return nil, fmt.Errorf("could not parse config file API version: "+
-				"YAML parse error: %s, JSON parse error: %s\n",
+				"YAML parse error: %s, JSON parse error: %s",
 				err.Error(), errJ.Error())
 		}
 	}
@@ -116,7 +116,7 @@ func parseRaw(c []byte) (*stnrv1.StunnerConfig, error) {
 		if err := yaml.Unmarshal([]byte(c), &s); err != nil {
 			if errJ := json.Unmarshal([]byte(c), &s); errJ != nil {
 				return nil, fmt.Errorf("could not parse config file: "+
-					"YAML parse error: %s, JSON parse error: %s\n",
+					"YAML parse error: %s, JSON parse error: %s",
 					err.Error(), errJ.Error())
 			}
 		}
@@ -125,7 +125,7 @@ func parseRaw(c []byte) (*stnrv1.StunnerConfig, error) {
 		if err := yaml.Unmarshal([]byte(c), &a); err != nil {
 			if errJ := json.Unmarshal([]byte(c), &a); errJ != nil {
 				return nil, fmt.Errorf("could not parse config file: "+
-					"YAML parse error: %s, JSON parse error: %s\n",
+					"YAML parse error: %s, JSON parse error: %s",
 					err.Error(), errJ.Error())
 			}
 		}
