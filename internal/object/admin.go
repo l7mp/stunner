@@ -66,12 +66,12 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		if err := rc(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 
-			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusServiceUnavailable, err.Error())))
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+				http.StatusServiceUnavailable, err.Error())
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusOK, "READY")))
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+				http.StatusOK, "READY")
 		}
 	})
 
@@ -80,8 +80,8 @@ func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status Statu
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if js, err := json.Marshal(status()); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(fmt.Sprintf("{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusInternalServerError, err.Error())))
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n",
+				http.StatusInternalServerError, err.Error())
 		} else {
 			w.WriteHeader(http.StatusOK)
 			w.Write(js) //nolint:errcheck

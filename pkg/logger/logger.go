@@ -161,7 +161,7 @@ func NewRateLimitedLoggerFactory(logger LoggerFactory, limit rate.Limit, burst i
 
 // NewLogger either returns the existing LeveledLogger (if it exists) for the given scope or creates a new one.
 func (f *RateLimitedLoggerFactory) NewLogger(scope string) logging.LeveledLogger {
-	logger := f.LeveledLoggerFactory.newLogger(scope, f.Limit, f.Burst)
+	logger := f.newLogger(scope, f.Limit, f.Burst)
 
 	// disable rate-limiting logging at lower loglevels
 	l := f.DefaultLogLevel
@@ -249,7 +249,7 @@ func NewRateLimitedWriter(writer io.Writer, limit rate.Limit, burst int, addSupp
 
 // Write fulfills io.Writer.
 func (w *RateLimitedWriter) Write(p []byte) (int, error) {
-	if !w.RateLimiter.Allow() {
+	if !w.Allow() {
 		w.Counter++
 		return 0, nil
 	}
