@@ -1,0 +1,48 @@
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files from root directory
+COPY ../../go.mod ../../go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code from root directory
+COPY ../../ .
+
+# Build the wrapper binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o stunnerd-wrapper ./cmd/wrapper
+
+# Final stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+# Create non-root user
+RUN addgroup -g 1001 -S stunner && \
+    adduser -u 1001 -S stunner -G stunner
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder stage
+COPY --from=builder /app/stunnerd-wrapper .
+
+# Change ownership to non-root user
+RUN chown stunner:stunner /app/stunnerd-wrapper
+
+# Switch to non-root user
+USER stunner
+
+# Expose default TURN port
+EXPOSE 3478
+
+# Set entrypoint
+ENTRYPOINT ["./stunnerd-wrapper"]
+
+# Default command (can be overridden)
+CMD ["--help"] 

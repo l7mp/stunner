@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +19,17 @@ import (
 	"github.com/l7mp/stunner/pkg/buildinfo"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
 )
+
+// slogWriter converts log output to slog
+type slogWriter struct {
+	logger *slog.Logger
+}
+
+func (w *slogWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	w.logger.Info(msg)
+	return len(p), nil
+}
 
 var (
 	version    = "dev"
@@ -33,6 +47,7 @@ func main() {
 		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
+	var jsonLog = flag.BoolP("json-log", "j", false, "Enable JSON formatted logging (default: false)")
 
 	// Kubernetes config flags
 	k8sConfigFlags := cliopt.NewConfigFlags(true)
@@ -43,6 +58,27 @@ func main() {
 	cdsConfigFlags.AddFlags(flag.CommandLine)
 
 	flag.Parse()
+
+	// Check for JSON logging environment variable
+	if jsonLogEnv := os.Getenv("STUNNER_JSON_LOG"); jsonLogEnv == "true" || jsonLogEnv == "1" {
+		*jsonLog = true
+	}
+
+	// Setup JSON logging if requested
+	if *jsonLog {
+		handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})
+		
+		// Create a slog logger
+		slogger := slog.New(handler)
+		
+		// Redirect standard log to slog using our custom writer
+		log.SetFlags(0)
+		log.SetOutput(&slogWriter{logger: slogger})
+		
+		slogger.Info("JSON logging enabled")
+	}
 
 	logLevel := stnrv1.DefaultLogLevel
 	if *verbose {
