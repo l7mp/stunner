@@ -32,6 +32,7 @@ func main() {
 	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
 		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
+	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the liveness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
 
 	// Kubernetes config flags
@@ -75,11 +76,12 @@ func main() {
 	}
 
 	st := stunner.NewStunner(stunner.Options{
-		Name:                 *id,
-		LogLevel:             logLevel,
-		DryRun:               *dryRun,
-		NodeName:             nodeName,
-		UDPListenerThreadNum: *udpThreadNum,
+		Name:                        *id,
+		LogLevel:                    logLevel,
+		DryRun:                      *dryRun,
+		NodeName:                    nodeName,
+		UDPListenerThreadNum:        *udpThreadNum,
+		ForceReadyDuringTermination: *forceReadyDuringTermination,
 	})
 	defer st.Close()
 

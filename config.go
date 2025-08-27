@@ -41,6 +41,14 @@ type Options struct {
 	UDPListenerThreadNum int
 	// NodeName is the name of the Kubernetes node the TURN server is running on (if any).
 	NodeName string
+	// ForceReadyDuringTermination is flag to prevent the server failing the readiness
+	// check during graceful shutdown. Normally an app should fail the readiness check once it
+	// has entered into the graceful shutdown phase. Unfortunately, this will cause some buggy
+	// kube-proxy implementations to stop delivering UDP packets to the pod after a short
+	// timeout (usually 30 secs). This flag, is set, can be used to workaround such buggy
+	// Kubernetes implementations by forcing the server to pass the liveness probe during
+	// termination.
+	ForceReadyDuringTermination bool
 	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
 	// emulated data-plane.
 	Net transport.Net

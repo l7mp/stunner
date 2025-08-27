@@ -104,7 +104,7 @@ func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandle
 // NewReadinessHandler creates a helper function for checking the readiness of STUNner.
 func (s *Stunner) NewReadinessHandler() object.ReadinessHandler {
 	return func() error {
-		if s.IsReady() {
+		if s.forceReady || s.IsReady() {
 			return nil
 		} else {
 			return errors.New("stunnerd not ready")

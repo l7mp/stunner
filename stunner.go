@@ -43,7 +43,7 @@ type Stunner struct {
 	offloadHandler                                             OffloadHandler
 	node                                                       string
 	net                                                        transport.Net
-	ready, shutdown                                            bool
+	ready, shutdown, forceReady                                bool
 }
 
 // NewStunner creates a new STUNner deamon for the specified Options. Call Reconcile to reconcile
@@ -101,6 +101,7 @@ func NewStunner(options Options) *Stunner {
 		resolver:         r,
 		udpThreadNum:     udpThreadNum,
 		node:             options.NodeName,
+		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
 	}
 
