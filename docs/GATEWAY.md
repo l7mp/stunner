@@ -313,7 +313,7 @@ Backend reference configuration is as follows:
 | `group` | `string` | API group for the backend, either empty string for Service backends or `stunner.l7mp.io` for StaticService backends. Default: `""`. | No |
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
-| `namespace` | `string` | Namespace of the backend Service or StaticService. | Yes |
+| `namespace` | `string` | Namespace of the backend Service or StaticService. | No |
 | `port` | `int` | Port to use to reach the backend. If empty, make all ports available on the backend. Default: empty.| No |
 | `endPort` | `int` | If port is also specified, then access to the backend is restricted to the port range [port, endPort] inclusive. If port and endPort are empty, make all ports available on the backend. If port is given but endPort is not, admit the singleton port range [port,port]. Default: empty.| No |
 
