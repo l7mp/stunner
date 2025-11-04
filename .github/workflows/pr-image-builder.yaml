@@ -1,0 +1,75 @@
+name: Build and Push Docker Image for PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+
+  build_image_and_push_to_registry:
+    if: github.event.action != 'closed' && github.repository == 'l7mp/stunner'
+    name: Push Docker image to DockerHub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and Push Docker Image
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            l7mp/stunnerd:pr-${{ github.event.pull_request.number }}
+
+      - name: Comment on PR
+        if: success() && github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const comment = `The Docker image for this pull request (#${prNumber}) has been successfully built and pushed to DockerHub as \`docker.io/l7mp/stunnerd:pr-${prNumber}\`.`;
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment,
+            });
+
+  delete_docker_image_tag:
+    if: github.event.action == 'closed' && github.repository == 'l7mp/stunner'
+    name: Delete Docker Image Tag from DockerHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Docker Hub Token
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        run: |
+          TOKEN=$(curl -s -X POST "https://hub.docker.com/v2/users/login/" \
+            -H "Content-Type: application/json" \
+            -d '{"username": "'$DOCKER_USER'", "password": "'$DOCKER_TOKEN'"}' | jq -r .token)
+          echo "token=$TOKEN" >> $GITHUB_ENV
+      - name: Delete Docker Image Tag
+        env:
+          TOKEN: ${{ env.token }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          curl -s -H "Authorization: Bearer $TOKEN" \
+            -X DELETE "https://hub.docker.com/v2/repositories/l7mp/stunnerd/tags/pr-$PR_NUMBER/" \
+            -w "HTTP Response Code: %{http_code}\n"
