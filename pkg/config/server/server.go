@@ -98,7 +98,7 @@ func (s *Server) Close() {
 	s.configs.UnsubscribeAll()
 }
 
-// GetConfigStore returns the dataplane configs stores in the server.
+// GetConfigStore returns the dataplane config-store of the server.
 func (s *Server) GetConfigStore() *ConfigStore[string] {
 	return s.configs
 }
