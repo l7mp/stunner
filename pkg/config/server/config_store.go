@@ -60,7 +60,6 @@ func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv1.Stun
 			return
 		}
 	}
-
 	// Update the config
 	config := &Config{
 		Namespace: namespace,
@@ -260,5 +259,6 @@ func (cs *ConfigStore[T]) sendConfig(ch chan *Config, config *Config, patcher Pa
 	if patcher != nil {
 		c.Config = patcher(c.Config)
 	}
+
 	ch <- c
 }

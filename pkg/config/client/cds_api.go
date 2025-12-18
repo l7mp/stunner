@@ -3,6 +3,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -253,7 +254,7 @@ func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.Stu
 func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
 	go func() {
 		for {
-			if err := poll(ctx, a, ch, suppressDelete); err != nil {
+			if err := poll(ctx, a, ch, suppressDelete); err != nil && !errors.Is(err, context.Canceled) {
 				_, wsuri := a.Endpoint()
 				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
 			} else {
@@ -339,6 +340,10 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 				return
 			}
 
+			// Reset read deadline on ANY message (configs or pongs) to keep connection alive.
+			// The deadline is meant to detect dead connections, not absence of pongs.
+			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
+
 			if msgType != websocket.TextMessage {
 				errCh <- fmt.Errorf("unexpected message type (code: %d) from client %q",
 					msgType, conn.RemoteAddr().String())
@@ -390,6 +395,8 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 			return nil
 		case err := <-errCh:
 			// error: return it
+			a.Debugf("error on server connection to %s: %s", conn.RemoteAddr().String(),
+				err.Error())
 			return err
 		}
 	}
