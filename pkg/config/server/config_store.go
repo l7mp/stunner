@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
@@ -22,6 +23,7 @@ type Subscription[T comparable] struct {
 	ch      chan *Config
 	filter  ClientFilter[T]
 	patcher PatchFunc
+	valid   *atomic.Bool // Track if subscription is still active.
 }
 
 type ConfigStore[T comparable] struct {
@@ -82,7 +84,7 @@ func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv1.Stun
 	for _, sub := range subs {
 		// Check if the config matches the topic
 		if matchesTopic(config, sub.topic) {
-			cs.sendConfig(sub.ch, config, sub.patcher)
+			cs.sendConfig(&sub, config)
 		}
 	}
 }
@@ -151,11 +153,12 @@ func (cs *ConfigStore[T]) Push(arg T) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	for _, sub := range cs.subscriptions {
+	for i := range cs.subscriptions {
+		sub := &cs.subscriptions[i]
 		if sub.filter != nil && sub.filter(arg) {
 			for _, config := range configs {
 				if matchesTopic(config, sub.topic) {
-					cs.sendConfig(sub.ch, config, sub.patcher)
+					cs.sendConfig(sub, config)
 				}
 			}
 		}
@@ -177,13 +180,15 @@ func (cs *ConfigStore[T]) SubscribeConfig(namespace, name string, filter ClientF
 	return cs.subscribeToTopic(fmt.Sprintf("%s/%s", namespace, name), filter, patcher)
 }
 
-// Unsubscribe removes a subscription
+// Unsubscribe removes a subscription.
 func (cs *ConfigStore[_]) Unsubscribe(ch chan *Config) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
 	for i, sub := range cs.subscriptions {
 		if sub.ch == ch {
+			// Mark subscription as invalid BEFORE closing to prevent sends to closed channel.
+			sub.valid.Store(false)
 			// Remove by swapping with the last element and truncating
 			cs.subscriptions[i] = cs.subscriptions[len(cs.subscriptions)-1]
 			cs.subscriptions = cs.subscriptions[:len(cs.subscriptions)-1]
@@ -193,13 +198,15 @@ func (cs *ConfigStore[_]) Unsubscribe(ch chan *Config) {
 	}
 }
 
-// Unsubscribe removes a subscription
+// UnsubscribeAll removes all subscriptions.
 func (cs *ConfigStore[T]) UnsubscribeAll() {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	for _, sub := range cs.subscriptions {
-		close(sub.ch)
+	for i := range cs.subscriptions {
+		// Mark subscription as invalid BEFORE closing to prevent sends to closed channel.
+		cs.subscriptions[i].valid.Store(false)
+		close(cs.subscriptions[i].ch)
 	}
 
 	cs.subscriptions = []Subscription[T]{}
@@ -226,26 +233,34 @@ func matchesTopic(config *Config, topic string) bool {
 	}
 }
 
-// subscribeToTopic creates a subscription to a topic with an optional filter
+// subscribeToTopic creates a subscription to a topic with an optional filter.
 func (cs *ConfigStore[T]) subscribeToTopic(topic string, filter ClientFilter[T], patcher PatchFunc) chan *Config {
 	ch := make(chan *Config, SubscribeChannelBufferSize)
 
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	// Register the subscription
+	// Create valid flag initialized to true.
+	valid := &atomic.Bool{}
+	valid.Store(true)
+
+	// Register the subscription.
 	cs.subscriptions = append(cs.subscriptions, Subscription[T]{
 		topic:   topic,
 		ch:      ch,
 		filter:  filter,
 		patcher: patcher,
+		valid:   valid,
 	})
 
-	// Make a copy of configs that match the topic to send initial values
+	// Get a reference to the newly added subscription.
+	sub := &cs.subscriptions[len(cs.subscriptions)-1]
+
+	// Make a copy of configs that match the topic to send initial values.
 	for _, namespaceConfigs := range cs.configs {
 		for _, config := range namespaceConfigs {
 			if matchesTopic(config, topic) {
-				cs.sendConfig(ch, config, patcher)
+				cs.sendConfig(sub, config)
 			}
 		}
 	}
@@ -253,12 +268,18 @@ func (cs *ConfigStore[T]) subscribeToTopic(topic string, filter ClientFilter[T],
 	return ch
 }
 
-// sendConfig patcher and sends a config to a channel.
-func (cs *ConfigStore[T]) sendConfig(ch chan *Config, config *Config, patcher PatchFunc) {
-	c := config.DeepCopy()
-	if patcher != nil {
-		c.Config = patcher(c.Config)
+// sendConfig patches and sends a config to a subscription channel.
+// Returns early if the subscription has been marked invalid to prevent sending on a closed channel.
+func (cs *ConfigStore[T]) sendConfig(sub *Subscription[T], config *Config) {
+	// Check if subscription is still valid before attempting to send.
+	if !sub.valid.Load() {
+		return
 	}
 
-	ch <- c
+	c := config.DeepCopy()
+	if sub.patcher != nil {
+		c.Config = sub.patcher(c.Config)
+	}
+
+	sub.ch <- c
 }
