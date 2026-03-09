@@ -20,20 +20,18 @@ jobs:
 
       - name: Trigger release workflow in the stunner-helm repo
         if: ${{ inputs.dev == false || inputs.dev == 'false' }}
-        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          github_token: ${{ secrets.WEB_PAT_TOKEN }}
-          owner: l7mp
-          repo: stunner-helm
-          client_payload: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
-          workflow_file_name: publish.yaml
+          token: ${{ secrets.WEB_PAT_TOKEN }}
+          repo: l7mp/stunner-helm
+          workflow: publish.yaml
+          inputs: '{"tag": "${{ steps.vars.outputs.tag }}", "type": "stunner"}'
 
       - name: Trigger release workflow in the stunner-helm repo
         if: ${{ inputs.dev == true || inputs.dev == 'true' }}
-        uses: convictional/trigger-workflow-and-wait@v1.6.5
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          github_token: ${{ secrets.WEB_PAT_TOKEN }}
-          owner: l7mp
-          repo: stunner-helm
-          client_payload: '{"tag": "dev", "type": "stunner"}'
-          workflow_file_name: publish.yaml
+          token: ${{ secrets.WEB_PAT_TOKEN }}
+          repo: l7mp/stunner-helm
+          workflow: publish.yaml
+          inputs: '{"tag": "dev", "type": "stunner"}'
