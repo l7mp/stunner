@@ -13,7 +13,7 @@ require (
 	github.com/oapi-codegen/oapi-codegen/v2 v2.4.0
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pion/datachannel v1.5.9
-	github.com/pion/dtls/v3 v3.0.4
+	github.com/pion/dtls/v3 v3.0.11
 	github.com/pion/ice/v4 v4.0.2
 	github.com/pion/logging v0.2.4
 	github.com/pion/transport/v3 v3.0.7
@@ -22,7 +22,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.33.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.55.0
 	go.opentelemetry.io/otel/metric v1.33.0
@@ -30,7 +30,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.33.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/sys v0.38.0
-	golang.org/x/time v0.8.0
+	golang.org/x/time v0.10.0
 	gonum.org/v1/gonum v0.15.1
 	k8s.io/api v0.32.0
 	k8s.io/apimachinery v0.32.0
@@ -90,6 +90,7 @@ require (
 	github.com/pion/sdp/v3 v3.0.9 // indirect
 	github.com/pion/srtp/v3 v3.0.4 // indirect
 	github.com/pion/stun/v3 v3.0.0 // indirect
+	github.com/pion/transport/v4 v4.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
