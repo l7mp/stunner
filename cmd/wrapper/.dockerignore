@@ -1,0 +1,45 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+*_test.go
+test/
+
+# Build artifacts
+bin/
+build/
+dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Docker files
+Dockerfile*
+.dockerignore
+
+# Kubernetes manifests
+*.yaml
+*.yml
+deploy/
+
+# Examples
+examples/ 
