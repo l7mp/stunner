@@ -27,4 +27,4 @@ go.work
 turncat
 stunnerctl
 stunnerd
-icetester
+icetestercmd/wrapper/stunnerd-wrapper
