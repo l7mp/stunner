@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/pion/dtls/v3"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/internal/object"
@@ -45,7 +45,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
-		conns, err := socketPool.Make("udp", addr)
+		conns, err := socketPool.ListenPacket("udp4", addr)
 		if err != nil {
 			return err
 		}
@@ -118,14 +118,13 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		// for some reason dtls.Listen requires a UDPAddr and not an addr string
-		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		if err != nil {
 			return fmt.Errorf("failed to parse DTLS listener address %s: %s", addr, err)
 		}
-		dtlsListener, err := dtls.Listen("udp", udpAddr, &dtls.Config{
-			Certificates: []tls.Certificate{cer},
-			// ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
-		})
+		dtlsListener, err := dtls.ListenWithOptions("udp4", udpAddr,
+			dtls.WithCertificates(cer),
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
@@ -154,7 +153,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 	t, err := turn.NewServer(turn.ServerConfig{
 		Realm:             s.GetRealm(),
 		AuthHandler:       s.NewAuthHandler(),
-		EventHandlers:     s.NewEventHandler(l),
+		EventHandler:      s.NewEventHandler(l),
 		QuotaHandler:      s.quotaHandler.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,

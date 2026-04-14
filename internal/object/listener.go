@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3"
-	"github.com/pion/turn/v4"
+	"github.com/pion/transport/v4"
+	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -209,44 +209,30 @@ func (l *Listener) GetConfig() stnrv1.Config {
 func (l *Listener) Close() error {
 	l.log.Tracef("closing %s listener at %s", l.Proto.String(), l.Addr)
 
+	if l.Server != nil {
+		if err := l.Server.Close(); err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
+			return err
+		}
+	}
+	l.Server = nil
+
 	for _, c := range l.Conns {
 		switch l.Proto {
 		case stnrv1.ListenerProtocolTURNUDP:
-			l.log.Tracef("closing %s packet socket at %s", l.Proto.String(), l.Addr)
-
 			conn, ok := c.(turn.PacketConnConfig)
 			if !ok {
-				return fmt.Errorf("internal error: invalid conversion to " +
-					"turn.PacketConnConfig")
+				continue
 			}
-
-			if err := conn.PacketConn.Close(); err != nil && !util.IsClosedErr(err) {
-				return err
-			}
+			_ = conn.PacketConn.Close()
 		case stnrv1.ListenerProtocolTURNTCP, stnrv1.ListenerProtocolTURNTLS, stnrv1.ListenerProtocolTURNDTLS:
-			l.log.Tracef("closing %s listener socket at %s", l.Proto.String(), l.Addr)
-
 			conn, ok := c.(turn.ListenerConfig)
 			if !ok {
-				return fmt.Errorf("internal error: invalid conversion to " +
-					"turn.ListenerConfig")
+				continue
 			}
-
-			if err := conn.Listener.Close(); err != nil && !util.IsClosedErr(err) {
-				return err
-			}
-		default:
-			return fmt.Errorf("internal error: unknown listener protocol %q",
-				l.Proto.String())
+			_ = conn.Listener.Close()
 		}
 	}
-
 	l.Conns = []any{}
-
-	if l.Server != nil {
-		l.Server.Close() //nolint:errcheck
-	}
-	l.Server = nil
 
 	return nil
 }

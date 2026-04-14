@@ -156,10 +156,10 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 		var client net.Conn
 		var err error
 		if clientProto == "udp" {
-			turncatAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:25000") //nolint:errcheck
+			turncatAddr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:25000") //nolint:errcheck
 			client, err = net.DialUDP("udp", nil, turncatAddr)
 		} else {
-			turncatAddr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:25000") //nolint:errcheck
+			turncatAddr, _ := net.ResolveTCPAddr("tcp4", "127.0.0.1:25000") //nolint:errcheck
 			client, err = net.DialTCP("tcp", nil, turncatAddr)
 		}
 		if err != nil {

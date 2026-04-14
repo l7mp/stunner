@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/v3/test"
-	"github.com/pion/transport/v3/vnet"
+	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v4/vnet"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/object"
@@ -57,7 +57,7 @@ func TestPortRangePacketConn(t *testing.T) {
 	t.Run("LoopbackOnValidPort", func(t *testing.T) {
 		log.Debug("Creating base socket")
 		addr := "127.0.0.1:15000"
-		baseConn, err := nw.ListenPacket("udp", addr)
+		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
@@ -66,7 +66,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
-		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.NoError(t, err, "should succeed")
@@ -87,7 +87,7 @@ func TestPortRangePacketConn(t *testing.T) {
 	t.Run("LoopbackOnInvalidPort", func(t *testing.T) {
 		log.Debug("Creating base socket")
 		addr := "127.0.0.1:25000"
-		baseConn, err := nw.ListenPacket("udp", addr)
+		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
@@ -96,7 +96,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
-		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.Error(t, err, "should reject")
@@ -116,7 +116,7 @@ func TestPortRangePacketConn(t *testing.T) {
 	t.Run("LoopbackOnSinglePort", func(t *testing.T) {
 		log.Debug("Creating base socket")
 		addr := "127.0.0.1:15000"
-		baseConn, err := nw.ListenPacket("udp", addr)
+		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
@@ -125,7 +125,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("Sending packet")
-		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.NoError(t, err, "should succeed")
@@ -163,7 +163,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 
 	log.Debug("Creating base socket")
 	addr := "127.0.0.1:25000"
-	baseConn, err := nw.ListenPacket("udp", addr)
+	baseConn, err := nw.ListenPacket("udp4", addr)
 	if err != nil {
 		b.Fatalf("Cannot listen on vnet: %s", err.Error())
 	}
@@ -175,7 +175,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 		b.Fatalf("Cannot create port-range packetconn: %s", err.Error())
 	}
 
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 	if err != nil {
 		b.Fatalf("Cannot resove UDP addess: %s", err.Error())
 	}

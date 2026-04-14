@@ -9,16 +9,17 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3"
-	"github.com/pion/transport/v3/stdnet"
-	"github.com/pion/transport/v3/test"
-	"github.com/pion/transport/v3/vnet"
-	"github.com/pion/turn/v4"
+	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v4/stdnet"
+	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v4/vnet"
+	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/internal/resolver"
@@ -93,13 +94,14 @@ func stunnerEchoTest(conf echoTestConfig) {
 	log := conf.loggerFactory.NewLogger("test")
 
 	client, err := turn.NewClient(&turn.ClientConfig{
-		STUNServerAddr: conf.stunnerAddr,
-		TURNServerAddr: conf.stunnerAddr,
-		Username:       conf.user,
-		Password:       conf.pass,
-		Conn:           conf.lconn,
-		Net:            conf.wan,
-		LoggerFactory:  conf.loggerFactory,
+		STUNServerAddr:         conf.stunnerAddr,
+		TURNServerAddr:         conf.stunnerAddr,
+		Username:               conf.user,
+		Password:               conf.pass,
+		Conn:                   conf.lconn,
+		RequestedAddressFamily: turn.RequestedAddressFamilyIPv4,
+		Net:                    conf.wan,
+		LoggerFactory:          conf.loggerFactory,
 	})
 
 	assert.NoError(t, err, "cannot create TURN client")
@@ -582,9 +584,9 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 
 			log.Debug("creating a client")
 			var lconn net.PacketConn
-			switch proto {
+			switch strings.ToLower(proto) {
 			case "turn-udp":
-				lconn, err = net.ListenPacket("udp", "0.0.0.0:0")
+				lconn, err = net.ListenPacket("udp4", "0.0.0.0:0")
 				assert.NoError(t, err, "cannot create UDP client socket")
 			case "turn-tcp":
 				conn, cErr := net.Dial("tcp", stunnerAddr)
@@ -605,14 +607,14 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 				assert.NoError(t, err, "cannot create certificate for DTLS client socket")
 				// for some reason dtls.Listen requires a UDPAddr and not an addr string
 				udpAddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 23478}
-				conn, err := dtls.Dial("udp", udpAddr, &dtls.Config{
+				conn, err := dtls.Dial("udp4", udpAddr, &dtls.Config{
 					Certificates:       []tls.Certificate{cer},
 					InsecureSkipVerify: true,
 				})
 				assert.NoError(t, err, "cannot create DTLS client socket")
 				lconn = turn.NewSTUNConn(conn)
 			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown client protocol in test"))
+				assert.FailNow(t, "internal error: unknown client protocol in test", "protocol=%q", proto)
 			}
 
 			stdnet, _ := stdnet.NewNet()
@@ -1763,7 +1765,7 @@ type stunnerLifecycleTestConfig struct {
 var testLifecycleURLSpecDefault = "http://127.0.0.1:8086"
 var testLifecycleURLDisable = ""
 var testLifecycleURLNoAddr = "http://:8086"
-var testLifecycleURLDiffPort = "http://0.0.0.0:8087"
+var testLifecycleURLDiffPort = "http://:8087"
 var testLifecycleURLNoAddrNoPort = "http://"
 
 var testLifecycle = []stunnerLifecycleTestConfig{
@@ -1915,7 +1917,7 @@ func TestStunnerLifecycle(t *testing.T) {
 			assert.NoError(t, err)
 
 			addr := u.Hostname()
-			if addr == "" || addr == "0.0.0.0" {
+			if isHostAny(addr) {
 				addr = "127.0.0.1"
 			}
 
@@ -2010,7 +2012,7 @@ var testMetrics = []stunnerMetricsTestConfig{
 	},
 	{
 		name:       "reconcile with a different port",
-		mcEndpoint: "http://0.0.0.0:9087/metrics",
+		mcEndpoint: "http://:9087/metrics",
 		metricsTester: func(t *testing.T, status bool, err error) {
 			assert.NoError(t, err, "metric server: running")
 			assert.True(t, status, "metric server: serving")
@@ -2074,7 +2076,7 @@ func TestStunnerMetrics(t *testing.T) {
 			assert.NoError(t, err)
 
 			addr := u.Hostname()
-			if addr == "" || addr == "0.0.0.0" {
+			if isHostAny(addr) {
 				addr = "127.0.0.1"
 			}
 
@@ -2265,4 +2267,22 @@ func TestStunnerConfigV1Alpha1(t *testing.T) {
 			assert.NoError(t, v.Close(), "cannot close VNet")
 		})
 	}
+}
+
+func isHostAny(host string) bool {
+	h := strings.TrimSpace(host)
+	return h == "" || h == "0.0.0.0" || h == "::"
+}
+
+// func isAddrAny(addrPort string) bool {
+// 	h, _, err := net.SplitHostPort(addrPort)
+// 	if err != nil {
+// 		return isHostAny(addrPort)
+// 	}
+// 	return isHostAny(h)
+// }
+
+func isHostLocal(host string) bool {
+	h := strings.TrimSpace(host)
+	return strings.EqualFold(h, "localhost") || h == "127.0.0.1" || h == "::1"
 }

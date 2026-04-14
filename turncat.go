@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -106,7 +106,7 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 		return nil, fmt.Errorf("error parsing peer address %q: %w", config.PeerAddr, pErr)
 	}
 	// default to UDP
-	peerAddress, err := net.ResolveUDPAddr("udp", peer.Host)
+	peerAddress, err := net.ResolveUDPAddr("udp4", peer.Host)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving peer address %q: %w", config.PeerAddr, err)
 	}
@@ -121,33 +121,32 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	// a global listener connection for the local tunnel endpoint
 	// per-client connections will connect back to the client
 	log.Tracef("Setting up listener connection on %s", config.ListenerAddr)
-	var listenerConn interface{}
-	listenerConf := &net.ListenConfig{Control: reuseAddr}
 
+	var listenerConn any
+	listenConf := &net.ListenConfig{Control: reuseAddr}
 	var listenerAddress net.Addr
 	switch listenerProtocol {
 	case "file":
 		listenerConn = util.NewFileConn(os.Stdin)
-	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
-		addr, err := net.ResolveUDPAddr("udp", listener.Host)
+	case "udp", "udp4", "unixgram", "ip", "ip4":
+		addr, err := net.ResolveUDPAddr("udp4", listener.Host)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
 		}
-
-		l, err := listenerConf.ListenPacket(context.Background(), addr.Network(), addr.String())
+		l, err := listenConf.ListenPacket(context.Background(), addr.Network(), addr.String())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create listening client packet socket at %s: %s",
 				config.ListenerAddr, err)
 		}
 		listenerAddress = addr
 		listenerConn = l
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
-		addr, err := net.ResolveTCPAddr("tcp", listener.Host)
+	case "tcp", "tcp4", "unix", "unixpacket":
+		addr, err := net.ResolveTCPAddr("tcp4", listener.Host)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving listener address %q: %w", config.ListenerAddr, err)
 		}
 
-		l, err := listenerConf.Listen(context.Background(), addr.Network(), addr.String())
+		l, err := listenConf.Listen(context.Background(), addr.Network(), addr.String())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create listening client socket at %s: %s",
 				config.ListenerAddr, err)
@@ -175,11 +174,11 @@ func NewTurncat(config *TurncatConfig) (*Turncat, error) {
 	}
 
 	switch listenerProtocol {
-	case "udp", "udp4", "udp6", "unixgram", "ip", "ip4", "ip6":
+	case "udp", "udp4", "unixgram", "ip", "ip4":
 		// client connection is a packet conn, write our own Listen/Accept loop for UDP
 		// main loop: for every new packet we create a new connection and connect it back to the client
 		go t.runListenPacket()
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
+	case "tcp", "tcp4", "unix", "unixpacket":
 		// client connection is bytestream, we are supposed to have a Listen/Accept loop available
 		go t.runListen()
 	case "file":
@@ -249,14 +248,14 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	var turnConn net.PacketConn
 	switch strings.ToLower(t.serverProto) {
 	case "turn-udp":
-		t, err := net.ListenPacket(t.serverAddr.Network(), "0.0.0.0:0")
+		t, err := net.ListenPacket("udp4", "0.0.0.0:0")
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate TURN listening packet socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
 		}
 		turnConn = t
 	case "turn-tcp":
-		c, err := net.Dial(t.serverAddr.Network(), t.serverAddr.String())
+		c, err := net.Dial("tcp4", t.serverAddr.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate TURN socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)
@@ -265,7 +264,7 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	case "turn-tls":
 		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 		// assert.NoError(t, err, "cannot create certificate for TLS client socket")
-		c, err := tls.Dial("tcp", t.serverAddr.String(), &tls.Config{
+		c, err := tls.Dial("tcp4", t.serverAddr.String(), &tls.Config{
 			MinVersion:         tls.VersionTLS12,
 			ServerName:         t.serverName,
 			InsecureSkipVerify: t.insecure,
@@ -278,10 +277,10 @@ func (t *Turncat) newConnection(clientConn net.Conn) (*connection, error) {
 	case "turn-dtls":
 		// cert, err := tls.LoadX509KeyPair(certFile.Name(), keyFile.Name())
 		// assert.NoError(t, err, "cannot create certificate for DTLS client socket")
-		udpAddr, _ := net.ResolveUDPAddr("udp", t.serverAddr.String())
-		conn, err := dtls.Dial("udp", udpAddr, &dtls.Config{
-			InsecureSkipVerify: t.insecure,
-		})
+		udpAddr, _ := net.ResolveUDPAddr("udp4", t.serverAddr.String())
+		conn, err := dtls.DialWithOptions("udp4", udpAddr,
+			dtls.WithInsecureSkipVerify(t.insecure),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate TURN/DTLS socket for client %s:%s: %s",
 				clientAddr.Network(), clientAddr.String(), err)

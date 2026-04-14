@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/l7mp/stunner/internal/telemetry"
-	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v4"
 )
 
 // PacketConnPool is a factory to create pools of related PacketConns, which may either be a set of
@@ -13,8 +13,8 @@ import (
 // that can do multithreaded readloops, or a single PacketConn as a fallback for non-unic
 // architectures and for testing.
 type PacketConnPool interface {
-	// Make creates a PacketConnPool, caller must make sure to close the sockets.
-	Make(network, address string) ([]net.PacketConn, error)
+	// ListenPacket creates a PacketConn listener analogous to net.ListenPacket.
+	ListenPacket(network, address string) ([]net.PacketConn, error)
 	// Size returns the number of sockets in the pool.
 	Size() int
 }
@@ -22,16 +22,16 @@ type PacketConnPool interface {
 // defaultPacketConPool implements a socketpool that consists of only a single socket, used as a
 // fallback for architectures that do not support SO_REUSEPORT or when socket pooling is disabled.
 type defaultPacketConnPool struct {
-	transport.Net
+	net          transport.Net
 	listenerName string
 	telemetry    *telemetry.Telemetry
 }
 
-// Make creates a PacketConnPool, caller must make sure to close the sockets.
-func (p *defaultPacketConnPool) Make(network, address string) ([]net.PacketConn, error) {
+// ListenPacket creates a PacketConn listener analogous to net.ListenPacket.
+func (p *defaultPacketConnPool) ListenPacket(network, address string) ([]net.PacketConn, error) {
 	conns := []net.PacketConn{}
 
-	conn, err := p.ListenPacket(network, address)
+	conn, err := p.net.ListenPacket(network, address)
 	if err != nil {
 		return []net.PacketConn{}, fmt.Errorf("failed to create PacketConn at %s "+
 			"(REUSEPORT: false): %s", address, err)

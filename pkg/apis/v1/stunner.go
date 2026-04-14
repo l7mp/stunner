@@ -211,8 +211,6 @@ func (req *StunnerConfig) Summary() string {
 			addr = "<private-pod-ip-addr>"
 		case "__node_address_placeholder":
 			addr = "<node-ip-addr>"
-		case "0.0.0.0":
-			addr = "0.0.0.0"
 		default:
 			addr = l.Addr
 		}

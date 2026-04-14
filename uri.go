@@ -51,14 +51,14 @@ func ParseUri(uri string) (*StunnerUri, error) {
 	s.Protocol = proto
 
 	switch strings.ToLower(proto) {
-	case "udp", "udp4", "udp6", "dtls", "turn-udp", "turn-dtls":
-		a, err := net.ResolveUDPAddr("udp", s.Address+":"+u.Port())
+	case "udp", "udp4", "dtls", "turn-udp", "turn-dtls":
+		a, err := net.ResolveUDPAddr("udp4", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
 		}
 		s.Addr = a
-	case "tcp", "tcp4", "tcp6", "tls", "turn-tcp", "turn-tls":
-		a, err := net.ResolveTCPAddr("tcp", s.Address+":"+u.Port())
+	case "tcp", "tcp4", "tls", "turn-tcp", "turn-tls":
+		a, err := net.ResolveTCPAddr("tcp4", s.Address+":"+u.Port())
 		if err != nil {
 			return nil, err
 		}

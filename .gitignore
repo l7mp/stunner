@@ -11,6 +11,14 @@
 # Additional dev artifacts
 .DS_Store
 
+# Local secrets and throwaway artifacts
+.github_access_token
+ca.key
+ca.crt
+*.bak
+tmp/
+*.tmp
+
 # Test binary, built with `go test -c`
 *.test
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v4"
 
 	"github.com/l7mp/stunner/internal/resolver"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"

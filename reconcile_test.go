@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v4/test"
+	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/resolver"
@@ -76,9 +78,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("user", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "user",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
@@ -344,9 +350,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("user", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "user",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
@@ -427,9 +437,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("user", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "user",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
@@ -514,9 +528,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("user", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "user",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
@@ -592,9 +610,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("newuser", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "newuser",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "newuser", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("newuser",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
@@ -674,9 +696,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "newpass", "password ok")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler("user", stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: "user",
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
+			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "newpass"), "auth handler ok")
 
@@ -759,12 +785,18 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "GetLongTermCredential")
 
 			handler := s.NewAuthHandler()
-			key, ok := handler(username, stnrv1.DefaultRealm,
-				&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234})
+			userID, key, ok := handler(&turn.RequestAttributes{
+				Username: username,
+				Realm:    stnrv1.DefaultRealm,
+				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+			})
 			assert.True(t, ok, "authHandler key ok")
 
 			key2 := a12n.GenerateAuthKey(username, stnrv1.DefaultRealm, passwd)
 			assert.Equal(t, key, key2, "authHandler key matches")
+
+			// userID must be the parsed user-id portion ("dummy_user")
+			assert.Equal(t, "dummy_user", userID, "authHandler userID ok for ephemeral auth")
 
 			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
 			admin := s.GetAdmin()
@@ -2018,7 +2050,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
-			assert.NoError(t, err, "cannot create client listening socket")
+			require.NoError(t, err, "cannot create client listening socket")
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
 				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,

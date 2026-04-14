@@ -7,7 +7,7 @@ import (
 
 	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/util"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
@@ -23,8 +23,12 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 		return nil
 	}
 
-	return func(username string, realm string, srcAddr net.Addr) ([]byte, bool) {
-		// dynamic: auth mode might have changed behind ur back
+	return func(ra *turn.RequestAttributes) (string, []byte, bool) {
+		username := ra.Username
+		realm := ra.Realm
+		srcAddr := ra.SrcAddr
+
+		// dynamic: auth mode might have changed behind our back
 		auth := s.GetAuth()
 
 		switch auth.Type {
@@ -35,35 +39,37 @@ func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
 			key := a12n.GenerateAuthKey(auth.Username, auth.Realm, auth.Password)
 			if username == auth.Username {
 				auth.Log.Debug("static auth request: valid username")
-				return key, true
+				// userID is username for static auth
+				return username, key, true
 			}
 
 			auth.Log.Infof("static auth request: failed: invalid username")
-			return nil, false
+			return "", nil, false
 
 		case stnrv1.AuthTypeEphemeral:
 			auth.Log.Tracef("ephemeral auth request: username=%q realm=%q srcAddr=%v",
 				username, realm, srcAddr)
 
-			if err := a12n.CheckTimeWindowedUsername(username); err != nil {
+			userID, err := a12n.CheckTimeWindowedUsername(username)
+			if err != nil {
 				auth.Log.Infof("ephemeral auth request: failed: %s", err)
-				return nil, false
+				return "", nil, false
 			}
 
 			password, err := a12n.GetLongTermCredential(username, auth.Secret)
 			if err != nil {
-				auth.Log.Debugf("ephemeral auth request: error generating password: %s",
-					err)
-				return nil, false
+				auth.Log.Debugf("ephemeral auth request: error generating password: %s", err)
+				return "", nil, false
 			}
 
 			auth.Log.Debug("ephemeral auth request: success")
-			return a12n.GenerateAuthKey(username, auth.Realm, password), true
+			key := a12n.GenerateAuthKey(username, auth.Realm, password)
+			// userID is username for ephemeral auth as well
+			return userID, key, true
 
 		default:
-			auth.Log.Errorf("internal error: unknown authentication mode %q",
-				auth.Type.String())
-			return nil, false
+			auth.Log.Errorf("internal error: unknown authentication mode %q", auth.Type.String())
+			return "", nil, false
 		}
 	}
 }
@@ -208,8 +214,8 @@ func newOffloadHandlerStub(s *Stunner) OffloadHandler {
 }
 
 // NewEventHandler creates a set of callbcks for tracking the lifecycle of TURN allocations.
-func (s *Stunner) NewEventHandler(l *object.Listener) turn.EventHandlers {
-	return turn.EventHandlers{
+func (s *Stunner) NewEventHandler(l *object.Listener) turn.EventHandler {
+	return turn.EventHandler{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
 			if verdict {

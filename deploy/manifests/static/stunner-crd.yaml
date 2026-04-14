@@ -284,7 +284,7 @@ spec:
                   HealthCheckEndpoint is the URI of the form `http://address:port` exposed for external
                   HTTP health-checking. A liveness probe responder will be exposed on path `/live` and
                   readiness probe on path `/ready`. The scheme (`http://`) is mandatory, default is to
-                  enable health-checking at "http://0.0.0.0:8086".
+                  enable health-checking at "http://:8086".
                 type: string
               loadBalancerServiceAnnotations:
                 additionalProperties:
@@ -1725,7 +1725,7 @@ spec:
               enableMetricsEndpoint:
                 description: |-
                   EnableMetricsEnpoint can be used to enable metrics scraping (Prometheus). If enabled, a
-                  metrics endpoint will be available at http://0.0.0.0:8080 at all dataplane pods. Default
+                  metrics endpoint will be available at http://:8080 at all dataplane pods. Default
                   is no metrics collection.
                 type: boolean
               env:

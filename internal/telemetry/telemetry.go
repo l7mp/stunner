@@ -11,7 +11,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 const (
@@ -53,7 +52,7 @@ func New(callbacks Callbacks, dryRun bool, log logging.LeveledLogger) (*Telemetr
 	var reader sdkmetric.Reader
 
 	resource, err := resource.Merge(resource.Default(),
-		resource.NewSchemaless(semconv.ServiceNameKey.String("stunner")))
+		resource.NewSchemaless(attribute.String("service.name", "stunner")))
 	if err != nil {
 		return nil, fmt.Errorf("could not create OTEL resource: %w", err)
 	}

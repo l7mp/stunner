@@ -12,8 +12,9 @@ import (
 
 	"github.com/go-logr/zapr"
 	"github.com/gorilla/websocket"
-	"github.com/pion/transport/v3/test"
+	"github.com/pion/transport/v4/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/yaml"
@@ -60,7 +61,6 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			// patch in the loglevel
 			c.Admin.LogLevel = stunnerTestLoglevel
-
 			checkDefaultConfig(t, c, "TURN-UDP")
 
 			// patch in the vnet
@@ -76,7 +76,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(c), "starting server")
+			require.NoError(t, stunner.Reconcile(c), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -537,13 +537,13 @@ func TestStunnerConfigPatcher(t *testing.T) {
 		name: "default",
 		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) {},
 		tester: func(c *stnrv1.StunnerConfig) bool {
-			return len(c.Listeners) == 1 && c.Listeners[0].Addr == "0.0.0.0"
+			return len(c.Listeners) == 1 && isHostAny(c.Listeners[0].Addr)
 		},
 	}, {
 		name: "default w/ IP",
 		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) { c.Listeners[0].Addr = "127.0.0.1" },
 		tester: func(c *stnrv1.StunnerConfig) bool {
-			return len(c.Listeners) == 1 && c.Listeners[0].Addr == "127.0.0.1"
+			return len(c.Listeners) == 1 && isHostLocal(c.Listeners[0].Addr)
 		},
 	}, {
 		name: "node rewrite",

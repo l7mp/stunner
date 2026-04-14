@@ -4,7 +4,7 @@ package util
 
 import (
 	"github.com/l7mp/stunner/internal/telemetry"
-	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v4"
 )
 
 // NewPacketConnPool creates a new packet connection pool which is fixed to a single connection,
@@ -13,7 +13,7 @@ import (
 func NewPacketConnPool(listenerName string, vnet transport.Net, threadNum int, t *telemetry.Telemetry) PacketConnPool {
 	// default to a single socket for vnet or if udp multithreading is disabled
 	return &defaultPacketConnPool{
-		Net:          vnet,
+		net:          vnet,
 		listenerName: listenerName,
 		telemetry:    t,
 	}

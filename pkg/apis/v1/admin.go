@@ -23,7 +23,7 @@ type AdminConfig struct {
 	// HTTP health-checking. A liveness probe responder will be exposed on path `/live` and
 	// readiness probe on path `/ready`. The scheme (`http://`) is mandatory, and if no port is
 	// specified then the default port is 8086. If ignored, then the default is to enable
-	// health-checking at `http://0.0.0.0:8086`. Set to a pointer to an empty string to disable
+	// health-checking at `http://:8086`. Set to a pointer to an empty string to disable
 	// health-checking.
 	HealthCheckEndpoint *string `json:"healthcheck_endpoint,omitempty"`
 	// UserQuota defines the number of permitted TURN allocatoins per username. Affects

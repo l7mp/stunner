@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3"
+	"github.com/pion/transport/v4"
+	"github.com/pion/turn/v5"
 	"k8s.io/utils/lru"
 
 	"github.com/l7mp/stunner/internal/object"
@@ -79,12 +80,15 @@ func (r *RelayGen) Validate() error {
 
 // AllocatePacketConn generates a new transport relay connection and returns the IP/Port to be
 // returned to the client in the allocation response.
-func (r *RelayGen) AllocatePacketConn(network string, requestedPort int) (net.PacketConn, net.Addr, error) {
+func (r *RelayGen) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
+	requestedPort := conf.RequestedPort
 	if requestedPort <= 1 || requestedPort > 2<<16-1 {
 		requestedPort = 0
 	}
 
-	conn, err := r.Net.ListenPacket(network, fmt.Sprintf("%s:%d", r.Address, requestedPort))
+	// This will fail unless (1) r.Address is "" (IPADDR_ANY), or (2) r.Address is IPv4 and the
+	// requested network is also IPv4, or (3) both are IPv6.
+	conn, err := r.Net.ListenPacket(conf.Network, fmt.Sprintf("%s:%d", r.Address, requestedPort))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,9 +105,14 @@ func (r *RelayGen) AllocatePacketConn(network string, requestedPort int) (net.Pa
 	return conn, relayAddr, nil
 }
 
-// AllocateConn generates a new Conn to receive traffic on and the IP/Port to populate the
-// allocation response with
-func (g *RelayGen) AllocateConn(network string, requestedPort int) (net.Conn, net.Addr, error) {
+// AllocateConn generates a new outgoing TCP connection bound to the relay address.
+func (g *RelayGen) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
+	return nil, errTodo
+}
+
+// AllocateListener generates a new Listener to receive traffic on and the IP/Port to populate the
+// allocation response with.
+func (r *RelayGen) AllocateListener(conf turn.AllocateListenerConfig) (net.Listener, net.Addr, error) {
 	return nil, nil, errTodo
 }
 

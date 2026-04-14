@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v3/test"
-	"github.com/pion/turn/v4"
+	"github.com/pion/transport/v4/test"
+	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
@@ -47,7 +48,7 @@ func turncatEchoTest(conf turncatEchoTestConfig) {
 	log := conf.loggerFactory.NewLogger("test")
 
 	echoConn, err := net.ListenPacket(conf.peer.Network(), conf.peer.String())
-	assert.NoError(t, err, "cannot allocate echo server connection")
+	require.NoError(t, err, "cannot allocate echo server connection")
 
 	go func() {
 		buf := make([]byte, 1600)
@@ -61,7 +62,7 @@ func turncatEchoTest(conf turncatEchoTestConfig) {
 
 			// echo the data
 			_, err = echoConn.WriteTo(buf[:n], from)
-			assert.NoError(t, err, err)
+			require.NoError(t, err, err)
 		}
 	}()
 
@@ -143,7 +144,7 @@ func TestTurncatPlaintext(t *testing.T) {
 		}},
 	})
 
-	assert.NoError(t, err, "starting server")
+	require.NoError(t, err, "starting server")
 	defer stunner.Close()
 
 	testTurncatConfigs := []TurncatConfig{
@@ -192,14 +193,14 @@ func TestTurncatPlaintext(t *testing.T) {
 
 			log.Debug("creating turncat relay")
 			turncat, err := NewTurncat(&c)
-			assert.NoError(t, err, "cannot create turncat relay")
+			require.NoError(t, err, "cannot create turncat relay")
 
 			lconn, err := net.Dial(turncat.listenerAddr.Network(), turncat.listenerAddr.String())
-			assert.NoError(t, err, "cannot create client socket")
+			require.NoError(t, err, "cannot create client socket")
 
 			if strings.HasPrefix(turncat.listenerAddr.Network(), "tcp") {
 				// prevent "addess already in use" errors: close sends RST
-				assert.NoError(t, lconn.(*net.TCPConn).SetLinger(0),
+				require.NoError(t, lconn.(*net.TCPConn).SetLinger(0),
 					"cannnot set TCP linger")
 			}
 

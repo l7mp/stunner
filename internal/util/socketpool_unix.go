@@ -11,13 +11,13 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/l7mp/stunner/internal/telemetry"
-	"github.com/pion/transport/v3"
-	"github.com/pion/transport/v3/stdnet"
+	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v4/stdnet"
 )
 
 // unixPacketConPool implements socketpools for unix with full support for SO_REUSEPORT
 type unixPacketConnPool struct {
-	net.ListenConfig
+	listenConfig net.ListenConfig
 	listenerName string
 	size         int
 	telemetry    *telemetry.Telemetry
@@ -31,7 +31,7 @@ func NewPacketConnPool(listenerName string, vnet transport.Net, threadNum int, t
 	_, ok := vnet.(*stdnet.Net)
 	if ok && threadNum > 0 {
 		return &unixPacketConnPool{
-			ListenConfig: net.ListenConfig{
+			listenConfig: net.ListenConfig{
 				Control: func(network, address string, conn syscall.RawConn) error {
 					var operr error
 					if err := conn.Control(func(fd uintptr) {
@@ -49,15 +49,15 @@ func NewPacketConnPool(listenerName string, vnet transport.Net, threadNum int, t
 			telemetry:    t,
 		}
 	} else {
-		return &defaultPacketConnPool{listenerName: listenerName, Net: vnet, telemetry: t}
+		return &defaultPacketConnPool{listenerName: listenerName, net: vnet, telemetry: t}
 	}
 }
 
-// Make creates a PacketConnPool, caller must make sure to close the sockets.
-func (p *unixPacketConnPool) Make(network, address string) ([]net.PacketConn, error) {
+// ListenPacket creates a PacketConn listener over the pool analogous to net.ListenPacket.
+func (p *unixPacketConnPool) ListenPacket(network, address string) ([]net.PacketConn, error) {
 	conns := []net.PacketConn{}
 	for i := 0; i < p.size; i++ {
-		conn, err := p.ListenPacket(context.Background(), network, address)
+		conn, err := p.listenConfig.ListenPacket(context.Background(), network, address)
 		// this will have to be converted to errors.Join once we bump Go dependency to
 		// 1.20, for now we return on the first error that poccurred.
 		if err != nil {

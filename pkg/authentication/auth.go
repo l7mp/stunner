@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 )
 
 // UsernameSeparator is the separator character used in time-windowed TURN authentication as
@@ -39,25 +39,36 @@ func GenerateTimeWindowedUsername(startTime time.Time, duration time.Duration, u
 // that we make more effort to find out which component of the username is the UNIX timestamp: we
 // find the first thing that looks like a UNIX timestamp in the username and use that for checking
 // the time-windowed credential, and reject everything else.
-func CheckTimeWindowedUsername(username string) error {
+func CheckTimeWindowedUsername(username string) (string, error) {
 	timestamp := 0
-	for _, ts := range strings.Split(username, UsernameSeparator) {
+	parts := strings.Split(username, UsernameSeparator)
+	timestampIdx := -1
+	for i, ts := range parts {
 		t, err := strconv.Atoi(ts)
 		if err == nil {
 			timestamp = t
+			timestampIdx = i
 			break
 		}
 	}
 
 	if timestamp == 0 {
-		return fmt.Errorf("invalid time-windowed username %q", username)
+		return "", fmt.Errorf("invalid time-windowed username %q", username)
 	}
 
 	if int64(timestamp) < time.Now().Unix() {
-		return fmt.Errorf("expired time-windowed username %q", username)
+		return "", fmt.Errorf("expired time-windowed username %q", username)
 	}
 
-	return nil
+	// Default format is timestamp:userID
+	userID := username
+	if len(parts) == 2 {
+		if timestampIdx == 0 {
+			userID = parts[1]
+		}
+	}
+
+	return userID, nil
 }
 
 // GetLongTermCredential creates a password given a username and a shared secret.
