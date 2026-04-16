@@ -24,11 +24,8 @@ type Options struct {
 	// SuppressRollback controls whether to rollback to the last working configuration after a
 	// failed reconciliation request. Default is false, which means to always do a rollback.
 	SuppressRollback bool
-	// LogLevel specifies the required loglevel for STUNner and each of its sub-objects, e.g.,
-	// "all:TRACE" will force maximal loglevel throughout, "all:ERROR,auth:TRACE,turn:DEBUG"
-	// will suppress all logs except in the authentication subsystem and the TURN protocol
-	// logic.
-	LogLevel string
+	// LogOptions controls logger settings (level, optional rate limiter settings).
+	LogOptions LogOptions
 	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
 	// testing.
 	Resolver resolver.DnsResolver

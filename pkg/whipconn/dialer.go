@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/datachannel"
@@ -50,17 +51,11 @@ func (d *Dialer) WithSettingEngine(e webrtc.SettingEngine) *Dialer {
 }
 
 func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error) {
-	stopped := false
+	var stopped atomic.Bool
 	var connCh chan any
 	var errCh chan error
 	defer func() {
-		stopped = true
-		if connCh != nil {
-			close(connCh)
-		}
-		if errCh != nil {
-			close(errCh)
-		}
+		stopped.Store(true)
 	}()
 
 	peerConn, err := d.api.NewPeerConnection(webrtc.Configuration{
@@ -85,30 +80,49 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	}
 
 	connCh = make(chan any, 1)
-	errCh = make(chan error)
+	errCh = make(chan error, 1)
+
+	sendErr := func(err error) {
+		if stopped.Load() {
+			return
+		}
+
+		select {
+		case errCh <- err:
+		default:
+		}
+	}
 
 	// Register channel opening handling
 	dataChannel.OnOpen(func() {
+		if stopped.Load() {
+			return
+		}
+
 		conn.log.Debugf("Creating new connection in data channel %s-%d",
 			dataChannel.Label(), dataChannel.ID())
 
 		raw, err := dataChannel.Detach()
 		if err != nil {
-			errCh <- fmt.Errorf("failed to detach DataChannel: %w", err)
+			sendErr(fmt.Errorf("failed to detach DataChannel: %w", err))
+			return
 		}
 		conn.dataConn = raw
 
-		connCh <- struct{}{}
+		select {
+		case connCh <- struct{}{}:
+		default:
+		}
 	})
 
 	// If PeerConnection is closed, close the client
 	peerConn.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
 		conn.log.Infof("Connection state has changed: %s", p)
 		if p == webrtc.PeerConnectionStateFailed || p == webrtc.PeerConnectionStateClosed {
-			if stopped {
+			if stopped.Load() {
 				conn.Close() //nolint
 			} else {
-				errCh <- fmt.Errorf("ICE connection terminated with state: %s", p.String())
+				sendErr(fmt.Errorf("ICE connection terminated with state: %s", p.String()))
 			}
 		}
 	})

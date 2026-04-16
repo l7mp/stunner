@@ -77,7 +77,7 @@ func main() {
 
 	st := stunner.NewStunner(stunner.Options{
 		Name:                        *id,
-		LogLevel:                    logLevel,
+		LogOptions:                  stunner.LogOptions{Level: logLevel},
 		DryRun:                      *dryRun,
 		NodeName:                    nodeName,
 		UDPListenerThreadNum:        *udpThreadNum,

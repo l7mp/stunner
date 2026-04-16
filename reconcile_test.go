@@ -1940,7 +1940,7 @@ func TestStunnerReconcile(t *testing.T) {
 			log.Debug("creating a stunnerd")
 			s := NewStunner(Options{
 				DryRun:           true,
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback: true,
 			})
 
@@ -2020,11 +2020,10 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 	// should never err
 	mockDns.Start()
-	assert.NoError(t, nil, "start mock DNS")
 
 	log.Debug("creating a stunnerd")
 	s := NewStunner(Options{
-		LogLevel:         stunnerTestLoglevel,
+		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 		SuppressRollback: rollback,
 		Resolver:         mockDns,
 		Net:              v.podnet,

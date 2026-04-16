@@ -40,6 +40,19 @@ type LoggerFactory interface {
 	SetWriter(w io.Writer)
 }
 
+// Options configures logger behavior.
+type Options struct {
+	// Level is a scoped level specification (for example, "all:WARN,turn:DEBUG").
+	// If empty, the caller should use its own default level.
+	Level string
+	// RateLimit is the maximum number of rate-limited log events per second.
+	// If non-positive, the caller should use its own default rate limit.
+	RateLimit rate.Limit
+	// Burst is the burst size of the log rate limiter.
+	// If non-positive, the caller should use its own default burst size.
+	Burst int
+}
+
 // LeveledLoggerFactory defines levels by scopes and creates new LeveledLoggers that can dynamically change their own loglevels.
 type LeveledLoggerFactory struct {
 	Writer          io.Writer

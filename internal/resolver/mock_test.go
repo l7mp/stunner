@@ -25,12 +25,10 @@ func TestMockResolver(t *testing.T) {
 
 	// should never err
 	mockDns.Start()
-	assert.NoError(t, nil, "start mock DNS")
 
 	// should never err
 	err := mockDns.Register("dummy")
 	assert.NoError(t, err, "register")
-	assert.NoError(t, nil, "register")
 
 	ip, err := mockDns.Lookup("stunner.l7mp.io")
 	assert.NoError(t, err, "lookup 1")
@@ -54,9 +52,7 @@ func TestMockResolver(t *testing.T) {
 
 	// should never err
 	mockDns.Unregister("dummy")
-	assert.NoError(t, nil, "unregister")
 
 	// should never err
 	mockDns.Close()
-	assert.NoError(t, nil, "stop mock DNS")
 }

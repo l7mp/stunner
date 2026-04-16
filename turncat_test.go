@@ -103,12 +103,12 @@ func TestTurncatPlaintext(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := logger.NewLoggerFactory(turncatTestLoglevel)
-	log := logger.NewLogger("test")
+	logFactory := logger.NewLoggerFactory(turncatTestLoglevel)
+	log := logFactory.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{
-		LogLevel:         turncatTestLoglevel,
+		LogOptions:       LogOptions{Level: turncatTestLoglevel},
 		SuppressRollback: true,
 	})
 
@@ -153,28 +153,28 @@ func TestTurncatPlaintext(t *testing.T) {
 			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       plaintextAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "udp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       plaintextAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "tcp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       plaintextAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "tcp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       plaintextAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 	}
 
@@ -204,7 +204,7 @@ func TestTurncatPlaintext(t *testing.T) {
 					"cannnot set TCP linger")
 			}
 
-			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logger}
+			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logFactory}
 			turncatEchoTest(testConfig)
 
 			turncat.Close()
@@ -220,12 +220,12 @@ func TestTurncatLongterm(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	logger := logger.NewLoggerFactory(turncatTestLoglevel)
-	log := logger.NewLogger("test")
+	logFactory := logger.NewLoggerFactory(turncatTestLoglevel)
+	log := logFactory.NewLogger("test")
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{
-		LogLevel:         turncatTestLoglevel,
+		LogOptions:       LogOptions{Level: turncatTestLoglevel},
 		SuppressRollback: true,
 	})
 	err := stunner.Reconcile(&stnrv1.StunnerConfig{
@@ -267,28 +267,28 @@ func TestTurncatLongterm(t *testing.T) {
 			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       longtermAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "udp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       longtermAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "tcp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=udp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       longtermAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 		{
 			ListenerAddr:  "tcp://127.0.0.1:25000",
 			ServerAddr:    "turn://127.0.0.1:23478?transport=tcp",
 			PeerAddr:      "udp://localhost:25678",
 			AuthGen:       longtermAuthGen,
-			LoggerFactory: logger,
+			LoggerFactory: logFactory,
 		},
 	}
 
@@ -318,7 +318,7 @@ func TestTurncatLongterm(t *testing.T) {
 					"cannnot set TCP linger")
 			}
 
-			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logger}
+			testConfig := turncatEchoTestConfig{t, stunner, lconn, turncat.peerAddr, logFactory}
 			turncatEchoTest(testConfig)
 
 			turncat.Close()

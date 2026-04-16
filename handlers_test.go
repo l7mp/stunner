@@ -252,7 +252,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback: true,
 				Net:              v.podnet,
 			})

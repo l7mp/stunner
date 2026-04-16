@@ -30,6 +30,28 @@ var testerLogLevel = zapcore.Level(-10)
 // var testerLogLevel = zapcore.DebugLevel
 // var testerLogLevel = zapcore.ErrorLevel
 
+func mustReadConfig(t *testing.T, ch <-chan *stnrv1.StunnerConfig, timeout time.Duration) *stnrv1.StunnerConfig {
+	t.Helper()
+
+	select {
+	case c := <-ch:
+		return c
+	case <-time.After(timeout):
+		t.Fatalf("timeout while waiting for config update")
+		return nil
+	}
+}
+
+func mustNotReadConfig(t *testing.T, ch <-chan *stnrv1.StunnerConfig, timeout time.Duration) {
+	t.Helper()
+
+	select {
+	case c := <-ch:
+		t.Fatalf("unexpected config update received: %#v", c)
+	case <-time.After(timeout):
+	}
+}
+
 /********************************************
  *
  * default-config
@@ -70,7 +92,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback: true,
 				Net:              v.podnet,
 			})
@@ -153,11 +175,10 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	assert.NoError(t, os.Remove(file), "removing temp config file")
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}})
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv1.StunnerConfig, 1)
-	defer close(conf)
 
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -167,8 +188,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	err = stunner.WatchConfig(ctx, url, conf, false)
 	assert.NoError(t, err, "creating config watcher")
 
-	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
-	time.Sleep(50 * time.Millisecond)
+	// nothing should happen here: watcher startup should not emit a config
+	mustNotReadConfig(t, conf, 50*time.Millisecond)
 
 	log.Debug("write the default config to the config file and check")
 	uri := "turn://user1:passwd1@1.2.3.4:3478?transport=udp"
@@ -197,8 +218,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// // wait a bit so that the watcher has time to react
 	// time.Sleep(50 * time.Millisecond)
 
-	c2, ok := <-conf
-	assert.True(t, ok, "config emitted")
+	c2 := mustReadConfig(t, conf, time.Second)
 	checkDefaultConfig(t, c2, "TURN-UDP")
 
 	log.Debug("write a wrong config file: WatchConfig validates")
@@ -216,16 +236,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// this makes sure that we do not share anything with ConfigWatch
 	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
 
-	// we should not read anything so that channel should not br redable
-	time.Sleep(50 * time.Millisecond)
-	readable := false
-	select {
-	case _, ok := <-conf:
-		readable = ok
-	default:
-		readable = false
-	}
-	assert.False(t, readable, "wrong config file does not trigger a watch event")
+	// wrong config file must not trigger an update
+	mustNotReadConfig(t, conf, 50*time.Millisecond)
 
 	log.Debug("update the config file and check")
 	c2.Listeners[0].Protocol = "TURN-TCP"
@@ -238,7 +250,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	c3 := <-conf
+	c3 := mustReadConfig(t, conf, time.Second)
 	checkDefaultConfig(t, c3, "TURN-TCP")
 
 	stunner.Close()
@@ -268,11 +280,10 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	assert.NoError(t, os.Remove(file), "removing temp config file")
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel})
+	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}})
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv1.StunnerConfig, 1)
-	defer close(conf)
 
 	log.Debug("init watcher with nonexistent config file")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -282,8 +293,8 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	err = stunner.WatchConfig(ctx, url, conf, false)
 	assert.NoError(t, err, "creating config watcher")
 
-	// nothing should happen here: wait a bit so that the watcher has comfortable time to start
-	time.Sleep(50 * time.Millisecond)
+	// nothing should happen here: watcher startup should not emit a config
+	mustNotReadConfig(t, conf, 50*time.Millisecond)
 
 	log.Debug("write v1 config and check")
 
@@ -299,8 +310,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	_, err = f.WriteString(testConfigV1)
 	assert.NoError(t, err, "write config to temp file")
 
-	c2, ok := <-conf
-	assert.True(t, ok, "config emitted")
+	c2 := mustReadConfig(t, conf, time.Second)
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
 	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
@@ -324,8 +334,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	_, err = f.WriteString(testConfigV1A1)
 	assert.NoError(t, err, "write config to temp file")
 
-	c2, ok = <-conf
-	assert.True(t, ok, "config emitted")
+	c2 = mustReadConfig(t, conf, time.Second)
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
 	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
@@ -413,17 +422,15 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	log.Debug("creating a stunnerd")
-	stunner := NewStunner(Options{LogLevel: stunnerTestLoglevel, Name: "ns1/tester"})
+	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}, Name: "ns1/tester"})
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv1.StunnerConfig, 1)
-	defer close(conf)
 
 	log.Debug("init config poller")
 	assert.NoError(t, stunner.WatchConfig(ctx, origin, conf, true), "creating config poller")
 
-	c2, ok := <-conf
-	assert.True(t, ok, "config emitted")
+	c2 := mustReadConfig(t, conf, time.Second)
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
 	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
@@ -441,8 +448,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	assert.Equal(t, "1.2.3.5", c2.Clusters[0].Endpoints[0], "cluster port")
 
 	// next read yields a v1alpha1 config
-	c2, ok = <-conf
-	assert.True(t, ok, "config emitted")
+	c2 = mustReadConfig(t, conf, time.Second)
 
 	assert.Equal(t, stnrv1.ApiVersion, c2.ApiVersion, "version")
 	assert.Equal(t, "all:ERROR", c2.Admin.LogLevel, "loglevel")
@@ -474,10 +480,9 @@ func TestStunnerConfigPatcher(t *testing.T) {
 	z, err := zc.Build()
 	assert.NoError(t, err, "logger created")
 	zlogger := zapr.NewLogger(z)
-	logger := zlogger.WithName("tester")
+	testLogger := zlogger.WithName("tester")
 
 	confChan := make(chan *stnrv1.StunnerConfig, 1)
-	defer close(confChan) // must be closed after the context is cancelled
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -495,14 +500,14 @@ func TestStunnerConfigPatcher(t *testing.T) {
 		}
 		return conf
 	}
-	srv := cdsserver.New(testCDSAddr, patcher, logger)
+	srv := cdsserver.New(testCDSAddr, patcher, testLogger)
 	assert.NotNil(t, srv, "server")
 	err = srv.Start(ctx)
 	assert.NoError(t, err, "start")
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{
-		LogLevel:         stunnerTestLoglevel,
+		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 		Name:             "ns1/tester",
 		NodeName:         "127.1.2.3", // must be a valid IP otherwise reconcile fails
 		SuppressRollback: true,

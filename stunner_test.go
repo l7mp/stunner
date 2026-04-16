@@ -28,7 +28,6 @@ import (
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	stnrv1a1 "github.com/l7mp/stunner/pkg/apis/v1alpha1"
-	a12n "github.com/l7mp/stunner/pkg/authentication"
 	cfgclient "github.com/l7mp/stunner/pkg/config/client"
 )
 
@@ -550,7 +549,7 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:             stunnerTestLoglevel,
+				LogOptions:           LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback:     true,
 				UDPListenerThreadNum: udpThreadNum,
 			})
@@ -566,19 +565,7 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 			assert.True(t, stunner.ready, "lifecycle 2: ready")
 			assert.True(t, stunner.IsReady(), "lifecycle 2: ready")
 
-			var u, p string
-			switch auth {
-			case "plaintext", "static":
-				u = "user1"
-				p = "passwd1"
-			case "longterm", "ephemeral":
-				u = a12n.GenerateTimeWindowedUsername(time.Now(), time.Minute, "")
-				p2, err := a12n.GetLongTermCredential(u, "my-secret")
-				assert.NoError(t, err, err)
-				p = p2
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
+			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			stunnerAddr := "127.0.0.1:23478"
 
@@ -1126,7 +1113,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback: true,
 				Resolver:         mockDns,
 				Net:              v.podnet,
@@ -1135,18 +1122,8 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
-			var u, p string
 			auth := c.config.Auth.Type
-			switch auth {
-			case "plaintext", "static":
-				u = "user1"
-				p = "passwd1"
-			case "longterm", "ephemeral":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
-				assert.NoError(t, err, err)
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
+			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -1579,10 +1556,6 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	// log rate-limiter settings
-	LogRateLimit = 2
-	LogBurst = 1
-
 	for _, c := range testPortRangeConfigsWithVNet {
 		t.Run(c.testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", c.testName)
@@ -1601,7 +1574,11 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions: LogOptions{
+					Level:     stunnerTestLoglevel,
+					RateLimit: 2,
+					Burst:     1,
+				},
 				SuppressRollback: true,
 				DryRun:           false,
 				Resolver:         mockDns,
@@ -1611,18 +1588,8 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
-			var u, p string
 			auth := c.config.Auth.Type
-			switch auth {
-			case "plaintext", "static":
-				u = "user1"
-				p = "passwd1"
-			case "longterm", "ephemeral":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
-				assert.NoError(t, err, err)
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
+			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -1862,7 +1829,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 	log.Debug("creating a stunnerd")
 	s := NewStunner(Options{
-		LogLevel: stunnerTestLoglevel,
+		LogOptions: LogOptions{Level: stunnerTestLoglevel},
 	})
 
 	assert.False(t, s.IsReady(), "empty server not ready")
@@ -2037,7 +2004,7 @@ func TestStunnerMetrics(t *testing.T) {
 
 	log.Debug("creating a stunnerd")
 	s := NewStunner(Options{
-		LogLevel: stunnerTestLoglevel,
+		LogOptions: LogOptions{Level: stunnerTestLoglevel},
 	})
 
 	assert.False(t, s.IsReady(), "empty server not ready")
@@ -2188,7 +2155,7 @@ func TestStunnerConfigV1Alpha1(t *testing.T) {
 
 			log.Debug("creating a stunnerd")
 			stunner := NewStunner(Options{
-				LogLevel:         stunnerTestLoglevel,
+				LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 				SuppressRollback: true,
 				Net:              v.podnet,
 			})
@@ -2240,18 +2207,8 @@ func TestStunnerConfigV1Alpha1(t *testing.T) {
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(config), "starting server")
 
-			var u, p string
 			auth := config.Auth.Type
-			switch auth {
-			case "plaintext", "static":
-				u = "user1"
-				p = "passwd1"
-			case "longterm", "ephemeral":
-				u, p, err = turn.GenerateLongTermCredentials("my-secret", time.Minute)
-				assert.NoError(t, err, err)
-			default:
-				assert.NoError(t, fmt.Errorf("internal error: unknown auth type in test"))
-			}
+			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")

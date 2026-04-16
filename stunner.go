@@ -9,6 +9,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4"
 	"github.com/pion/transport/v4/stdnet"
+	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
@@ -29,6 +30,9 @@ var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 // restarted but otherwise reconciliation occured smoothly. It is safe to ignore this error.
 var ErrRestartRequired = object.ErrRestartRequired
 
+// LogOptions configures logging behavior for STUNner.
+type LogOptions = logger.Options
+
 // Stunner is an instance of the STUNner deamon.
 type Stunner struct {
 	name, version                                              string
@@ -36,6 +40,8 @@ type Stunner struct {
 	suppressRollback, dryRun                                   bool
 	resolver                                                   resolver.DnsResolver
 	udpThreadNum                                               int
+	logRateLimit                                               rate.Limit
+	logBurst                                                   int
 	telemetry                                                  *telemetry.Telemetry
 	logger                                                     logger.LoggerFactory
 	log                                                        logging.LeveledLogger
@@ -54,8 +60,8 @@ type Stunner struct {
 // which will keep on serving connections but will fail readiness probes.
 func NewStunner(options Options) *Stunner {
 	logger := logger.NewLoggerFactory(DefaultLogLevel)
-	if options.LogLevel != "" {
-		logger.SetLevel(options.LogLevel)
+	if options.LogOptions.Level != "" {
+		logger.SetLevel(options.LogOptions.Level)
 	}
 	log := logger.NewLogger("stunner")
 
@@ -82,6 +88,16 @@ func NewStunner(options Options) *Stunner {
 		udpThreadNum = options.UDPListenerThreadNum
 	}
 
+	logRateLimit := LogRateLimit
+	if options.LogOptions.RateLimit > 0 {
+		logRateLimit = options.LogOptions.RateLimit
+	}
+
+	logBurst := LogBurst
+	if options.LogOptions.Burst > 0 {
+		logBurst = options.LogOptions.Burst
+	}
+
 	id := options.Name
 	if id == "" {
 		if h, err := os.Hostname(); err != nil {
@@ -103,6 +119,8 @@ func NewStunner(options Options) *Stunner {
 		node:             options.NodeName,
 		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
+		logRateLimit:     logRateLimit,
+		logBurst:         logBurst,
 	}
 
 	s.offloadHandler = s.NewOffloadHandler()

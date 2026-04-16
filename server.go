@@ -16,12 +16,12 @@ import (
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-// Number of log events per second reported at ERROR, WARN and INFO loglevel (logging at DEBUG and
-// TRACE levels is not rate-limited).
+// LogRateLimit is the default number of log events per second reported at ERROR, WARN and INFO
+// loglevel (logging at DEBUG and TRACE levels is not rate-limited).
 var LogRateLimit rate.Limit = 1.0
 
-// Burst size for rate-limited logging at ERROR, WARN and INFO loglevel (logging at DEBUG and TRACE
-// levels is not rate-limited).
+// LogBurst is the default burst size for rate-limited logging at ERROR, WARN and INFO loglevel
+// (logging at DEBUG and TRACE levels is not rate-limited).
 var LogBurst = 3
 
 // Start will start the TURN server that belongs to  a listener.
@@ -157,7 +157,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		QuotaHandler:      s.quotaHandler.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,
-		LoggerFactory:     logger.NewRateLimitedLoggerFactory(s.logger, LogRateLimit, LogBurst),
+		LoggerFactory:     logger.NewRateLimitedLoggerFactory(s.logger, s.logRateLimit, s.logBurst),
 	})
 	if err != nil {
 		return fmt.Errorf("cannot set up TURN server for listener %s: %w",

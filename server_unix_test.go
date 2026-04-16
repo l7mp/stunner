@@ -62,7 +62,7 @@ func RunBenchmarkServer(b *testing.B, proto string, udpThreadNum int) {
 
 	log.Debug("Creating a stunnerd")
 	stunner := NewStunner(Options{
-		LogLevel:             stunnerTestLoglevel,
+		LogOptions:           LogOptions{Level: stunnerTestLoglevel},
 		SuppressRollback:     true,
 		UDPListenerThreadNum: udpThreadNum, // ignored for anything but UDP
 	})
