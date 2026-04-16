@@ -21,6 +21,7 @@ import (
 	"github.com/pion/transport/v4/vnet"
 	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/resolver"
 	telemetrytester "github.com/l7mp/stunner/internal/telemetry/tester"
@@ -2242,4 +2243,24 @@ func isHostAny(host string) bool {
 func isHostLocal(host string) bool {
 	h := strings.TrimSpace(host)
 	return strings.EqualFold(h, "localhost") || h == "127.0.0.1" || h == "::1"
+}
+
+func getTestCredentials(t *testing.T, authType, username, password, secret string) (string, string) {
+	t.Helper()
+
+	switch authType {
+	case "", "plaintext", "static":
+		return username, password
+	case "longterm", "ephemeral":
+		if secret == "" {
+			secret = "my-secret"
+		}
+
+		u, p, err := turn.GenerateLongTermCredentials(secret, time.Minute)
+		require.NoError(t, err)
+		return u, p
+	default:
+		t.Fatalf("unknown auth type %q", authType)
+		return "", ""
+	}
 }
