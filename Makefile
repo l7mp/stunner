@@ -33,6 +33,10 @@ vet: ## Run go vet against code.
 test: generate fmt vet
 	go test ./... -v
 
+.PHONY: lint
+lint: ## Run golangci-lint against code.
+	golangci-lint run
+
 ##@ Build
 
 .PHONY: build
