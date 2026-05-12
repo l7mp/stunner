@@ -136,5 +136,5 @@ you from adopting STUNner.
 <!-- STUNner supports two dataplane provisioning modes. In the default *managed* mode, the dataplane -->
 <!-- pods (i.e., the `stunnerd` pods) are provisioned automatically per each Gateway existing in the -->
 <!-- cluster. In the *legacy* mode, the dataplane is supposed to be deployed by the user manually by -->
-<!-- installing the `stunner/stunner` Helm chart into the target namespaces. Legacy mode is considered -->
+<!-- installing the `stunner/stunner-unmanaged` Helm chart into the target namespaces. Legacy mode is considered -->
 <!-- obsolete at this point and it will be removed in a later release. -->

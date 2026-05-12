@@ -9,8 +9,7 @@ then
   context=
   kcontext=
 fi
-helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace --namespace stunner $kcontext
-helm install stunner stunner/stunner --namespace stunner $kcontext
+helm install stunner stunner/stunner --create-namespace --namespace stunner $kcontext
 kubectl apply -f stunner-gwcc.yaml $context
 kubectl apply $context -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1alpha2

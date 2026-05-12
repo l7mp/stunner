@@ -46,19 +46,19 @@ kubectl -n <gateway-namespace> rollout restart deployment <gateway-name>
 
 <!-- ### Legacy mode -->
 
-<!-- In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane, by installing the `stunner-gateway-operator` Helm chart, and the dataplane(s), by helm-installing the `stunner` chart possibly multiple times. -->
+<!-- In the default *managed dataplane mode*, the STUNner gateway operator automatically provisions the dataplane, which substantially simplifies operations and removes lot of manual and repetitive work. For compatibility reasons the traditional operational model, called the *legacy mode*, is still available. In this mode the user is responsible for provisioning both the control plane and the dataplane(s) by helm-installing the `stunner-unmanaged` chart. -->
 
 <!-- ```console -->
-<!-- helm install stunner-gateway-operator stunner/stunner-gateway-operator --create-namespace \ -->
+<!-- helm install stunner-gateway-operator stunner/stunner --create-namespace \ -->
 <!--     --namespace=stunner-system --set stunnerGatewayOperator.dataplane.mode=legacy -->
-<!-- helm install stunner stunner/stunner --create-namespace --namespace=stunner -->
+<!-- helm install stunner stunner/stunner-unmanaged --create-namespace --namespace=stunner -->
 <!-- ``` -->
 
 <!-- You can install multiple legacy STUNner dataplanes side-by-side, provided that the corresponding namespaces are different. For instance, to create a `prod` dataplane installation for your production workload and a `dev` installation for experimentation, the below commands will install two dataplanes, one into the `stunner-prod` and another one into the `stunner-dev` namespace. -->
 
 <!-- ```console -->
-<!-- helm install stunner-prod stunner/stunner --create-namespace --namespace=stunner-prod -->
-<!-- helm install stunner-dev stunner/stunner --create-namespace --namespace=stunner-dev -->
+<!-- helm install stunner-prod stunner/stunner-unmanaged --create-namespace --namespace=stunner-prod -->
+<!-- helm install stunner-dev stunner/stunner-unmanaged --create-namespace --namespace=stunner-dev -->
 <!-- ``` -->
 
 ### Skip install CRDs
@@ -73,7 +73,7 @@ To manually install the CRDs:
 
 ```console
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
-kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner-gateway-operator/crds/stunner-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner/crds/stunner-crd.yaml
 ```
 
 ## Customization
@@ -82,7 +82,7 @@ The Helm charts let you fine-tune STUNner features, including [compute resources
 
 ### Resources requests/limits
 
-it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner-gateway-operator/values.yaml) resource request and limit is set as follows:
+it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner/values.yaml) resource request and limit is set as follows:
 
 ```yaml
 resources:
