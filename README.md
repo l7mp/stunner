@@ -32,8 +32,6 @@
     <img src="https://img.shields.io/coveralls/github/l7mp/stunner" /></a>
 </p>
 
-*Note: This page documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
-
 # STUNner: A Kubernetes media gateway for WebRTC
 
 Ever wondered how to [deploy your WebRTC infrastructure into the
