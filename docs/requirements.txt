@@ -4,7 +4,7 @@
 #
 #    pip-compile docs/requirements.in
 #
-click==8.3.3
+click==8.4.0
     # via mkdocs
 ghp-import==2.1.0
     # via mkdocs
@@ -59,7 +59,7 @@ pathspec==1.1.1
     # via mkdocs
 platformdirs==4.9.6
     # via mkdocs-get-deps
-pymdown-extensions==10.21.2
+pymdown-extensions==10.21.3
     # via mkdocstrings
 python-dateutil==2.9.0.post0
     # via ghp-import
