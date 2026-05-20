@@ -37,7 +37,7 @@ jobs:
         run: |
           helm repo add stunner https://l7mp.io/stunner
           helm repo update
-          helm install stunner stunner/stunner --create-namespace --namespace=stunner  --set stunnerGatewayOperator.dataplane.mode=managed  --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m  --set stunnerGatewayOperator.dataplane.spec.resources.requests.cpu=100m
+          helm install stunner stunner/stunner --create-namespace --namespace=stunner --set stunnerGatewayOperator.deployment.container.manager.resources.requests.cpu=200m  --set stunnerGatewayOperator.dataplane.spec.resources.requests.cpu=100m
 
       - name: Deploy iperf server
         run: kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml
