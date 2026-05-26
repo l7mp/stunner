@@ -37,7 +37,14 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 	permissionHandler := s.NewPermissionHandler(l)
 
-	addr := fmt.Sprintf("0.0.0.0:%d", l.Port)
+	// Wildcard bind: ":port" parses as the unspecified address. On dual-stack
+	// hosts (Linux default with net.ipv6.bindv6only=0) this gives a single
+	// socket reachable via both IPv4 and IPv6; on IPv4-only or IPv6-only
+	// hosts it still binds the available family. Earlier releases hardcoded
+	// "0.0.0.0:%d" together with the IPv4-only network "udp4" (and "udp4"
+	// for DTLS), which silently failed on IPv6-only clusters (e.g. IPv6-only
+	// EKS).
+	addr := fmt.Sprintf(":%d", l.Port)
 
 	switch l.Proto {
 	case stnrv1.ListenerProtocolTURNUDP:
@@ -45,7 +52,7 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
-		conns, err := socketPool.ListenPacket("udp4", addr)
+		conns, err := socketPool.ListenPacket("udp", addr)
 		if err != nil {
 			return err
 		}
@@ -118,11 +125,11 @@ func (s *Stunner) StartServer(l *object.Listener) error {
 		}
 
 		// for some reason dtls.Listen requires a UDPAddr and not an addr string
-		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
 			return fmt.Errorf("failed to parse DTLS listener address %s: %s", addr, err)
 		}
-		dtlsListener, err := dtls.ListenWithOptions("udp4", udpAddr,
+		dtlsListener, err := dtls.ListenWithOptions("udp", udpAddr,
 			dtls.WithCertificates(cer),
 		)
 		if err != nil {

@@ -65,7 +65,12 @@ func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger logger.Logge
 	return &RelayGen{
 		Listener:     l,
 		RelayAddress: l.Addr,
-		Address:      "0.0.0.0",
+		// Empty string is IPADDR_ANY: on dual-stack hosts (Linux default with
+		// net.ipv6.bindv6only=0) ListenPacket("udp", ":0") binds a single
+		// socket reachable from both IPv4 and IPv6 peers. Earlier releases
+		// hardcoded "0.0.0.0" here, which silently broke relays to IPv6-only
+		// peers (e.g. IPv6-only EKS pods).
+		Address:      "",
 		ClusterCache: lru.New(ClusterCacheSize),
 		Net:          l.Net,
 		Logger:       logger,
