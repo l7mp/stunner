@@ -3,11 +3,30 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.0'
+      - 'v*.*.*'
 
 jobs:
+  check_release_readme:
+    name: Block release if README is dev-mode
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify README is release-ready
+        run: |
+          dev_note="Note: This page documents the latest development version of STUNner."
+
+          for f in README.md docs/README.md; do
+            if grep -Fq "$dev_note" "$f"; then
+              echo "::error title=Release blocked::$f still contains the development-version note. This is a human error in release preparation. Remove the note, commit, and retag."
+              exit 1
+            fi
+          done
+
   run_tests:
     name: Run tests
+    needs: check_release_readme
     uses: l7mp/stunner/.github/workflows/test.yml@main
 
   push_stunner_to_registry:
