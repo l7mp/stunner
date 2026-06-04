@@ -32,7 +32,6 @@
     <img src="https://img.shields.io/coveralls/github/l7mp/stunner" /></a>
 </p>
 
-*Note: This page documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
 
 # STUNner: A Kubernetes media gateway for WebRTC
 
@@ -135,7 +134,7 @@ way.
   and `hostNetwork`/`hostPort` services typically recommended as a prerequisite to containerizing
   your WebRTC media plane: with STUNner your media servers will run in ordinary unprivileged
   Kubernetes pods exposed on single gateway service.
-  
+
 * **No reliance on external services for NAT traversal.** Can't afford a [hosted TURN
   service](https://bloggeek.me/webrtc-turn) for client-side NAT traversal? Can't get decent
   audio/video quality because the third-party TURN service poses a bottleneck? STUNner can be
