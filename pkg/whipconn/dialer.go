@@ -66,7 +66,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to create PeerConnection: %w", err)
 	}
 
-	d.log.Trace("Creating DataChannel")
+	d.log.Trace("creating DataChannel")
 	dataChannel, err := peerConn.CreateDataChannel("whipconn", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DataChannel: %w", err)
@@ -99,7 +99,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 			return
 		}
 
-		conn.log.Debugf("Creating new connection in data channel %s-%d",
+		conn.log.Debugf("creating new connection in data channel %s-%d",
 			dataChannel.Label(), dataChannel.ID())
 
 		raw, err := dataChannel.Detach()
@@ -117,12 +117,12 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 
 	// If PeerConnection is closed, close the client
 	peerConn.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
-		conn.log.Infof("Connection state has changed: %s", p)
+		conn.log.Infof("connection state has changed: %s", p)
 		if p == webrtc.PeerConnectionStateFailed || p == webrtc.PeerConnectionStateClosed {
 			if stopped.Load() {
 				conn.Close() //nolint
 			} else {
-				sendErr(fmt.Errorf("ICE connection terminated with state: %s", p.String()))
+				sendErr(fmt.Errorf("iCE connection terminated with state: %s", p.String()))
 			}
 		}
 	})
@@ -144,7 +144,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	gatherComplete := webrtc.GatheringCompletePromise(peerConn)
 	<-gatherComplete
 
-	d.log.Debugf("ICE gathering complete: %s", peerConn.LocalDescription().SDP)
+	d.log.Debugf("iCE gathering complete: %s", peerConn.LocalDescription().SDP)
 
 	sdp := []byte(peerConn.LocalDescription().SDP)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
@@ -165,11 +165,11 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to POST WHIP request: %w", err)
 	}
 
-	d.log.Tracef("Received POST response with status code: %d", resp.StatusCode)
+	d.log.Tracef("received POST response with status code: %d", resp.StatusCode)
 
 	if resp.StatusCode != 201 {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("POST request returned invalid status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("pOST request returned invalid status: %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -199,7 +199,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	// Waiting for the connection or errors surfaced from the callbacks
 	select {
 	case <-connCh:
-		d.log.Infof("Creating new connection %s", conn.String())
+		d.log.Infof("creating new connection %s", conn.String())
 		return conn, nil
 	case err := <-errCh:
 		conn.Close() //nolint:errcheck
@@ -226,7 +226,7 @@ func (c *DialerConn) Close() error {
 	}
 	c.closed = true
 
-	c.log.Trace("Closing WHIP client connection")
+	c.log.Trace("closing WHIP client connection")
 
 	uri := makeURL(c.addr, makeResourceURL(c.dialer.config.WHIPEndpoint, c.resourceId))
 	req, err := http.NewRequest("DELETE", uri.String(), nil)

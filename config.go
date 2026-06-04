@@ -112,42 +112,16 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	return c, nil
 }
 
-// GetConfig returns the configuration of the running STUNner daemon.
+// GetConfig returns the configuration of the running STUNner daemon. The root Object assembles
+// the StunnerConfig from its descendants — see internal/object/stunner.go.
 func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
-	s.log.Tracef("GetConfig")
-
-	// singletons, but we want to avoid panics when GetConfig is called on an uninitialized
-	// STUNner object
-	adminConf := stnrv1.AdminConfig{}
-	if len(s.adminManager.Keys()) > 0 {
-		adminConf = *s.GetAdmin().GetConfig().(*stnrv1.AdminConfig)
+	s.log.Tracef("getConfig")
+	if s.root == nil {
+		return &stnrv1.StunnerConfig{ApiVersion: s.version}
 	}
-
-	authConf := stnrv1.AuthConfig{}
-	if len(s.authManager.Keys()) > 0 {
-		authConf = *s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
-	}
-
-	listeners := s.listenerManager.Keys()
-	clusters := s.clusterManager.Keys()
-
-	c := stnrv1.StunnerConfig{
-		ApiVersion: s.version,
-		Admin:      adminConf,
-		Auth:       authConf,
-		Listeners:  make([]stnrv1.ListenerConfig, len(listeners)),
-		Clusters:   make([]stnrv1.ClusterConfig, len(clusters)),
-	}
-
-	for i, name := range listeners {
-		c.Listeners[i] = *s.GetListener(name).GetConfig().(*stnrv1.ListenerConfig)
-	}
-
-	for i, name := range clusters {
-		c.Clusters[i] = *s.GetCluster(name).GetConfig().(*stnrv1.ClusterConfig)
-	}
-
-	return &c
+	c := s.root.GetConfig().(*stnrv1.StunnerConfig)
+	c.ApiVersion = s.version
+	return c
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.

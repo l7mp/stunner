@@ -13,128 +13,147 @@ import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Listener implements a STUNner cluster
+// Cluster represents a set of upstream peers to which STUNner can relay traffic. Static clusters
+// hold IP/CIDR endpoints; strict-DNS clusters resolve domain names in the background.
 type Cluster struct {
 	Name      string
 	Type      stnrv1.ClusterType
 	Protocol  stnrv1.ClusterProtocol
 	Endpoints []*util.Endpoint
 	Domains   []string
-	Resolver  resolver.DnsResolver // for strict DNS
+	Resolver  resolver.DnsResolver
 
-	getStats OffloadStatsHandler
-	logger   logging.LoggerFactory
-	log      logging.LeveledLogger
+	reg Registry
+	log logging.LeveledLogger
 }
 
-// NewCluster creates a new cluster.
-func NewCluster(conf stnrv1.Config, resolver resolver.DnsResolver, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) (Object, error) {
+// NewCluster creates a Cluster object.
+func NewCluster(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+	if conf == nil {
+		return &Cluster{
+			Endpoints: []*util.Endpoint{},
+			Domains:   []string{},
+			Resolver:  rt.Resolver,
+			reg:       reg,
+			log:       rt.Logger.NewLogger("cluster"),
+		}, nil
+	}
 	req, ok := conf.(*stnrv1.ClusterConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
 	}
-
-	// make sure req.Name is correct
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-
-	c := Cluster{
+	c := &Cluster{
 		Name:      req.Name,
 		Endpoints: []*util.Endpoint{},
 		Domains:   []string{},
-		Resolver:  resolver,
-		getStats:  offloadStatsHandler,
-		logger:    logger,
-		log:       logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
+		Resolver:  rt.Resolver,
+		reg:       reg,
+		log:       rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
 	}
-
-	c.log.Tracef("NewCluster: %s", req.String())
-
-	if err := c.Reconcile(req); err != nil && err != ErrRestartRequired {
+	if err := c.Reconcile(req); err != nil {
 		return nil, err
 	}
-
-	return &c, nil
+	return c, nil
 }
 
-// Inspect examines whether a configuration change requires a reconciliation (returns true if it
-// does) or restart (returns ErrRestartRequired).
-func (c *Cluster) Inspect(old, new, full stnrv1.Config) (bool, error) {
-	return !old.DeepEqual(new), nil
+func (c *Cluster) ObjectName() string { return c.Name }
+func (c *Cluster) ObjectType() string { return TypeCluster }
+
+func (c *Cluster) Extract(full *stnrv1.StunnerConfig) (stnrv1.Config, error) {
+	conf, err := full.GetClusterConfig(c.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &conf, nil
 }
 
-// Reconcile updates the authenticator for a new configuration.
+func (c *Cluster) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+	req, ok := new.(*stnrv1.ClusterConfig)
+	if !ok {
+		return ActionNone, stnrv1.ErrInvalidConf
+	}
+	cur := old.(*stnrv1.ClusterConfig)
+	if cur.DeepEqual(req) {
+		return ActionNone, nil
+	}
+
+	strictDNS := stnrv1.ClusterTypeStrictDNS.String()
+	curStrictDNS := strings.EqualFold(cur.Type, strictDNS)
+	reqStrictDNS := strings.EqualFold(req.Type, strictDNS)
+	becomesStrictDNS := !curStrictDNS && reqStrictDNS
+	leavesStrictDNS := curStrictDNS && !reqStrictDNS
+	strictDNSEndpointsChanged := curStrictDNS && reqStrictDNS &&
+		!sameStringSet(cur.Endpoints, req.Endpoints)
+
+	if becomesStrictDNS || strictDNSEndpointsChanged || leavesStrictDNS {
+		return ActionRestart, nil
+	}
+
+	return ActionReconcile, nil
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aa := append([]string(nil), a...)
+	bb := append([]string(nil), b...)
+	sort.Strings(aa)
+	sort.Strings(bb)
+
+	for i := range aa {
+		if aa[i] != bb[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 	req, ok := conf.(*stnrv1.ClusterConfig)
 	if !ok {
 		return stnrv1.ErrInvalidConf
 	}
-
 	if err := req.Validate(); err != nil {
 		return err
 	}
-
-	c.log.Tracef("Reconcile: %s", req.String())
+	c.log.Tracef("reconcile: %s", req.String())
+	c.Name = req.Name
 	c.Type, _ = stnrv1.NewClusterType(req.Type)
 	c.Protocol, _ = stnrv1.NewClusterProtocol(req.Protocol)
 
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
-		// remove existing endpoints and start anew
-		c.Endpoints = c.Endpoints[:0]
+		c.Endpoints = []*util.Endpoint{}
 		for _, e := range req.Endpoints {
-			// try to parse as a subnet
 			ep, err := util.ParseEndpoint(e)
 			if err != nil {
-				c.log.Warnf("cluster %q: could not parse endpoint %q ",
-					"(ignoring): %s", c.Name, e, err.Error())
+				c.log.Warnf("cluster %q: could not parse endpoint %q (ignoring): %s",
+					c.Name, e, err.Error())
+				continue
 			}
-
 			c.Endpoints = append(c.Endpoints, ep)
 		}
 	case stnrv1.ClusterTypeStrictDNS:
-		// TODO: port-range support for DNS clusters
 		if c.Resolver == nil {
-			return fmt.Errorf("STRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
+			return fmt.Errorf("sTRICT_DNS cluster %q initialized with no DNS resolver", c.Name)
 		}
-
-		deleted, added := util.Diff(c.Domains, req.Endpoints)
-
-		for _, h := range deleted {
-			c.Resolver.Unregister(h)
-			c.Domains = util.Remove(c.Domains, h)
-		}
-
-		for _, h := range added {
-			if c.Resolver.Register(h) == nil {
-				c.Domains = append(c.Domains, h)
-			}
-		}
+		c.Domains = append([]string(nil), req.Endpoints...)
 	}
-
 	return nil
 }
 
-// ObjectName returns the name of the object.
-func (c *Cluster) ObjectName() string {
-	// singleton!
-	return c.Name
-}
-
-// ObjectType returns the type of the object.
-func (c *Cluster) ObjectType() string {
-	return "cluster"
-}
-
-// GetConfig returns the configuration of the running cluster.
 func (c *Cluster) GetConfig() stnrv1.Config {
 	conf := stnrv1.ClusterConfig{
 		Name:     c.Name,
 		Protocol: c.Protocol.String(),
 		Type:     c.Type.String(),
 	}
-
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
 		conf.Endpoints = make([]string, len(c.Endpoints))
@@ -146,103 +165,75 @@ func (c *Cluster) GetConfig() stnrv1.Config {
 		copy(conf.Endpoints, c.Domains)
 		conf.Endpoints = sort.StringSlice(conf.Endpoints)
 	}
-
 	return &conf
 }
 
-// Close closes the cluster.
-func (c *Cluster) Close() error {
-	c.log.Trace("closing cluster")
-
+func (c *Cluster) Start() error {
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
-		// do nothing
+	case stnrv1.ClusterTypeStrictDNS:
+		for _, h := range c.Domains {
+			if err := c.Resolver.Register(h); err != nil {
+				c.log.Warnf("failed to register domain %s in the DNS resolver: %s",
+					h, err.Error())
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) Close(_ bool) error {
+	c.log.Trace("closing cluster")
+	switch c.Type {
+	case stnrv1.ClusterTypeStatic:
 	case stnrv1.ClusterTypeStrictDNS:
 		for _, d := range c.Domains {
 			c.Resolver.Unregister(d)
 		}
 	}
-
 	return nil
 }
 
-// Status returns the status of the object.
 func (c *Cluster) Status() stnrv1.Status {
+	stats := stnrv1.OffloadDirStat{}
+	if c.reg != nil {
+		if o, ok := c.reg.LookupOne(TypeOffload); ok {
+			stats = o.(*Offload).Handler().Stats(c.Name, stnrv1.ClusterStat)
+		}
+	}
 	return &stnrv1.ClusterStatus{
 		ClusterConfig: c.GetConfig().(*stnrv1.ClusterConfig),
-		Stats:         c.getStats(c.Name, stnrv1.ClusterStat),
+		Stats:         stats,
 	}
 }
 
-// Route decides whether a peer IP appears among the permitted endpoints of a cluster.
-func (c *Cluster) Route(peer net.IP) bool {
-	return c.Match(peer, 0)
-}
+// Route returns true if peer is in the cluster's endpoint set.
+func (c *Cluster) Route(peer net.IP) bool { return c.Match(peer, 0) }
 
-// Match decides whether a peer IP and port matches one of the permitted endpoints of a cluster. If
-// port is zero then port-matching is disabled.
+// Match returns true if (peer, port) is in the cluster's endpoint set. If port==0, port is
+// ignored.
 func (c *Cluster) Match(peer net.IP, port int) bool {
-	c.log.Tracef("Match: cluster %q of type %s, peer IP: %s", c.Name, c.Type.String(),
-		peer.String())
-
+	c.log.Tracef("match: cluster %q type %s peer %s", c.Name, c.Type.String(), peer.String())
 	switch c.Type {
 	case stnrv1.ClusterTypeStatic:
-		// endpoints are IPNets
-		c.log.Tracef("route: STATIC cluster with %d endpoints", len(c.Endpoints))
-
 		for _, e := range c.Endpoints {
-			c.log.Tracef("considering endpoint %q", e)
 			if e.Match(peer, port) {
 				return true
 			}
 		}
-
 	case stnrv1.ClusterTypeStrictDNS:
-		// endpoints are obtained from the DNS
 		c.log.Tracef("route: STRICT_DNS cluster with domains: [%s]", strings.Join(c.Domains, ", "))
-
 		for _, d := range c.Domains {
-			c.log.Tracef("considering domain %q", d)
-
 			hs, err := c.Resolver.Lookup(d)
 			if err != nil {
 				c.log.Infof("could not resolve domain %q: %s", d, err.Error())
 			}
-
 			for _, n := range hs {
-				c.log.Tracef("considering IP address %q", n)
 				if n.Equal(peer) {
 					return true
 				}
 			}
 		}
 	}
-
 	return false
-}
-
-// ClusterFactory can create now Cluster objects
-type ClusterFactory struct {
-	resolver            resolver.DnsResolver
-	offloadStatsHandler OffloadStatsHandler
-	logger              logging.LoggerFactory
-}
-
-// NewClusterFactory creates a new factory for Cluster objects
-func NewClusterFactory(resolver resolver.DnsResolver, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) Factory {
-	return &ClusterFactory{
-		resolver:            resolver,
-		offloadStatsHandler: offloadStatsHandler,
-		logger:              logger,
-	}
-}
-
-// New can produce a new Cluster object from the given configuration. A nil config will create an
-// empty cluster object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *ClusterFactory) New(conf stnrv1.Config) (Object, error) {
-	if conf == nil {
-		return &Cluster{}, nil
-	}
-
-	return NewCluster(conf, f.resolver, f.offloadStatsHandler, f.logger)
 }

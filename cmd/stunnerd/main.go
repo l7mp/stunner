@@ -89,19 +89,19 @@ func main() {
 	log := st.GetLogger().NewLogger("stunnerd")
 
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
-	log.Infof("Starting stunnerd id %q, STUNner %s ", st.GetId(), buildInfo.String())
+	log.Infof("starting stunnerd id %q, STUNner %s ", st.GetId(), buildInfo.String())
 
 	conf := make(chan *stnrv1.StunnerConfig, 1)
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
 	if flag.NArg() == 1 {
-		log.Infof("Starting %s with default configuration at TURN URI: %s",
+		log.Infof("starting %s with default configuration at TURN URI: %s",
 			os.Args[0], flag.Arg(0))
 
 		c, err := stunner.NewDefaultConfig(flag.Arg(0))
 		if err != nil {
-			log.Errorf("Could not load default STUNner config: %s", err.Error())
+			log.Errorf("could not load default STUNner config: %s", err.Error())
 			os.Exit(1)
 		}
 
@@ -111,17 +111,17 @@ func main() {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		if configOrigin == "k8s" {
-			log.Info("Discovering configuration from Kubernetes")
+			log.Info("discovering configuration from Kubernetes")
 			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 				st.GetLogger().NewLogger("cds-fwd"))
 			if err != nil {
-				log.Errorf("Error searching for CDS server: %s", err.Error())
+				log.Errorf("error searching for CDS server: %s", err.Error())
 				os.Exit(1)
 			}
 			configOrigin = cdsAddr.Addr
 		}
 
-		log.Infof("Loading configuration from origin %q", configOrigin)
+		log.Infof("loading configuration from origin %q", configOrigin)
 		c, err := st.LoadConfig(configOrigin)
 		if err != nil {
 			log.Error(err.Error())
@@ -132,7 +132,7 @@ func main() {
 		conf <- c
 
 	} else if *watch {
-		log.Info("Bootstrapping stunnerd with minimal config")
+		log.Info("bootstrapping stunnerd with minimal config")
 		z := cdsclient.ZeroConfig(st.GetId())
 		conf <- z
 
@@ -141,19 +141,19 @@ func main() {
 		cancelConfigLoader = cancel
 
 		if configOrigin == "k8s" {
-			log.Info("Discovering configuration from Kubernetes")
+			log.Info("discovering configuration from Kubernetes")
 			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 				st.GetLogger().NewLogger("cds-fwd"))
 			if err != nil {
-				log.Errorf("Error searching for CDS server: %s", err.Error())
+				log.Errorf("error searching for CDS server: %s", err.Error())
 				os.Exit(1)
 			}
 			configOrigin = cdsAddr.Addr
 		}
 
-		log.Infof("Watching configuration at origin %q (ignoring delete-config updates)", configOrigin)
+		log.Infof("watching configuration at origin %q (ignoring delete-config updates)", configOrigin)
 		if err := st.WatchConfig(ctx, configOrigin, conf, true); err != nil {
-			log.Errorf("Could not run config watcher: %s", err.Error())
+			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
 		}
 	} else {
@@ -171,16 +171,16 @@ func main() {
 	for {
 		select {
 		case <-exit:
-			log.Info("Normal exit on graceful shutdown")
+			log.Info("normal exit on graceful shutdown")
 			os.Exit(0)
 
 		case <-sigterm:
-			log.Infof("Commencing graceful shutdown with %d active connection(s)",
+			log.Infof("commencing graceful shutdown with %d active connection(s)",
 				st.AllocationCount())
 			st.Shutdown()
 
 			if cancelConfigLoader != nil {
-				log.Info("Canceling config loader")
+				log.Info("canceling config loader")
 				cancelConfigLoader()
 				cancelConfigLoader = nil
 			}
@@ -197,25 +197,25 @@ func main() {
 			}()
 
 		case c := <-conf:
-			log.Infof("New configuration available: %q", c.String())
+			log.Infof("new configuration available: %q", c.String())
 
 			// command line loglevel overrides config
 			if *verbose || *level != "" {
 				c.Admin.LogLevel = logLevel
 			}
 
-			log.Debug("Initiating reconciliation")
+			log.Debug("initiating reconciliation")
 
 			if err := st.Reconcile(c); err != nil {
 				if e, ok := err.(stnrv1.ErrRestarted); ok {
-					log.Debugf("Reconciliation ready: %s", e.Error())
+					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
-					log.Errorf("Could not reconcile new configuration "+
+					log.Errorf("could not reconcile new configuration "+
 						"(running configuration unchanged): %s", err.Error())
 				}
 			}
 
-			log.Trace("Reconciliation ready")
+			log.Trace("reconciliation ready")
 		}
 	}
 }

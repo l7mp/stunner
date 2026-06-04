@@ -1,4 +1,4 @@
-package stunner
+package object
 
 // code adopted from github.com/livekit/pkg/telemetry
 
@@ -14,7 +14,6 @@ import (
 	"github.com/pion/turn/v5"
 	"k8s.io/utils/lru"
 
-	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -31,13 +30,11 @@ var (
 	ErrInvalidPeerProtocol = errors.New("unknown peer transport protocol")
 )
 
-type PortRangeChecker = func(addr net.Addr) (*object.Cluster, bool)
-
-// RelayGen can be used to only allocate connections inside a defined target port
+// TURNRelay can be used to only allocate connections inside a defined target port
 // range. A static ip address can be set.
-type RelayGen struct {
+type TURNRelay struct {
 	// Listener is the listener on behalf of which the relay address generator is created.
-	Listener *object.Listener
+	*Listener
 
 	// RelayAddress is the IP returned to the user when the relay is created.
 	RelayAddress net.IP
@@ -61,8 +58,8 @@ type RelayGen struct {
 	telemetry *telemetry.Telemetry
 }
 
-func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger logger.LoggerFactory) *RelayGen {
-	return &RelayGen{
+func NewTURNRelay(l *Listener) *TURNRelay {
+	r := &TURNRelay{
 		Listener:     l,
 		RelayAddress: l.Addr,
 		// Empty string is IPADDR_ANY: on dual-stack hosts (Linux default with
@@ -72,20 +69,22 @@ func NewRelayGen(l *object.Listener, t *telemetry.Telemetry, logger logger.Logge
 		// peers (e.g. IPv6-only EKS pods).
 		Address:      "",
 		ClusterCache: lru.New(ClusterCacheSize),
+		telemetry:    l.telemetry,
 		Net:          l.Net,
-		Logger:       logger,
-		telemetry:    t,
+		Logger:       l.logger,
 	}
+	r.PortRangeChecker = GenPortRangeChecker(r)
+	return r
 }
 
 // Validate is called on server startup and confirms the RelayAddressGenerator is properly configured.
-func (r *RelayGen) Validate() error {
+func (r *TURNRelay) Validate() error {
 	return nil
 }
 
 // AllocatePacketConn generates a new transport relay connection and returns the IP/Port to be
 // returned to the client in the allocation response.
-func (r *RelayGen) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
+func (r *TURNRelay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
 	requestedPort := conf.RequestedPort
 	if requestedPort <= 1 || requestedPort > 2<<16-1 {
 		requestedPort = 0
@@ -111,48 +110,44 @@ func (r *RelayGen) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Pac
 }
 
 // AllocateConn generates a new outgoing TCP connection bound to the relay address.
-func (g *RelayGen) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
+func (g *TURNRelay) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
 	return nil, errTodo
 }
 
 // AllocateListener generates a new Listener to receive traffic on and the IP/Port to populate the
 // allocation response with.
-func (r *RelayGen) AllocateListener(conf turn.AllocateListenerConfig) (net.Listener, net.Addr, error) {
+func (r *TURNRelay) AllocateListener(conf turn.AllocateListenerConfig) (net.Listener, net.Addr, error) {
 	return nil, nil, errTodo
 }
 
+type PortRangeChecker = func(addr net.Addr) (*Cluster, bool)
+
 // GenPortRangeChecker finds the cluster that is responsible for routing the packet and checks
-// whether the peer address is in the port range specified for the cluster. The RelayGen caches
-// recent hits for simplicity.
-func (s *Stunner) GenPortRangeChecker(g *RelayGen) PortRangeChecker {
-	return func(addr net.Addr) (*object.Cluster, bool) {
+// whether the peer address is in the port range specified for the cluster. The relay's
+// ClusterCache memoises recent hits; we re-resolve via the Registry on every miss, so
+// reconcile-driven cluster changes propagate without a relay rebuild.
+func GenPortRangeChecker(relay *TURNRelay) PortRangeChecker {
+	return func(addr net.Addr) (*Cluster, bool) {
 		u, ok := addr.(*net.UDPAddr)
 		if !ok {
 			return nil, false
 		}
-
 		ip := u.IP.String()
-		c, ok := g.ClusterCache.Get(ip)
-		var cluster *object.Cluster
-		if ok {
-			// cache hit
-			cluster = c.(*object.Cluster)
+		var cluster *Cluster
+		if c, ok := relay.ClusterCache.Get(ip); ok {
+			cluster = c.(*Cluster)
 		} else {
-			// route
-			for _, r := range g.Listener.Routes {
-				c := s.GetCluster(r)
-				if c != nil && c.Route(u.IP) {
+			for _, c := range relay.Listener.clustersForRoutes() {
+				if c.Route(u.IP) {
 					cluster = c
-					g.ClusterCache.Add(ip, c)
+					relay.ClusterCache.Add(ip, c)
 					break
 				}
 			}
 		}
-
 		if cluster != nil {
 			return cluster, cluster.Match(u.IP, u.Port)
 		}
-
 		return nil, false
 	}
 }

@@ -37,6 +37,14 @@ type StunnerReconcileTestConfig struct {
 	tester func(t *testing.T, s *Stunner, err error)
 }
 
+func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
+	t.Helper()
+	if !assert.NotNil(t, h, "auth handler exists") {
+		return "", nil, false
+	}
+	return h(ra)
+}
+
 var testReconcileDefault = []StunnerReconcileTestConfig{
 	{
 		name: "reconcile-test: default admin",
@@ -64,13 +72,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "no restart needed")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
 			// make sure we get the right loglevel, we may override this for debugging the tests
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
 
-			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
+			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
 			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
 
@@ -78,7 +86,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -88,7 +96,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -100,7 +108,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -337,12 +345,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			// check everyting
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, "new-name", "stunner name")
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
 
-			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
+			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
 			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
 
@@ -350,7 +358,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -360,7 +368,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -372,7 +380,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -424,12 +432,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// no restart!
 			assert.NoError(t, err, "no restart needed")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
+			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
 			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
 
@@ -437,7 +445,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -447,7 +455,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -459,7 +467,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -513,14 +521,15 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			// check everyting
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
-			assert.Equal(t, admin.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
+			adminConf := admin.GetConfig().(*stnrv1.AdminConfig)
+			assert.Equal(t, adminConf.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
 
-			assert.Len(t, s.authManager.Keys(), 1, "authManager keys")
+			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
 			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
 
@@ -528,7 +537,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -538,7 +547,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -550,7 +559,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -610,7 +619,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "newuser",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -620,12 +629,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("newuser",
 				stnrv1.DefaultRealm, "pass"), "auth handler ok")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -637,7 +646,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -696,7 +705,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Password, "newpass", "password ok")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -706,12 +715,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
 				stnrv1.DefaultRealm, "newpass"), "auth handler ok")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -723,7 +732,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -785,7 +794,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "GetLongTermCredential")
 
 			handler := s.NewAuthHandler()
-			userID, key, ok := handler(&turn.RequestAttributes{
+			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: username,
 				Realm:    stnrv1.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -798,12 +807,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// userID must be the parsed user-id portion ("dummy_user")
 			assert.Equal(t, "dummy_user", userID, "authHandler userID ok for ephemeral auth")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -815,7 +824,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -874,7 +883,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -888,12 +897,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
 			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
 
-			assert.Len(t, s.adminManager.Keys(), 1, "adminManager keys")
+			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -916,6 +925,49 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+		},
+	},
+	{
+		name: "reconcile-test: rename listener",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:   "renamed-listener",
+				Addr:   "127.0.0.1",
+				Routes: []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.NoError(t, err, "no restart needed")
+
+			assert.Nil(t, s.GetListener("default-listener"), "old listener deleted")
+
+			l := s.GetListener("renamed-listener")
+			assert.NotNil(t, l, "renamed listener found")
+			assert.IsType(t, l, &object.Listener{}, "listener type ok")
+			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
+			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
+			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, "allow-any", l.Routes[0], "listener route name ok")
+
+			p := s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
 		},
 	},
 	{
@@ -947,7 +999,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// does not require a restart!
 			assert.NoError(t, err, "restarted")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.Nil(t, l, "listener found")
@@ -1049,7 +1101,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// does not require a restart!
 			assert.NoError(t, err, "restart")
 
-			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 2, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1149,7 +1201,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
 
-			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 2, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1251,7 +1303,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
 
-			assert.Len(t, s.listenerManager.Keys(), 2, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 2, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1343,7 +1395,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// does not require a restart!
 			assert.NoError(t, err, "restart")
 
-			assert.Len(t, s.listenerManager.Keys(), 1, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1395,7 +1447,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Nil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Len(t, s.listenerManager.Keys(), 0, "listenerManager keys")
+			assert.Len(t, s.GetListeners(), 0, "listenerManager keys")
 		},
 	},
 	/// cluster
@@ -1425,7 +1477,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -1450,6 +1502,53 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+		},
+	},
+	{
+		name: "reconcile-test: rename cluster",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:   "default-listener",
+				Addr:   "127.0.0.1",
+				Routes: []string{"renamed-cluster"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "renamed-cluster",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.NoError(t, err, err)
+
+			assert.Nil(t, s.GetCluster("allow-any"), "old cluster deleted")
+
+			c := s.GetCluster("renamed-cluster")
+			assert.NotNil(t, c, "renamed cluster found")
+			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
+			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			_, n, _ := net.ParseCIDR("0.0.0.0/0")
+			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+
+			l := s.GetListener("default-listener")
+			assert.NotNil(t, l, "listener found")
+			assert.Len(t, l.Routes, 1, "listener route count ok")
+			assert.Equal(t, "renamed-cluster", l.Routes[0], "listener route name ok")
+
+			p := s.NewPermissionHandler(l)
+			assert.NotNil(t, p, "permission handler exists")
+			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
+				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
 		},
 	},
 	{
@@ -1478,7 +1577,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.Nil(t, c, "cluster found")
@@ -1535,7 +1634,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 1, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.Nil(t, c, "cluster found")
@@ -1594,7 +1693,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 2, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -1660,7 +1759,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// only routes have changed, we shouldn't need a restart
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 2, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -1725,7 +1824,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// only routes have changed, we shouldn't need a restart
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 2, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
@@ -1804,7 +1903,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.clusterManager.Keys(), 0, "clusterManager keys")
+			assert.Len(t, s.GetClusters(), 0, "clusterManager keys")
 
 			l := s.GetListener("default-listener")
 			p := s.NewPermissionHandler(l)
@@ -1872,7 +1971,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			e, ok := err.(stnrv1.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
-			assert.Contains(t, e.Objects, "admin: default-admin-config")
+			assert.Contains(t, e.Objects, "offload: default-offload")
 
 			a := s.GetAdmin()
 			assert.NotNil(t, a, "admin")
@@ -1902,7 +2001,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			e, ok := err.(stnrv1.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
-			assert.Contains(t, e.Objects, "admin: default-admin-config")
+			assert.Contains(t, e.Objects, "offload: default-offload")
 
 			a := s.GetAdmin()
 			assert.NotNil(t, a, "admin")
@@ -1948,25 +2047,23 @@ func TestStunnerReconcile(t *testing.T) {
 			assert.NoError(t, s.Reconcile(conf), "starting server")
 
 			runningConf := s.GetConfig()
-			assert.NotNil(t, runningConf, "default stunner get config ok")
+			require.NotNil(t, runningConf, "default stunner get config ok")
 
-			// fmt.Printf("default conf: %#v\n", conf.Clusters[0])
-			// fmt.Printf("running conf: %#v\n", runningConf.Clusters[0])
-			// x := reflect.DeepEqual(conf.Clusters[0], runningConf.Clusters[0])
-			// fmt.Printf("deepeq: %#v\n", x)
-			// x = conf.Clusters[0].DeepEqual(&runningConf.Clusters[0])
-			// fmt.Printf("deepeqqqqqqq: %#v\n", x)
-
-			assert.True(t, conf.Admin.DeepEqual(&runningConf.Admin),
+			require.True(t, conf.Admin.DeepEqual(&runningConf.Admin),
 				"default stunner admin config ok")
-			assert.True(t, conf.Auth.DeepEqual(&runningConf.Auth),
+			require.True(t, conf.Auth.DeepEqual(&runningConf.Auth),
 				"default stunner auth config ok")
-			assert.True(t, conf.Listeners[0].DeepEqual(
+			require.NotEmpty(t, conf.Listeners, "default conf listener config")
+			require.NotEmpty(t, runningConf.Listeners, "running conf listener config")
+			require.True(t, conf.Listeners[0].DeepEqual(
 				&runningConf.Listeners[0]), "default stunner listener config ok")
-			assert.True(t, conf.Clusters[0].DeepEqual(
+
+			require.NotEmpty(t, conf.Clusters, "default conf cluster config")
+			require.NotEmpty(t, runningConf.Clusters, "running conf cluster config")
+			require.True(t, conf.Clusters[0].DeepEqual(
 				&runningConf.Clusters[0]), "default stunner cluster config ok")
 
-			assert.True(t, conf.DeepEqual(runningConf), "default stunner config ok")
+			require.True(t, conf.DeepEqual(runningConf), "default stunner config ok")
 
 			err = s.Reconcile(&c.config)
 			c.tester(t, s, err)
@@ -1986,6 +2083,7 @@ type StunnerTestReconcileE2EConfig struct {
 	testName                                          string
 	config                                            stnrv1.StunnerConfig
 	echoServerAddr                                    string
+	errContains                                       string
 	bindSuccess, allocateSuccess, echoResult, restart bool
 }
 
@@ -2038,7 +2136,9 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 			log.Debug("reconciling server")
 			err := s.Reconcile(&c.config)
-			if c.restart {
+			if c.errContains != "" {
+				assert.ErrorContains(t, err, c.errContains, "starting server")
+			} else if c.restart {
 				assert.ErrorContains(t, err, "restart", "starting server")
 			} else {
 				assert.NoError(t, err, "no restart")
@@ -2873,7 +2973,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			}},
 		},
 		echoServerAddr:  "1.2.3.5:5678",
-		restart:         false,
+		restart:         true,
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
@@ -3095,6 +3195,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				}},
 			},
 			echoServerAddr:  "1.2.3.5:5678",
+			errContains:     "cannot load cert/key pair",
 			restart:         true,
 			bindSuccess:     true,
 			allocateSuccess: true,

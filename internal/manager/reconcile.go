@@ -3,143 +3,243 @@ package manager
 import (
 	"fmt"
 
+	"github.com/pion/logging"
+
 	"github.com/l7mp/stunner/internal/object"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-type ReconcileJob struct {
-	Object               object.Object
-	NewConfig, OldConfig stnrv1.Config
+// ReconcilePolicy holds root-only reconciliation behavior knobs.
+type ReconcilePolicy struct {
+	SuppressRollback bool
+	DryRun           bool
+	Log              logging.LeveledLogger
 }
 
-type ReconciliationState struct {
-	NewJobQueue, ChangedJobQueue, DeletedJobQueue []ReconcileJob
-	ToBeStarted, ToBeRestarted                    []object.Object
+type actionRef struct {
+	Manager *Manager
+	Object  object.Object
+	Config  stnrv1.Config
 }
 
-// PrepareReconciliation prepares the reconciliation of the objects handled by the manager and returns a
-// set of reconciliation jobs to be performed, ErrRestartRequired if the server needs to be
-// restarted, and an error if the config was not accepted. Configuration must be validated.
-func (m *managerImpl) PrepareReconciliation(confs []stnrv1.Config, stunnerConf stnrv1.Config) (*ReconciliationState, error) {
-	m.log.Tracef("preparing reconciliation")
+type reconcileOps struct {
+	reconcile      []actionRef
+	create         []actionRef
+	delete         []actionRef
+	start          []actionRef
+	stop           []actionRef
+	restartedNames []string
+}
 
-	state := ReconciliationState{
-		NewJobQueue:     []ReconcileJob{},
-		ChangedJobQueue: []ReconcileJob{},
-		DeletedJobQueue: []ReconcileJob{},
-		ToBeStarted:     []object.Object{},
-		ToBeRestarted:   []object.Object{},
+// Reconcile runs one reconcile against the root manager and applies root-only behavior
+// (validation, snapshotting, rollback, dry-run).
+func Reconcile(root *Manager, req *stnrv1.StunnerConfig, p ReconcilePolicy) error {
+	if err := req.Validate(); err != nil {
+		return err
 	}
 
-	// find what has to be added or changed
-	for _, c := range confs {
-		m.log.Debugf("reconciling for conf %q: %s", c.ConfigName(), c.String())
+	root.log.Infof("reconciliation: commencing (dry-run=%t,rollback=%t,listeners=%d,clusters=%d) for config=%s",
+		p.DryRun, !p.SuppressRollback, len(req.Listeners), len(req.Clusters), req.String())
 
-		o, found := m.Get(c.ConfigName())
-		if found {
-			// got new config for the object: object may need to be updated
-			runningConf := o.GetConfig()
+	snapshot := root.Items()[0].GetConfig().(*stnrv1.StunnerConfig)
 
-			// make sure lists are sorted and names are OK
-			if err := runningConf.Validate(); err != nil {
-				return nil, fmt.Errorf("internal error: cannot validate running "+
-					"config (%s) for object %s: %w", runningConf.String(),
-					o.ObjectName(), err)
+	err := root.reconcile(req, p.DryRun)
+	if err != nil && !p.SuppressRollback {
+		p.Log.Infof("reconciliation: rollback initiated")
+		_ = root.reconcile(snapshot, p.DryRun)
+	}
+
+	return err
+}
+
+// reconcile performs one reconcile over this manager subtree.
+func (m *Manager) reconcile(req *stnrv1.StunnerConfig, dryRun bool) error {
+	reg := m.reg
+	ops := &reconcileOps{}
+
+	if err := m.prepare(reg, req, ops); err != nil {
+		return err
+	}
+
+	// 1. Close objects that are in the stop class.
+	if !dryRun {
+		for _, ref := range ops.stop {
+			m.log.Debugf("reconciliation: close %s/%s", ref.Object.ObjectType(), ref.Object.ObjectName())
+			if err := ref.Object.Close(false); err != nil {
+				m.log.Warnf("close %s/%s: %s", ref.Object.ObjectType(), ref.Object.ObjectName(), err.Error())
 			}
-
-			m.log.Tracef("inspecting object %q for configuration change: %s -> %s",
-				o.ObjectName(), runningConf.String(), c.String())
-
-			changed, err := o.Inspect(runningConf, c, stunnerConf)
-			if err != nil && err != object.ErrRestartRequired {
-				return nil, err
-			}
-
-			if changed {
-				m.log.Tracef("object %q changes, adding to job queue", o.ObjectName())
-				state.ChangedJobQueue = append(state.ChangedJobQueue,
-					ReconcileJob{Object: o, NewConfig: c, OldConfig: runningConf})
-
-				if err == object.ErrRestartRequired {
-					m.log.Tracef("object %q asks for a restart", o.ObjectName())
-					state.ToBeRestarted = append(state.ToBeRestarted, o)
-				}
-
-			} else {
-				m.log.Tracef("object %q unchanged", o.ObjectName())
-			}
-
-		} else {
-			m.log.Tracef("new object %q: adding to job queue", c.ConfigName())
-			state.NewJobQueue = append(state.NewJobQueue,
-				ReconcileJob{Object: nil, NewConfig: c, OldConfig: nil})
 		}
 	}
 
-	// find what has to be deleted
-	for _, o := range m.objects {
-		if !findConfByName(confs, o.ObjectName()) {
-			m.log.Tracef("deleted object %q: adding to deleted queue", o.ObjectName())
-			state.DeletedJobQueue = append(state.DeletedJobQueue,
-				ReconcileJob{Object: o, NewConfig: nil, OldConfig: o.GetConfig()})
+	// 2. Reconcile existing objects whose state has changed.
+	for _, ref := range ops.reconcile {
+		m.log.Tracef("reconciliation: reconcile %s/%s", ref.Object.ObjectType(), ref.Object.ObjectName())
+		if err := ref.Object.Reconcile(ref.Config); err != nil {
+			return fmt.Errorf("reconcile %s/%s: %w", ref.Object.ObjectType(), ref.Object.ObjectName(), err)
 		}
 	}
 
-	return &state, nil
-}
-
-// FinishReconciliation finishes the reconciliation from the specified state.
-func (m *managerImpl) FinishReconciliation(state *ReconciliationState) error {
-	m.log.Tracef("finishing reconciliation")
-
-	m.log.Trace("running the new-object job queue")
-	for _, j := range state.NewJobQueue {
-		o, err := m.factory.New(j.NewConfig)
+	// 3. Create new objects as necessary.
+	for i := range ops.create {
+		cr := &ops.create[i]
+		m.log.Debugf("reconciliation: create %s/%s", cr.Manager.objectType, cr.Config.ConfigName())
+		obj, err := cr.Manager.ctor(cr.Config, cr.Manager.reg)
 		if err != nil {
-			if err != object.ErrRestartRequired {
-				m.log.Errorf("could not create new object: %s", err.Error())
+			return fmt.Errorf("manager %q: create %q: %w", cr.Manager.name, cr.Config.ConfigName(), err)
+		}
+		if obj == nil {
+			return fmt.Errorf("manager %q: create %q: constructor returned nil object", cr.Manager.name,
+				cr.Config.ConfigName())
+		}
+		cr.Object = obj
+		ops.start = append(ops.start, actionRef{Object: obj})
+		if err := cr.Manager.reg.Add(obj); err != nil {
+			return fmt.Errorf("manager %q: add %q to registry: %w", cr.Manager.name, cr.Config.ConfigName(), err)
+		}
+		m.log.Debugf("reconciliation: create %s/%s: done", obj.ObjectType(), obj.ObjectName())
+	}
+
+	// 4. Delete stale objects.
+	for _, ref := range ops.delete {
+		m.log.Debugf("reconciliation: delete %s/%s", ref.Object.ObjectType(), ref.Object.ObjectName())
+		if err := m.reg.Remove(ref.Object); err != nil {
+			return fmt.Errorf("remove %s/%s from registry: %w", ref.Object.ObjectType(), ref.Object.ObjectName(), err)
+		}
+	}
+
+	// 5. Start objects that are in the start class.
+	if !dryRun {
+		for _, ref := range ops.start {
+			m.log.Debugf("reconciliation: start %s/%s", ref.Object.ObjectType(), ref.Object.ObjectName())
+			if err := ref.Object.Start(); err != nil {
+				return fmt.Errorf("start %s/%s: %w", ref.Object.ObjectType(), ref.Object.ObjectName(), err)
+			}
+		}
+	}
+
+	m.log.Debugf("reconciliation: done (dry-run=%t) stats: close=%d reconcile=%d create=%d delete=%d start=%d restarted=%d",
+		dryRun, len(ops.stop), len(ops.reconcile), len(ops.create), len(ops.delete), len(ops.start),
+		len(ops.restartedNames))
+
+	return restartedErrorFromOps(ops)
+}
+
+// Shutdown closes every object in this manager subtree with shutdown=true and removes it from the
+// registry.
+func (m *Manager) Shutdown() error {
+	reg := m.reg
+	for _, item := range m.Items() {
+		shutdownObject(reg, item, m.reg, m.log)
+	}
+	return nil
+}
+
+func (m *Manager) prepare(reg Registry, full *stnrv1.StunnerConfig, ops *reconcileOps) error {
+	desired, err := m.extractor(full)
+	if err != nil {
+		return fmt.Errorf("manager %q list extractor: %w", m.name, err)
+	}
+
+	if m.singleton {
+		if len(desired) != 1 {
+			return fmt.Errorf("manager %q singleton extractor returned %d items", m.name, len(desired))
+		}
+	}
+
+	seen := make(map[string]bool, len(desired))
+	for _, conf := range desired {
+		name := conf.ConfigName()
+		if m.singleton {
+			if name != m.itemName {
+				return fmt.Errorf("manager %q singleton item must be named %q, got %q", m.name, m.itemName, name)
+			}
+			name = m.itemName
+		}
+		seen[name] = true
+
+		obj, found := m.reg.Lookup(m.objectType, name)
+		if !found {
+			ops.create = append(ops.create, actionRef{Manager: m, Config: conf})
+			continue
+		}
+
+		decision, err := obj.Inspect(obj.GetConfig(), conf, full)
+		if err != nil {
+			return fmt.Errorf("inspect %s/%s: %w", obj.ObjectType(), obj.ObjectName(), err)
+		}
+
+		switch decision {
+		case object.ActionNone:
+		case object.ActionReconcile:
+			ops.reconcile = append(ops.reconcile, actionRef{Object: obj, Config: conf})
+		case object.ActionRestart:
+			ops.reconcile = append(ops.reconcile, actionRef{Object: obj, Config: conf})
+			ops.stop = append(ops.stop, actionRef{Object: obj})
+			ops.start = append(ops.start, actionRef{Object: obj})
+			if shouldReportRestart(obj.ObjectType()) {
+				ops.restartedNames = append(ops.restartedNames,
+					fmt.Sprintf("%s: %s", obj.ObjectType(), obj.ObjectName()))
+			}
+		default:
+			panic(fmt.Sprintf("object %s/%s returned invalid inspect action: %d",
+				obj.ObjectType(), obj.ObjectName(), decision))
+		}
+
+		node := reg.NodeOf(obj)
+		for _, sm := range node.SubManagers {
+			if err := sm.prepare(reg, full, ops); err != nil {
 				return err
 			}
-			state.ToBeStarted = append(state.ToBeStarted, o)
-		}
-		// ignore errors
-		_ = m.Upsert(o)
-	}
-
-	m.log.Trace("running the deletion job queue")
-	for _, j := range state.DeletedJobQueue {
-		o := j.Object
-		m.log.Tracef("deleting object %q: running conf: %s", o.ObjectName(),
-			j.OldConfig.String())
-		// ignore error
-		_ = m.Delete(o)
-	}
-
-	m.log.Trace("running the reconciliation job queue")
-	for _, j := range state.ChangedJobQueue {
-		o := j.Object
-		m.log.Tracef("reconciling object %q: %s -> %s", o.ObjectName(),
-			j.OldConfig.String(), j.NewConfig.String())
-
-		err := o.Reconcile(j.NewConfig)
-		// reconciled objects are already inspected for a restart: ignore restart requests
-		if err != nil && err != object.ErrRestartRequired {
-			return err
 		}
 	}
 
-	m.log.Debugf("reconciliation ready: to-be-created: %d, changed: %d, deleted: %d",
-		len(state.NewJobQueue), len(state.ChangedJobQueue), len(state.DeletedJobQueue))
+	for _, obj := range m.reg.LookupAll(m.objectType) {
+		if seen[obj.ObjectName()] {
+			continue
+		}
+		collectDeleteSubtree(reg, obj, ops)
+	}
 
 	return nil
 }
 
-func findConfByName(confs []stnrv1.Config, name string) bool {
-	for _, c := range confs {
-		if c.ConfigName() == name {
-			return true
+func shouldReportRestart(objType string) bool {
+	switch objType {
+	case object.TypeHealth, object.TypeMetrics:
+		return false
+	default:
+		return true
+	}
+}
+
+func collectDeleteSubtree(reg Registry, obj object.Object, ops *reconcileOps) {
+	node := reg.NodeOf(obj)
+	for _, sm := range node.SubManagers {
+		for _, child := range sm.Items() {
+			collectDeleteSubtree(reg, child, ops)
+		}
+	}
+	ops.delete = append(ops.delete, actionRef{Object: obj})
+	ops.stop = append(ops.stop, actionRef{Object: obj})
+}
+
+func shutdownObject(reg Registry, obj object.Object, registryIface object.Registry, log logging.LeveledLogger) {
+	node := reg.NodeOf(obj)
+	for _, sm := range node.SubManagers {
+		for _, item := range sm.Items() {
+			shutdownObject(reg, item, registryIface, log)
 		}
 	}
 
-	return false
+	if err := obj.Close(true); err != nil {
+		log.Warnf("close error on %s/%s during shutdown: %s", obj.ObjectType(), obj.ObjectName(), err.Error())
+	}
+	_ = registryIface.Remove(obj)
+}
+
+func restartedErrorFromOps(ops *reconcileOps) error {
+	if len(ops.restartedNames) == 0 {
+		return nil
+	}
+	return stnrv1.ErrRestarted{Objects: append([]string(nil), ops.restartedNames...)}
 }

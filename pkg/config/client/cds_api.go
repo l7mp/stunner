@@ -86,7 +86,7 @@ func (a *AllConfigsAPI) Endpoint() (string, string) {
 }
 
 func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error) {
-	a.Debugf("GET: loading all configs from CDS server %s", a.addr)
+	a.Debugf("gET: loading all configs from CDS server %s", a.addr)
 
 	r, err := a.client.ListV1ConfigsWithResponse(ctx, nil)
 	if err != nil {
@@ -95,7 +95,7 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -103,12 +103,12 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error
 }
 
 func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("WATCH: watching all configs from CDS server %s", a.wsURI)
+	a.Debugf("wATCH: watching all configs from CDS server %s", a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("POLL: polling all configs from CDS server %s", a.wsURI)
+	a.Debugf("pOLL: polling all configs from CDS server %s", a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
 
@@ -150,7 +150,7 @@ func (a *ConfigsNamespaceAPI) Endpoint() (string, string) {
 }
 
 func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error) {
-	a.Debugf("GET: loading all configs in namespace %s from CDS server %s",
+	a.Debugf("gET: loading all configs in namespace %s from CDS server %s",
 		a.namespace, a.addr)
 
 	r, err := a.client.ListV1ConfigsNamespaceWithResponse(ctx, a.namespace, nil)
@@ -160,7 +160,7 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig,
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -168,13 +168,13 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig,
 }
 
 func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("WATCH: watching all configs in namespace %s from CDS server %s",
+	a.Debugf("wATCH: watching all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("POLL: polling all configs in namespace %s from CDS server %s",
+	a.Debugf("pOLL: polling all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
@@ -218,7 +218,7 @@ func (a *ConfigNamespaceNameAPI) Endpoint() (string, string) {
 }
 
 func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConfig, error) {
-	a.Debugf("GET: loading config for gateway %s/%s from CDS server %s",
+	a.Debugf("gET: loading config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.addr)
 
 	var params *api.GetV1ConfigNamespaceNameParams
@@ -232,7 +232,7 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv1.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
+		return []*stnrv1.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -240,13 +240,13 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv1.StunnerConf
 }
 
 func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("WATCH: watching config for gateway %s/%s from CDS server %s",
+	a.Debugf("wATCH: watching config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
+	a.Debugf("pOLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
@@ -326,7 +326,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 		conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 		// reinit the deadline when we get a pong
 		conn.SetPongHandler(func(string) error {
-			// a.Tracef("Got PONG from server %q", url)
+			// a.Tracef("got PONG from server %q", url)
 			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 			return nil
 		})
@@ -368,7 +368,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 			}
 
 			if suppressDelete && IsConfigDeleted(c) {
-				a.Infof("Ignoring delete configuration update from %q", url)
+				a.Infof("ignoring delete configuration update from %q", url)
 				continue
 			}
 

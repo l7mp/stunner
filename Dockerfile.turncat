@@ -1,0 +1,28 @@
+###########
+# BUILD
+FROM golang:1.18-alpine as builder
+
+WORKDIR /app
+
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
+
+COPY *.go ./
+COPY internal/ internal/
+COPY pkg/apis/v1alpha1/ pkg/apis/v1alpha1/
+
+# turncat
+COPY cmd/turncat/main.go cmd/turncat/
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o turncat cmd/turncat/main.go
+
+###########
+# TURNCAT
+FROM scratch AS turncat
+
+WORKDIR /app
+
+COPY --from=builder /app/turncat /usr/bin/
+
+CMD [ "turncat", "-v", "udp://127.0.0.1:5000", "turn://test:test@127.0.0.1:3478", "udp://127.0.0.1:5001" ]

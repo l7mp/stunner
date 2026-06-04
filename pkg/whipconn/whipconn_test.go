@@ -51,17 +51,17 @@ var testerTestCases = []struct {
 	{
 		name: "Basic connectivity",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
 			assert.NoError(t, err)
 
-			log.Debug("Echo test round 1")
+			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
-			log.Debug("Echo test round 2")
+			log.Debug("echo test round 2")
 			echoTest(t, clientConn, "test2")
 
 			assert.NoError(t, clientConn.Close(), "client conn close")
@@ -69,11 +69,11 @@ var testerTestCases = []struct {
 	}, {
 		name: "Invalid bearer token refused",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(Config{BearerToken: "dummy-token"}, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			_, err := d.DialContext(ctx, addr)
 			assert.Error(t, err)
 		},
@@ -81,19 +81,19 @@ var testerTestCases = []struct {
 		name:   "Empty bearer token accepted",
 		config: &Config{BearerToken: ""},
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			config := defaultConfig
 			config.BearerToken = ""
 			d := NewDialer(config, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
 			assert.NoError(t, err)
 
-			log.Debug("Echo test round 1")
+			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
-			log.Debug("Echo test round 2")
+			log.Debug("echo test round 2")
 			echoTest(t, clientConn, "test2")
 
 			assert.NoError(t, clientConn.Close(), "client conn close")
@@ -104,37 +104,37 @@ var testerTestCases = []struct {
 			// a new context for the dialer
 			dialerCtx, dialerCancel := context.WithCancel(context.Background())
 
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(dialerCtx, addr)
 			assert.NoError(t, err)
 
-			log.Debug("Echo test round 1")
+			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
 
-			log.Debug("Closing dialer")
+			log.Debug("closing dialer")
 			dialerCancel()
 
-			log.Debug("Echo test round 2")
+			log.Debug("echo test round 2")
 			echoTest(t, clientConn, "test2")
 		},
 	}, {
 		name: "Client side close closes server",
 		tester: func(t *testing.T, serverCtx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(serverCtx, addr)
 			assert.NoError(t, err)
 
 			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
 
-			log.Debug("Closing client connection")
+			log.Debug("closing client connection")
 			assert.NoError(t, clientConn.Close())
 
 			// should close the server conn too
@@ -146,17 +146,17 @@ var testerTestCases = []struct {
 			clientCtx, clientCancel := context.WithCancel(context.Background())
 			defer clientCancel()
 
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(clientCtx, addr)
 			assert.NoError(t, err)
 
 			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
 
-			log.Debug("Closing server connections")
+			log.Debug("closing server connections")
 			for _, lConn := range l.GetConns() {
 				assert.NoError(t, lConn.Close())
 			}
@@ -169,11 +169,11 @@ var testerTestCases = []struct {
 	}, {
 		name: "Multiple connections",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(defaultConfig, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing: creating 5 connections")
+			log.Debug("dialing: creating 5 connections")
 			var wg sync.WaitGroup
 			wg.Add(5)
 			connChan := make(chan net.Conn, 5)
@@ -184,10 +184,10 @@ var testerTestCases = []struct {
 					clientConn, err := d.DialContext(ctx, addr)
 					assert.NoError(t, err)
 
-					log.Debug("Echo test round 1")
+					log.Debug("echo test round 1")
 					echoTest(t, clientConn, "test1111")
 
-					log.Debug("Echo test round 2")
+					log.Debug("echo test round 2")
 					echoTest(t, clientConn, "test2222")
 
 					connChan <- clientConn
@@ -221,17 +221,17 @@ var testerTestCases = []struct {
 		name:   "Connecting with custom path",
 		config: &Config{WHIPEndpoint: "/custompath"},
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := NewDialer(Config{WHIPEndpoint: "/custompath"}, logger)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
 			assert.NoError(t, err)
 
-			log.Debug("Echo test round 1")
+			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
-			log.Debug("Echo test round 2")
+			log.Debug("echo test round 2")
 			echoTest(t, clientConn, "test2")
 
 			assert.NoError(t, clientConn.Close(), "client conn close")
@@ -239,7 +239,7 @@ var testerTestCases = []struct {
 	}, {
 		name: "Failed datachannel connection fails Dial",
 		tester: func(t *testing.T, ctx context.Context, l *Listener) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			// empty ICE servers and forcing relay policy will fail the dialer
 			d := NewDialer(Config{
 				ICEServers:         []webrtc.ICEServer{},
@@ -253,7 +253,7 @@ var testerTestCases = []struct {
 			e.SetICETimeouts(500*time.Millisecond, 1000*time.Millisecond, time.Second)
 			d.WithSettingEngine(e)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			_, err := d.DialContext(ctx, addr)
 			assert.Error(t, err)
 		},
@@ -274,13 +274,13 @@ func TestTesterConn(t *testing.T) {
 				config = *c.config
 			}
 
-			log.Debug("Creating listener")
+			log.Debug("creating listener")
 			listener, err := NewListener(addr, config, logger)
 			assert.NoError(t, err)
 			l = listener
 			assert.NotNil(t, l)
 
-			log.Debug("Creating echo services")
+			log.Debug("creating echo services")
 			go func() {
 				for {
 					conn, err := l.Accept()
@@ -288,7 +288,7 @@ func TestTesterConn(t *testing.T) {
 						return
 					}
 
-					log.Debug("Accepting server connection")
+					log.Debug("accepting server connection")
 
 					// readloop
 					go func() {
@@ -314,7 +314,7 @@ func TestTesterConn(t *testing.T) {
 }
 
 func TestConfigEndpoint(t *testing.T) {
-	log.Debug("Creating listener")
+	log.Debug("creating listener")
 	l, err := NewListener(addr, defaultConfig, logger)
 	assert.NoError(t, err)
 	assert.NotNil(t, l)

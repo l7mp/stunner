@@ -45,7 +45,7 @@ type dnsResolverImpl struct {
 // NewDnsResolver creates a new DNS resolver
 func NewDnsResolver(name string, logger logging.LoggerFactory) DnsResolver {
 	log := logger.NewLogger(name)
-	log.Tracef("NewDnsResolver")
+	log.Tracef("newDnsResolver")
 
 	return &dnsResolverImpl{
 		ctx:      context.Background(),
@@ -56,7 +56,7 @@ func NewDnsResolver(name string, logger logging.LoggerFactory) DnsResolver {
 
 // Register adds domain name to the resolver queue for background resolution
 func (r *dnsResolverImpl) Register(domain string) error {
-	r.log.Tracef("Register: %q", domain)
+	r.log.Tracef("register: %q", domain)
 
 	e, found := r.register[domain]
 	if found {
@@ -77,7 +77,7 @@ func (r *dnsResolverImpl) Register(domain string) error {
 	}
 	r.register[domain] = e
 
-	r.log.Debugf("Starting resolver thread for domain %q", domain)
+	r.log.Debugf("starting resolver thread for domain %q", domain)
 	go startResolver(e, r.log)
 
 	return nil
@@ -85,13 +85,13 @@ func (r *dnsResolverImpl) Register(domain string) error {
 
 // the resolver goroutine
 func startResolver(e *serviceEntry, log logging.LeveledLogger) {
-	log.Infof("Resolver thread starting for domain %q, DNS update interval: %v",
+	log.Infof("resolver thread starting for domain %q, DNS update interval: %v",
 		e.domain, dnsUpdateInterval)
 
 	if err := doResolve(e); err != nil {
-		log.Debugf("Initial resolution failed for domain %q: %s", e.domain, err.Error())
+		log.Debugf("initial resolution failed for domain %q: %s", e.domain, err.Error())
 	}
-	log.Tracef("Initial resolution ready for domain %q, found %d endpoints", e.domain,
+	log.Tracef("initial resolution ready for domain %q, found %d endpoints", e.domain,
 		len(e.hostNames))
 
 	ticker := time.NewTicker(dnsUpdateInterval)
@@ -100,15 +100,15 @@ func startResolver(e *serviceEntry, log logging.LeveledLogger) {
 	for {
 		select {
 		case <-e.ctx.Done():
-			log.Debugf("Resolver thread exiting for domain %q", e.domain)
+			log.Debugf("resolver thread exiting for domain %q", e.domain)
 			return
 		case <-ticker.C:
-			log.Tracef("Resolving for domain %q", e.domain)
+			log.Tracef("resolving for domain %q", e.domain)
 			if err := doResolve(e); err != nil {
-				log.Debugf("Resolution failed for domain %q: %s",
+				log.Debugf("resolution failed for domain %q: %s",
 					e.domain, err.Error())
 			}
-			log.Tracef("Periodic resolution ready for domain %q, found %d endpoints", e.domain,
+			log.Tracef("periodic resolution ready for domain %q, found %d endpoints", e.domain,
 				len(e.hostNames))
 		}
 	}
@@ -152,7 +152,7 @@ func doResolve(e *serviceEntry) error {
 
 // Unregister removes a domain name from the resolver queue
 func (r *dnsResolverImpl) Unregister(domain string) {
-	r.log.Tracef("Unregister: %q", domain)
+	r.log.Tracef("unregister: %q", domain)
 
 	e, found := r.register[domain]
 	if !found {
@@ -171,7 +171,7 @@ func (r *dnsResolverImpl) Unregister(domain string) {
 
 // Lookup returns the hostname(s) for a domain
 func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
-	r.log.Tracef("Lookup domain: %q", domain)
+	r.log.Tracef("lookup domain: %q", domain)
 
 	e, found := r.register[domain]
 	if !found {
@@ -184,20 +184,20 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 	ret := make([]net.IP, len(e.hostNames))
 	copy(ret, e.hostNames)
 
-	r.log.Tracef("Lookup ready: domain %q, endpoints: %d", domain, len(ret))
+	r.log.Tracef("lookup ready: domain %q, endpoints: %d", domain, len(ret))
 
 	return ret, nil
 }
 
 // Starts spawns the background resolver thread
 func (r *dnsResolverImpl) Start() {
-	r.log.Debugf("Starting")
+	r.log.Debugf("starting")
 	// Register already started the resolver threads
 }
 
 // Close closes the background resolver
 func (r *dnsResolverImpl) Close() {
-	r.log.Debugf("Closing: active domains: %d", len(r.register))
+	r.log.Debugf("closing: active domains: %d", len(r.register))
 	// XXX: if the server Close sequence is OK then this should never happen
 	if len(r.register) > 0 {
 		r.log.Warnf("trying to close DNS resolver with %d active domains",

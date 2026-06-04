@@ -85,31 +85,31 @@ func main() {
 	log = loggerFactory.NewLogger("turncat-cli")
 
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
-	log.Debugf("Starting turncat %s", buildInfo.String())
+	log.Debugf("starting turncat %s", buildInfo.String())
 
 	uri := flag.Arg(1)
-	log.Debugf("Reading STUNner config from URI %q", uri)
+	log.Debugf("reading STUNner config from URI %q", uri)
 	config, err := getStunnerConf(uri)
 	if err != nil {
-		log.Errorf("Error: %s", err.Error())
+		log.Errorf("error: %s", err.Error())
 		os.Exit(1)
 	}
 
-	log.Debug("Generating STUNner authentication client")
+	log.Debug("generating STUNner authentication client")
 	authGen, err := getAuth(config)
 	if err != nil {
-		log.Errorf("Could not create STUNner authentication client: %s", err.Error())
+		log.Errorf("could not create STUNner authentication client: %s", err.Error())
 		os.Exit(1)
 	}
 
-	log.Debug("Generating STUNner URI")
+	log.Debug("generating STUNner URI")
 	stunnerURI, err := getStunnerURI(config)
 	if err != nil {
-		log.Errorf("Could not create STUNner URI: %s", err.Error())
+		log.Errorf("could not create STUNner URI: %s", err.Error())
 		os.Exit(1)
 	}
 
-	log.Debugf("Starting turncat with STUNner URI: %s", stunnerURI)
+	log.Debugf("starting turncat with STUNner URI: %s", stunnerURI)
 	cfg := &stunner.TurncatConfig{
 		ListenerAddr:  flag.Arg(0),
 		ServerAddr:    stunnerURI,
@@ -122,11 +122,11 @@ func main() {
 	}
 	t, err := stunner.NewTurncat(cfg)
 	if err != nil {
-		log.Errorf("Could not init turncat: %s\n", err)
+		log.Errorf("could not init turncat: %s\n", err)
 		os.Exit(1)
 	}
 
-	log.Debug("Entering main loop")
+	log.Debug("entering main loop")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -171,7 +171,7 @@ func getStunnerConfFromK8s(def string) (*stnrv1.StunnerConfig, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Debug("Searching for CDS server")
+	log.Debug("searching for CDS server")
 	cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 		loggerFactory.NewLogger("cds-fwd"))
 	if err != nil {

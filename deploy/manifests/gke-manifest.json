@@ -1,0 +1,101 @@
+POST https://container.googleapis.com/v1beta1/projects/voip-over-service-mesh/zones/europe-central2-a/clusters
+{
+  "cluster": {
+    "name": "webrtc-stunner-test",
+    "masterAuth": {
+      "clientCertificateConfig": {}
+    },
+    "network": "projects/voip-over-service-mesh/global/networks/default",
+    "addonsConfig": {
+      "httpLoadBalancing": {},
+      "horizontalPodAutoscaling": {},
+      "kubernetesDashboard": {
+        "disabled": true
+      },
+      "networkPolicyConfig": {},
+      "dnsCacheConfig": {},
+      "gcePersistentDiskCsiDriverConfig": {}
+    },
+    "subnetwork": "projects/voip-over-service-mesh/regions/europe-central2/subnetworks/default",
+    "nodePools": [
+      {
+        "name": "default-pool",
+        "config": {
+          "machineType": "e2-standard-2",
+          "diskSizeGb": 30,
+          "oauthScopes": [
+            "https://www.googleapis.com/auth/devstorage.read_only",
+            "https://www.googleapis.com/auth/logging.write",
+            "https://www.googleapis.com/auth/monitoring",
+            "https://www.googleapis.com/auth/servicecontrol",
+            "https://www.googleapis.com/auth/service.management.readonly",
+            "https://www.googleapis.com/auth/trace.append"
+          ],
+          "metadata": {
+            "disable-legacy-endpoints": "true"
+          },
+          "imageType": "COS_CONTAINERD",
+          "diskType": "pd-standard",
+          "shieldedInstanceConfig": {
+            "enableIntegrityMonitoring": true
+          }
+        },
+        "initialNodeCount": 2,
+        "autoscaling": {
+          "enabled": true,
+          "maxNodeCount": 6
+        },
+        "management": {
+          "autoUpgrade": true,
+          "autoRepair": true
+        },
+        "maxPodsConstraint": {
+          "maxPodsPerNode": "110"
+        },
+        "networkConfig": {},
+        "upgradeSettings": {
+          "maxSurge": 1
+        }
+      }
+    ],
+    "locations": [
+      "europe-central2-a"
+    ],
+    "networkPolicy": {
+      "provider": "CALICO",
+      "enabled": true
+    },
+    "ipAllocationPolicy": {
+      "useIpAliases": true
+    },
+    "masterAuthorizedNetworksConfig": {},
+    "autoscaling": {},
+    "networkConfig": {
+      "datapathProvider": "LEGACY_DATAPATH"
+    },
+    "defaultMaxPodsConstraint": {
+      "maxPodsPerNode": "110"
+    },
+    "authenticatorGroupsConfig": {},
+    "databaseEncryption": {
+      "state": "DECRYPTED"
+    },
+    "shieldedNodes": {
+      "enabled": true
+    },
+    "releaseChannel": {
+      "channel": "RAPID"
+    },
+    "notificationConfig": {
+      "pubsub": {}
+    },
+    "initialClusterVersion": "1.22.4-gke.1501",
+    "location": "europe-central2-a",
+    "loggingConfig": {
+      "componentConfig": {}
+    },
+    "monitoringConfig": {
+      "componentConfig": {}
+    }
+  }
+}

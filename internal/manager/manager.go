@@ -1,103 +1,78 @@
 package manager
 
 import (
-	// "fmt"
-	"sort"
-	"sync"
-
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/internal/object"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Manager stores STUNner objects
-type Manager interface {
-	// Upsert upserts the object into the store
-	Upsert(o object.Object) error
-	// Get returns a named object
-	Get(name string) (object.Object, bool)
-	// Delete deletes the object from the store, may return ErrReturnRequired
-	Delete(o object.Object) error
-	// PrepareReconciliation prepares the reconciliation of the manager
-	PrepareReconciliation(confs []stnrv1.Config, stunenerConf stnrv1.Config) (*ReconciliationState, error)
-	// FinishReconciliation finishes the reconciliation from the specified state
-	FinishReconciliation(state *ReconciliationState) error
-	// Keys returns the names iof all objects in the store in alphabetical order, suitable for iteration
-	Keys() []string
+// ListExtractor pulls the slice of typed Configs handled by this Manager out of the full
+// StunnerConfig. Singleton Managers return a single-element slice; multi-instance Managers (e.g.,
+// the per-Listener Manager under ListenerList) return one entry per item.
+type ListExtractor = func(*stnrv1.StunnerConfig) ([]stnrv1.Config, error)
+
+// Constructor creates a new object for a manager from config and registry.
+type Constructor = func(conf stnrv1.Config, reg object.Registry) (object.Object, error)
+
+// Manager owns the items of one ObjectType. Items live in the Registry, not in the Manager — the
+// Manager just knows how to find them by type and how to drive the per-item reconcile lifecycle.
+type Manager struct {
+	name       string
+	objectType string
+	ctor       Constructor
+	extractor  ListExtractor
+	reg        Registry
+	log        logging.LeveledLogger
+	singleton  bool
+	itemName   string
 }
 
-// locks avoid races during reconcile: auth/perm handlers may call into the manager from separate threads
-type managerImpl struct {
-	name    string
-	lock    sync.RWMutex
-	objects map[string]object.Object
-	factory object.Factory
-	log     logging.LeveledLogger
-}
+// Option customizes a manager at construction time.
+type Option func(*Manager)
 
-// NewManager creates a new Manager.
-func NewManager(name string, f object.Factory, logger logging.LoggerFactory) Manager {
-	return &managerImpl{
-		name:    name,
-		objects: make(map[string]object.Object),
-		factory: f,
-		log:     logger.NewLogger(name),
+// WithSingleton marks a manager as singleton and fixes its item name.
+func WithSingleton(itemName string) Option {
+	return func(m *Manager) {
+		m.singleton = true
+		m.itemName = itemName
 	}
 }
 
-// config must be validated before callling u!
-func (m *managerImpl) Upsert(o object.Object) error {
-	m.log.Tracef("upsert object %q", o.ObjectName())
-
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.objects[o.ObjectName()] = o
-
-	return nil
-}
-
-func (m *managerImpl) Get(name string) (object.Object, bool) {
-	// m.log.Tracef("get object %s", name)
-
-	m.lock.RLock()
-	o, found := m.objects[name]
-	m.lock.RUnlock()
-
-	if found {
-		return o, found
+// NewManager creates a new Manager for the given object type. The Registry is the shared store;
+// the Constructor builds new items; the ListExtractor selects this manager's slice out of the full
+// StunnerConfig.
+func NewManager(name, objectType string, ctor Constructor, extractor ListExtractor, reg Registry, logger logging.LoggerFactory, opts ...Option) *Manager {
+	m := &Manager{
+		name:       name,
+		objectType: objectType,
+		ctor:       ctor,
+		extractor:  extractor,
+		reg:        reg,
+		log:        logger.NewLogger(name),
 	}
-
-	return nil, false
-}
-
-// Delete removes an object, may return ErrRestartRequired
-func (m *managerImpl) Delete(o object.Object) error {
-	m.log.Tracef("delete object %q", o.ObjectName())
-
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	delete(m.objects, o.ObjectName())
-
-	return o.Close()
-}
-
-// safe for addition/deletion
-func (m *managerImpl) Keys() []string {
-	// m.log.Tracef("object keys")
-
-	names := make([]string, len(m.objects))
-	i := 0
-
-	m.lock.RLock()
-	for k := range m.objects {
-		names[i] = k
-		i += 1
+	for _, opt := range opts {
+		opt(m)
 	}
-	m.lock.RUnlock()
+	return m
+}
 
-	sort.Strings(names)
-	return names
+func (m *Manager) Name() string             { return m.name }
+func (m *Manager) ObjectType() string       { return m.objectType }
+func (m *Manager) Constructor() Constructor { return m.ctor }
+func (m *Manager) Extractor() ListExtractor { return m.extractor }
+
+func (m *Manager) Items() []object.Object { return m.reg.LookupAll(m.objectType) }
+
+func (m *Manager) Get(name string) (object.Object, bool) {
+	return m.reg.Lookup(m.objectType, name)
+}
+
+func (m *Manager) Keys() []string {
+	items := m.Items()
+	out := make([]string, len(items))
+	for i, o := range items {
+		out[i] = o.ObjectName()
+	}
+	return out
 }

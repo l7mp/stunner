@@ -1,4 +1,4 @@
-package stunner
+package object
 
 import (
 	"net"
@@ -9,7 +9,6 @@ import (
 	"github.com/pion/transport/v4/vnet"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/pkg/logger"
 )
@@ -21,10 +20,10 @@ var connTestLoglevel string = "all:ERROR"
 // var connTestLoglevel string = "all:TRACE"
 // var connTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
-var testCluster = object.Cluster{Name: "test-cluster"}
+var testCluster = Cluster{Name: "test-cluster"}
 
 func getChecker(minPort, maxPort int) PortRangeChecker {
-	return func(addr net.Addr) (*object.Cluster, bool) {
+	return func(addr net.Addr) (*Cluster, bool) {
 		u, ok := addr.(*net.UDPAddr)
 		if !ok {
 			return nil, false
@@ -44,7 +43,7 @@ func TestPortRangePacketConn(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(connTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	log.Debug("Creating vnet")
+	log.Debug("creating vnet")
 	nw, err := vnet.NewNet(&vnet.NetConfig{})
 	if !assert.NoError(t, err, "should succeed") {
 		return
@@ -55,24 +54,24 @@ func TestPortRangePacketConn(t *testing.T) {
 	defer tm.Close() //nolint:errcheck
 
 	t.Run("LoopbackOnValidPort", func(t *testing.T) {
-		log.Debug("Creating base socket")
+		log.Debug("creating base socket")
 		addr := "127.0.0.1:15000"
 		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
-		log.Debug("Creating filtered packet conn wrappeer socket")
+		log.Debug("creating filtered packet conn wrappeer socket")
 		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
-		log.Debug("Sending packet")
+		log.Debug("sending packet")
 		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.NoError(t, err, "should succeed")
 		assert.Equal(t, len(msg), n, "should match")
 
-		log.Debug("Receiving packet")
+		log.Debug("receiving packet")
 		buf := make([]byte, 1000)
 		n, remoteAddr, err := conn.ReadFrom(buf)
 		assert.NoError(t, err, "should succeed")
@@ -80,58 +79,58 @@ func TestPortRangePacketConn(t *testing.T) {
 		assert.Equal(t, msg, string(buf[:n]), "should match")
 		assert.Equal(t, udpAddr.String(), remoteAddr.String(), "should match") //nolint:forcetypeassert
 
-		log.Debug("Closing connection")
+		log.Debug("closing connection")
 		assert.NoError(t, conn.Close(), "should succeed") // should close baseConn
 	})
 
 	t.Run("LoopbackOnInvalidPort", func(t *testing.T) {
-		log.Debug("Creating base socket")
+		log.Debug("creating base socket")
 		addr := "127.0.0.1:25000"
 		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
-		log.Debug("Creating filtered packet conn wrappeer socket")
+		log.Debug("creating filtered packet conn wrappeer socket")
 		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
-		log.Debug("Sending packet")
+		log.Debug("sending packet")
 		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.Error(t, err, "should reject")
 		assert.Equal(t, 0, n, "should match")
 
-		log.Debug("Receiving packet")
+		log.Debug("receiving packet")
 		buf := make([]byte, 1000)
 		// this would hang otherwise
 		assert.NoError(t, conn.SetReadDeadline(time.Now().Add(10*time.Millisecond)), "read deadline")
 		_, _, err = conn.ReadFrom(buf)
 		assert.Error(t, err, "should be rejected")
 
-		log.Debug("Closing connection")
+		log.Debug("closing connection")
 		assert.NoError(t, conn.Close(), "should succeed")
 	})
 
 	t.Run("LoopbackOnSinglePort", func(t *testing.T) {
-		log.Debug("Creating base socket")
+		log.Debug("creating base socket")
 		addr := "127.0.0.1:15000"
 		baseConn, err := nw.ListenPacket("udp4", addr)
 		assert.NoError(t, err, "should succeed")
 		msg := "PING!"
 
-		log.Debug("Creating filtered packet conn wrappeer socket")
+		log.Debug("creating filtered packet conn wrappeer socket")
 		conn := NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
-		log.Debug("Sending packet")
+		log.Debug("sending packet")
 		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 		assert.NoError(t, err, "should resolve UDP address")
 		n, err := conn.WriteTo([]byte(msg), udpAddr)
 		assert.NoError(t, err, "should succeed")
 		assert.Equal(t, len(msg), n, "should match")
 
-		log.Debug("Receiving packet")
+		log.Debug("receiving packet")
 		buf := make([]byte, 1000)
 		n, remoteAddr, err := conn.ReadFrom(buf)
 		assert.NoError(t, err, "should succeed")
@@ -139,7 +138,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		assert.Equal(t, msg, string(buf[:n]), "should match")
 		assert.Equal(t, udpAddr.String(), remoteAddr.String(), "should match") //nolint:forcetypeassert
 
-		log.Debug("Closing connection")
+		log.Debug("closing connection")
 		assert.NoError(t, conn.Close(), "should succeed") // should close baseConn
 	})
 }
@@ -151,7 +150,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	//	relayLog := loggerFactory.WithRateLimiter(.25, 1).NewLogger("relay")
 	relayLog := log
 
-	log.Debug("Creating vnet")
+	log.Debug("creating vnet")
 	nw, err := vnet.NewNet(&vnet.NetConfig{})
 	if err != nil {
 		b.Fatalf("Cannot allocate vnet: %s", err.Error())
@@ -161,7 +160,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	assert.NoError(b, err, "should succeed")
 	defer tm.Close() //nolint:errcheck
 
-	log.Debug("Creating base socket")
+	log.Debug("creating base socket")
 	addr := "127.0.0.1:25000"
 	baseConn, err := nw.ListenPacket("udp4", addr)
 	if err != nil {
@@ -169,7 +168,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	}
 	msg := "PING!"
 
-	log.Debug("Creating filtered packet conn wrappeer socket")
+	log.Debug("creating filtered packet conn wrappeer socket")
 	conn := WithCounter(NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, relayLog))
 	if err != nil {
 		b.Fatalf("Cannot create port-range packetconn: %s", err.Error())
@@ -207,7 +206,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 		b.Fatalf("Write counter (%d) should be %d", writeCounter, b.N)
 	}
 
-	log.Debug("Closing connection")
+	log.Debug("closing connection")
 	err = conn.Close()
 	if err != nil {
 		b.Fatalf("Cannot close connection: %s", err.Error())

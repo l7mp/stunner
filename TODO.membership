@@ -1,0 +1,31 @@
+STUNner membership/enterprise features
+1. eBPF (timeline: @Tamas?)
+2. User quotas: (timeline: 3 days, but pion/turn PRs are pending)
+   - limit max TURN allocations per username
+   - TODO: merge lifetime callback
+   - TODO: submit quota handler PR to pion/turn (10 lines of code)
+   - TODO: expose quota config in a new Gateway annotation or via an optional GatewayConfig spec
+3. Deploy the STUNner dataplane into a DaemonSet (timeline: 1 week, but would need to roll a
+   proprietary operator first)
+   - simplifies public TURN and STUN server deployment
+   - TODO: add option to Dataplane CRD
+   - TODO: update the renderer (dataplane_util.go) to output a DaemonSet instead of a Deployment
+4. Pure STUN: disallow TURN allocation, only binding queries are answered (1 week at least)
+   - removes a possible DDoS vector for the pure STUN use case (dummy TURN credentials allow client
+     to make allocations even if they cannot use them to proxy traffic, just in order to consume
+     resources)
+   - the only requirement is that we do not install an auth-handler in stunnerd, but this requires
+     some tweaking of the rendering pipeline (we now assume auth secrets are mandatory): https://github.com/pion/turn/blob/3ff9392281fdcc2af71778571f42444a75b9d0a6/server_test.go#L573
+   - TODO: introduce new protocols STUN-UDP and STUN-TCP to differentiate TURN listeners from STUN
+     listeners
+   - TODO: add operator support
+   - TODO: add support to stunnerd  to start the server without an auth handler
+   - TODO: end-to-end testing (we break some of our own internal assumptions and this may cause
+     problems)
+5. Event reporting to OTel collector (timeline: dunno, need to research first)
+   - observability, alarms, etc
+   - TODO: understand the config requirements here
+6. Let's encrypt integration (timeline: couple of weeks)
+   - automatically sign the TLS certs used for TURN-TLS and TURN-DTLS listeners
+   - requires basic HTTP routing support in stunnerd to redirect ACME queries to cert-manager
+

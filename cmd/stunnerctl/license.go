@@ -22,14 +22,14 @@ func runLicense(_ *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Debug("Searching for CDS server")
+	log.Debug("searching for CDS server")
 	pod, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 		loggerFactory.NewLogger("cds-fwd"))
 	if err != nil {
 		return fmt.Errorf("error searching for CDS server: %w", err)
 	}
 
-	log.Debugf("Connecting to CDS server: %s", pod.String())
+	log.Debugf("connecting to CDS server: %s", pod.String())
 	licenseClient, err := cdsclient.NewLicenseStatusClient(pod.Addr, loggerFactory.NewLogger("cds-client"))
 	if err != nil {
 		return fmt.Errorf("error creating CDS client: %w", err)

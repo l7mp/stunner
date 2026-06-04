@@ -42,7 +42,7 @@ func NewLicenseStatusClient(addr string, logger logging.LeveledLogger, opts ...C
 }
 
 func (a *licenseStatusClient) LicenseStatus(ctx context.Context) (stnrv1.LicenseStatus, error) {
-	a.Debugf("GET: loading license status from CDS server %s", a.addr)
+	a.Debugf("gET: loading license status from CDS server %s", a.addr)
 
 	s := stnrv1.NewEmptyLicenseStatus()
 	r, err := a.client.GetV1LicenseStatusWithResponse(ctx)
@@ -52,7 +52,7 @@ func (a *licenseStatusClient) LicenseStatus(ctx context.Context) (stnrv1.License
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return s, fmt.Errorf("HTTP error (status: %s): %s", r.HTTPResponse.Status, body)
+		return s, fmt.Errorf("hTTP error (status: %s): %s", r.HTTPResponse.Status, body)
 	}
 
 	if err := json.Unmarshal(r.Body, &s); err != nil {

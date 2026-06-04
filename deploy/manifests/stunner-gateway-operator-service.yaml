@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stunner-gateway-operator
+  namespace: stunner-system
+spec:
+  selector:
+    control-plane: controller-manager
+  ports:
+  - port: 13478
+    protocol: TCP

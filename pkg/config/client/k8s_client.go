@@ -152,14 +152,14 @@ func NewK8sDiscoverer(k8sFlags *cliopt.ConfigFlags, log logging.LeveledLogger) (
 		log:      log,
 	}
 
-	d.log.Debug("Obtaining kubeconfig")
+	d.log.Debug("obtaining kubeconfig")
 	config, err := d.k8sFlags.ToRESTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("error building Kubernetes config: %w", err)
 	}
 	d.config = config
 
-	d.log.Debug("Creating a Kubernetes client")
+	d.log.Debug("creating a Kubernetes client")
 	cs, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating http client: %w", err)
@@ -194,7 +194,7 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 	}
 
 	label := fmt.Sprintf("%s=%s", stnrv1.DefaultCDSServiceLabelKey, stnrv1.DefaultCDSServiceLabelValue)
-	d.log.Debugf("Querying CDS server pods in namespace %q using label-selector %q", nsLog, label)
+	d.log.Debugf("querying CDS server pods in namespace %q using label-selector %q", nsLog, label)
 
 	pods, err := d.cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: label,
@@ -260,7 +260,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 		}
 	}
 
-	d.log.Debugf("Calling GET on api/pods using namespace %q and label selector %q",
+	d.log.Debugf("calling GET on api/pods using namespace %q and label selector %q",
 		gwNs, selector.String())
 	pods, err := d.cs.CoreV1().Pods(gwNs).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
@@ -275,7 +275,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 		for i, p := range pods.Items {
 			if p.GetName() == podFlags.Name {
 				// keep only the i-th pod
-				d.log.Debugf("Enforcing pod %s/%s for gateway %s/%s", *k8sFlags.Namespace, gwNs, gw)
+				d.log.Debugf("enforcing pod %s/%s for gateway %s/%s", *k8sFlags.Namespace, gwNs, gw)
 				pods.Items = pods.Items[i : i+1]
 				found = true
 				break
@@ -299,7 +299,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 
 			p, err := d.PortFwd(ctx, &pod, podFlags.Port)
 			if err != nil {
-				d.log.Errorf("Failed to create port-forwarder to stunnerd pod %s/%s: %s",
+				d.log.Errorf("failed to create port-forwarder to stunnerd pod %s/%s: %s",
 					pod.GetNamespace(), pod.GetName(), err.Error())
 				return
 			}
@@ -312,7 +312,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 
 	wg.Wait()
 
-	d.log.Debugf("Successfully opened %d port-forward connections", len(pods.Items))
+	d.log.Debugf("successfully opened %d port-forward connections", len(pods.Items))
 
 	return ps, nil
 }
@@ -339,7 +339,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 	}
 
 	label := fmt.Sprintf("%s=%s", stnrv1.DefaultAppLabelKey, stnrv1.DefaultAuthAppLabelValue)
-	d.log.Debugf("Querying auth service pods in namespace %q using label-selector %q", nsLog, label)
+	d.log.Debugf("querying auth service pods in namespace %q using label-selector %q", nsLog, label)
 
 	pods, err := d.cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: label,
@@ -353,7 +353,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 	}
 
 	if len(pods.Items) > 1 {
-		d.log.Infof("Mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
+		d.log.Infof("mulitple (%d) authentication service instances found, using the first one", len(pods.Items))
 	}
 
 	return d.PortFwd(ctx, &pods.Items[0], authFlags.Port)
@@ -376,7 +376,7 @@ func DiscoverK8sPod(ctx context.Context, k8sFlags *cliopt.ConfigFlags, namespace
 	}
 
 	if len(pods.Items) > 1 {
-		d.log.Infof("Mulitple (%d) pods found, using the first one", len(pods.Items))
+		d.log.Infof("mulitple (%d) pods found, using the first one", len(pods.Items))
 	}
 
 	return d.PortFwd(ctx, &pods.Items[0], port)
@@ -388,7 +388,7 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 		Namespace: pod.GetNamespace(),
 		Proxy:     true,
 	}
-	d.log.Debugf("Found pod: %s/%s", p.Namespace, p.Name)
+	d.log.Debugf("found pod: %s/%s", p.Namespace, p.Name)
 	req := d.cs.RESTClient().
 		Post().
 		Prefix("api/v1").
@@ -397,7 +397,7 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 		Name(p.Name).
 		SubResource("portforward")
 
-	d.log.Debugf("Creating a SPDY stream to API server using URL %q", req.URL().String())
+	d.log.Debugf("creating a SPDY stream to API server using URL %q", req.URL().String())
 	transport, upgrader, err := spdy.RoundTripperFor(d.config)
 	if err != nil {
 		return PodInfo{}, fmt.Errorf("failed to get transport/upgrader from restconfig: %w", err)
@@ -405,7 +405,7 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, req.URL())
 
-	d.log.Debugf("Creating a port-forwarder to pod")
+	d.log.Debugf("creating a port-forwarder to pod")
 	remoteAddr := fmt.Sprintf("0:%d", port)
 	stopChan, readyChan := make(chan struct{}, 1), make(chan struct{}, 1)
 	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
@@ -421,7 +421,7 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 		}
 	}()
 
-	d.log.Debug("Waiting for port-forwarder...")
+	d.log.Debug("waiting for port-forwarder...")
 	<-readyChan
 
 	localPort, err := fw.GetPorts()
@@ -440,6 +440,6 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 	}()
 
 	p.Addr = fmt.Sprintf("127.0.0.1:%d", localPort[0].Local)
-	d.log.Debugf("Port-forwarder connected to %s", p.String())
+	d.log.Debugf("port-forwarder connected to %s", p.String())
 	return p, nil
 }

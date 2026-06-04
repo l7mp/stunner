@@ -1,0 +1,21 @@
+# Agent Guide for This Repository
+
+- Build: `make build` (binaries in `bin/`); quick build of one binary: `go build ./cmd/stunnerd` etc.
+- Lint/format: `make fmt` (runs `go fmt ./...`); vet with `make vet`.
+- Tests: `make test` (runs `go test ./... -v`). Single test: `go test ./path/to/pkg -run TestName -v`.
+- Go version: see `go.mod` (use the declared toolchain when possible).
+- Prefer standard `go test` patterns; keep tests in `*_test.go` near the code under test.
+- Imports: group as standard library, third-party, then internal (`github.com/l7mp/stunner/...`), each group separated by one blank line.
+- Formatting: always use `goimports`; add 5 sec timeout to handle unavailable packages; do not hand-format or realign imports.
+- Types: favor explicit types on exported identifiers and struct fields; use type aliases sparingly.
+- Naming: exported identifiers should be descriptive and follow Go conventions (e.g., `NewX`, `DoSomething`, `ErrSomething`).
+- Errors: return `error` values instead of panicking; wrap with context where helpful and check errors immediately.
+- Logging: use the existing logging facilities (`pkg/logger`, `go-logr`, or zap) rather than `fmt.Println` in non-test code.
+- Concurrency: prefer `context.Context` for cancellation and timeouts; avoid unbounded goroutines and channels.
+- Configuration: keep config types and validation in the existing config packages; avoid duplicating config parsing logic.
+- Public APIs: respect existing interfaces and types in `pkg/...`; extend them instead of creating parallel APIs.
+- Tests: use Ginkgo/Gomegav2 or `testify` depending on the `go.mod` consistently; keep tests deterministic and avoid network flakiness when possible.
+- File layout: follow existing patterns in `cmd`, `pkg`, and `internal`; place new commands under `cmd/` and reusable libraries under `pkg/`.
+- Error messages and logs should be concise, actionable, and avoid leaking secrets or user data.
+- Before submitting changes, run at least: `make fmt vet test`.
+- Commit message format: `{prefix}: Capitalized-verb...` where `prefix` is one of the usual types such as `fix`, `chore`, `test`, `feature`, etc.

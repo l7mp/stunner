@@ -44,7 +44,7 @@ func runICETest(_ *cobra.Command, args []string) error {
 		case v1.ListenerProtocolTURNUDP, v1.ListenerProtocolTURNTCP:
 			turnTransports = append(turnTransports, proto)
 		default:
-			return fmt.Errorf("ICE test is currently not available on TURN transport protocol %s", proto)
+			return fmt.Errorf("iCE test is currently not available on TURN transport protocol %s", proto)
 		}
 	}
 

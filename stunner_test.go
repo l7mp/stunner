@@ -22,6 +22,7 @@ import (
 	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/internal/resolver"
 	telemetrytester "github.com/l7mp/stunner/internal/telemetry/tester"
@@ -36,17 +37,21 @@ const (
 	// timeout  = 200 * time.Millisecond
 	// interval = 50 * time.Millisecond
 
-	stunnerTestLoglevel string = "all:ERROR"
-
+	// stunnerTestLoglevel string = "all:ERROR"
 	// stunnerTestLoglevel string = stnrv1.DefaultLogLevel
 	// stunnerTestLoglevel string = "all:INFO"
 	// stunnerTestLoglevel string = "all:TRACE"
-	// 	stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
+	stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 )
 
 var certPem, keyPem, _ = GenerateSelfSignedKey()
 var certPem64 = base64.StdEncoding.EncodeToString(certPem)
 var keyPem64 = base64.StdEncoding.EncodeToString(keyPem)
+
+func init() {
+	LogRateLimit = rate.Inf
+	LogBurst = 1
+}
 
 /********************************************
  *
@@ -104,8 +109,13 @@ func stunnerEchoTest(conf echoTestConfig) {
 		LoggerFactory:          conf.loggerFactory,
 	})
 
-	assert.NoError(t, err, "cannot create TURN client")
-	assert.NoError(t, client.Listen(), "cannot listen on TURN client")
+	if !assert.NoError(t, err, "cannot create TURN client") {
+		return
+	}
+	if !assert.NoError(t, client.Listen(), "cannot listen on TURN client") {
+		client.Close()
+		return
+	}
 	defer client.Close()
 
 	log.Debug("sending a binding request")
@@ -114,7 +124,12 @@ func stunnerEchoTest(conf echoTestConfig) {
 	if conf.bindSuccess == false {
 		assert.Error(t, err, "binding request failed")
 	} else {
-		assert.NoError(t, err, "binding request ok")
+		if !assert.NoError(t, err, "binding request ok") {
+			return
+		}
+		if !assert.NotNil(t, reflAddr, "binding response address") {
+			return
+		}
 		log.Debugf("mapped-address: %v", reflAddr.String())
 		udpAddr := reflAddr.(*net.UDPAddr)
 
@@ -126,13 +141,20 @@ func stunnerEchoTest(conf echoTestConfig) {
 		if conf.allocateSuccess == false {
 			assert.Error(t, err, err)
 		} else {
-			assert.NoError(t, err, err)
+			if !assert.NoError(t, err, err) {
+				return
+			}
+			if !assert.NotNil(t, conn, "allocated relay connection") {
+				return
+			}
 
 			// log.Debugf("laddr: %s", conn.LocalAddr().String())
 
 			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
 			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
-			assert.NoError(t, err, "creating echo socket")
+			if !assert.NoError(t, err, "creating echo socket") {
+				return
+			}
 
 			// assert.NotNil(t, err, "echo socket not nil")
 
@@ -1627,8 +1649,13 @@ func stunnerEchoFloodTest(conf echoTestConfig) {
 		LoggerFactory:  conf.loggerFactory,
 	})
 
-	assert.NoError(t, err, "cannot create TURN client")
-	assert.NoError(t, client.Listen(), "cannot listen on TURN client")
+	if !assert.NoError(t, err, "cannot create TURN client") {
+		return
+	}
+	if !assert.NoError(t, client.Listen(), "cannot listen on TURN client") {
+		client.Close()
+		return
+	}
 	defer client.Close()
 
 	log.Debug("sending a binding request")
@@ -1637,7 +1664,12 @@ func stunnerEchoFloodTest(conf echoTestConfig) {
 	if conf.bindSuccess == false {
 		assert.Error(t, err, "binding request failed")
 	} else {
-		assert.NoError(t, err, "binding request ok")
+		if !assert.NoError(t, err, "binding request ok") {
+			return
+		}
+		if !assert.NotNil(t, reflAddr, "binding response address") {
+			return
+		}
 		log.Debugf("mapped-address: %v", reflAddr.String())
 		udpAddr := reflAddr.(*net.UDPAddr)
 
@@ -1649,13 +1681,20 @@ func stunnerEchoFloodTest(conf echoTestConfig) {
 		if conf.allocateSuccess == false {
 			assert.Error(t, err, err)
 		} else {
-			assert.NoError(t, err, err)
+			if !assert.NoError(t, err, err) {
+				return
+			}
+			if !assert.NotNil(t, conn, "allocated relay connection") {
+				return
+			}
 
 			// log.Debugf("laddr: %s", conn.LocalAddr().String())
 
 			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
 			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
-			assert.NoError(t, err, "creating echo socket")
+			if !assert.NoError(t, err, "creating echo socket") {
+				return
+			}
 
 			// assert.NotNil(t, err, "echo socket not nil")
 

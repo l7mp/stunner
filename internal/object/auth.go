@@ -1,135 +1,103 @@
 package object
 
 import (
-	// "fmt"
-	"errors"
-
 	"github.com/pion/logging"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Auth is the STUNner authenticator
+// Auth is the STUNner authenticator. It is queried by TURN handlers at request time via the
+// Registry (LookupOne(TypeAuth)) — the runtime cross-reference that used to go through Router.
 type Auth struct {
 	Type                              stnrv1.AuthType
 	Realm, Username, Password, Secret string
+	reg                               Registry
 	Log                               logging.LeveledLogger
 }
 
-// NewAuth creates a new authenticator.
-func NewAuth(conf stnrv1.Config, logger logging.LoggerFactory) (Object, error) {
+// NewAuth creates an Auth object.
+func NewAuth(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+	a := &Auth{
+		reg: reg,
+		Log: rt.Logger.NewLogger("auth"),
+	}
+	if conf == nil {
+		return a, nil
+	}
 	req, ok := conf.(*stnrv1.AuthConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
 	}
-
-	auth := Auth{Log: logger.NewLogger("auth")}
-	auth.Log.Tracef("NewAuth: %s", req.String())
-
-	if err := auth.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
+	if err := a.Reconcile(req); err != nil {
 		return nil, err
 	}
-
-	return &auth, nil
+	return a, nil
 }
 
-// Inspect examines whether a configuration change requires a reconciliation (returns true if it
-// does) or restart (returns ErrRestartRequired).
-func (auth *Auth) Inspect(old, new, full stnrv1.Config) (bool, error) {
-	return !old.DeepEqual(new), nil
+func (a *Auth) ObjectName() string { return stnrv1.DefaultAuthName }
+func (a *Auth) ObjectType() string { return TypeAuth }
+
+func (a *Auth) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
+	cp := c.Auth
+	return &cp, nil
 }
 
-// Reconcile updates the authenticator for a new configuration.
-func (auth *Auth) Reconcile(conf stnrv1.Config) error {
+func (a *Auth) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+	req, ok := new.(*stnrv1.AuthConfig)
+	if !ok {
+		return ActionNone, stnrv1.ErrInvalidConf
+	}
+	cur := old.(*stnrv1.AuthConfig)
+	if !cur.DeepEqual(req) {
+		return ActionReconcile, nil
+	}
+	return ActionNone, nil
+}
+
+func (a *Auth) Reconcile(conf stnrv1.Config) error {
 	req, ok := conf.(*stnrv1.AuthConfig)
 	if !ok {
 		return stnrv1.ErrInvalidConf
 	}
-
 	if err := req.Validate(); err != nil {
 		return err
 	}
-
-	// type already validated
 	atype, _ := stnrv1.NewAuthType(req.Type)
+	a.Log.Debugf("using authentication: %s", atype.String())
 
-	auth.Log.Debugf("using authentication: %s", atype.String())
-
-	// no error: update
-	auth.Type = atype
-	auth.Realm = req.Realm
+	a.Type = atype
+	a.Realm = req.Realm
+	a.Username, a.Password, a.Secret = "", "", ""
 	switch atype {
 	case stnrv1.AuthTypeNone:
-		// no auth
 	case stnrv1.AuthTypeStatic:
-		auth.Username = req.Credentials["username"]
-		auth.Password = req.Credentials["password"]
+		a.Username = req.Credentials["username"]
+		a.Password = req.Credentials["password"]
 	case stnrv1.AuthTypeEphemeral:
-		auth.Secret = req.Credentials["secret"]
+		a.Secret = req.Credentials["secret"]
 	}
-
 	return nil
 }
 
-// ObjectName returns the name of the object
-func (auth *Auth) ObjectName() string {
-	// singleton!
-	return stnrv1.DefaultAuthName
-}
-
-// ObjectType returns the type of the object
-func (a *Auth) ObjectType() string {
-	return "auth"
-}
-
-// GetConfig returns the configuration of the running authenticator
-func (auth *Auth) GetConfig() stnrv1.Config {
-	auth.Log.Tracef("GetConfig")
+func (a *Auth) GetConfig() stnrv1.Config {
 	r := stnrv1.AuthConfig{
-		Type:        auth.Type.String(),
-		Realm:       auth.Realm,
+		Type:        a.Type.String(),
+		Realm:       a.Realm,
 		Credentials: make(map[string]string),
 	}
-	switch auth.Type {
+	switch a.Type {
 	case stnrv1.AuthTypeNone:
-		// no auth
 	case stnrv1.AuthTypeStatic:
-		r.Credentials["username"] = auth.Username
-		r.Credentials["password"] = auth.Password
+		r.Credentials["username"] = a.Username
+		r.Credentials["password"] = a.Password
 	case stnrv1.AuthTypeEphemeral:
-		r.Credentials["secret"] = auth.Secret
+		r.Credentials["secret"] = a.Secret
 	}
-
 	return &r
 }
 
-// Close closes the authenticator
-func (auth *Auth) Close() error {
-	auth.Log.Tracef("Close")
-	return nil
-}
-
-// Status returns the status of the object.
-func (auth *Auth) Status() stnrv1.Status {
-	return auth.GetConfig()
-}
-
-// AuthFactory can create now Auth objects
-type AuthFactory struct {
-	logger logging.LoggerFactory
-}
-
-// NewAuthFactory creates a new factory for Auth objects
-func NewAuthFactory(logger logging.LoggerFactory) Factory {
-	return &AuthFactory{logger: logger}
-}
-
-// New can produce a new Auth object from the given configuration. A nil config will create an
-// empty auth object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *AuthFactory) New(conf stnrv1.Config) (Object, error) {
-	if conf == nil {
-		return &Auth{}, nil
-	}
-
-	return NewAuth(conf, f.logger)
+func (a *Auth) Start() error       { return nil }
+func (a *Auth) Close(_ bool) error { return nil }
+func (a *Auth) Status() stnrv1.Status {
+	return a.GetConfig()
 }

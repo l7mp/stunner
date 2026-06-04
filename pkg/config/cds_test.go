@@ -623,7 +623,7 @@ func TestServerAPI(t *testing.T) {
 	assert.Nil(t, s, "config 4")
 
 	testLog.Debug("--------------------------------")
-	testLog.Debug("Update1: ns1/gw1 + ns2/gw1      ")
+	testLog.Debug("update1: ns1/gw1 + ns2/gw1      ")
 	testLog.Debug("--------------------------------")
 	testLog.Debug("poll: one result")
 	c1 := testConfig("ns1/gw1", "realm1")
@@ -717,7 +717,7 @@ func TestServerAPI(t *testing.T) {
 	assert.Nil(t, s)
 
 	testLog.Debug("--------------------------------")
-	testLog.Debug("Update1: ns1/gw1 + ns1/gw2      ")
+	testLog.Debug("update1: ns1/gw1 + ns1/gw2      ")
 	testLog.Debug("--------------------------------")
 	testLog.Debug("update: conf 1 and conf 3")
 	c1 = testConfig("ns1/gw1", "realm-new")
@@ -828,7 +828,7 @@ func TestServerAPI(t *testing.T) {
 	assert.True(t, s.DeepEqual(sc1.Config), "deepeq")
 
 	testLog.Debug("--------------------------------")
-	testLog.Debug("Restart + Update1: ns1/gw1 + ns2/gw1 + ns1/gw2")
+	testLog.Debug("restart + Update1: ns1/gw1 + ns2/gw1 + ns1/gw2")
 	testLog.Debug("--------------------------------")
 	testLog.Debug("restarting server")
 	serverCancel()
@@ -955,7 +955,7 @@ func TestServerAPI(t *testing.T) {
 	server.SuppressConfigDeletion = false // false by default
 
 	testLog.Debug("--------------------------------")
-	testLog.Debug("Update1: ns1/gw1 + ns3/gw1      ")
+	testLog.Debug("update1: ns1/gw1 + ns3/gw1      ")
 	testLog.Debug("--------------------------------")
 	testLog.Debug("update: conf 1, remove conf 3, and add conf 4")
 	c1 = testConfig("ns1/gw1", "realm-newer")
@@ -1345,7 +1345,7 @@ func TestDeleteConfigAPI(t *testing.T) {
 		conf := watchConfig(ch, 25*time.Millisecond)
 		assert.Nil(t, conf, "noconfig")
 
-		testLog.Trace("Adding config")
+		testLog.Trace("adding config")
 		testConf := testConfig("ns1/gw1", "realm1")
 		err = srv.UpdateConfig([]server.Config{testConf})
 		assert.NoError(t, err, "update")
@@ -1354,7 +1354,7 @@ func TestDeleteConfigAPI(t *testing.T) {
 		assert.NotNil(t, conf)
 		assert.Equal(t, *testConf.Config, *conf)
 
-		testLog.Trace("Deleting config")
+		testLog.Trace("deleting config")
 		err = srv.UpdateConfig([]server.Config{})
 		assert.NoError(t, err, "update")
 		testCase.tester(t)

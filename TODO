@@ -1,0 +1,18 @@
+* Refactor
+- use net API for manipulating addresses instead of manual string processing: net.Split/JoinHostport, net.IP*Unspecified instead of "0.0.0.0", default listener address to "localhost" and use Resolve*Addr to map to an IP address, handle "" in listener.Addr
+- quota store tests
+- offload engine: make it a proper object so that we know when to restart it independently of Admin
+- logger: make rate limiting level-aware (limit only ERROR/WARN/INFO, never DEBUG/TRACE)
+- logger: replace writer-level limiter with LeveledLogger wrapper and keep one shared token bucket across scopes
+- logger: add tests proving DEBUG/TRACE are never dropped while INFO/WARN/ERROR remain limited
+
+* URGENT
+- observe-rtc/testRTC integration???`
+
+* ideas for student projects
+- experiment with ObservRTC
+
+* write FAQ
+- AWS and DO LB
+- deploying tcpdump
+- write troubleshooting guide

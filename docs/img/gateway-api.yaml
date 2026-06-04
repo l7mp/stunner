@@ -1,0 +1,55 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: stunner
+spec:
+  controllerName: l7mp.io/stunner/gateway
+  description: "STUNner WebRTC gateway"
+  parametersRef:
+    kind: ConfigMap
+    group: ""
+    name: stunner-global-config
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunner-global-config
+data:
+  realm: "stunner.l7mp.io"
+  authType: plaintext
+  username: user1
+  password: passwd1
+  sharedSecret: "my-shared-secret"
+  authLifetime: 86400
+  loglevel: "all:INFO"
+  minPort: 10000
+  maxPort: 20000
+
+---
+
+kind: Gateway
+metadata:
+  name: webrtc-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner
+  listeners:
+  - name: udp
+    protocol: UDP
+    port: 3478
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app: stunner
+  - name: tcp
+    protocol: TCP
+    port: 3478
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app: stunner

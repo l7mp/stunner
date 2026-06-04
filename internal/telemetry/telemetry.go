@@ -95,7 +95,7 @@ func New(callbacks Callbacks, dryRun bool, log logging.LeveledLogger) (*Telemetr
 // Close cleanly shuts down the meter provider and blocks until the shutdown cycle is finished or a
 // timout expires.
 func (t *Telemetry) Close() error {
-	t.log.Trace("Shutting down telemetry")
+	t.log.Trace("shutting down telemetry")
 	ctx, cancel := context.WithTimeout(t.ctx, closeTimeout)
 	defer cancel()
 	defer t.cancel()

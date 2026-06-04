@@ -45,7 +45,7 @@ func runStatus(_ *cobra.Command, args []string) error {
 		extraLog += fmt.Sprintf("for gateway %s", gw)
 	}
 
-	log.Debug("Searching for dataplane pods " + extraLog)
+	log.Debug("searching for dataplane pods " + extraLog)
 	pods, err := cdsclient.DiscoverK8sStunnerdPods(ctx, k8sConfigFlags, podConfigFlags,
 		gwNs, gw, loggerFactory.NewLogger("stunnerd-fwd"))
 	if err != nil {
@@ -59,13 +59,13 @@ func runStatus(_ *cobra.Command, args []string) error {
 		url := fmt.Sprintf("http://%s/status", pod.Addr)
 		res, err := client.Get(url)
 		if err != nil {
-			log.Errorf("Error querying status for stunnerd pod at URL %q on %s: %s",
+			log.Errorf("error querying status for stunnerd pod at URL %q on %s: %s",
 				url, pod.String(), err.Error())
 			continue
 		}
 
 		if res.StatusCode != http.StatusOK {
-			log.Errorf("Status query failed on %s with HTTP error code %s",
+			log.Errorf("status query failed on %s with HTTP error code %s",
 				pod.String(), res.Status)
 			continue
 		}
@@ -73,7 +73,7 @@ func runStatus(_ *cobra.Command, args []string) error {
 		s := v1.StunnerStatus{}
 		err = json.NewDecoder(res.Body).Decode(&s)
 		if err != nil {
-			log.Errorf("Could not decode status response: %s", err.Error())
+			log.Errorf("could not decode status response: %s", err.Error())
 			continue
 		}
 

@@ -1,0 +1,16 @@
+apiVersion: stunner.l7mp.io/v1
+kind: Dataplane
+metadata:
+  name: default
+spec:
+  image: localhost/l7mp/stunner:latest
+  replicas: 1
+  resources:
+    limits:
+      cpu: 250m
+      memory: 120Mi
+    requests:
+      cpu: 250m
+      memory: 120Mi
+  terminationGracePeriodSeconds: 3600
+  enableMetricsEndpoint: true

@@ -77,7 +77,7 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 			return nil, fmt.Errorf("invalid API operation %q", operationID)
 		}
 
-		s.log.V(4).Info("WS upgrade middleware: upgrading connection", "client", r.RemoteAddr)
+		s.log.V(4).Info("wS upgrade middleware: upgrading connection", "client", r.RemoteAddr)
 
 		// upgrade to webSocket
 		upgrader := websocket.Upgrader{
@@ -121,7 +121,7 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
 	})
 
-	s.log.V(2).Info("New config stream connection", "api", operationID, "client", conn.Id())
+	s.log.V(2).Info("new config stream connection", "api", operationID, "client", conn.Id())
 
 	for {
 		select {
@@ -130,13 +130,13 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 			if !ok {
 				continue // avoid race condition
 			}
-			s.log.V(4).Info("Sending client connection", "api", operationID, "client", conn.Id(),
+			s.log.V(4).Info("sending client connection", "api", operationID, "client", conn.Id(),
 				"config", config.String())
 			s.writeConfig(conn, config.Config)
 
 		// or wait until client closes the connection or the server is cancelled
 		case <-ctx.Done():
-			s.log.V(1).Info("Client connection closed", "api", operationID, "client", conn.Id())
+			s.log.V(1).Info("client connection closed", "api", operationID, "client", conn.Id())
 			s.closeConn(conn)
 			return
 		}
@@ -150,7 +150,7 @@ func (s *Server) writeConfig(conn *Conn, c *stnrv1.StunnerConfig) {
 		return
 	}
 
-	s.log.V(2).Info("Sending configuration to client", "client", conn.Id())
+	s.log.V(2).Info("sending configuration to client", "client", conn.Id())
 
 	if err := conn.WriteMessage(websocket.TextMessage, json); err != nil {
 		s.log.Error(err, "Error sending config update", "client", conn.Id())
@@ -164,7 +164,7 @@ func (s *Server) closeConn(conn *Conn) {
 	}
 	conn.closed = true
 
-	s.log.V(1).Info("Closing client connection", "client", conn.Id())
+	s.log.V(1).Info("closing client connection", "client", conn.Id())
 
 	conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
 
