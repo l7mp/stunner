@@ -91,9 +91,27 @@ func (r *RelayGen) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Pac
 		requestedPort = 0
 	}
 
-	// This will fail unless (1) r.Address is "" (IPADDR_ANY), or (2) r.Address is IPv4 and the
-	// requested network is also IPv4, or (3) both are IPv6.
-	conn, err := r.Net.ListenPacket(conf.Network, fmt.Sprintf("%s:%d", r.Address, requestedPort))
+	// pion/turn passes a family-pinned Network ("udp4" or "udp6") derived
+	// from the allocation's RFC 6156 family. On Linux dual-stack hosts that
+	// hint forces ListenPacket into a single-family socket regardless of how
+	// the listener itself was bound -- so a relay allocated from an IPv6-only
+	// Kubernetes cluster (where pion/turn defaults to the RFC 6156 IPv4
+	// family because the Allocate request omits REQUESTED-ADDRESS-FAMILY) is
+	// unreachable for the cluster's IPv6 backend pods.
+	//
+	// When the listener Address is the wildcard, override the network with
+	// the family-neutral "udp" so a single relay socket binds [::] and
+	// reaches both IPv4 and IPv6 peers. Pinned Address listeners are
+	// untouched and keep RFC 6156 strict family behavior.
+	//
+	// End-to-end cross-family forwarding additionally requires pion/turn's
+	// permission family check to accept v6 peers on a v4 allocation; see the
+	// pion/turn upstream issue tracking that.
+	network := conf.Network
+	if r.Address == "" && (network == "udp4" || network == "udp6") {
+		network = "udp"
+	}
+	conn, err := r.Net.ListenPacket(network, fmt.Sprintf("%s:%d", r.Address, requestedPort))
 	if err != nil {
 		return nil, nil, err
 	}
