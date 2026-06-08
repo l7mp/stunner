@@ -32,8 +32,10 @@ type Router interface {
 func GetClustersForListener(l *Listener) []*Cluster {
 	ret := []*Cluster{}
 	for _, route := range l.Routes {
-		if c := l.GetCluster(route); c != nil {
-			ret = append(ret, c)
+		for _, o := range l.reg.LookupAll(TypeCluster) {
+			if o.ObjectName() == route {
+				ret = append(ret, o.(*Cluster))
+			}
 		}
 	}
 
