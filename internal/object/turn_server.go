@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/pion/dtls/v3"
@@ -45,14 +46,14 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 	permissionHandler := NewTURNPermissionHandler(l)
 	relay := NewTURNRelay(l)
 
-	addr := fmt.Sprintf("0.0.0.0:%d", l.Port)
+	addr := net.JoinHostPort("", strconv.Itoa(l.Port))
 
 	switch s.proto {
 	case stnrv1.ListenerProtocolTURNUDP:
 		socketPool := util.NewPacketConnPool(s.name, l.Net, l.udpThreadNum, l.telemetry)
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
-		conns, err := socketPool.ListenPacket("udp4", addr)
+		conns, err := socketPool.ListenPacket("udp", addr)
 		if err != nil {
 			return nil, err
 		}
@@ -111,11 +112,11 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 			return nil, fmt.Errorf("cannot load cert/key pair for creating DTLS listener at %s: %s",
 				addr, err)
 		}
-		udpAddr, err := net.ResolveUDPAddr("udp4", addr)
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DTLS listener address %s: %s", addr, err)
 		}
-		dtlsListener, err := dtls.ListenWithOptions("udp4", udpAddr,
+		dtlsListener, err := dtls.ListenWithOptions("udp", udpAddr,
 			dtls.WithCertificates(cer),
 		)
 		if err != nil {

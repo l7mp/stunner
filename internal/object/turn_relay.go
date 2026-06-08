@@ -1,11 +1,10 @@
 package object
 
-// code adopted from github.com/livekit/pkg/telemetry
-
 import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -92,7 +91,7 @@ func (r *TURNRelay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Pa
 
 	// This will fail unless (1) r.Address is "" (IPADDR_ANY), or (2) r.Address is IPv4 and the
 	// requested network is also IPv4, or (3) both are IPv6.
-	conn, err := r.Net.ListenPacket(conf.Network, fmt.Sprintf("%s:%d", r.Address, requestedPort))
+	conn, err := r.Net.ListenPacket(conf.Network, net.JoinHostPort(r.Address, strconv.Itoa(requestedPort)))
 	if err != nil {
 		return nil, nil, err
 	}
