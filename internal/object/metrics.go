@@ -6,10 +6,12 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
@@ -20,8 +22,11 @@ type Metrics struct {
 	server   *http.Server
 	servAddr net.Addr
 	dryRun   bool
-	reg      Registry
-	log      logging.LeveledLogger
+
+	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
+	conf atomic.Pointer[MetricsConfig]
+
+	log logging.LeveledLogger
 }
 
 // MetricsConfig is the typed subconfig consumed by Metrics. An empty endpoint disables the server.
@@ -30,7 +35,7 @@ type MetricsConfig struct {
 }
 
 func (c *MetricsConfig) Validate() error    { return nil }
-func (c *MetricsConfig) ConfigName() string { return DefaultMetricsName }
+func (c *MetricsConfig) ConfigName() string { return stnrv1.DefaultMetricsName }
 func (c *MetricsConfig) DeepEqual(other stnrv1.Config) bool {
 	o, ok := other.(*MetricsConfig)
 	if !ok {
@@ -50,10 +55,9 @@ func (c *MetricsConfig) String() string {
 }
 
 // NewMetrics creates a Metrics object.
-func NewMetrics(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewMetrics(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	m := &Metrics{
 		dryRun: rt.DryRun,
-		reg:    reg,
 		log:    rt.Logger.NewLogger("metrics"),
 	}
 	if conf == nil {
@@ -69,29 +73,33 @@ func NewMetrics(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
 	return m, nil
 }
 
-func (m *Metrics) ObjectName() string { return DefaultMetricsName }
-func (m *Metrics) ObjectType() string { return TypeMetrics }
+func (m *Metrics) Name() string             { return stnrv1.DefaultMetricsName }
+func (m *Metrics) Type() runtime.ObjectType { return runtime.TypeMetrics }
 
-func (m *Metrics) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	return &MetricsConfig{Endpoint: c.Admin.MetricsEndpoint}, nil
+// GetConfig returns a copy of the live metrics config. Safe for concurrent use.
+func (m *Metrics) GetConfig() stnrv1.Config {
+	if snap := m.conf.Load(); snap != nil {
+		cp := *snap
+		return &cp
+	}
+	return &MetricsConfig{}
 }
 
-func (m *Metrics) GetConfig() stnrv1.Config { return &MetricsConfig{Endpoint: m.endpoint} }
-func (m *Metrics) Status() stnrv1.Status    { return m.GetConfig() }
+func (m *Metrics) Status() stnrv1.Status { return m.GetConfig() }
 
-func (m *Metrics) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+func (m *Metrics) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*MetricsConfig)
 	if !ok {
-		return ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
 	}
 	cur := old.(*MetricsConfig)
 	if reflect.DeepEqual(req, cur) {
 		if (req.Endpoint != "" && m.server == nil) || (req.Endpoint == "" && m.server != nil) {
-			return ActionRestart, nil
+			return runtime.ActionRestart, nil
 		}
-		return ActionNone, nil
+		return runtime.ActionNone, nil
 	}
-	return ActionRestart, nil
+	return runtime.ActionRestart, nil
 }
 
 func (m *Metrics) Reconcile(conf stnrv1.Config) error {
@@ -100,6 +108,7 @@ func (m *Metrics) Reconcile(conf stnrv1.Config) error {
 		return stnrv1.ErrInvalidConf
 	}
 	m.endpoint = req.Endpoint
+	m.conf.Store(&MetricsConfig{Endpoint: req.Endpoint})
 	return nil
 }
 

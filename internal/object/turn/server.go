@@ -1,4 +1,4 @@
-package object
+package turn
 
 import (
 	"crypto/tls"
@@ -11,46 +11,51 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
+	objruntime "github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// TURNServer wraps a pion/turn server bound to a Listener. The Listener is held as a named field
-// (not embedded) because both *turn.Server and *Listener carry AllocationCount and embedding both
-// would shadow the underlying server's method.
-type TURNServer struct {
+// Server wraps a pion/turn server bound to a listener context.
+type Server struct {
 	*turn.Server
-	listener *Listener
+	runtime  *objruntime.Runtime
+	listener string
 	name     string
 	proto    stnrv1.ListenerProtocol
-	Conns    []any // either a set of turn.ListenerConfigs or turn.PacketConnConfigs
+	Conns    []any
 	log      logging.LeveledLogger
 }
 
-// NewTURNServer (re)starts the TURN server for a listener. The handler callbacks consult the
-// Registry at request time (via the listener handle) for cross-references like the live Auth
-// configuration and the cluster routing tables.
-func NewTURNServer(l *Listener) (*TURNServer, error) {
-	s := &TURNServer{
-		listener: l,
-		name:     l.Name,
-		proto:    l.Proto,
-		log:      l.log,
+// NewServer starts the TURN server for a listener context.
+func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) (*Server, error) {
+	conf := rt.GetConfig(objruntime.TypeListener, listener).(*stnrv1.ListenerConfig)
+	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
+	if err != nil {
+		panic(fmt.Sprintf("turn: invalid listener protocol for %q: %s", listener, err.Error()))
+	}
+	log := rt.Logger.NewLogger(fmt.Sprintf("listener-%s", listener))
+
+	s := &Server{
+		runtime:  rt,
+		listener: listener,
+		name:     listener,
+		proto:    proto,
+		log:      log,
 	}
 	s.log.Debugf("TURN server %s (re)starting", s.name)
 
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
 
-	permissionHandler := NewTURNPermissionHandler(l)
-	relay := NewTURNRelay(l)
-
-	addr := net.JoinHostPort("", strconv.Itoa(l.Port))
+	permissionHandler := NewPermissionHandler(listener, rt, log)
+	relay := NewRelay(listener, rt)
+	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(conf.Port))
 
 	switch s.proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := util.NewPacketConnPool(s.name, l.Net, l.udpThreadNum, l.telemetry)
+		socketPool := util.NewPacketConnPool(s.name, rt.Net, rt.UdpThreadNum, rt.Telemetry)
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
 		conns, err := socketPool.ListenPacket("udp", addr)
@@ -73,7 +78,7 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
-		tcpListener = telemetry.NewListener(tcpListener, s.name, telemetry.ListenerType, l.telemetry)
+		tcpListener = telemetry.NewListener(tcpListener, s.name, telemetry.ListenerType, rt.Telemetry)
 		conn := turn.ListenerConfig{
 			Listener:              tcpListener,
 			RelayAddressGenerator: relay,
@@ -84,10 +89,9 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 
 	case stnrv1.ListenerProtocolTURNTLS:
 		s.log.Debugf("setting up TLS/TCP listener at %s", addr)
-		cer, err := tls.X509KeyPair(l.Cert, l.Key)
+		cer, err := tls.X509KeyPair([]byte(conf.Cert), []byte(conf.Key))
 		if err != nil {
-			return nil, fmt.Errorf("cannot load cert/key pair for creating TLS listener at %s: %s",
-				addr, err)
+			return nil, fmt.Errorf("cannot load cert/key pair for creating TLS listener at %s: %s", addr, err)
 		}
 		tlsListener, err := tls.Listen("tcp", addr, &tls.Config{
 			MinVersion:   tls.VersionTLS12,
@@ -96,7 +100,7 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
-		tlsListener = telemetry.NewListener(tlsListener, s.name, telemetry.ListenerType, l.telemetry)
+		tlsListener = telemetry.NewListener(tlsListener, s.name, telemetry.ListenerType, rt.Telemetry)
 		conn := turn.ListenerConfig{
 			Listener:              tlsListener,
 			RelayAddressGenerator: relay,
@@ -107,22 +111,19 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 
 	case stnrv1.ListenerProtocolTURNDTLS:
 		s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
-		cer, err := tls.X509KeyPair(l.Cert, l.Key)
+		cer, err := tls.X509KeyPair([]byte(conf.Cert), []byte(conf.Key))
 		if err != nil {
-			return nil, fmt.Errorf("cannot load cert/key pair for creating DTLS listener at %s: %s",
-				addr, err)
+			return nil, fmt.Errorf("cannot load cert/key pair for creating DTLS listener at %s: %s", addr, err)
 		}
 		udpAddr, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DTLS listener address %s: %s", addr, err)
 		}
-		dtlsListener, err := dtls.ListenWithOptions("udp", udpAddr,
-			dtls.WithCertificates(cer),
-		)
+		dtlsListener, err := dtls.ListenWithOptions("udp", udpAddr, dtls.WithCertificates(cer))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
-		dtlsListener = telemetry.NewListener(dtlsListener, s.name, telemetry.ListenerType, l.telemetry)
+		dtlsListener = telemetry.NewListener(dtlsListener, s.name, telemetry.ListenerType, rt.Telemetry)
 		conn := turn.ListenerConfig{
 			Listener:              dtlsListener,
 			RelayAddressGenerator: relay,
@@ -135,36 +136,32 @@ func NewTURNServer(l *Listener) (*TURNServer, error) {
 		return nil, fmt.Errorf("internal error: unknown listener protocol %q", s.proto.String())
 	}
 
-	if len(pConns) == 0 && len(lConns) == 0 {
-		return nil, nil
-	}
-
-	q := NewTURNQuotaHandler(l)
-	o := l.getOffload()
-	if o == nil {
-		o = &offloadHandlerStub{}
-	}
+	q := NewQuotaHandler(rt)
+	auth := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv1.AuthConfig)
 	server, err := turn.NewServer(turn.ServerConfig{
-		Realm:             l.Realm,
-		AuthHandler:       NewTURNAuthHandler(l),
-		EventHandler:      NewTURNEventHandler(l, q, o),
+		Realm:             auth.Realm,
+		AuthHandler:       NewAuthHandler(rt, log),
+		EventHandler:      NewEventHandler(listener, rt, log, q, offload),
 		QuotaHandler:      q.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,
-		LoggerFactory:     l.logger,
+		LoggerFactory:     rt.Logger,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("cannot set up TURN server for listener %s: %w", l.Name, err)
+		return nil, fmt.Errorf("cannot set up TURN server for listener %s: %w", listener, err)
 	}
 	s.Server = server
-	l.log.Infof("listener %s: TURN server running", l.Name)
+	log.Infof("listener %s: TURN server running", listener)
 	return s, nil
 }
 
-// Close shuts down the TURN server and its underlying transport listeners. Satisfies the Server
-// interface consumed by Listener.
-func (s *TURNServer) Close() error {
-	s.log.Tracef("closing %s listener at %s", s.proto.String(), s.listener.Addr)
+// Start is a no-op because the TURN server is fully initialized by NewServer.
+func (s *Server) Start() error { return nil }
+
+// Close shuts down the TURN server and its underlying transport listeners.
+func (s *Server) Close() error {
+	conf := s.runtime.GetConfig(objruntime.TypeListener, s.listener).(*stnrv1.ListenerConfig)
+	s.log.Tracef("closing %s listener at %s", s.proto.String(), conf.Addr)
 	if s.Server != nil {
 		if err := s.Server.Close(); err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
 			return err

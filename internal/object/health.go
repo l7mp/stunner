@@ -8,24 +8,28 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Health is the Object that owns the /live, /ready, /status HTTP server. It used to live inside
 // Admin; carving it out lets the health-check server restart independently of metrics and offload.
 type Health struct {
-	endpoint   string
-	server     *http.Server
-	servAddr   net.Addr
-	mux        *http.ServeMux
-	dryRun     bool
-	readiness  ReadinessHandler
-	statusFunc StatusHandler
-	reg        Registry
-	log        logging.LeveledLogger
+	endpoint string
+	server   *http.Server
+	servAddr net.Addr
+	mux      *http.ServeMux
+	dryRun   bool
+
+	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
+	conf atomic.Pointer[HealthConfig]
+
+	rt  *runtime.Runtime
+	log logging.LeveledLogger
 }
 
 // HealthConfig is the typed subconfig consumed by the Health object.
@@ -37,7 +41,7 @@ type HealthConfig struct {
 }
 
 func (c *HealthConfig) Validate() error    { return nil }
-func (c *HealthConfig) ConfigName() string { return DefaultHealthName }
+func (c *HealthConfig) ConfigName() string { return stnrv1.DefaultHealthName }
 func (c *HealthConfig) DeepEqual(other stnrv1.Config) bool {
 	o, ok := other.(*HealthConfig)
 	if !ok {
@@ -57,29 +61,20 @@ func (c *HealthConfig) String() string {
 }
 
 // NewHealth creates a Health object.
-func NewHealth(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewHealth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+	h := &Health{
+		dryRun: rt.DryRun,
+		rt:     rt,
+		log:    rt.Logger.NewLogger("health"),
+	}
+	h.mux = h.buildMux()
 	if conf == nil {
-		return &Health{
-			dryRun:     rt.DryRun,
-			readiness:  rt.ReadinessHandler,
-			statusFunc: rt.StatusHandler,
-			reg:        reg,
-			log:        rt.Logger.NewLogger("health"),
-		}, nil
+		return h, nil
 	}
 	req, ok := conf.(*HealthConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
 	}
-
-	h := &Health{
-		dryRun:     rt.DryRun,
-		readiness:  rt.ReadinessHandler,
-		statusFunc: rt.StatusHandler,
-		reg:        reg,
-		log:        rt.Logger.NewLogger("health"),
-	}
-	h.mux = h.buildMux()
 	if err := h.Reconcile(req); err != nil {
 		return nil, err
 	}
@@ -96,16 +91,16 @@ func (h *Health) buildMux() *http.ServeMux {
 	})
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if h.readiness == nil {
+		if h.rt == nil {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
 				http.StatusOK, "READY")
 			return
 		}
-		if err := h.readiness(); err != nil {
+		if !h.rt.ReadyForProbes() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusServiceUnavailable, err.Error())
+				http.StatusServiceUnavailable, "stunnerd not ready")
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -114,12 +109,16 @@ func (h *Health) buildMux() *http.ServeMux {
 	})
 	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if h.statusFunc == nil {
+		var status stnrv1.Status
+		if h.rt != nil {
+			status = h.rt.GetStatus(runtime.TypeStunner, "")
+		}
+		if status == nil {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("{}\n")) //nolint:errcheck
 			return
 		}
-		js, err := json.Marshal(h.statusFunc())
+		js, err := json.Marshal(status)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
@@ -132,37 +131,33 @@ func (h *Health) buildMux() *http.ServeMux {
 	return mux
 }
 
-func (h *Health) ObjectName() string { return DefaultHealthName }
-func (h *Health) ObjectType() string { return TypeHealth }
+func (h *Health) Name() string             { return stnrv1.DefaultHealthName }
+func (h *Health) Type() runtime.ObjectType { return runtime.TypeHealth }
 
-// Extract reads the HealthCheckEndpoint out of the Admin section of the full config. A nil pointer
-// (the canonical "use defaults") is mapped to the default endpoint; an explicit empty-string
-// pointer disables health-checking, exactly as the user-facing API documents.
-func (h *Health) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	endpoint := defaultHealthEndpoint()
-	if c.Admin.HealthCheckEndpoint != nil {
-		endpoint = *c.Admin.HealthCheckEndpoint
+// GetConfig returns a copy of the live health config. Safe for concurrent use.
+func (h *Health) GetConfig() stnrv1.Config {
+	if snap := h.conf.Load(); snap != nil {
+		cp := *snap
+		return &cp
 	}
-	return &HealthConfig{Endpoint: endpoint}, nil
+	return &HealthConfig{}
 }
-
-func (h *Health) GetConfig() stnrv1.Config { return &HealthConfig{Endpoint: h.endpoint} }
 
 func (h *Health) Status() stnrv1.Status { return h.GetConfig() }
 
-func (h *Health) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+func (h *Health) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*HealthConfig)
 	if !ok {
-		return ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
 	}
 	cur := old.(*HealthConfig)
 	if reflect.DeepEqual(req, cur) {
 		if (req.Endpoint != "" && h.server == nil) || (req.Endpoint == "" && h.server != nil) {
-			return ActionRestart, nil
+			return runtime.ActionRestart, nil
 		}
-		return ActionNone, nil
+		return runtime.ActionNone, nil
 	}
-	return ActionRestart, nil
+	return runtime.ActionRestart, nil
 }
 
 func (h *Health) Reconcile(conf stnrv1.Config) error {
@@ -171,6 +166,7 @@ func (h *Health) Reconcile(conf stnrv1.Config) error {
 		return stnrv1.ErrInvalidConf
 	}
 	h.endpoint = req.Endpoint
+	h.conf.Store(&HealthConfig{Endpoint: req.Endpoint})
 	if h.mux == nil {
 		h.mux = h.buildMux()
 	}

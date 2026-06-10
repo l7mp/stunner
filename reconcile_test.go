@@ -2,8 +2,10 @@ package stunner
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	// "strconv"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/object"
+	objectturn "github.com/l7mp/stunner/internal/object/turn"
 	"github.com/l7mp/stunner/internal/resolver"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
@@ -43,6 +46,140 @@ func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttribute
 		return "", nil, false
 	}
 	return h(ra)
+}
+
+func mustAuthType(t *testing.T, auth *object.Auth) stnrv1.AuthType {
+	t.Helper()
+	conf, ok := auth.GetConfig().(*stnrv1.AuthConfig)
+	require.True(t, ok)
+	typ, err := stnrv1.NewAuthType(conf.Type)
+	require.NoError(t, err)
+	return typ
+}
+
+func mustClusterType(t *testing.T, cluster *object.Cluster) stnrv1.ClusterType {
+	t.Helper()
+	conf, ok := cluster.GetConfig().(*stnrv1.ClusterConfig)
+	require.True(t, ok)
+	typ, err := stnrv1.NewClusterType(conf.Type)
+	require.NoError(t, err)
+	return typ
+}
+
+func mustAdminName(t *testing.T, admin *object.Admin) string {
+	t.Helper()
+	conf, ok := admin.GetConfig().(*stnrv1.AdminConfig)
+	require.True(t, ok)
+	return conf.Name
+}
+
+func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
+	return objectturn.NewAuthHandler(s.rt, s.log)
+}
+
+func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandler {
+	if l == nil {
+		return nil
+	}
+
+	return objectturn.NewPermissionHandler(l.Name(), s.rt, s.log)
+}
+
+func makeRaceConfig(realm string) stnrv1.StunnerConfig {
+	return stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
+			LogLevel: stnrv1.DefaultLogLevel,
+		},
+		Auth: stnrv1.AuthConfig{
+			Type:  stnrv1.AuthTypeStatic.String(),
+			Realm: realm,
+			Credentials: map[string]string{
+				"username": "user",
+				"password": "pass",
+			},
+		},
+		Listeners: []stnrv1.ListenerConfig{{
+			Name:     "default-listener",
+			Protocol: stnrv1.ListenerProtocolTURNUDP.String(),
+			Addr:     "127.0.0.1",
+			Port:     3478,
+			Routes:   []string{"allow-any"},
+		}},
+		Clusters: []stnrv1.ClusterConfig{{
+			Name:      "allow-any",
+			Type:      stnrv1.ClusterTypeStatic.String(),
+			Protocol:  stnrv1.ClusterProtocolUDP.String(),
+			Endpoints: []string{"0.0.0.0/0"},
+		}},
+	}
+}
+
+func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv1.StunnerConfig) {
+	t.Helper()
+	err := s.Reconcile(c)
+	if err == nil {
+		return
+	}
+
+	var restarted stnrv1.ErrRestarted
+	require.True(t, errors.As(err, &restarted), "unexpected reconcile error: %v", err)
+}
+
+func TestConcurrentReadsDuringReconcile(t *testing.T) {
+	s := NewStunner(Options{DryRun: true, SuppressRollback: true})
+	require.NotNil(t, s)
+	defer s.Close()
+
+	a := makeRaceConfig("realm-a")
+	b := makeRaceConfig("realm-b")
+
+	reconcileAllowRestart(t, s, &a)
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+
+				cfg := s.GetConfig()
+				auth := s.NewAuthHandler()
+				if auth != nil {
+					_, _, _ = auth(&turn.RequestAttributes{
+						Username: "user",
+						Realm:    cfg.Auth.Realm,
+						SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000},
+					})
+				}
+
+				for _, l := range s.GetListeners() {
+					p := s.NewPermissionHandler(l)
+					if p != nil {
+						_ = p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000}, net.ParseIP("1.1.1.1"))
+					}
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < 100; i++ {
+		if i%2 == 0 {
+			reconcileAllowRestart(t, s, &a)
+		} else {
+			reconcileAllowRestart(t, s, &b)
+		}
+	}
+
+	close(stop)
+	wg.Wait()
 }
 
 var testReconcileDefault = []StunnerReconcileTestConfig{
@@ -74,13 +211,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
 			// make sure we get the right loglevel, we may override this for debugging the tests
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
@@ -113,7 +250,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -208,7 +345,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "empty username or password is OK with auth type none")
-			assert.Equal(t, stnrv1.AuthTypeNone, s.GetAuth().Type)
+			assert.Equal(t, stnrv1.AuthTypeNone, mustAuthType(t, s.GetAuth()))
 			authConfig, ok := s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
 			assert.True(t, ok)
 			assert.Empty(t, authConfig.Credentials)
@@ -347,12 +484,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// check everyting
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, "new-name", "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), "new-name", "stunner name")
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
@@ -385,7 +522,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -434,12 +571,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
@@ -472,7 +609,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -523,7 +660,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// check everyting
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, "default-stunnerd", "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
 			adminConf := admin.GetConfig().(*stnrv1.AdminConfig)
 			assert.Equal(t, adminConf.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
@@ -531,7 +668,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
@@ -564,7 +701,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -613,7 +750,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "newuser", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
@@ -631,7 +768,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -651,7 +788,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -699,7 +836,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeStatic, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "newpass", "password ok")
@@ -717,7 +854,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -737,7 +874,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -785,7 +922,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, auth.Type, stnrv1.AuthTypeEphemeral, "auth type ok")
+			assert.Equal(t, stnrv1.AuthTypeEphemeral, mustAuthType(t, auth), "auth type ok")
 			assert.Equal(t, auth.Secret, "newsecret")
 
 			duration, _ := time.ParseDuration("10h")
@@ -809,7 +946,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -829,7 +966,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -899,7 +1036,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, admin.Name, stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
@@ -907,7 +1044,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1019,7 +1156,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1115,7 +1252,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1217,7 +1354,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1319,7 +1456,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1411,7 +1548,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1482,7 +1619,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
 			_, n, _ := net.ParseCIDR("2.2.2.2/8")
@@ -1535,7 +1672,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("renamed-cluster")
 			assert.NotNil(t, c, "renamed cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1585,7 +1722,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
 			_, n, _ := net.ParseCIDR("2.2.2.2/8")
@@ -1642,7 +1779,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1:<1-2>", "cluster endpoint ok")
 			assert.Equal(t, c.Endpoints[1].String(), "2.0.0.0/8:<3-4>", "cluster endpoint ok")
@@ -1698,7 +1835,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1710,7 +1847,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
 			_, n, _ = net.ParseCIDR("2.2.2.2/8")
@@ -1764,7 +1901,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1776,7 +1913,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
 			_, n, _ = net.ParseCIDR("2.2.2.2/8")
@@ -1829,7 +1966,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
@@ -1841,7 +1978,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, c.Type, stnrv1.ClusterTypeStatic, "cluster mode ok")
+			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
 			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
 			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1:<1-2>", "cluster endpoint ok")
 			assert.Equal(t, c.Endpoints[1].String(), "2.0.0.0/8:<3-4>", "cluster endpoint ok")

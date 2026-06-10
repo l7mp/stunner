@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/datachannel"
@@ -30,7 +31,8 @@ type Listener struct {
 	lock         sync.Mutex
 	logger       logging.LoggerFactory
 	log, connLog logging.LeveledLogger
-	closed       bool
+	closed       atomic.Bool
+	closeOnce    sync.Once
 }
 
 func NewListener(addr string, config Config, logger logging.LoggerFactory) (*Listener, error) {
@@ -73,11 +75,11 @@ func NewListener(addr string, config Config, logger logging.LoggerFactory) (*Lis
 	}
 	l.server = &http.Server{Addr: addr, Handler: mux}
 	go func() {
-		defer close(l.errCh)
-		defer close(l.connCh)
-
 		if err := l.server.Serve(c); err != nil {
-			l.errCh <- err
+			select {
+			case l.errCh <- err:
+			default:
+			}
 		}
 	}()
 
@@ -103,17 +105,21 @@ func (l *Listener) Accept() (net.Conn, error) {
 }
 
 func (l *Listener) Close() error {
-	if l.closed {
-		return nil
-	}
-	l.closed = true
+	var closeErr error
+	l.closeOnce.Do(func() {
+		l.closed.Store(true)
+		l.log.Tracef("closing WHIP server listener at address %s", l.addr)
 
-	l.log.Tracef("closing WHIP server listener at address %s", l.addr)
+		// Send an error to stop any Accept() calls running.
+		select {
+		case l.errCh <- net.ErrClosed:
+		default:
+		}
 
-	// Send an error to stop any Accept() calls running
-	l.errCh <- net.ErrClosed
+		closeErr = l.server.Close()
+	})
 
-	return l.server.Close()
+	return closeErr
 }
 
 func (l *Listener) configGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +240,7 @@ func (l *Listener) whipRequestHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			conn.DataConn = raw
-			conn.started = true
+			conn.started.Store(true)
 
 			l.log.Infof("creating new connection for client %s", r.RemoteAddr)
 			l.connCh <- conn
@@ -327,46 +333,51 @@ func (l *Listener) GetConns() []*ListenerConn {
 	return ret
 }
 
+func (l *Listener) ConnCount() int {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return len(l.conns)
+}
+
 type ListenerConn struct {
-	ResourceUrl     string
-	listener        *Listener
-	PeerConn        *webrtc.PeerConnection
-	dataChan        *webrtc.DataChannel
-	DataConn        datachannel.ReadWriteCloser
-	started, closed bool
-	log             logging.LeveledLogger
+	ResourceUrl string
+	listener    *Listener
+	PeerConn    *webrtc.PeerConnection
+	dataChan    *webrtc.DataChannel
+	DataConn    datachannel.ReadWriteCloser
+	started     atomic.Bool
+	closed      atomic.Bool
+	closeOnce   sync.Once
+	closeErr    error
+	log         logging.LeveledLogger
 }
 
 func (c *ListenerConn) Close() error {
 	c.log.Tracef("closing WHIP listener connection %s", c.String())
+	c.closeOnce.Do(func() {
+		c.closed.Store(true)
 
-	if c.closed {
-		return nil
-	}
-	c.closed = true
-
-	// Close the datachannel
-	var err error
-	if c.dataChan != nil && c.dataChan.ReadyState() == webrtc.DataChannelStateOpen {
-		if err = c.DataConn.Close(); err != nil {
-			c.log.Debugf("error closing DataChannel: %s", err.Error())
+		// Close the data channel.
+		if c.dataChan != nil && c.dataChan.ReadyState() == webrtc.DataChannelStateOpen {
+			if err := c.DataConn.Close(); err != nil {
+				c.log.Debugf("error closing DataChannel: %s", err.Error())
+			}
 		}
-	}
 
-	// Close the peer connection
-	err = c.PeerConn.Close()
-	if err != nil {
-		c.log.Debugf("error closing PeerConnection: %s", err.Error())
-	}
+		// Close the peer connection.
+		if err := c.PeerConn.Close(); err != nil {
+			c.log.Debugf("error closing PeerConnection: %s", err.Error())
+			c.closeErr = err
+		}
 
-	if c.started {
-		c.listener.lock.Lock()
-		delete(c.listener.conns, c.String())
-		c.listener.lock.Unlock()
-	}
+		if c.started.Load() {
+			c.listener.lock.Lock()
+			delete(c.listener.conns, c.String())
+			c.listener.lock.Unlock()
+		}
+	})
 
-	// Return the last error
-	return err
+	return c.closeErr
 }
 
 func (c *ListenerConn) Read(b []byte) (int, error) {

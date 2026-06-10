@@ -177,15 +177,15 @@ func TestServerPoll(t *testing.T) {
 	defer close(ch3)
 
 	go func() {
-		err = client1.Poll(ctx, ch1, false)
+		err := client1.Poll(ctx, ch1, false)
 		assert.NoError(t, err, "client 1 cancelled")
 	}()
 	go func() {
-		err = client2.Poll(ctx, ch2, false)
+		err := client2.Poll(ctx, ch2, false)
 		assert.NoError(t, err, "client 2 cancelled")
 	}()
 	go func() {
-		err = client3.Poll(ctx, ch2, false)
+		err := client3.Poll(ctx, ch3, false)
 		assert.NoError(t, err, "client 3 cancelled")
 	}()
 

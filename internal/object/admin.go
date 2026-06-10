@@ -6,32 +6,37 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 )
 
-const DefaultAdminObjectName = "DefaultAdmin"
-
 // Admin holds the bits of STUNner administration that aren't carved out into Health/Metrics/
-// Offload. After the refactor Admin owns only Name/LogLevel/UserQuota/License — everything that
-// used to drag the whole struct through close+start now lives in the sibling Objects.
+// Offload: Name/LogLevel/UserQuota/License. Everything that used to drag the whole struct
+// through close+start lives in the sibling Objects.
 type Admin struct {
-	Name, LogLevel string
+	name, LogLevel string
 	quota          int
 	LicenseManager licensecfg.ConfigManager
 	licenseConfig  *stnrv1.LicenseConfig
-	reg            Registry
-	log            logging.LeveledLogger
+
+	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
+	// the allocation path via GetConfig.
+	conf atomic.Pointer[stnrv1.AdminConfig]
+
+	rt  *runtime.Runtime
+	log logging.LeveledLogger
 }
 
 // NewAdmin creates an Admin object.
-func NewAdmin(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Admin{
 		LicenseManager: licensecfg.New(rt.Logger.NewLogger("license")),
-		reg:            reg,
+		rt:             rt,
 		log:            rt.Logger.NewLogger("admin"),
 	}
 	if conf == nil {
@@ -47,57 +52,43 @@ func NewAdmin(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
 	return a, nil
 }
 
-func (a *Admin) ObjectName() string { return stnrv1.DefaultAdminName }
-func (a *Admin) ObjectType() string { return TypeAdmin }
+func (a *Admin) Name() string             { return stnrv1.DefaultAdminName }
+func (a *Admin) Type() runtime.ObjectType { return runtime.TypeAdmin }
 
-// Extract returns the AdminConfig piece of the full StunnerConfig as-is. Sub-objects
-// (Health/Metrics/Offload) Extract their own slices independently.
-func (a *Admin) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	cp := c.Admin
-	return &cp, nil
-}
-
-// GetConfig returns the full AdminConfig, pulling Health/Metrics/Offload pieces from the live
-// children stored in the Registry.
+// GetConfig returns the full AdminConfig, combining the admin's own snapshot with the
+// Health/Metrics/Offload pieces pulled from the live children. Safe for concurrent use.
 func (a *Admin) GetConfig() stnrv1.Config {
 	a.log.Tracef("getConfig")
 
+	out := &stnrv1.AdminConfig{}
+	if own := a.conf.Load(); own != nil {
+		*out = *own
+	}
+
 	healthEndpoint := ""
-	metricsEndpoint := ""
-	offloadEngine := stnrv1.OffloadEngineNone.String()
-	offloadInterfaces := []string{}
+	if hc, ok := a.rt.GetConfig(runtime.TypeHealth, "").(*HealthConfig); ok && hc != nil {
+		healthEndpoint = hc.Endpoint
+	}
+	out.HealthCheckEndpoint = &healthEndpoint
 
-	if a.reg != nil {
-		if h, ok := a.reg.LookupOne(TypeHealth); ok {
-			healthEndpoint = h.GetConfig().(*HealthConfig).Endpoint
-		}
-		if m, ok := a.reg.LookupOne(TypeMetrics); ok {
-			metricsEndpoint = m.GetConfig().(*MetricsConfig).Endpoint
-		}
-		if o, ok := a.reg.LookupOne(TypeOffload); ok {
-			off := o.GetConfig().(*OffloadConfig)
-			offloadEngine = off.Engine
-			offloadInterfaces = make([]string, len(off.Interfaces))
-			copy(offloadInterfaces, off.Interfaces)
-		}
+	if mc, ok := a.rt.GetConfig(runtime.TypeMetrics, "").(*MetricsConfig); ok && mc != nil {
+		out.MetricsEndpoint = mc.Endpoint
 	}
 
-	return &stnrv1.AdminConfig{
-		Name:                a.Name,
-		LogLevel:            a.LogLevel,
-		MetricsEndpoint:     metricsEndpoint,
-		HealthCheckEndpoint: &healthEndpoint,
-		UserQuota:           a.quota,
-		OffloadEngine:       offloadEngine,
-		OffloadInterfaces:   offloadInterfaces,
-		LicenseConfig:       a.licenseConfig,
+	out.OffloadEngine = stnrv1.OffloadEngineNone.String()
+	out.OffloadInterfaces = []string{}
+	if oc, ok := a.rt.GetConfig(runtime.TypeOffload, "").(*OffloadConfig); ok && oc != nil {
+		out.OffloadEngine = oc.Engine
+		out.OffloadInterfaces = append([]string{}, oc.Interfaces...)
 	}
+
+	return out
 }
 
-func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv1.AdminConfig)
 	if !ok {
-		return ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
 	}
 	cur := old.(*stnrv1.AdminConfig)
 	// Only compare own-state fields. Sub-fields (Health/Metrics/Offload) are inspected by
@@ -109,9 +100,9 @@ func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action
 	// Admin owns no restartable resources of its own: name/loglevel/quota/license can be
 	// updated in place.
 	if changed {
-		return ActionReconcile, nil
+		return runtime.ActionReconcile, nil
 	}
-	return ActionNone, nil
+	return runtime.ActionNone, nil
 }
 
 func (a *Admin) Reconcile(conf stnrv1.Config) error {
@@ -124,11 +115,18 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	}
 	a.log.Tracef("reconcile: %s", req.String())
 
-	a.Name = req.Name
+	a.name = req.Name
 	a.LogLevel = req.LogLevel
 	a.quota = req.UserQuota
 	a.LicenseManager.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
+
+	a.conf.Store(&stnrv1.AdminConfig{
+		Name:          a.name,
+		LogLevel:      a.LogLevel,
+		UserQuota:     a.quota,
+		LicenseConfig: a.licenseConfig,
+	})
 	return nil
 }
 
@@ -146,21 +144,25 @@ func (a *Admin) Status() stnrv1.Status {
 		intfs = strings.Join(conf.OffloadInterfaces, ",")
 	}
 	return &stnrv1.AdminStatus{
-		Name:                a.Name,
-		LogLevel:            a.LogLevel,
+		Name:                conf.Name,
+		LogLevel:            conf.LogLevel,
 		MetricsEndpoint:     conf.MetricsEndpoint,
 		HealthCheckEndpoint: healthEndpoint,
-		UserQuota:           strconv.Itoa(a.quota),
+		UserQuota:           strconv.Itoa(conf.UserQuota),
 		OffloadStatus:       fmt.Sprintf("%s[%s]", conf.OffloadEngine, intfs),
 		LicensingInfo:       a.LicenseManager.Status(),
 	}
 }
 
-// UserQuota returns the configured per-user TURN allocation quota.
-func (a *Admin) UserQuota() int { return a.quota }
+// UserQuota returns the configured per-user TURN allocation quota. Safe for concurrent use.
+func (a *Admin) UserQuota() int {
+	if own := a.conf.Load(); own != nil {
+		return own.UserQuota
+	}
+	return 0
+}
 
-// getAddrFromURL is reused by Health and Metrics for parsing URI-style endpoints. It is exported
-// here (lowercase, package-internal) so all admin-adjacent Objects share one implementation.
+// getAddrFromURL is reused by Health and Metrics for parsing URI-style endpoints.
 func getAddrFromURL(e string, defaultPort int) (string, string) {
 	if e == "" {
 		return "", ""

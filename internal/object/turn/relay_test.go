@@ -1,4 +1,4 @@
-package object
+package turn
 
 import (
 	"net"
@@ -20,16 +20,16 @@ var connTestLoglevel string = "all:ERROR"
 // var connTestLoglevel string = "all:TRACE"
 // var connTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 
-var testCluster = Cluster{Name: "test-cluster"}
+var testCluster = "test-cluster"
 
 func getChecker(minPort, maxPort int) PortRangeChecker {
-	return func(addr net.Addr) (*Cluster, bool) {
+	return func(addr net.Addr) (string, bool) {
 		u, ok := addr.(*net.UDPAddr)
 		if !ok {
-			return nil, false
+			return "", false
 		}
 
-		return &testCluster, u.Port >= minPort && u.Port <= maxPort
+		return testCluster, u.Port >= minPort && u.Port <= maxPort
 	}
 }
 

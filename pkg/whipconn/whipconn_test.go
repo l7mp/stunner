@@ -132,13 +132,13 @@ var testerTestCases = []struct {
 			clientConn, err := d.DialContext(serverCtx, addr)
 			assert.NoError(t, err)
 
-			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 1 }, timeout, interval)
 
 			log.Debug("closing client connection")
 			assert.NoError(t, clientConn.Close())
 
 			// should close the server conn too
-			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 0 }, timeout, interval)
 		},
 	}, {
 		name: "Server side close closes client",
@@ -154,17 +154,17 @@ var testerTestCases = []struct {
 			clientConn, err := d.DialContext(clientCtx, addr)
 			assert.NoError(t, err)
 
-			assert.Eventually(t, func() bool { return len(l.conns) == 1 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 1 }, timeout, interval)
 
 			log.Debug("closing server connections")
 			for _, lConn := range l.GetConns() {
 				assert.NoError(t, lConn.Close())
 			}
 
-			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 0 }, timeout, interval)
 
 			// should close the client conn too
-			assert.Eventually(t, func() bool { return clientConn.(*DialerConn).closed == true }, timeout, interval)
+			assert.Eventually(t, func() bool { return clientConn.(*DialerConn).IsClosed() }, timeout, interval)
 		},
 	}, {
 		name: "Multiple connections",
@@ -197,13 +197,13 @@ var testerTestCases = []struct {
 			wg.Wait()
 			close(connChan)
 
-			assert.Eventually(t, func() bool { return len(l.conns) == 5 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 5 }, timeout, interval)
 
 			for c := range connChan {
 				c.Close() //nolint:errcheck
 			}
 
-			assert.Eventually(t, func() bool { return len(l.conns) == 0 }, timeout, interval)
+			assert.Eventually(t, func() bool { return l.ConnCount() == 0 }, timeout, interval)
 		},
 	}, {
 		name: "Closing invalid resource fails",

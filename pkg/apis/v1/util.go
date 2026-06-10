@@ -253,15 +253,6 @@ func (p OffloadMode) String() string {
 	}
 }
 
-type StatType int
-
-const (
-	// ListenerStat is a marker used to signal that the caller wants the listener statistics.
-	ListenerStat StatType = iota + 1
-	// ClusterStat is a marker used to signal that the caller wants the cluster statistics.
-	ClusterStat
-)
-
 // OffloadStatMap defines the TX/RX offload statistics for a particular listener or cluster.
 type OffloadDirStat struct {
 	Rx OffloadStatInfo `json:"rx"`
@@ -273,4 +264,21 @@ type OffloadStatInfo struct {
 	Pkts          uint64 `json:"pkts"`
 	Bytes         uint64 `json:"bytes"`
 	TimestampLast uint64 `json:"timestamp"`
+}
+
+// OffloadStatus holds offload runtime status and traffic counters.
+type OffloadStatus struct {
+	Engine     string                    `json:"engine,omitempty"`
+	Interfaces []string                  `json:"interfaces,omitempty"`
+	Listeners  map[string]OffloadDirStat `json:"listeners,omitempty"`
+	Clusters   map[string]OffloadDirStat `json:"clusters,omitempty"`
+}
+
+// String stringifies the offload status.
+func (s *OffloadStatus) String() string {
+	if s == nil {
+		return "offload:{}"
+	}
+	return fmt.Sprintf("offload:{engine=%q,interfaces=[%s],listeners=%d,clusters=%d}",
+		s.Engine, strings.Join(s.Interfaces, ","), len(s.Listeners), len(s.Clusters))
 }

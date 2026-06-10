@@ -12,9 +12,9 @@ import (
 // Conn represents a client WebSocket connection.
 type Conn struct {
 	*util.Conn
-	ch     chan *Config
-	closed bool
-	cancel context.CancelFunc
+	ch        chan *Config
+	closeOnce sync.Once
+	cancel    context.CancelFunc
 }
 
 // NewConn wraps a WebSocket connection.

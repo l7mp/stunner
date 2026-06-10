@@ -1,4 +1,4 @@
-package manager
+package reconciler
 
 import (
 	"errors"
@@ -8,14 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
 const (
-	testRootType  = "test-root"
-	testGroupType = "test-group"
-	testItemType  = "test-item"
+	testRootType  runtime.ObjectType = runtime.TypeStunner
+	testGroupType runtime.ObjectType = "test-group"
+	testItemType  runtime.ObjectType = "test-item"
 )
 
 var (
@@ -36,7 +37,7 @@ const (
 
 type fakeConfig struct {
 	Name             string
-	Decision         object.Action
+	Decision         runtime.Action
 	InspectErr       bool
 	ReconcileErrMode fakeErrMode
 	CreateErrMode    fakeErrMode
@@ -90,11 +91,11 @@ func (r *eventRecorder) snapshot() []string {
 }
 
 type fakeFactory struct {
-	objType string
+	objType runtime.ObjectType
 	rec     *eventRecorder
 }
 
-func (f *fakeFactory) New(conf stnrv1.Config, _ object.Registry) (object.Object, error) {
+func (f *fakeFactory) New(conf stnrv1.Config) (runtime.Runnable, error) {
 	cfg := conf.(*fakeConfig).clone()
 	f.rec.add(fmt.Sprintf("factory:%s/%s", f.objType, cfg.Name))
 
@@ -115,18 +116,14 @@ func (f *fakeFactory) New(conf stnrv1.Config, _ object.Registry) (object.Object,
 }
 
 type fakeObject struct {
-	objType string
+	objType runtime.ObjectType
 	cfg     *fakeConfig
 	rec     *eventRecorder
 }
 
-func (o *fakeObject) ObjectName() string { return o.cfg.Name }
+func (o *fakeObject) Name() string { return o.cfg.Name }
 
-func (o *fakeObject) ObjectType() string { return o.objType }
-
-func (o *fakeObject) Extract(_ *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	return o.cfg.clone(), nil
-}
+func (o *fakeObject) Type() runtime.ObjectType { return o.objType }
 
 func (o *fakeObject) GetConfig() stnrv1.Config {
 	return o.cfg.clone()
@@ -136,12 +133,12 @@ func (o *fakeObject) Status() stnrv1.Status {
 	return fakeStatus{}
 }
 
-func (o *fakeObject) Inspect(_, conf stnrv1.Config, _ *stnrv1.StunnerConfig) (object.Action, error) {
+func (o *fakeObject) Inspect(_, conf stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	cfg := conf.(*fakeConfig)
 	o.rec.add(fmt.Sprintf("inspect:%s/%s:%d", o.objType, o.cfg.Name, cfg.Decision))
 
 	if cfg.InspectErr {
-		return object.ActionNone, errInspect
+		return runtime.ActionNone, errInspect
 	}
 
 	return cfg.Decision, nil
@@ -182,62 +179,102 @@ func (o *fakeObject) Close(shutdown bool) error {
 }
 
 type testEnv struct {
-	t       *testing.T
-	reg     Registry
-	rec     *eventRecorder
-	desired map[string][]stnrv1.Config
-
-	rootManager  *Manager
-	groupManager *Manager
-	itemManager  *Manager
+	t          *testing.T
+	rt         *runtime.Runtime
+	rec        *eventRecorder
+	desired    map[runtime.ObjectType][]stnrv1.Config
+	reconciler *Reconciler
 }
 
 func newTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 
 	rec := &eventRecorder{}
-	reg := NewRegistry()
 	logFactory := logger.NewLoggerFactory("all:ERROR")
+	rt := runtime.New(runtime.Deps{Logger: logFactory, DryRun: true})
 
 	env := &testEnv{
 		t:       t,
-		reg:     reg,
+		rt:      rt,
 		rec:     rec,
-		desired: map[string][]stnrv1.Config{},
+		desired: map[runtime.ObjectType][]stnrv1.Config{},
 	}
 
-	env.rootManager = NewManager("test-root-manager", testRootType,
-		(&fakeFactory{objType: testRootType, rec: rec}).New, env.extractor(testRootType), reg, logFactory,
-		WithSingleton("root"))
-	env.groupManager = NewManager("test-group-manager", testGroupType,
-		(&fakeFactory{objType: testGroupType, rec: rec}).New, env.extractor(testGroupType), reg, logFactory)
-	env.itemManager = NewManager("test-item-manager", testItemType,
-		(&fakeFactory{objType: testItemType, rec: rec}).New, env.extractor(testItemType), reg, logFactory)
+	catalog := object.NewCatalogFromKinds(
+		object.KindSpec{
+			Type:     testRootType,
+			Children: []runtime.ObjectType{testGroupType},
+			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+				return (&fakeFactory{objType: testRootType, rec: rec}).New(conf)
+			},
+			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+				return env.extractor(testRootType)(), nil
+			},
+			Singleton:     true,
+			SingletonName: func(_ runtime.Runnable) string { return "root" },
+		},
+		object.KindSpec{
+			Type:     testGroupType,
+			Children: []runtime.ObjectType{testItemType},
+			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+				return (&fakeFactory{objType: testGroupType, rec: rec}).New(conf)
+			},
+			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+				return env.extractor(testGroupType)(), nil
+			},
+		},
+		object.KindSpec{
+			Type: testItemType,
+			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+				return (&fakeFactory{objType: testItemType, rec: rec}).New(conf)
+			},
+			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+				return env.extractor(testItemType)(), nil
+			},
+		},
+	)
+
+	env.reconciler = New(catalog, rt, logFactory)
 
 	return env
 }
 
-func (e *testEnv) extractor(objType string) ListExtractor {
-	return func(_ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+func (e *testEnv) extractor(objType runtime.ObjectType) func() []stnrv1.Config {
+	return func() []stnrv1.Config {
 		confs := e.desired[objType]
 		out := make([]stnrv1.Config, len(confs))
 		for i := range confs {
 			out[i] = confs[i].(*fakeConfig).clone()
 		}
-		return out, nil
+		return out
 	}
 }
 
-func (e *testEnv) addExisting(objType string, cfg *fakeConfig) *fakeObject {
+func (e *testEnv) addExisting(objType runtime.ObjectType, cfg *fakeConfig) *fakeObject {
 	e.t.Helper()
 
 	o := &fakeObject{objType: objType, cfg: cfg.clone(), rec: e.rec}
-	require.NoError(e.t, e.reg.Add(o))
+
+	var parent runtime.Runnable
+	switch objType {
+	case testRootType:
+		parent = nil
+	case testGroupType:
+		p, ok := e.rt.Registry.Get(testRootType, "root")
+		require.True(e.t, ok)
+		parent = p
+	case testItemType:
+		p, ok := e.rt.Registry.Get(testGroupType, "group")
+		require.True(e.t, ok)
+		parent = p
+	}
+
+	require.NoError(e.t, e.rt.Registry.Add(o, parent))
 
 	return o
 }
 
-func (e *testEnv) setDesired(objType string, cfgs ...*fakeConfig) {
+func (e *testEnv) setDesired(objType runtime.ObjectType, cfgs ...*fakeConfig) {
 	e.t.Helper()
 
 	out := make([]stnrv1.Config, len(cfgs))
@@ -250,11 +287,8 @@ func (e *testEnv) setDesired(objType string, cfgs ...*fakeConfig) {
 func (e *testEnv) seedBaseTree() {
 	e.t.Helper()
 
-	root := e.addExisting(testRootType, &fakeConfig{Name: "root"})
-	group := e.addExisting(testGroupType, &fakeConfig{Name: "group"})
-
-	require.NoError(e.t, e.reg.AttachSubManager(root, e.groupManager))
-	require.NoError(e.t, e.reg.AttachSubManager(group, e.itemManager))
+	e.addExisting(testRootType, &fakeConfig{Name: "root"})
+	e.addExisting(testGroupType, &fakeConfig{Name: "group"})
 
 	e.setDesired(testRootType, &fakeConfig{Name: "root"})
 	e.setDesired(testGroupType, &fakeConfig{Name: "group"})
@@ -286,7 +320,6 @@ func assertNoPrefix(t *testing.T, got []string, prefix string) {
 	}
 }
 
-// Test full lifecycle with mixed reconcile, restart, create, and delete actions.
 func TestReconcileFlow(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
@@ -296,19 +329,19 @@ func TestReconcileFlow(t *testing.T) {
 	env.addExisting(testItemType, &fakeConfig{Name: "delete"})
 
 	env.setDesired(testItemType,
-		&fakeConfig{Name: "reconcile", Decision: object.ActionReconcile},
-		&fakeConfig{Name: "restart", Decision: object.ActionRestart},
+		&fakeConfig{Name: "reconcile", Decision: runtime.ActionReconcile},
+		&fakeConfig{Name: "restart", Decision: runtime.ActionRestart},
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	var restarted stnrv1.ErrRestarted
 	require.ErrorAs(t, err, &restarted)
 	require.Equal(t, []string{fmt.Sprintf("%s: %s", testItemType, "restart")}, restarted.Objects)
 
-	_, foundDeleted := env.reg.Lookup(testItemType, "delete")
+	_, foundDeleted := env.rt.Registry.Get(testItemType, "delete")
 	require.False(t, foundDeleted)
-	_, foundNew := env.reg.Lookup(testItemType, "new")
+	_, foundNew := env.rt.Registry.Get(testItemType, "new")
 	require.True(t, foundNew)
 
 	events := env.rec.snapshot()
@@ -323,31 +356,34 @@ func TestReconcileFlow(t *testing.T) {
 	})
 }
 
-// Test that dry-run applies config changes but skips close/start side effects.
 func TestDryRun(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.addExisting(testItemType, &fakeConfig{Name: "old"})
 	env.setDesired(testItemType,
-		&fakeConfig{Name: "old", Decision: object.ActionRestart},
+		&fakeConfig{Name: "old", Decision: runtime.ActionRestart},
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, true)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, true)
 	var restarted stnrv1.ErrRestarted
 	require.ErrorAs(t, err, &restarted)
 	require.Equal(t, []string{fmt.Sprintf("%s: %s", testItemType, "old")}, restarted.Objects)
 
-	oldObj, oldFound := env.reg.Lookup(testItemType, "old")
+	oldObj, oldFound := env.rt.Registry.Get(testItemType, "old")
 	require.True(t, oldFound)
-	oldCfg, ok := oldObj.GetConfig().(*fakeConfig)
+	oldReconcilable, ok := oldObj.(runtime.Object)
 	require.True(t, ok)
-	require.Equal(t, object.ActionRestart, oldCfg.Decision)
+	oldCfg, ok := oldReconcilable.GetConfig().(*fakeConfig)
+	require.True(t, ok)
+	require.Equal(t, runtime.ActionRestart, oldCfg.Decision)
 
-	newObj, newFound := env.reg.Lookup(testItemType, "new")
+	newObj, newFound := env.rt.Registry.Get(testItemType, "new")
 	require.True(t, newFound)
-	newCfg, ok := newObj.GetConfig().(*fakeConfig)
+	newReconcilable, ok := newObj.(runtime.Object)
+	require.True(t, ok)
+	newCfg, ok := newReconcilable.GetConfig().(*fakeConfig)
 	require.True(t, ok)
 	require.Equal(t, "new", newCfg.Name)
 
@@ -360,7 +396,6 @@ func TestDryRun(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test recursive subtree deletion when a parent disappears from desired config.
 func TestDeleteSubtree(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
@@ -371,16 +406,16 @@ func TestDeleteSubtree(t *testing.T) {
 	env.setDesired(testGroupType)
 	env.setDesired(testItemType)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.NoError(t, err)
 
-	_, rootFound := env.reg.Lookup(testRootType, "root")
+	_, rootFound := env.rt.Registry.Get(testRootType, "root")
 	require.True(t, rootFound)
-	_, groupFound := env.reg.Lookup(testGroupType, "group")
+	_, groupFound := env.rt.Registry.Get(testGroupType, "group")
 	require.False(t, groupFound)
-	_, aFound := env.reg.Lookup(testItemType, "a")
+	_, aFound := env.rt.Registry.Get(testItemType, "a")
 	require.False(t, aFound)
-	_, bFound := env.reg.Lookup(testItemType, "b")
+	_, bFound := env.rt.Registry.Get(testItemType, "b")
 	require.False(t, bFound)
 
 	events := env.rec.snapshot()
@@ -394,7 +429,6 @@ func TestDeleteSubtree(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that inspect errors abort reconciliation before any lifecycle operation.
 func TestInspectErr(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
@@ -402,7 +436,7 @@ func TestInspectErr(t *testing.T) {
 	env.addExisting(testItemType, &fakeConfig{Name: "bad"})
 	env.setDesired(testItemType, &fakeConfig{Name: "bad", InspectErr: true})
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errInspect)
 
 	events := env.rec.snapshot()
@@ -411,25 +445,24 @@ func TestInspectErr(t *testing.T) {
 	assertNoPrefix(t, events, "factory:")
 	assertNoPrefix(t, events, "start:")
 
-	_, found := env.reg.Lookup(testItemType, "bad")
+	_, found := env.rt.Registry.Get(testItemType, "bad")
 	require.True(t, found)
 }
 
-// Test that reconcile errors abort processing before create and start phases.
 func TestReconcileErr(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.addExisting(testItemType, &fakeConfig{Name: "existing"})
 	env.setDesired(testItemType,
-		&fakeConfig{Name: "existing", Decision: object.ActionReconcile, ReconcileErrMode: fakeErrFatal},
+		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrFatal},
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errReconcile)
 
-	_, found := env.reg.Lookup(testItemType, "new")
+	_, found := env.rt.Registry.Get(testItemType, "new")
 	require.False(t, found)
 
 	events := env.rec.snapshot()
@@ -438,16 +471,15 @@ func TestReconcileErr(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that start errors are returned after successful object creation.
 func TestStartErr(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 	env.setDesired(testItemType, &fakeConfig{Name: "new", StartErr: true})
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errStart)
 
-	_, found := env.reg.Lookup(testItemType, "new")
+	_, found := env.rt.Registry.Get(testItemType, "new")
 	require.True(t, found)
 
 	events := env.rec.snapshot()
@@ -457,17 +489,16 @@ func TestStartErr(t *testing.T) {
 	})
 }
 
-// Test that ErrRestartRequired from Reconcile is propagated as an error.
 func TestReconcileRestartRequired(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.addExisting(testItemType, &fakeConfig{Name: "existing"})
 	env.setDesired(testItemType,
-		&fakeConfig{Name: "existing", Decision: object.ActionReconcile, ReconcileErrMode: fakeErrRestartRequired},
+		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrRestartRequired},
 	)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorIs(t, err, object.ErrRestartRequired)
 
 	events := env.rec.snapshot()
@@ -476,7 +507,6 @@ func TestReconcileRestartRequired(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that ErrRestartRequired from Factory.New is propagated as an error.
 func TestCreateRestartRequired(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
@@ -485,10 +515,10 @@ func TestCreateRestartRequired(t *testing.T) {
 		&fakeConfig{Name: "new", CreateErrMode: fakeErrRestartRequired},
 	)
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorIs(t, err, object.ErrRestartRequired)
 
-	_, found := env.reg.Lookup(testItemType, "new")
+	_, found := env.rt.Registry.Get(testItemType, "new")
 	require.False(t, found)
 
 	events := env.rec.snapshot()
@@ -496,14 +526,13 @@ func TestCreateRestartRequired(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that singleton managers reject desired configs with the wrong item name.
 func TestSingletonWrongName(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.setDesired(testRootType, &fakeConfig{Name: "renamed-root"})
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
 	require.ErrorContains(t, err, "singleton item must be named")
 
 	events := env.rec.snapshot()
@@ -513,15 +542,14 @@ func TestSingletonWrongName(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that singleton managers reject desired configs with invalid cardinality.
 func TestSingletonCardinality(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.setDesired(testRootType, &fakeConfig{Name: "root"}, &fakeConfig{Name: "root"})
 
-	err := env.rootManager.reconcile(&stnrv1.StunnerConfig{}, false)
-	require.ErrorContains(t, err, "singleton extractor returned")
+	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	require.ErrorContains(t, err, "singleton resolver returned")
 
 	events := env.rec.snapshot()
 	assertNoPrefix(t, events, "reconcile:")
@@ -530,7 +558,6 @@ func TestSingletonCardinality(t *testing.T) {
 	assertNoPrefix(t, events, "start:")
 }
 
-// Test that shutdown recursively closes and removes the entire tree.
 func TestShutdownTree(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
@@ -538,18 +565,18 @@ func TestShutdownTree(t *testing.T) {
 	env.addExisting(testItemType, &fakeConfig{Name: "a", ShutdownCloseErr: true})
 	env.addExisting(testItemType, &fakeConfig{Name: "b"})
 
-	err := env.rootManager.Shutdown()
+	err := env.reconciler.Shutdown()
 	require.NoError(t, err)
 
-	require.Empty(t, env.reg.LookupAll(testRootType))
-	require.Empty(t, env.reg.LookupAll(testGroupType))
-	require.Empty(t, env.reg.LookupAll(testItemType))
+	require.Empty(t, env.rt.Registry.List(testRootType))
+	require.Empty(t, env.rt.Registry.List(testGroupType))
+	require.Empty(t, env.rt.Registry.List(testItemType))
 
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{
 		"close:test-item/a:true",
 		"close:test-item/b:true",
 		"close:test-group/group:true",
-		"close:test-root/root:true",
+		fmt.Sprintf("close:%s/root:true", testRootType),
 	})
 }

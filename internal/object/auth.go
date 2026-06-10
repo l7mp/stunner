@@ -1,24 +1,29 @@
 package object
 
 import (
+	"sync/atomic"
+
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Auth is the STUNner authenticator. It is queried by TURN handlers at request time via the
-// Registry (LookupOne(TypeAuth)) — the runtime cross-reference that used to go through Router.
+// Auth is the STUNner authenticator. TURN handlers read the live auth config per request via
+// rt.GetConfig(TypeAuth, ""), which loads the atomic snapshot published by Reconcile.
 type Auth struct {
-	Type                              stnrv1.AuthType
+	authType                          stnrv1.AuthType
 	Realm, Username, Password, Secret string
-	reg                               Registry
-	Log                               logging.LeveledLogger
+
+	// conf is the atomic snapshot read by the auth handler on the request path.
+	conf atomic.Pointer[stnrv1.AuthConfig]
+
+	Log logging.LeveledLogger
 }
 
 // NewAuth creates an Auth object.
-func NewAuth(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewAuth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Auth{
-		reg: reg,
 		Log: rt.Logger.NewLogger("auth"),
 	}
 	if conf == nil {
@@ -34,24 +39,19 @@ func NewAuth(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
 	return a, nil
 }
 
-func (a *Auth) ObjectName() string { return stnrv1.DefaultAuthName }
-func (a *Auth) ObjectType() string { return TypeAuth }
+func (a *Auth) Name() string             { return stnrv1.DefaultAuthName }
+func (a *Auth) Type() runtime.ObjectType { return runtime.TypeAuth }
 
-func (a *Auth) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	cp := c.Auth
-	return &cp, nil
-}
-
-func (a *Auth) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+func (a *Auth) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv1.AuthConfig)
 	if !ok {
-		return ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
 	}
 	cur := old.(*stnrv1.AuthConfig)
 	if !cur.DeepEqual(req) {
-		return ActionReconcile, nil
+		return runtime.ActionReconcile, nil
 	}
-	return ActionNone, nil
+	return runtime.ActionNone, nil
 }
 
 func (a *Auth) Reconcile(conf stnrv1.Config) error {
@@ -65,7 +65,7 @@ func (a *Auth) Reconcile(conf stnrv1.Config) error {
 	atype, _ := stnrv1.NewAuthType(req.Type)
 	a.Log.Debugf("using authentication: %s", atype.String())
 
-	a.Type = atype
+	a.authType = atype
 	a.Realm = req.Realm
 	a.Username, a.Password, a.Secret = "", "", ""
 	switch atype {
@@ -76,24 +76,43 @@ func (a *Auth) Reconcile(conf stnrv1.Config) error {
 	case stnrv1.AuthTypeEphemeral:
 		a.Secret = req.Credentials["secret"]
 	}
-	return nil
-}
 
-func (a *Auth) GetConfig() stnrv1.Config {
-	r := stnrv1.AuthConfig{
-		Type:        a.Type.String(),
+	// Publish the snapshot for the request path.
+	snap := &stnrv1.AuthConfig{
+		Type:        atype.String(),
 		Realm:       a.Realm,
 		Credentials: make(map[string]string),
 	}
-	switch a.Type {
+	switch atype {
 	case stnrv1.AuthTypeNone:
 	case stnrv1.AuthTypeStatic:
-		r.Credentials["username"] = a.Username
-		r.Credentials["password"] = a.Password
+		snap.Credentials["username"] = a.Username
+		snap.Credentials["password"] = a.Password
 	case stnrv1.AuthTypeEphemeral:
-		r.Credentials["secret"] = a.Secret
+		snap.Credentials["secret"] = a.Secret
 	}
-	return &r
+	a.conf.Store(snap)
+	return nil
+}
+
+// GetConfig returns a copy of the live auth config. Safe for concurrent use.
+func (a *Auth) GetConfig() stnrv1.Config {
+	snap := a.conf.Load()
+	if snap == nil {
+		return &stnrv1.AuthConfig{
+			Type:        stnrv1.AuthTypeNone.String(),
+			Credentials: map[string]string{},
+		}
+	}
+	out := stnrv1.AuthConfig{
+		Type:        snap.Type,
+		Realm:       snap.Realm,
+		Credentials: make(map[string]string, len(snap.Credentials)),
+	}
+	for k, v := range snap.Credentials {
+		out.Credentials[k] = v
+	}
+	return &out
 }
 
 func (a *Auth) Start() error       { return nil }

@@ -577,15 +577,15 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 				UDPListenerThreadNum: udpThreadNum,
 			})
 
-			assert.False(t, stunner.shutdown, "lifecycle 1: alive")
-			assert.False(t, stunner.ready, "lifecycle 1: not-ready")
+			assert.False(t, stunner.rt.IsShutdown(), "lifecycle 1: alive")
+			assert.False(t, stunner.rt.IsReady(), "lifecycle 1: not-ready")
 			assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
 
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c), "starting server")
 
-			assert.False(t, stunner.shutdown, "lifecycle 2: alive")
-			assert.True(t, stunner.ready, "lifecycle 2: ready")
+			assert.False(t, stunner.rt.IsShutdown(), "lifecycle 2: alive")
+			assert.True(t, stunner.rt.IsReady(), "lifecycle 2: ready")
 			assert.True(t, stunner.IsReady(), "lifecycle 2: ready")
 
 			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
@@ -635,20 +635,20 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
 
-			assert.False(t, stunner.shutdown, "lifecycle 3: alive")
-			assert.True(t, stunner.ready, "lifecycle 3: ready")
+			assert.False(t, stunner.rt.IsShutdown(), "lifecycle 3: alive")
+			assert.True(t, stunner.rt.IsReady(), "lifecycle 3: ready")
 			assert.True(t, stunner.IsReady(), "lifecycle 3: ready")
 
 			stunner.Shutdown()
 
-			assert.True(t, stunner.shutdown, "lifecycle 4: shutting down")
-			assert.False(t, stunner.ready, "lifecycle 4: not-ready")
+			assert.True(t, stunner.rt.IsShutdown(), "lifecycle 4: shutting down")
+			assert.False(t, stunner.rt.IsReady(), "lifecycle 4: not-ready")
 			assert.False(t, stunner.IsReady(), "lifecycle 4: not-ready")
 
 			stunner.Close()
 
-			assert.True(t, stunner.shutdown, "lifecycle 3: shutting down")
-			assert.False(t, stunner.ready, "lifecycle 3: not-ready")
+			assert.True(t, stunner.rt.IsShutdown(), "lifecycle 3: shutting down")
+			assert.False(t, stunner.rt.IsReady(), "lifecycle 3: not-ready")
 			assert.False(t, stunner.IsReady(), "lifecycle 3: not-ready")
 		})
 	}

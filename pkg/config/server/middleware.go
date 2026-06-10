@@ -103,6 +103,9 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 	ctx, cancel := context.WithCancel(reqCtx)
 	conn := NewConn(wsConn, ch, cancel)
 	s.conns.Upsert(conn)
+	conn.SetPingHandler(func(string) error {
+		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
+	})
 
 	// a dummy reader that drops everything it receives: this must be there for the
 	// WebSocket server to call our pong-handler: conn.Close() will kill this goroutine
@@ -116,10 +119,6 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 			}
 		}
 	}()
-
-	conn.SetPingHandler(func(string) error {
-		return conn.WriteMessage(websocket.PongMessage, []byte("keepalive"))
-	})
 
 	s.log.V(2).Info("new config stream connection", "api", operationID, "client", conn.Id())
 
@@ -159,22 +158,19 @@ func (s *Server) writeConfig(conn *Conn, c *stnrv1.StunnerConfig) {
 }
 
 func (s *Server) closeConn(conn *Conn) {
-	if conn.closed {
-		return
-	}
-	conn.closed = true
+	conn.closeOnce.Do(func() {
+		s.log.V(1).Info("closing client connection", "client", conn.Id())
 
-	s.log.V(1).Info("closing client connection", "client", conn.Id())
+		conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
 
-	conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+		if conn.cancel != nil {
+			conn.cancel()
+			conn.cancel = nil
+		}
 
-	if conn.cancel != nil {
-		conn.cancel()
-		conn.cancel = nil
-	}
+		s.conns.Delete(conn)
+		conn.Close() //nolint:errcheck
 
-	s.conns.Delete(conn)
-	conn.Close() //nolint:errcheck
-
-	s.configs.Unsubscribe(conn.ch)
+		s.configs.Unsubscribe(conn.ch)
+	})
 }

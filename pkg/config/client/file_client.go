@@ -115,7 +115,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 	w.log.Debugf("initial config file successfully loaded from %q: %s", config, c.String())
 
-	ch <- c
+	ch <- c.DeepCopy()
 
 	// save deepcopy so that we can filter repeated events
 	prev := stnrv1.StunnerConfig{}
@@ -171,7 +171,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 
 			w.log.Debugf("config file successfully loaded from %q: %s", config, c.String())
 
-			ch <- c
+			ch <- c.DeepCopy()
 
 			// save deepcopy so that we can filter repeated events
 			c.DeepCopyInto(&prev)

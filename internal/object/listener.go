@@ -7,27 +7,23 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4"
 
-	"github.com/l7mp/stunner/internal/quota"
+	objectturn "github.com/l7mp/stunner/internal/object/turn"
+	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
-	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-// Server is the listener-facing interface implemented by TURN server wrappers (currently
-// TURNServer). Kept as an interface so tests can swap in stubs.
-type Server interface {
-	Close() error
-	AllocationCount() int
-}
-
-// Listener implements a STUNner listener.
+// Listener implements a STUNner listener. The TURN server it drives lives in the listener's
+// ListenerServer child; the listener itself holds only the reconciled config, published as an
+// atomic snapshot for the TURN request path.
 type Listener struct {
-	Name, Realm            string
+	name, Realm            string
 	Proto                  stnrv1.ListenerProtocol
 	Addr                   net.IP
 	Port, MinPort, MaxPort int
@@ -37,23 +33,23 @@ type Listener struct {
 	Cert, Key              []byte
 	Routes                 []string
 
-	reg          Registry
+	// conf is the atomic snapshot read by the TURN handlers on the request path.
+	conf atomic.Pointer[stnrv1.ListenerConfig]
+
+	rt           *runtime.Runtime
 	telemetry    *telemetry.Telemetry
 	udpThreadNum int
-	server       Server
-	quotaStore   quota.Store
 	Net          transport.Net
 	logger       logger.LoggerFactory
 	log          logging.LeveledLogger
 }
 
 // NewListener creates a Listener object.
-func NewListener(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	if conf == nil {
 		return &Listener{
-			reg:          reg,
+			rt:           rt,
 			telemetry:    rt.Telemetry,
-			quotaStore:   rt.QuotaStore,
 			udpThreadNum: rt.UdpThreadNum,
 			Net:          rt.Net,
 			logger:       rt.Logger,
@@ -66,10 +62,9 @@ func NewListener(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) 
 	}
 	name := req.Name
 	l := &Listener{
-		Name:         name,
-		reg:          reg,
+		name:         name,
+		rt:           rt,
 		telemetry:    rt.Telemetry,
-		quotaStore:   rt.QuotaStore,
 		udpThreadNum: rt.UdpThreadNum,
 		Net:          rt.Net,
 		logger:       rt.Logger,
@@ -81,22 +76,13 @@ func NewListener(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) 
 	return l, nil
 }
 
-func (l *Listener) ObjectName() string { return l.Name }
-func (l *Listener) ObjectType() string { return TypeListener }
+func (l *Listener) Name() string             { return l.name }
+func (l *Listener) Type() runtime.ObjectType { return runtime.TypeListener }
 
-// Extract pulls the listener's own ListenerConfig out of the full config.
-func (l *Listener) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	lc, err := c.GetListenerConfig(l.Name)
-	if err != nil {
-		return nil, err
-	}
-	return &lc, nil
-}
-
-func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (Action, error) {
+func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req := new.(*stnrv1.ListenerConfig)
 	if err := req.Validate(); err != nil {
-		return ActionNone, err
+		return runtime.ActionNone, err
 	}
 
 	cur := old.(*stnrv1.ListenerConfig)
@@ -105,15 +91,15 @@ func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (
 	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
 	cert, err := base64.StdEncoding.DecodeString(req.Cert)
 	if err != nil {
-		return ActionNone, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
+		return runtime.ActionNone, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
 	}
 	key, err := base64.StdEncoding.DecodeString(req.Key)
 	if err != nil {
-		return ActionNone, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
+		return runtime.ActionNone, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
 	}
 
 	// A restart is only avoidable when Routes and/or PublicIP/PublicPort are the only changes.
-	restart := !(l.Name == req.Name &&
+	restart := !(l.name == req.Name &&
 		l.Proto == proto &&
 		l.rawAddr == req.Addr &&
 		l.Port == req.Port &&
@@ -121,22 +107,22 @@ func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (
 		bytes.Equal(l.Key, key))
 
 	curRealm := l.Realm
-	if a := l.lookupAuth(); a != nil {
+	if a := l.lookupAuthConfig(); a != nil {
 		curRealm = a.Realm
 	}
 	desiredRealm := full.Auth.Realm
 	if curRealm != desiredRealm {
-		l.log.Tracef("listener %s restarts due to changing auth realm", l.Name)
+		l.log.Tracef("listener %s restarts due to changing auth realm", l.name)
 		changed = true
 		restart = true
 	}
 	if !changed {
-		return ActionNone, nil
+		return runtime.ActionNone, nil
 	}
 	if restart {
-		return ActionRestart, nil
+		return runtime.ActionRestart, nil
 	}
-	return ActionReconcile, nil
+	return runtime.ActionReconcile, nil
 }
 
 func (l *Listener) Reconcile(conf stnrv1.Config) error {
@@ -144,6 +130,12 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 	l.log.Tracef("reconcile: %s", req.String())
 	if err := req.Validate(); err != nil {
 		return err
+	}
+	if l.name == "" {
+		l.name = req.Name
+	}
+	if l.name != req.Name {
+		return fmt.Errorf("cannot rename listener %q to %q", l.name, req.Name)
 	}
 
 	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
@@ -155,7 +147,6 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		return fmt.Errorf("invalid listener address: %s", req.Addr)
 	}
 
-	l.Name = req.Name
 	l.Proto = proto
 	l.Addr = ipAddr
 	l.rawAddr = req.Addr
@@ -173,7 +164,7 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		l.Key = key
 	}
 	l.Realm = stnrv1.DefaultRealm
-	if a := l.lookupAuth(); a != nil {
+	if a := l.lookupAuthConfig(); a != nil {
 		l.Realm = a.Realm
 	}
 	l.PublicAddr = req.PublicAddr
@@ -181,122 +172,104 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 
 	l.Routes = make([]string, len(req.Routes))
 	copy(l.Routes, req.Routes)
+
+	// Publish the snapshot for the TURN request path.
+	l.conf.Store(l.buildConfig())
+
+	l.rt.Router.InvalidateCache()
 	return nil
 }
 
-// String returns a short stable representation, safe as a map key.
-func (l *Listener) String() string {
-	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.Name, strings.ToLower(l.Proto.String()),
-		l.Addr, l.Port, l.MinPort, l.MaxPort)
-}
-
-func (l *Listener) GetConfig() stnrv1.Config {
-	sort.Strings(l.Routes)
+// buildConfig renders the listener's live config from its fields. Only called from Reconcile;
+// readers go through the snapshot.
+func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
+	routes := make([]string, len(l.Routes))
+	copy(routes, l.Routes)
+	sort.Strings(routes)
 	c := &stnrv1.ListenerConfig{
-		Name:       l.Name,
+		Name:       l.name,
 		Protocol:   l.Proto.String(),
 		Addr:       l.rawAddr,
 		Port:       l.Port,
 		PublicAddr: l.PublicAddr,
 		PublicPort: l.PublicPort,
+		Routes:     routes,
 	}
 	c.Cert = string(l.Cert)
 	c.Key = string(l.Key)
-	c.Routes = make([]string, len(l.Routes))
-	copy(c.Routes, l.Routes)
 	return c
 }
 
-func (l *Listener) Start() error {
-	l.log.Infof("listener %s (re)starting", l.String())
-	switch l.Proto {
-	case stnrv1.ListenerProtocolTURNUDP, stnrv1.ListenerProtocolTURNTCP,
-		stnrv1.ListenerProtocolTURNTLS, stnrv1.ListenerProtocolTURNDTLS:
-		t, err := NewTURNServer(l)
-		if err != nil {
-			return fmt.Errorf("failed to start TURN server for listener %s: %w", l.Name, err)
-		}
-		l.server = t
-	default:
-		return fmt.Errorf("internal error: unknown listener protocol %q", l.Proto.String())
+// String returns a short stable representation, safe as a map key.
+func (l *Listener) String() string {
+	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.name, strings.ToLower(l.Proto.String()),
+		l.Addr, l.Port, l.MinPort, l.MaxPort)
+}
+
+// GetConfig returns a copy of the live listener config. Safe for concurrent use.
+func (l *Listener) GetConfig() stnrv1.Config {
+	snap := l.conf.Load()
+	if snap == nil {
+		return &stnrv1.ListenerConfig{Name: l.name}
 	}
-	l.log.Infof("listener %s: listener running", l.Name)
+	cp := *snap
+	cp.Routes = make([]string, len(snap.Routes))
+	copy(cp.Routes, snap.Routes)
+	return &cp
+}
+
+func (l *Listener) Start() error {
 	return nil
 }
 
 func (l *Listener) Close(_ bool) error {
-	l.log.Tracef("closing %s listener at %s", l.Proto.String(), l.Addr)
-	if l.server == nil {
-		return nil
-	}
-	if err := l.server.Close(); err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
-		return err
-	}
-	l.server = nil
+	l.rt.Router.InvalidateCache()
 	return nil
 }
 
 func (l *Listener) Status() stnrv1.Status {
-	stats := stnrv1.OffloadDirStat{}
-	if a := l.getOffload(); a != nil {
-		stats = a.Stats(l.Name, stnrv1.ListenerStat)
+	conf := l.GetConfig().(*stnrv1.ListenerConfig)
+	status := &stnrv1.ListenerStatus{
+		ListenerConfig: conf,
 	}
-	return &stnrv1.ListenerStatus{
-		ListenerConfig: l.GetConfig().(*stnrv1.ListenerConfig),
-		Stats:          stats,
+	if offloadStatus, ok := l.rt.GetStatus(runtime.TypeOffload, "").(*stnrv1.OffloadStatus); ok {
+		status.Stats = offloadStatus.Listeners[conf.Name]
 	}
+	return status
 }
 
+// AllocationCount returns the number of active allocations on the listener's TURN server.
 func (l *Listener) AllocationCount() int {
-	if l.server != nil {
-		return l.server.AllocationCount()
-	}
-	return 0
-}
-
-// Registry-backed cross-references used at TURN handler time. These replace the old Router.GetX
-// helpers; they are looked up dynamically so a reconcile that swaps an Auth or a Cluster takes
-// effect on the next request without needing a Listener restart for cross-ref reasons.
-
-func (l *Listener) lookupAuth() *Auth {
-	if l.reg == nil {
-		return nil
-	}
-	a, ok := l.reg.LookupOne(TypeAuth)
+	o, ok := l.rt.Registry.Get(runtime.TypeListenerServer, l.name)
 	if !ok {
-		return nil
+		return 0
 	}
-	return a.(*Auth)
-}
-
-func (l *Listener) lookupCluster(name string) *Cluster {
-	if l.reg == nil {
-		return nil
-	}
-	c, ok := l.reg.Lookup(TypeCluster, name)
+	s, ok := o.(interface {
+		AllocationCount() int
+	})
 	if !ok {
-		return nil
+		return 0
 	}
-	return c.(*Cluster)
+	return s.AllocationCount()
 }
 
-func (l *Listener) clustersForRoutes() []*Cluster {
-	out := []*Cluster{}
-	for _, r := range l.Routes {
-		if c := l.lookupCluster(r); c != nil {
-			out = append(out, c)
-		}
-	}
-	return out
+// lookupAuthConfig is the runtime-backed cross-reference used at reconcile time to track auth
+// realm changes.
+func (l *Listener) lookupAuthConfig() *stnrv1.AuthConfig {
+	a, _ := l.rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
+	return a
 }
 
-func (l *Listener) getOffload() TURNOffloadHandler {
-	if l.reg == nil {
-		return nil
-	}
-	o, ok := l.reg.LookupOne(TypeOffload)
+func (l *Listener) getOffload() objectturn.OffloadHandler {
+	o, ok := l.rt.Registry.Get(runtime.TypeOffload, stnrv1.DefaultOffloadName)
 	if !ok {
-		return nil
+		return objectturn.NewOffloadHandlerStub()
 	}
-	return o.(*Offload).Handler()
+	p, ok := o.(interface {
+		Handler() objectturn.OffloadHandler
+	})
+	if !ok {
+		return objectturn.NewOffloadHandlerStub()
+	}
+	return p.Handler()
 }

@@ -3,50 +3,48 @@ package object
 import (
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Stunner is the root Object of the dataplane tree. It holds no own runtime state; its job is to
-// surface the full StunnerConfig (Extract identity), report live state from descendants, and
-// provide a single Object handle the Reconciler can root its walk at.
+// Stunner is the root Object of the dataplane tree. It holds no own runtime state; its job is
+// to surface the full StunnerConfig, report live state from descendants, and provide a single
+// node the reconciler can root its walk at.
 type Stunner struct {
-	reg Registry
+	rt  *runtime.Runtime
 	log logging.LeveledLogger
 }
 
 // NewStunner creates the singleton root object.
-func NewStunner(_ stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
+func NewStunner(_ stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	return &Stunner{
-		reg: reg,
+		rt:  rt,
 		log: rt.Logger.NewLogger("stunner-root"),
 	}, nil
 }
 
-func (s *Stunner) ObjectName() string { return stnrv1.DefaultStunnerName }
-func (s *Stunner) ObjectType() string { return TypeStunner }
+func (s *Stunner) Name() string             { return stnrv1.DefaultStunnerName }
+func (s *Stunner) Type() runtime.ObjectType { return runtime.TypeStunner }
 
-// Extract is identity: the root sees the whole config.
-func (s *Stunner) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) { return c, nil }
-
-// GetConfig pulls each top-level child's config from the Registry. Surfaces the
-// running dataplane state — semantically equivalent to the old Stunner.GetConfig in ./config.go.
+// GetConfig pulls each top-level child's config from the registry, surfacing the running
+// dataplane state. Children missing before the first reconcile are reported as zero values.
 func (s *Stunner) GetConfig() stnrv1.Config {
 	out := &stnrv1.StunnerConfig{ApiVersion: stnrv1.ApiVersion}
-	if s.reg == nil {
+	if s.rt == nil {
 		return out
 	}
 
-	if a, ok := s.reg.LookupOne(TypeAdmin); ok {
-		out.Admin = *a.GetConfig().(*stnrv1.AdminConfig)
+	if a, ok := s.rt.GetConfig(runtime.TypeAdmin, "").(*stnrv1.AdminConfig); ok && a != nil {
+		out.Admin = *a
 	}
-	if a, ok := s.reg.LookupOne(TypeAuth); ok {
-		out.Auth = *a.GetConfig().(*stnrv1.AuthConfig)
+	if a, ok := s.rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig); ok && a != nil {
+		out.Auth = *a
 	}
-	if l, ok := s.reg.LookupOne(TypeListenerList); ok {
-		out.Listeners = append([]stnrv1.ListenerConfig(nil), l.GetConfig().(*ListenerListConfig).Listeners...)
+	for _, l := range s.rt.GetConfigs(runtime.TypeListener) {
+		out.Listeners = append(out.Listeners, *(l.(*stnrv1.ListenerConfig)))
 	}
-	if c, ok := s.reg.LookupOne(TypeClusterList); ok {
-		out.Clusters = append([]stnrv1.ClusterConfig(nil), c.GetConfig().(*ClusterListConfig).Clusters...)
+	for _, c := range s.rt.GetConfigs(runtime.TypeCluster) {
+		out.Clusters = append(out.Clusters, *(c.(*stnrv1.ClusterConfig)))
 	}
 
 	return out
@@ -55,40 +53,32 @@ func (s *Stunner) GetConfig() stnrv1.Config {
 // Status aggregates the children's statuses into a StunnerStatus.
 func (s *Stunner) Status() stnrv1.Status {
 	status := &stnrv1.StunnerStatus{ApiVersion: stnrv1.ApiVersion}
-	if s.reg == nil {
+	if s.rt == nil {
 		return status
 	}
-	if a, ok := s.reg.LookupOne(TypeAdmin); ok {
-		if as, ok := a.Status().(*stnrv1.AdminStatus); ok {
-			status.Admin = as
-		}
+	if a, ok := s.rt.GetStatus(runtime.TypeAdmin, "").(*stnrv1.AdminStatus); ok {
+		status.Admin = a
 	}
-	if a, ok := s.reg.LookupOne(TypeAuth); ok {
-		if as, ok := a.Status().(*stnrv1.AuthConfig); ok {
-			status.Auth = as
-		}
+	if a, ok := s.rt.GetStatus(runtime.TypeAuth, "").(*stnrv1.AuthConfig); ok {
+		status.Auth = a
 	}
-	listeners := s.reg.LookupAll(TypeListener)
-	status.Listeners = make([]*stnrv1.ListenerStatus, 0, len(listeners))
-	for _, l := range listeners {
-		if ls, ok := l.Status().(*stnrv1.ListenerStatus); ok {
-			status.Listeners = append(status.Listeners, ls)
-		}
+	listenerStatuses := s.rt.GetStatuses(runtime.TypeListener)
+	status.Listeners = make([]*stnrv1.ListenerStatus, 0, len(listenerStatuses))
+	for _, ls := range listenerStatuses {
+		status.Listeners = append(status.Listeners, ls.(*stnrv1.ListenerStatus))
 	}
-	clusters := s.reg.LookupAll(TypeCluster)
-	status.Clusters = make([]*stnrv1.ClusterStatus, 0, len(clusters))
-	for _, c := range clusters {
-		if cs, ok := c.Status().(*stnrv1.ClusterStatus); ok {
-			status.Clusters = append(status.Clusters, cs)
-		}
+	clusterStatuses := s.rt.GetStatuses(runtime.TypeCluster)
+	status.Clusters = make([]*stnrv1.ClusterStatus, 0, len(clusterStatuses))
+	for _, cs := range clusterStatuses {
+		status.Clusters = append(status.Clusters, cs.(*stnrv1.ClusterStatus))
 	}
 	return status
 }
 
 // Inspect/Reconcile/Start/Close are no-ops at the root: it has no own state and the tree-walk
 // handles descendants.
-func (s *Stunner) Inspect(_, _ stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
-	return ActionNone, nil
+func (s *Stunner) Inspect(_, _ stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+	return runtime.ActionNone, nil
 }
 func (s *Stunner) Reconcile(_ stnrv1.Config) error { return nil }
 func (s *Stunner) Start() error                    { return nil }

@@ -4,27 +4,34 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 
+	objectturn "github.com/l7mp/stunner/internal/object/turn"
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
 // Offload wraps the TURN offload handler in its own Object so reconciliations don't accidentally
-// bounce the eBPF engine. The key invariant: Close(false) is a NO-OP. The engine only goes down on
-// process shutdown (Close(true)) or on an explicit Engine/Interfaces change (Inspect signals
-// restart, the Reconciler calls Close(false) anyway — that's why the no-op must be defended by
-// Inspect rather than by Close itself for the engine-change case; see Close below).
+// bounce the eBPF engine.
 //
-// The "centerpiece of the whole refactor": with this split, changes to Health or Metrics endpoints
-// no longer drag Offload through close+start.
+// INVARIANT (intentional, do not "fix"): Close(false) is a NO-OP and Start is idempotent. The
+// engine only goes down on process shutdown (Close(true)). Even when Inspect signals a restart
+// for an engine/interfaces change, the reconcile-driven Close(false) keeps the engine running:
+// swapping engine internals on a config change is the offload handler's concern, not the object
+// lifecycle's. The payoff of this split: changes to Health or Metrics endpoints never drag
+// Offload through close+start.
 type Offload struct {
 	engine     stnrv1.OffloadMode
 	interfaces []string
-	handler    TURNOffloadHandler
+	handler    objectturn.OffloadHandler
 	started    bool
-	reg        Registry
-	log        logging.LeveledLogger
+
+	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
+	conf atomic.Pointer[OffloadConfig]
+
+	log logging.LeveledLogger
 }
 
 // OffloadConfig is the typed subconfig consumed by Offload.
@@ -39,7 +46,7 @@ func (c *OffloadConfig) Validate() error {
 	}
 	return nil
 }
-func (c *OffloadConfig) ConfigName() string { return DefaultOffloadName }
+func (c *OffloadConfig) ConfigName() string { return stnrv1.DefaultOffloadName }
 func (c *OffloadConfig) DeepEqual(other stnrv1.Config) bool {
 	o, ok := other.(*OffloadConfig)
 	if !ok {
@@ -60,20 +67,11 @@ func (c *OffloadConfig) String() string {
 		c.Engine, strings.Join(c.Interfaces, ","))
 }
 
-// OffloadHandlerCtor builds the underlying offload handler. In the OSS build this defaults to a
-// stub; downstream non-OSS builds inject a real eBPF-backed handler.
-type OffloadHandlerCtor = func() TURNOffloadHandler
-
 // NewOffload creates an Offload object.
-func NewOffload(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
-	ctor := rt.OffloadHandler
-	if ctor == nil {
-		ctor = func() TURNOffloadHandler { return &offloadHandlerStub{} }
-	}
+func NewOffload(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	o := &Offload{
 		engine:  stnrv1.OffloadEngineNone,
-		handler: ctor(),
-		reg:     reg,
+		handler: objectturn.NewOffloadHandlerStub(),
 		log:     rt.Logger.NewLogger("offload"),
 	}
 	if conf == nil {
@@ -89,44 +87,61 @@ func NewOffload(conf stnrv1.Config, reg Registry, rt *Runtime) (Object, error) {
 	return o, nil
 }
 
-func (o *Offload) ObjectName() string { return DefaultOffloadName }
-func (o *Offload) ObjectType() string { return TypeOffload }
+func (o *Offload) Name() string             { return stnrv1.DefaultOffloadName }
+func (o *Offload) Type() runtime.ObjectType { return runtime.TypeOffload }
 
-func (o *Offload) Extract(c *stnrv1.StunnerConfig) (stnrv1.Config, error) {
-	return &OffloadConfig{
-		Engine:     c.Admin.OffloadEngine,
-		Interfaces: append([]string(nil), c.Admin.OffloadInterfaces...),
-	}, nil
-}
-
+// GetConfig returns a copy of the live offload config. Safe for concurrent use.
 func (o *Offload) GetConfig() stnrv1.Config {
-	return &OffloadConfig{
-		Engine:     o.engine.String(),
-		Interfaces: append([]string(nil), o.interfaces...),
+	if snap := o.conf.Load(); snap != nil {
+		return &OffloadConfig{
+			Engine:     snap.Engine,
+			Interfaces: append([]string(nil), snap.Interfaces...),
+		}
 	}
+	return &OffloadConfig{Engine: stnrv1.OffloadEngineNone.String()}
 }
-func (o *Offload) Status() stnrv1.Status { return o.GetConfig() }
 
-func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (Action, error) {
+func (o *Offload) Status() stnrv1.Status {
+	conf := o.GetConfig().(*OffloadConfig)
+	status := &stnrv1.OffloadStatus{
+		Engine:     conf.Engine,
+		Interfaces: conf.Interfaces,
+		Listeners:  map[string]stnrv1.OffloadDirStat{},
+		Clusters:   map[string]stnrv1.OffloadDirStat{},
+	}
+	if o.handler == nil {
+		return status
+	}
+	runtimeStatus := o.handler.Status()
+	for k, v := range runtimeStatus.Listeners {
+		status.Listeners[k] = v
+	}
+	for k, v := range runtimeStatus.Clusters {
+		status.Clusters[k] = v
+	}
+	return status
+}
+
+func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*OffloadConfig)
 	if !ok {
-		return ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
 	}
 	cur := old.(*OffloadConfig)
 	newEngine, err := stnrv1.NewOffloadEngine(req.Engine)
 	if err != nil {
-		return ActionNone, err
+		return runtime.ActionNone, err
 	}
 	curEngine, err := stnrv1.NewOffloadEngine(cur.Engine)
 	if err != nil {
-		return ActionNone, err
+		return runtime.ActionNone, err
 	}
 	changed := newEngine != curEngine || !reflect.DeepEqual(req.Interfaces, cur.Interfaces)
 	// Only an actual engine/interfaces change requires the engine to be torn down.
 	if changed {
-		return ActionRestart, nil
+		return runtime.ActionRestart, nil
 	}
-	return ActionNone, nil
+	return runtime.ActionNone, nil
 }
 
 func (o *Offload) Reconcile(conf stnrv1.Config) error {
@@ -140,6 +155,10 @@ func (o *Offload) Reconcile(conf stnrv1.Config) error {
 	}
 	o.engine = eng
 	o.interfaces = append([]string(nil), req.Interfaces...)
+	o.conf.Store(&OffloadConfig{
+		Engine:     eng.String(),
+		Interfaces: append([]string(nil), req.Interfaces...),
+	})
 	return nil
 }
 
@@ -157,12 +176,9 @@ func (o *Offload) Start() error {
 	return nil
 }
 
-// Close is the whole point of the refactor: a reconcile-driven Close(false) MUST NOT tear the
-// engine down. Only an explicit shutdown closes it. Note that when an engine/interfaces change
-// actually requires a restart, the Reconciler will call Close(false) → no-op, then Reconcile (which
-// updates the in-memory config), then Start (idempotent — already started). If the underlying
-// handler needs to swap interfaces/engine internally on Reconcile, that's the handler's concern;
-// from the Object's perspective we keep the engine running across reconfigs.
+// Close stops the object. Offload objects are special: a reconcile-driven Close(false) MUST
+// NOT tear the engine down, only an explicit shutdown (Close(true)) really closes it. See the
+// type-level invariant comment.
 func (o *Offload) Close(shutdown bool) error {
 	if !shutdown {
 		return nil
@@ -177,4 +193,4 @@ func (o *Offload) Close(shutdown bool) error {
 
 // Handler exposes the underlying offload handler. Used by the TURN server to wire up
 // per-allocation channel offload events.
-func (o *Offload) Handler() TURNOffloadHandler { return o.handler }
+func (o *Offload) Handler() objectturn.OffloadHandler { return o.handler }

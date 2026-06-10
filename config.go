@@ -9,6 +9,7 @@ import (
 	"github.com/pion/transport/v4"
 
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client"
 )
@@ -116,12 +117,11 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 // the StunnerConfig from its descendants — see internal/object/stunner.go.
 func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 	s.log.Tracef("getConfig")
-	if s.root == nil {
-		return &stnrv1.StunnerConfig{ApiVersion: s.version}
+	if c, ok := s.rt.GetConfig(runtime.TypeStunner, "").(*stnrv1.StunnerConfig); ok && c != nil {
+		c.ApiVersion = s.version
+		return c
 	}
-	c := s.root.GetConfig().(*stnrv1.StunnerConfig)
-	c.ApiVersion = s.version
-	return c
+	return &stnrv1.StunnerConfig{ApiVersion: s.version}
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.
