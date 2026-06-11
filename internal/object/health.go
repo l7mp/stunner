@@ -16,8 +16,7 @@ import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Health is the Object that owns the /live, /ready, /status HTTP server. It used to live inside
-// Admin; carving it out lets the health-check server restart independently of metrics and offload.
+// Health is the Object that owns the /live, /ready, /status HTTP server.
 type Health struct {
 	endpoint string
 	server   *http.Server
@@ -152,9 +151,6 @@ func (h *Health) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runti
 	}
 	cur := old.(*HealthConfig)
 	if reflect.DeepEqual(req, cur) {
-		if (req.Endpoint != "" && h.server == nil) || (req.Endpoint == "" && h.server != nil) {
-			return runtime.ActionRestart, nil
-		}
 		return runtime.ActionNone, nil
 	}
 	return runtime.ActionRestart, nil

@@ -40,7 +40,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewStunner(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{full}, nil
 		},
 		Singleton:     true,
@@ -57,7 +57,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewAdmin(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cp := full.Admin
 			return []stnrv1.Config{&cp}, nil
 		},
@@ -70,7 +70,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewAuth(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cp := full.Auth
 			return []stnrv1.Config{&cp}, nil
 		},
@@ -83,7 +83,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewHealth(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			endpoint := defaultHealthEndpoint()
 			if full.Admin.HealthCheckEndpoint != nil {
 				endpoint = *full.Admin.HealthCheckEndpoint
@@ -99,7 +99,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewMetrics(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{&MetricsConfig{Endpoint: full.Admin.MetricsEndpoint}}, nil
 		},
 		Singleton:     true,
@@ -111,7 +111,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewOffload(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{&OffloadConfig{
 				Engine:     full.Admin.OffloadEngine,
 				Interfaces: append([]string(nil), full.Admin.OffloadInterfaces...),
@@ -127,7 +127,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewListener(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			out := make([]stnrv1.Config, len(full.Listeners))
 			for i := range full.Listeners {
 				lc := full.Listeners[i]
@@ -146,7 +146,7 @@ func NewCatalog() *Catalog {
 			}
 			return NewListenerServer(listener, rt), nil
 		},
-		DesiredConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{&runtime.NodeConfig{Name: parent.Name()}}, nil
 		},
 		Singleton:     true,
@@ -159,7 +159,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewCluster(conf, rt)
 		},
-		DesiredConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			out := make([]stnrv1.Config, len(full.Clusters))
 			for i := range full.Clusters {
 				cc := full.Clusters[i]
@@ -185,7 +185,7 @@ func NewCatalog() *Catalog {
 		// One relay node per cluster protocol, derived from live parent state: when a
 		// cluster gains a protocol, the reconciler creates and starts only the new relay
 		// without bouncing the running ones.
-		DesiredConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cluster, ok := parent.(*Cluster)
 			if !ok {
 				return nil, fmt.Errorf("catalog: relay parent is not a cluster: %T", parent)

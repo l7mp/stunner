@@ -64,7 +64,7 @@ func (r *fakeRelay) Match(_ net.IP, _ int) bool       { return true }
 func newRuntime(t *testing.T) *runtime.Runtime {
 	t.Helper()
 	log := logger.NewLoggerFactory("all:ERROR")
-	return runtime.New(runtime.Deps{Logger: log, DryRun: true})
+	return runtime.New(runtime.Config{Logger: log, DryRun: true})
 }
 
 func TestRegistryChildrenAndOrdering(t *testing.T) {

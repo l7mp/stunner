@@ -654,8 +654,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// no restart!
-			assert.NoError(t, err, "no restart needed")
+			// metrics endpoint changed: the metrics server restart is reported
+			assert.Error(t, err, "restarted")
+			e, ok := err.(stnrv1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Contains(t, e.Objects, "metrics: default-metrics", "restarted object")
 
 			// check everyting
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")

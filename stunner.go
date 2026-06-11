@@ -153,23 +153,8 @@ func NewStunner(options Options) *Stunner {
 	}
 	s.telemetry = t
 
-	if err := s.buildObjectTree(); err != nil {
-		log.Errorf("could not build object tree: %s", err.Error())
-		return nil
-	}
-
-	if !s.dryRun {
-		s.resolver.Start()
-	}
-
-	return s
-}
-
-// buildObjectTree creates the object runtime and the reconciler, and registers the root
-// object eagerly so that status/config queries work before the first reconcile. Everything
-// below the root is materialized by the reconciler from the catalog.
-func (s *Stunner) buildObjectTree() error {
-	rt := runtime.New(runtime.Deps{
+	// Build the Runtime: a subsystem registry used throughout the code.
+	rt := runtime.New(runtime.Config{
 		Logger:       s.logger,
 		DryRun:       s.dryRun,
 		Resolver:     s.resolver,
@@ -181,21 +166,33 @@ func (s *Stunner) buildObjectTree() error {
 	rt.SetForceReady(s.forceReady)
 	s.rt = rt
 
+	// Catalog describes the object hierarchy.
 	catalog := object.NewCatalog()
 	rootSpec, ok := catalog.Kind(runtime.TypeStunner)
 	if !ok {
-		return fmt.Errorf("object catalog missing type: %s", runtime.TypeStunner)
-	}
-	root, err := rootSpec.New(nil, nil, rt)
-	if err != nil {
-		return fmt.Errorf("root factory: %w", err)
-	}
-	if err := rt.Registry.Add(root, nil); err != nil {
-		return fmt.Errorf("register root: %w", err)
+		log.Errorf("object catalog missing type: %s", runtime.TypeStunner)
+		return nil
 	}
 
+	// Register the root Stunner object.
+	root, err := rootSpec.New(nil, nil, rt)
+	if err != nil {
+		log.Errorf("root factory: %s", err.Error())
+		return nil
+	}
+	if err := rt.Registry.Add(root, nil); err != nil {
+		log.Errorf("register root: %s", err.Error())
+		return nil
+	}
+
+	// Create a reconciler.
 	s.reconciler = reconciler.New(catalog, rt, s.logger)
-	return nil
+
+	if !s.dryRun {
+		s.resolver.Start()
+	}
+
+	return s
 }
 
 // GetId returns the id of the current stunnerd instance.

@@ -191,7 +191,7 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	rec := &eventRecorder{}
 	logFactory := logger.NewLoggerFactory("all:ERROR")
-	rt := runtime.New(runtime.Deps{Logger: logFactory, DryRun: true})
+	rt := runtime.New(runtime.Config{Logger: logFactory, DryRun: true})
 
 	env := &testEnv{
 		t:       t,
@@ -207,7 +207,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testRootType, rec: rec}).New(conf)
 			},
-			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testRootType)(), nil
 			},
 			Singleton:     true,
@@ -219,7 +219,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testGroupType, rec: rec}).New(conf)
 			},
-			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testGroupType)(), nil
 			},
 		},
@@ -228,7 +228,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testItemType, rec: rec}).New(conf)
 			},
-			DesiredConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testItemType)(), nil
 			},
 		},
@@ -250,7 +250,7 @@ func (e *testEnv) extractor(objType runtime.ObjectType) func() []stnrv1.Config {
 	}
 }
 
-func (e *testEnv) addExisting(objType runtime.ObjectType, cfg *fakeConfig) *fakeObject {
+func (e *testEnv) addObject(objType runtime.ObjectType, cfg *fakeConfig) *fakeObject {
 	e.t.Helper()
 
 	o := &fakeObject{objType: objType, cfg: cfg.clone(), rec: e.rec}
@@ -287,46 +287,20 @@ func (e *testEnv) setDesired(objType runtime.ObjectType, cfgs ...*fakeConfig) {
 func (e *testEnv) seedBaseTree() {
 	e.t.Helper()
 
-	e.addExisting(testRootType, &fakeConfig{Name: "root"})
-	e.addExisting(testGroupType, &fakeConfig{Name: "group"})
+	e.addObject(testRootType, &fakeConfig{Name: "root"})
+	e.addObject(testGroupType, &fakeConfig{Name: "group"})
 
 	e.setDesired(testRootType, &fakeConfig{Name: "root"})
 	e.setDesired(testGroupType, &fakeConfig{Name: "group"})
-}
-
-func assertOrderedSubsequence(t *testing.T, got []string, want []string) {
-	t.Helper()
-
-	idx := 0
-	for _, w := range want {
-		found := false
-		for idx < len(got) {
-			if got[idx] == w {
-				idx++
-				found = true
-				break
-			}
-			idx++
-		}
-		require.Truef(t, found, "event %q is missing from event stream: %v", w, got)
-	}
-}
-
-func assertNoPrefix(t *testing.T, got []string, prefix string) {
-	t.Helper()
-
-	for _, e := range got {
-		require.NotContainsf(t, e, prefix, "unexpected %q event in %v", prefix, got)
-	}
 }
 
 func TestReconcileFlow(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "reconcile"})
-	env.addExisting(testItemType, &fakeConfig{Name: "restart"})
-	env.addExisting(testItemType, &fakeConfig{Name: "delete"})
+	env.addObject(testItemType, &fakeConfig{Name: "reconcile"})
+	env.addObject(testItemType, &fakeConfig{Name: "restart"})
+	env.addObject(testItemType, &fakeConfig{Name: "delete"})
 
 	env.setDesired(testItemType,
 		&fakeConfig{Name: "reconcile", Decision: runtime.ActionReconcile},
@@ -346,11 +320,11 @@ func TestReconcileFlow(t *testing.T) {
 
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{
+		"factory:test-item/new",
 		"close:test-item/restart:false",
 		"close:test-item/delete:false",
 		"reconcile:test-item/reconcile",
 		"reconcile:test-item/restart",
-		"factory:test-item/new",
 		"start:test-item/restart",
 		"start:test-item/new",
 	})
@@ -360,7 +334,7 @@ func TestDryRun(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "old"})
+	env.addObject(testItemType, &fakeConfig{Name: "old"})
 	env.setDesired(testItemType,
 		&fakeConfig{Name: "old", Decision: runtime.ActionRestart},
 		&fakeConfig{Name: "new"},
@@ -389,8 +363,8 @@ func TestDryRun(t *testing.T) {
 
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{
-		"reconcile:test-item/old",
 		"factory:test-item/new",
+		"reconcile:test-item/old",
 	})
 	assertNoPrefix(t, events, "close:")
 	assertNoPrefix(t, events, "start:")
@@ -400,8 +374,8 @@ func TestDeleteSubtree(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "a"})
-	env.addExisting(testItemType, &fakeConfig{Name: "b"})
+	env.addObject(testItemType, &fakeConfig{Name: "a"})
+	env.addObject(testItemType, &fakeConfig{Name: "b"})
 
 	env.setDesired(testGroupType)
 	env.setDesired(testItemType)
@@ -433,7 +407,7 @@ func TestInspectErr(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "bad"})
+	env.addObject(testItemType, &fakeConfig{Name: "bad"})
 	env.setDesired(testItemType, &fakeConfig{Name: "bad", InspectErr: true})
 
 	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
@@ -453,7 +427,7 @@ func TestReconcileErr(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "existing"})
+	env.addObject(testItemType, &fakeConfig{Name: "existing"})
 	env.setDesired(testItemType,
 		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrFatal},
 		&fakeConfig{Name: "new"},
@@ -466,8 +440,12 @@ func TestReconcileErr(t *testing.T) {
 	require.False(t, found)
 
 	events := env.rec.snapshot()
-	assertOrderedSubsequence(t, events, []string{"reconcile:test-item/existing"})
-	assertNoPrefix(t, events, "factory:")
+	// The new object is constructed in the prepare phase but, since the reconcile fails, it
+	// must never be registered (checked above) nor started.
+	assertOrderedSubsequence(t, events, []string{
+		"factory:test-item/new",
+		"reconcile:test-item/existing",
+	})
 	assertNoPrefix(t, events, "start:")
 }
 
@@ -493,7 +471,7 @@ func TestReconcileRestartRequired(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "existing"})
+	env.addObject(testItemType, &fakeConfig{Name: "existing"})
 	env.setDesired(testItemType,
 		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrRestartRequired},
 	)
@@ -562,8 +540,8 @@ func TestShutdownTree(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.addExisting(testItemType, &fakeConfig{Name: "a", ShutdownCloseErr: true})
-	env.addExisting(testItemType, &fakeConfig{Name: "b"})
+	env.addObject(testItemType, &fakeConfig{Name: "a", ShutdownCloseErr: true})
+	env.addObject(testItemType, &fakeConfig{Name: "b"})
 
 	err := env.reconciler.Shutdown()
 	require.NoError(t, err)
@@ -579,4 +557,30 @@ func TestShutdownTree(t *testing.T) {
 		"close:test-group/group:true",
 		fmt.Sprintf("close:%s/root:true", testRootType),
 	})
+}
+
+func assertOrderedSubsequence(t *testing.T, got []string, want []string) {
+	t.Helper()
+
+	idx := 0
+	for _, w := range want {
+		found := false
+		for idx < len(got) {
+			if got[idx] == w {
+				idx++
+				found = true
+				break
+			}
+			idx++
+		}
+		require.Truef(t, found, "event %q is missing from event stream: %v", w, got)
+	}
+}
+
+func assertNoPrefix(t *testing.T, got []string, prefix string) {
+	t.Helper()
+
+	for _, e := range got {
+		require.NotContainsf(t, e, prefix, "unexpected %q event in %v", prefix, got)
+	}
 }

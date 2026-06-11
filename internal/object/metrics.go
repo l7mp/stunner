@@ -94,9 +94,6 @@ func (m *Metrics) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runt
 	}
 	cur := old.(*MetricsConfig)
 	if reflect.DeepEqual(req, cur) {
-		if (req.Endpoint != "" && m.server == nil) || (req.Endpoint == "" && m.server != nil) {
-			return runtime.ActionRestart, nil
-		}
 		return runtime.ActionNone, nil
 	}
 	return runtime.ActionRestart, nil

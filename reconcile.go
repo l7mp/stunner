@@ -1,6 +1,8 @@
 package stunner
 
 import (
+	"errors"
+
 	"github.com/l7mp/stunner/internal/reconciler"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	cdsclient "github.com/l7mp/stunner/pkg/config/client"
@@ -24,8 +26,10 @@ func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
 	}
 
 	// Become ready unless we are shutting down, already ready, in rollback, or bootstrapping
-	// with a zero-config.
-	if err == nil && !s.rt.IsShutdown() && !s.rt.IsReady() && !cdsclient.IsZeroConfig(req) {
+	// with a zero-config. ErrRestarted still counts as a successful reconciliation.
+	var restarted stnrv1.ErrRestarted
+	if (err == nil || errors.As(err, &restarted)) &&
+		!s.rt.IsShutdown() && !s.rt.IsReady() && !cdsclient.IsZeroConfig(req) {
 		s.rt.SetReady(true)
 	}
 

@@ -54,7 +54,7 @@ type testEnv struct {
 func newTestEnv() *testEnv {
 	log := logger.NewLoggerFactory(stnrv1.DefaultLogLevel)
 	r := resolver.NewMockResolver(map[string][]string{}, log)
-	rt := runtime.New(runtime.Deps{Logger: log, DryRun: true, Resolver: r})
+	rt := runtime.New(runtime.Config{Logger: log, DryRun: true, Resolver: r})
 	return &testEnv{rt: rt}
 }
 

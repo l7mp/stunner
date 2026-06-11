@@ -37,11 +37,11 @@ const (
 	// timeout  = 200 * time.Millisecond
 	// interval = 50 * time.Millisecond
 
-	// stunnerTestLoglevel string = "all:ERROR"
+	stunnerTestLoglevel string = "all:ERROR"
 	// stunnerTestLoglevel string = stnrv1.DefaultLogLevel
 	// stunnerTestLoglevel string = "all:INFO"
 	// stunnerTestLoglevel string = "all:TRACE"
-	stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
+	// stunnerTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
 )
 
 var certPem, keyPem, _ = GenerateSelfSignedKey()
@@ -1912,8 +1912,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 			log.Debug("reconciling server")
 			conf.Admin.HealthCheckEndpoint = c.hcEndpoint
-			err := s.Reconcile(&conf)
-			assert.NoError(t, err, "cannot reconcile")
+			reconcileAllowRestart(t, s, &conf)
 
 			// obtain hc address
 			e := "http://127.0.0.1:8086"
@@ -1946,7 +1945,7 @@ func TestStunnerLifecycle(t *testing.T) {
 	// make sure health-check is running
 	h := "0.0.0.0"
 	conf.Admin.HealthCheckEndpoint = &h
-	assert.NoError(t, s.Reconcile(&conf), "cannot reconcile")
+	reconcileAllowRestart(t, s, &conf)
 
 	status, err = doLivenessCheck("http://127.0.0.1:8086")
 	assert.NoError(t, err, "liveness test before graceful-shutdown: running")
@@ -2075,8 +2074,7 @@ func TestStunnerMetrics(t *testing.T) {
 
 			log.Debug("reconciling server")
 			conf.Admin.MetricsEndpoint = c.mcEndpoint
-			err := s.Reconcile(&conf)
-			assert.NoError(t, err, "cannot reconcile")
+			reconcileAllowRestart(t, s, &conf)
 
 			// obtain metric address
 			u, err := url.Parse(c.mcEndpoint)

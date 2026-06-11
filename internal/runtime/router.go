@@ -17,6 +17,14 @@ const (
 	peerRouteCacheSize     = 4096
 )
 
+var _ Router = (*router)(nil)
+
+// Router resolves relays for packet-level workflows.
+type Router interface {
+	Route(listener string, routes []string, peer net.IP, port int) (Relay, bool)
+	InvalidateCache()
+}
+
 // router is the default Router implementation, backed by listener-route and peer-route LRUs.
 // Relays are resolved from the registry (one relay node per cluster and protocol).
 type router struct {

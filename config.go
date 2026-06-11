@@ -55,7 +55,8 @@ type Options struct {
 // NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
-// username/password pair `user:pass`. Health-checks and metric scarping are disabled.
+// username/password pair `user:pass`. Health-checking is enabled at the default endpoint, metric
+// scraping is disabled.
 func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
@@ -66,7 +67,9 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
 
-	h := ""
+	// Health-checking is enabled at the default endpoint; this is what Validate would default a
+	// nil pointer to anyway, we just make the intention explicit.
+	h := fmt.Sprintf("http://:%d", stnrv1.DefaultHealthCheckPort)
 	c := &stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
