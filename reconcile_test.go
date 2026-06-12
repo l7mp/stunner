@@ -73,18 +73,6 @@ func mustAdminName(t *testing.T, admin *object.Admin) string {
 	return conf.Name
 }
 
-func (s *Stunner) NewAuthHandler() a12n.AuthHandler {
-	return objectturn.NewAuthHandler(s.rt, s.log)
-}
-
-func (s *Stunner) NewPermissionHandler(l *object.Listener) a12n.PermissionHandler {
-	if l == nil {
-		return nil
-	}
-
-	return objectturn.NewPermissionHandler(l.Name(), s.rt, s.log)
-}
-
 func makeRaceConfig(realm string) stnrv1.StunnerConfig {
 	return stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
@@ -127,7 +115,11 @@ func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv1.StunnerConfig) {
 }
 
 func TestConcurrentReadsDuringReconcile(t *testing.T) {
-	s := NewStunner(Options{DryRun: true, SuppressRollback: true})
+	s := NewStunner(Options{
+		DryRun:           true,
+		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
+		SuppressRollback: true,
+	})
 	require.NotNil(t, s)
 	defer s.Close()
 
@@ -151,7 +143,7 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 				}
 
 				cfg := s.GetConfig()
-				auth := s.NewAuthHandler()
+				auth := newAuthHandler(s)
 				if auth != nil {
 					_, _, _ = auth(&turn.RequestAttributes{
 						Username: "user",
@@ -161,7 +153,7 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 				}
 
 				for _, l := range s.GetListeners() {
-					p := s.NewPermissionHandler(l)
+					p := newPermissionHandler(s, l)
 					if p != nil {
 						_ = p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000}, net.ParseIP("1.1.1.1"))
 					}
@@ -222,7 +214,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
@@ -257,7 +249,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			// listener  uses the open cluster for routing
 
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -494,7 +486,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
@@ -528,7 +520,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -581,7 +573,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
@@ -615,7 +607,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -676,7 +668,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
@@ -710,7 +702,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -758,7 +750,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "newuser", "username ok")
 			assert.Equal(t, auth.Password, "pass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "newuser",
 				Realm:    stnrv1.DefaultRealm,
@@ -797,7 +789,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -844,7 +836,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, auth.Username, "user", "username ok")
 			assert.Equal(t, auth.Password, "newpass", "password ok")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
 				Realm:    stnrv1.DefaultRealm,
@@ -883,7 +875,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -933,7 +925,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			passwd, err := a12n.GetLongTermCredential(username, "newsecret")
 			assert.NoError(t, err, "GetLongTermCredential")
 
-			handler := s.NewAuthHandler()
+			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: username,
 				Realm:    stnrv1.DefaultRealm,
@@ -975,7 +967,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1053,7 +1045,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
@@ -1104,7 +1096,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, "allow-any", l.Routes[0], "listener route name ok")
 
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1165,7 +1157,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
@@ -1261,7 +1253,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1286,7 +1278,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
 			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
 
-			p = s.NewPermissionHandler(l)
+			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
@@ -1363,7 +1355,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1388,7 +1380,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
 			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
 
-			p = s.NewPermissionHandler(l)
+			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
@@ -1465,7 +1457,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1490,7 +1482,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
 			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
 
-			p = s.NewPermissionHandler(l)
+			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
@@ -1629,7 +1621,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -1685,7 +1677,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, l.Routes, 1, "listener route count ok")
 			assert.Equal(t, "renamed-cluster", l.Routes[0], "listener route name ok")
 
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1732,7 +1724,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			// listener still uses the old cluster for routing
@@ -1788,7 +1780,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[1].String(), "2.0.0.0/8:<3-4>", "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			// listener still uses the old cluster for routing
@@ -1844,7 +1836,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			c = s.GetCluster("newcluster")
@@ -1910,7 +1902,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			c = s.GetCluster("newcluster")
@@ -1975,7 +1967,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			c = s.GetCluster("newcluster")
@@ -2046,7 +2038,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Len(t, s.GetClusters(), 0, "clusterManager keys")
 
 			l := s.GetListener("default-listener")
-			p := s.NewPermissionHandler(l)
+			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
 
 			// missing cluster, deny all IPs
@@ -3352,4 +3344,16 @@ func TestStunnerReconcileWithVNetRollback(t *testing.T) {
 		log.Debugf("-------------- Running new test: %s -------------", name)
 		testStunnerReconcileWithVNet(t, testcase, false)
 	}
+}
+
+func newAuthHandler(s *Stunner) a12n.AuthHandler {
+	return objectturn.NewAuthHandler(s.rt, s.log)
+}
+
+func newPermissionHandler(s *Stunner, l *object.Listener) a12n.PermissionHandler {
+	if l == nil {
+		return nil
+	}
+
+	return objectturn.NewPermissionHandler(l.Name(), s.rt, s.log)
 }

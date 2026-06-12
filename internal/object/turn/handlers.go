@@ -16,6 +16,7 @@ import (
 func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.AuthHandler {
 	log.Trace("NewAuthHandler")
 
+	// We must return a nil auth-handler to switch pure STUN on.
 	a, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv1.AuthConfig)
 	if !ok || a == nil {
 		log.Warn("auth handler: no auth config in runtime")

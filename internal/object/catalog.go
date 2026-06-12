@@ -1,6 +1,5 @@
-// Package object implements the STUNner dataplane objects (Admin, Auth, Listener, Cluster,
-// etc.) and the default object catalog declaration. The reconciler walk
-// (internal/reconciler) materializes and converges the tree purely from the catalog.
+// Package object implements the STUNner dataplane objects (Admin, Auth, Listener, Cluster, etc.)
+// and the declarative object hierarchy (the catalog).
 package object
 
 import (
@@ -16,12 +15,12 @@ type Catalog = runtime.Catalog
 // NewCatalog builds the default object catalog:
 //
 //	Stunner (root, singleton)
-//	├── Admin ── Health / Metrics / Offload    (singletons)
-//	├── Auth                                   (singleton)
-//	├── Listener [N from config]
-//	│   └── ListenerServer                     (lifecycle-only, owns the TURN server)
-//	└── Cluster [N from config]
-//	    └── Relay [one per cluster protocol]   (lifecycle-only, owns the udp/tcp relay)
+//	+-- Admin ── Health / Metrics / Offload    (singletons)
+//	+-- Auth                                   (singleton)
+//	+-- Listener [N from config]
+//	|   +-- ListenerServer                     (lifecycle-only, owns the TURN server)
+//	+-- Cluster [N from config]
+//	    +-- Relay [one per cluster protocol]   (lifecycle-only, owns the udp/tcp relay)
 func NewCatalog() *Catalog {
 	specs := make([]KindSpec, 0, 10)
 
@@ -182,9 +181,6 @@ func NewCatalog() *Catalog {
 			}
 			return NewRelayNode(cluster, rc.Protocol), nil
 		},
-		// One relay node per cluster protocol, derived from live parent state: when a
-		// cluster gains a protocol, the reconciler creates and starts only the new relay
-		// without bouncing the running ones.
 		ExtractConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cluster, ok := parent.(*Cluster)
 			if !ok {

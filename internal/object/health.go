@@ -80,56 +80,6 @@ func NewHealth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) 
 	return h, nil
 }
 
-func (h *Health) buildMux() *http.ServeMux {
-	mux := http.NewServeMux()
-	// Liveness probe: always OK once we are here.
-	mux.HandleFunc("/live", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{}\n")) //nolint:errcheck
-	})
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if h.rt == nil {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusOK, "READY")
-			return
-		}
-		if !h.rt.ReadyForProbes() {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusServiceUnavailable, "stunnerd not ready")
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-			http.StatusOK, "READY")
-	})
-	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		var status stnrv1.Status
-		if h.rt != nil {
-			status = h.rt.GetStatus(runtime.TypeStunner, "")
-		}
-		if status == nil {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("{}\n")) //nolint:errcheck
-			return
-		}
-		js, err := json.Marshal(status)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusInternalServerError, err.Error())
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(js) //nolint:errcheck
-	})
-	return mux
-}
-
 func (h *Health) Name() string             { return stnrv1.DefaultHealthName }
 func (h *Health) Type() runtime.ObjectType { return runtime.TypeHealth }
 
@@ -217,6 +167,56 @@ func (h *Health) Close(_ bool) error {
 	h.server = nil
 	h.servAddr = nil
 	return nil
+}
+
+func (h *Health) buildMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	// Liveness probe: always OK once we are here.
+	mux.HandleFunc("/live", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("{}\n")) //nolint:errcheck
+	})
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if h.rt == nil {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusOK, "READY")
+			return
+		}
+		if !h.rt.ReadyForProbes() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusServiceUnavailable, "stunnerd not ready")
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+			http.StatusOK, "READY")
+	})
+	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		var status stnrv1.Status
+		if h.rt != nil {
+			status = h.rt.GetStatus(runtime.TypeStunner, "")
+		}
+		if status == nil {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("{}\n")) //nolint:errcheck
+			return
+		}
+		js, err := json.Marshal(status)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
+				http.StatusInternalServerError, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(js) //nolint:errcheck
+	})
+	return mux
 }
 
 // defaultHealthEndpoint mirrors the historical Admin behaviour: a nil HealthCheckEndpoint pointer
