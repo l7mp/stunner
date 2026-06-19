@@ -2012,6 +2012,71 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, []string{"a", "b", "c"}, ca.OffloadInterfaces, "offload intfs")
 		},
 	},
+	{
+		name: "reconcile-test: TCP cluster routed by a TURN-TCP listener",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv1.AuthConfig{
+				Type:        "static",
+				Credentials: map[string]string{"username": "user", "password": "pass"},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "tcp",
+				Protocol: stnrv1.ListenerProtocolTURNTCP.String(),
+				Addr:     "127.0.0.1",
+				Port:     3478,
+				Routes:   []string{"tcp-cluster", "udp-cluster"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{
+				{
+					Name:      "tcp-cluster",
+					Type:      stnrv1.ClusterTypeStatic.String(),
+					Protocol:  stnrv1.ClusterProtocolTCP.String(),
+					Endpoints: []string{"1.1.1.1", "2.2.2.0/24"},
+				},
+				{
+					Name:      "udp-cluster",
+					Type:      stnrv1.ClusterTypeStatic.String(),
+					Protocol:  stnrv1.ClusterProtocolUDP.String(),
+					Endpoints: []string{"3.3.3.3"},
+				},
+			},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			assert.NoError(t, err, "reconcile")
+
+			// The cluster exposes the TCP protocol through its public config.
+			tcpCluster := s.GetCluster("tcp-cluster")
+			require.NotNil(t, tcpCluster, "tcp cluster present")
+			tcpConf, ok := tcpCluster.GetConfig().(*stnrv1.ClusterConfig)
+			require.True(t, ok, "cluster config cast")
+			assert.Equal(t, stnrv1.ClusterProtocolTCP.String(), tcpConf.Protocol, "tcp cluster protocol")
+			assert.Equal(t, stnrv1.ClusterTypeStatic.String(), tcpConf.Type, "tcp cluster type")
+
+			// The router admits the TCP cluster's endpoints (static IP and CIDR) and rejects others.
+			router := s.rt.Router
+			assert.True(t, router.Match("tcp-cluster", net.ParseIP("1.1.1.1"), 0), "admit static endpoint")
+			assert.True(t, router.Match("tcp-cluster", net.ParseIP("2.2.2.7"), 0), "admit CIDR endpoint")
+			assert.False(t, router.Match("tcp-cluster", net.ParseIP("9.9.9.9"), 0), "reject non-endpoint")
+
+			// Route resolution is protocol-scoped: TCP peer -> TCP cluster, UDP peer -> UDP cluster,
+			// and a TCP-cluster endpoint is not reachable over UDP (and vice versa).
+			routes := []string{"tcp-cluster", "udp-cluster"}
+			cl, ok := router.Route("tcp", routes, stnrv1.ClusterProtocolTCP, net.ParseIP("1.1.1.1"), 0)
+			assert.True(t, ok, "TCP route resolves")
+			assert.Equal(t, "tcp-cluster", cl, "TCP route -> tcp cluster")
+
+			cl, ok = router.Route("tcp", routes, stnrv1.ClusterProtocolUDP, net.ParseIP("3.3.3.3"), 0)
+			assert.True(t, ok, "UDP route resolves")
+			assert.Equal(t, "udp-cluster", cl, "UDP route -> udp cluster")
+
+			_, ok = router.Route("tcp", routes, stnrv1.ClusterProtocolTCP, net.ParseIP("3.3.3.3"), 0)
+			assert.False(t, ok, "udp-cluster endpoint not reachable over TCP")
+			_, ok = router.Route("tcp", routes, stnrv1.ClusterProtocolUDP, net.ParseIP("1.1.1.1"), 0)
+			assert.False(t, ok, "tcp-cluster endpoint not reachable over UDP")
+		},
+	},
 }
 
 // start with default config and then reconcile with the given config
@@ -2214,7 +2279,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
 				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
-				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory}
+				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory, ""}
 			stunnerEchoTest(testConfig)
 
 			time.Sleep(100 * time.Millisecond)
@@ -3351,7 +3416,7 @@ func makeRaceConfig(realm string) stnrv1.StunnerConfig {
 	return stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
-			LogLevel: stnrv1.DefaultLogLevel,
+			LogLevel: stunnerTestLoglevel,
 		},
 		Auth: stnrv1.AuthConfig{
 			Type:  stnrv1.AuthTypeStatic.String(),

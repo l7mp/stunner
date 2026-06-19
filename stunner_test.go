@@ -73,30 +73,13 @@ type echoTestConfig struct {
 	echoServerAddr                            string
 	allocateSuccess, bindSuccess, echoSuccess bool
 	loggerFactory                             logging.LoggerFactory
+	// clusterProtocol selects the upstream cluster transport exercised by the test: "" or "udp"
+	// drives the UDP relay data path, "tcp" drives the RFC 6062 TCP relay (Connect) path.
+	clusterProtocol string
 }
-
-// type bundle struct {
-// 	addr net.Addr
-// 	err  error
-// }
-
-// func bindingRequestWithTimeout(client *turn.Client, timeout time.Duration) (net.Addr, error){
-//     res := make(chan bundle, 1)
-//     go func() {
-//             addr, err := client.SendBindingRequest()
-//             res <- bundle{addr, err}
-//     }()
-//     select {
-//     case <-time.After(timeout):
-//         return nil, fmt.Errorf("timeout")
-//     case result := <-res:
-//         return result.addr, result.err
-//     }
-// }
 
 func stunnerEchoTest(conf echoTestConfig) {
 	t := conf.t
-	log := conf.loggerFactory.NewLogger("test")
 
 	client, err := turn.NewClient(&turn.ClientConfig{
 		STUNServerAddr:         conf.stunnerAddr,
@@ -108,7 +91,6 @@ func stunnerEchoTest(conf echoTestConfig) {
 		Net:                    conf.wan,
 		LoggerFactory:          conf.loggerFactory,
 	})
-
 	if !assert.NoError(t, err, "cannot create TURN client") {
 		return
 	}
@@ -118,94 +100,189 @@ func stunnerEchoTest(conf echoTestConfig) {
 	}
 	defer client.Close()
 
+	// Dispatch to the per-cluster-protocol echo path. New upstream protocols get a new branch.
+	switch strings.ToLower(conf.clusterProtocol) {
+	case "tcp":
+		stunnerEchoTestTCP(conf, client)
+	default: // "" or "udp"
+		stunnerEchoTestUDP(conf, client)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+}
+
+// stunnerEchoTestUDP exercises a UDP cluster: a STUN binding check, a UDP allocation, and an echo
+// round-trip through the relay against a UDP echo server (works over VNet).
+func stunnerEchoTestUDP(conf echoTestConfig, client *turn.Client) {
+	t := conf.t
+	log := conf.loggerFactory.NewLogger("test")
+
 	log.Debug("sending a binding request")
-	// reflAddr, err := bindingRequestWithTimeout(client, 10000 * time.Millisecond)
 	reflAddr, err := client.SendBindingRequest()
 	if conf.bindSuccess == false {
 		assert.Error(t, err, "binding request failed")
+		return
+	}
+	if !assert.NoError(t, err, "binding request ok") {
+		return
+	}
+	if !assert.NotNil(t, reflAddr, "binding response address") {
+		return
+	}
+	log.Debugf("mapped-address: %v", reflAddr.String())
+	udpAddr := reflAddr.(*net.UDPAddr)
+
+	// The mapped-address should have IP address that was assigned to the LAN router.
+	assert.True(t, udpAddr.IP.Equal(conf.natAddr), "wrong srfx address")
+
+	log.Debug("sending an allocate request")
+	conn, err := client.Allocate()
+	if conf.allocateSuccess == false {
+		assert.Error(t, err, err)
+		return
+	}
+	if !assert.NoError(t, err, err) {
+		return
+	}
+	if !assert.NotNil(t, conn, "allocated relay connection") {
+		return
+	}
+
+	log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
+	echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
+	if !assert.NoError(t, err, "creating echo socket") {
+		return
+	}
+
+	go func() {
+		buf := make([]byte, 1600)
+		for {
+			n, from, err2 := echoConn.ReadFrom(buf)
+			if err2 != nil {
+				break
+			}
+
+			// verify the message was received from the relay address
+			assert.Equal(t, conn.LocalAddr().String(), from.String(),
+				"message should be received from the relay address")
+			assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
+
+			// echo the data
+			_, err2 = echoConn.WriteTo(buf[:n], from)
+			assert.NoError(t, err2, err2)
+		}
+	}()
+
+	if conf.echoSuccess == true {
+		buf := make([]byte, 1600)
+		for i := 0; i < 8; i++ {
+			log.Debug("sending \"Hello\"")
+			_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+			assert.NoError(t, err, err)
+
+			n, from, err2 := conn.ReadFrom(buf)
+			assert.NoError(t, err2, err2)
+			assert.Equal(t, n, len("Hello"), "message OK")
+			assert.Equal(t, []byte("Hello"), buf[:n], "message OK")
+
+			// verify the message was received from the relay address
+			assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
+				"message should be received from the relay address")
+
+			time.Sleep(100 * time.Millisecond)
+		}
 	} else {
-		if !assert.NoError(t, err, "binding request ok") {
-			return
-		}
-		if !assert.NotNil(t, reflAddr, "binding response address") {
-			return
-		}
-		log.Debugf("mapped-address: %v", reflAddr.String())
-		udpAddr := reflAddr.(*net.UDPAddr)
+		// should fail
+		_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
+		assert.Errorf(t, err, "got error message %s", err)
+	}
+	assert.NoError(t, conn.Close(), "cannot close relay connection")
+	assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
+}
 
-		// The mapped-address should have IP address that was assigned to the LAN router.
-		assert.True(t, udpAddr.IP.Equal(conf.natAddr), "wrong srfx address")
+// stunnerEchoTestTCP exercises a TCP cluster end-to-end via the RFC 6062 (TURN Connect) path: it
+// stands up a real localhost TCP echo server (the upstream peer), makes a TCP allocation, creates a
+// permission, dials the peer through the relay, and verifies the echo. Uses real sockets because
+// pion/transport/vnet has no TCP.
+func stunnerEchoTestTCP(conf echoTestConfig, client *turn.Client) {
+	t := conf.t
+	log := conf.loggerFactory.NewLogger("test")
 
-		log.Debug("sending an allocate request")
-		conn, err := client.Allocate()
-		if conf.allocateSuccess == false {
-			assert.Error(t, err, err)
-		} else {
-			if !assert.NoError(t, err, err) {
+	log.Debugf("creating TCP echo server at %s", conf.echoServerAddr)
+	echoLn, err := net.Listen("tcp", conf.echoServerAddr)
+	if !assert.NoError(t, err, "creating TCP echo listener") {
+		return
+	}
+	defer echoLn.Close()
+	go func() {
+		for {
+			ec, aerr := echoLn.Accept()
+			if aerr != nil {
 				return
 			}
-			if !assert.NotNil(t, conn, "allocated relay connection") {
-				return
-			}
-
-			// log.Debugf("laddr: %s", conn.LocalAddr().String())
-
-			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
-			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
-			if !assert.NoError(t, err, "creating echo socket") {
-				return
-			}
-
-			// assert.NotNil(t, err, "echo socket not nil")
-
-			go func() {
+			go func(c net.Conn) {
+				defer c.Close()
 				buf := make([]byte, 1600)
 				for {
-					n, from, err2 := echoConn.ReadFrom(buf)
-					if err2 != nil {
-						break
+					n, rerr := c.Read(buf)
+					if n > 0 {
+						assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
+						_, werr := c.Write(buf[:n])
+						assert.NoError(t, werr, werr)
 					}
-
-					// verify the message was received from the relay address
-					assert.Equal(t, conn.LocalAddr().String(), from.String(),
-						"message should be received from the relay address")
-					assert.Equal(t, "Hello", string(buf[:n]), "wrong message payload")
-
-					// echo the data
-					_, err2 = echoConn.WriteTo(buf[:n], from)
-					assert.NoError(t, err2, err2)
+					if rerr != nil {
+						return
+					}
 				}
-			}()
-
-			if conf.echoSuccess == true {
-				buf := make([]byte, 1600)
-				for i := 0; i < 8; i++ {
-					log.Debug("sending \"Hello\"")
-					_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-					assert.NoError(t, err, err)
-
-					n, from, err2 := conn.ReadFrom(buf)
-					assert.NoError(t, err2, err2)
-					assert.Equal(t, n, len("Hello"), "message OK")
-					assert.Equal(t, []byte("Hello"), buf[:n], "message OK")
-
-					// verify the message was received from the relay address
-					assert.Equal(t, echoConn.LocalAddr().String(), from.String(),
-						"message should be received from the relay address")
-
-					time.Sleep(100 * time.Millisecond)
-				}
-			} else {
-				// should fail
-				_, err = conn.WriteTo([]byte("Hello"), echoConn.LocalAddr())
-				assert.Errorf(t, err, "got error message %s", err)
-			}
-			assert.NoError(t, conn.Close(), "cannot close relay connection")
-			assert.NoError(t, echoConn.Close(), "cannot close echo server connection")
+			}(ec)
 		}
+	}()
+
+	log.Debug("sending a TCP allocate request")
+	alloc, err := client.AllocateTCP()
+	if conf.allocateSuccess == false {
+		assert.Error(t, err, "TCP allocation should fail")
+		return
 	}
-	time.Sleep(50 * time.Millisecond)
-	client.Close()
+	if !assert.NoError(t, err, "TCP allocation") {
+		return
+	}
+	defer alloc.Close() //nolint:errcheck
+
+	peerAddr, err := net.ResolveTCPAddr("tcp4", conf.echoServerAddr)
+	if !assert.NoError(t, err, "resolve echo address") {
+		return
+	}
+
+	log.Debugf("creating permission for peer %s", peerAddr.String())
+	assert.NoError(t, client.CreatePermission(peerAddr), "create permission")
+
+	if conf.echoSuccess == false {
+		_, derr := alloc.Dial("tcp4", conf.echoServerAddr)
+		assert.Error(t, derr, "connecting to an unadmitted peer should fail")
+		return
+	}
+
+	log.Debugf("connecting through the relay to %s", conf.echoServerAddr)
+	dataConn, err := alloc.Dial("tcp4", conf.echoServerAddr)
+	if !assert.NoError(t, err, "TCP connect through relay") {
+		return
+	}
+	defer dataConn.Close()
+
+	buf := make([]byte, 1600)
+	for i := 0; i < 8; i++ {
+		log.Debug("sending \"Hello\" over the TCP relay")
+		if _, err = dataConn.Write([]byte("Hello")); !assert.NoError(t, err, "write to relay") {
+			return
+		}
+		n, rerr := dataConn.Read(buf)
+		if !assert.NoError(t, rerr, "read from relay") {
+			return
+		}
+		assert.Equal(t, "Hello", string(buf[:n]), "echoed message OK")
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // *****************
@@ -420,6 +497,67 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 	},
 	{
 		config: stnrv1.StunnerConfig{
+			// turn-tcp listener, tcp cluster (RFC 6062), static
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "static",
+				Credentials: map[string]string{
+					"username": "user1",
+					"password": "passwd1",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:       "tcp",
+				Protocol:   "turn-tcp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Protocol:  "tcp",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		uri: "turn:1.2.3.4:3478?transport=tcp",
+	},
+	{
+		config: stnrv1.StunnerConfig{
+			// turn-tcp listener, tcp cluster (RFC 6062), ephemeral
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Type: "ephemeral",
+				Credentials: map[string]string{
+					"secret": "my-secret",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:       "tcp",
+				Protocol:   "turn-tcp",
+				Addr:       "127.0.0.1",
+				Port:       23478,
+				PublicAddr: "1.2.3.4",
+				PublicPort: 3478,
+				Routes:     []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Protocol:  "tcp",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		uri: "turn:1.2.3.4:3478?transport=tcp",
+	},
+	{
+		config: stnrv1.StunnerConfig{
 			// tls, static
 			ApiVersion: stnrv1.ApiVersion,
 			Admin: stnrv1.AdminConfig{
@@ -560,7 +698,12 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 		c := test.config
 		auth := c.Auth.Type
 		proto := c.Listeners[0].Protocol
-		testName := fmt.Sprintf("TestStunner_NewStunner_Localhost_auth:%s_client:%s", auth, proto)
+		clusterProto := c.Clusters[0].Protocol
+		if clusterProto == "" {
+			clusterProto = "udp"
+		}
+		testName := fmt.Sprintf("TestStunner_NewStunner_Localhost_auth:%s_client:%s_cluster:%s",
+			auth, proto, clusterProto)
 
 		t.Run(testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
@@ -630,7 +773,8 @@ func testStunnerLocalhost(t *testing.T, udpThreadNum int, tests []TestStunnerCon
 			stdnet, _ := stdnet.NewNet()
 			testConfig := echoTestConfig{t, stdnet, stdnet, stunner,
 				stunnerAddr, lconn, u, p, net.IPv4(127, 0, 0, 1),
-				"127.0.0.1:25678", true, true, true, loggerFactory}
+				"127.0.0.1:25678", true, true, true, loggerFactory, ""}
+			testConfig.clusterProtocol = c.Clusters[0].Protocol
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -1154,7 +1298,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, true, true, c.result, loggerFactory}
+				c.echoServerAddr, true, true, c.result, loggerFactory, ""}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -1620,7 +1764,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, true, true, c.result, loggerFactory}
+				c.echoServerAddr, true, true, c.result, loggerFactory, ""}
 			stunnerEchoFloodTest(testConfig)
 
 			if c.tester != nil {
@@ -2254,7 +2398,7 @@ func TestStunnerConfigV1Alpha1(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, true, true, c.result, loggerFactory}
+				c.echoServerAddr, true, true, c.result, loggerFactory, ""}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
