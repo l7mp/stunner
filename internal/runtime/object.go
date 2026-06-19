@@ -23,7 +23,6 @@ const (
 	TypeListener       ObjectType = "listener"
 	TypeListenerServer ObjectType = "listener-server"
 	TypeCluster        ObjectType = "cluster"
-	TypeRelay          ObjectType = "relay"
 )
 
 // Action is the reconciliation action an Object reports from Inspect.

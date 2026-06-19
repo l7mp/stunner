@@ -11,6 +11,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
+	"github.com/l7mp/stunner/internal/netutil"
 	objruntime "github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
 	"github.com/l7mp/stunner/internal/util"
@@ -51,11 +52,16 @@ func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) 
 
 	permissionHandler := NewPermissionHandler(listener, rt, log)
 	relay := NewRelay(listener, rt)
-	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(conf.Port))
+	// Empty host is the unspecified address: on dual-stack hosts (Linux default
+	// with net.ipv6.bindv6only=0) ":port" binds a single socket reachable via
+	// both IPv4 and IPv6, while on single-family hosts it binds the available
+	// family. Hardcoding "0.0.0.0" would be IPv4-only and fail on IPv6-only
+	// clusters.
+	addr := net.JoinHostPort("", strconv.Itoa(conf.Port))
 
 	switch s.proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := util.NewPacketConnPool(s.name, rt.Net, rt.UdpThreadNum, rt.Telemetry)
+		socketPool := netutil.NewPacketConnPool(s.name, rt.Net, rt.UdpThreadNum, rt.Telemetry)
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
 		conns, err := socketPool.ListenPacket("udp", addr)
@@ -78,7 +84,8 @@ func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
-		tcpListener = telemetry.NewListener(tcpListener, s.name, telemetry.ListenerType, rt.Telemetry)
+		tcpListener = netutil.NewListener(tcpListener, s.name, telemetry.ListenerType,
+			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              tcpListener,
 			RelayAddressGenerator: relay,
@@ -100,7 +107,8 @@ func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
-		tlsListener = telemetry.NewListener(tlsListener, s.name, telemetry.ListenerType, rt.Telemetry)
+		tlsListener = netutil.NewListener(tlsListener, s.name, telemetry.ListenerType,
+			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              tlsListener,
 			RelayAddressGenerator: relay,
@@ -123,7 +131,8 @@ func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
-		dtlsListener = telemetry.NewListener(dtlsListener, s.name, telemetry.ListenerType, rt.Telemetry)
+		dtlsListener = netutil.NewListener(dtlsListener, s.name, telemetry.ListenerType,
+			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              dtlsListener,
 			RelayAddressGenerator: relay,

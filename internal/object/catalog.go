@@ -39,11 +39,11 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewStunner(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{full}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultStunnerName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultStunnerName },
 	})
 
 	register(KindSpec{
@@ -56,12 +56,12 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewAdmin(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cp := full.Admin
 			return []stnrv1.Config{&cp}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultAdminName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultAdminName },
 	})
 
 	register(KindSpec{
@@ -69,12 +69,12 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewAuth(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			cp := full.Auth
 			return []stnrv1.Config{&cp}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultAuthName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultAuthName },
 	})
 
 	register(KindSpec{
@@ -82,7 +82,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewHealth(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			endpoint := defaultHealthEndpoint()
 			if full.Admin.HealthCheckEndpoint != nil {
 				endpoint = *full.Admin.HealthCheckEndpoint
@@ -90,7 +90,7 @@ func NewCatalog() *Catalog {
 			return []stnrv1.Config{&HealthConfig{Endpoint: endpoint}}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultHealthName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultHealthName },
 	})
 
 	register(KindSpec{
@@ -98,11 +98,11 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewMetrics(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{&MetricsConfig{Endpoint: full.Admin.MetricsEndpoint}}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultMetricsName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultMetricsName },
 	})
 
 	register(KindSpec{
@@ -110,14 +110,14 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewOffload(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			return []stnrv1.Config{&OffloadConfig{
 				Engine:     full.Admin.OffloadEngine,
 				Interfaces: append([]string(nil), full.Admin.OffloadInterfaces...),
 			}}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(_ runtime.Runnable) string { return stnrv1.DefaultOffloadName },
+		SingletonName: func(_ string) string { return stnrv1.DefaultOffloadName },
 	})
 
 	register(KindSpec{
@@ -126,7 +126,7 @@ func NewCatalog() *Catalog {
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewListener(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			out := make([]stnrv1.Config, len(full.Listeners))
 			for i := range full.Listeners {
 				lc := full.Listeners[i]
@@ -145,51 +145,23 @@ func NewCatalog() *Catalog {
 			}
 			return NewListenerServer(listener, rt), nil
 		},
-		ExtractConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
-			return []stnrv1.Config{&runtime.NodeConfig{Name: parent.Name()}}, nil
+		ExtractConfigs: func(parentName string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			return []stnrv1.Config{&runtime.NodeConfig{Name: parentName}}, nil
 		},
 		Singleton:     true,
-		SingletonName: func(parent runtime.Runnable) string { return parent.Name() },
+		SingletonName: func(parentName string) string { return parentName },
 	})
 
 	register(KindSpec{
-		Type:     runtime.TypeCluster,
-		Children: []runtime.ObjectType{runtime.TypeRelay},
+		Type: runtime.TypeCluster,
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewCluster(conf, rt)
 		},
-		ExtractConfigs: func(_ runtime.Runnable, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+		ExtractConfigs: func(_ string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 			out := make([]stnrv1.Config, len(full.Clusters))
 			for i := range full.Clusters {
 				cc := full.Clusters[i]
 				out[i] = &cc
-			}
-			return out, nil
-		},
-	})
-
-	register(KindSpec{
-		Type: runtime.TypeRelay,
-		New: func(parent runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
-			cluster, ok := parent.(*Cluster)
-			if !ok {
-				return nil, fmt.Errorf("catalog: relay parent is not a cluster: %T", parent)
-			}
-			rc, ok := conf.(*RelayConfig)
-			if !ok {
-				return nil, stnrv1.ErrInvalidConf
-			}
-			return NewRelayNode(cluster, rc.Protocol), nil
-		},
-		ExtractConfigs: func(parent runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
-			cluster, ok := parent.(*Cluster)
-			if !ok {
-				return nil, fmt.Errorf("catalog: relay parent is not a cluster: %T", parent)
-			}
-			protos := cluster.Protocols()
-			out := make([]stnrv1.Config, 0, len(protos))
-			for _, proto := range protos {
-				out = append(out, &RelayConfig{Cluster: cluster.Name(), Protocol: proto})
 			}
 			return out, nil
 		},

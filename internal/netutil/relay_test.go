@@ -1,4 +1,4 @@
-package turn
+package netutil
 
 import (
 	"net"
@@ -15,14 +15,9 @@ import (
 
 var connTestLoglevel string = "all:ERROR"
 
-// var connTestLoglevel string = stnrv1.DefaultLogLevel
-// var connTestLoglevel string = "all:INFO"
-// var connTestLoglevel string = "all:TRACE"
-// var connTestLoglevel string = "all:TRACE,vnet:INFO,turn:ERROR,turnc:ERROR"
-
 var testCluster = "test-cluster"
 
-func getChecker(minPort, maxPort int) PortRangeChecker {
+func getChecker(minPort, maxPort int) AdmitFunc {
 	return func(addr net.Addr) (string, bool) {
 		u, ok := addr.(*net.UDPAddr)
 		if !ok {
@@ -61,7 +56,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
+		conn := NewPacketConn(baseConn, testCluster, telemetry.ClusterType, tm, getChecker(10000, 20000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("sending packet")
@@ -91,7 +86,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(10000, 20000), tm, log)
+		conn := NewPacketConn(baseConn, testCluster, telemetry.ClusterType, tm, getChecker(10000, 20000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("sending packet")
@@ -120,7 +115,7 @@ func TestPortRangePacketConn(t *testing.T) {
 		msg := "PING!"
 
 		log.Debug("creating filtered packet conn wrappeer socket")
-		conn := NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, log)
+		conn := NewPacketConn(baseConn, testCluster, telemetry.ClusterType, tm, getChecker(15000, 15000), log)
 		assert.NoError(t, err, "should create port-range filtered packetconn")
 
 		log.Debug("sending packet")
@@ -147,7 +142,6 @@ func TestPortRangePacketConn(t *testing.T) {
 func BenchmarkPortRangePacketConn(b *testing.B) {
 	loggerFactory := logger.NewLoggerFactory(connTestLoglevel)
 	log := loggerFactory.NewLogger("test")
-	//	relayLog := loggerFactory.WithRateLimiter(.25, 1).NewLogger("relay")
 	relayLog := log
 
 	log.Debug("creating vnet")
@@ -169,10 +163,7 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	msg := "PING!"
 
 	log.Debug("creating filtered packet conn wrappeer socket")
-	conn := WithCounter(NewPortRangePacketConn(baseConn, getChecker(15000, 15000), tm, relayLog))
-	if err != nil {
-		b.Fatalf("Cannot create port-range packetconn: %s", err.Error())
-	}
+	conn := withCounter(NewPacketConn(baseConn, testCluster, telemetry.ClusterType, tm, getChecker(15000, 15000), relayLog))
 
 	udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 	if err != nil {
@@ -196,12 +187,12 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 		conn.ReadFrom(buffer) //nolint:errcheck
 	}
 
-	readCounter := conn.(*CounterPacketConn).ReadCounter()
+	readCounter := conn.(*counterPacketConn).ReadCounter()
 	if readCounter != 0 {
 		b.Fatalf("Read counter (%d) should be 0", readCounter)
 	}
 
-	writeCounter := conn.(*CounterPacketConn).WriteCounter()
+	writeCounter := conn.(*counterPacketConn).WriteCounter()
 	if writeCounter != 0 {
 		b.Fatalf("Write counter (%d) should be %d", writeCounter, b.N)
 	}
@@ -213,21 +204,17 @@ func BenchmarkPortRangePacketConn(b *testing.B) {
 	}
 }
 
-// CounterPacketConn is a net.PacketConn that filters on the target port range.
-type CounterPacketConn struct {
+// counterPacketConn is a net.PacketConn that counts successful reads/writes.
+type counterPacketConn struct {
 	net.PacketConn
 	readCounter, writeCounter int
 }
 
-// WithCounter decorates a PacketConn with a counter.
-func WithCounter(c net.PacketConn) net.PacketConn {
-	return &CounterPacketConn{
-		PacketConn: c,
-	}
+func withCounter(c net.PacketConn) net.PacketConn {
+	return &counterPacketConn{PacketConn: c}
 }
 
-// WriteTo writes to the PacketConn.
-func (c *CounterPacketConn) WriteTo(p []byte, peerAddr net.Addr) (int, error) {
+func (c *counterPacketConn) WriteTo(p []byte, peerAddr net.Addr) (int, error) {
 	n, err := c.PacketConn.WriteTo(p, peerAddr)
 	if err == nil {
 		c.writeCounter++
@@ -235,8 +222,7 @@ func (c *CounterPacketConn) WriteTo(p []byte, peerAddr net.Addr) (int, error) {
 	return n, err
 }
 
-// ReadFrom reads from the CounterPacketConn.
-func (c *CounterPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+func (c *counterPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 	n, addr, err := c.PacketConn.ReadFrom(p)
 	if err == nil {
 		c.readCounter++
@@ -244,5 +230,5 @@ func (c *CounterPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
 	return n, addr, err
 }
 
-func (c *CounterPacketConn) ReadCounter() int  { return c.readCounter }
-func (c *CounterPacketConn) WriteCounter() int { return c.writeCounter }
+func (c *counterPacketConn) ReadCounter() int  { return c.readCounter }
+func (c *counterPacketConn) WriteCounter() int { return c.writeCounter }

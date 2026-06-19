@@ -1,6 +1,6 @@
 //go:build linux
 
-package util
+package netutil
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func (p *unixPacketConnPool) ListenPacket(network, address string) ([]net.Packet
 			return []net.PacketConn{}, fmt.Errorf("failed to create PacketConn "+
 				"%d at %s (REUSEPORT: %t): %s", i, address, (p.size > 0), err)
 		}
-		conn = telemetry.NewPacketConn(conn, p.listenerName, telemetry.ListenerType, p.telemetry)
+		conn = NewPacketConn(conn, p.listenerName, telemetry.ListenerType, p.telemetry, nil, nil)
 		conns = append(conns, conn)
 	}
 

@@ -13,18 +13,18 @@ import (
 // rt.GetConfig(TypeAuth, ""), which loads the atomic snapshot published by Reconcile.
 type Auth struct {
 	authType                          stnrv1.AuthType
-	Realm, Username, Password, Secret string
+	realm, username, password, secret string
 
 	// conf is the atomic snapshot read by the auth handler on the request path.
 	conf atomic.Pointer[stnrv1.AuthConfig]
 
-	Log logging.LeveledLogger
+	log logging.LeveledLogger
 }
 
 // NewAuth creates an Auth object.
 func NewAuth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Auth{
-		Log: rt.Logger.NewLogger("auth"),
+		log: rt.Logger.NewLogger("auth"),
 	}
 	if conf == nil {
 		return a, nil
@@ -63,33 +63,33 @@ func (a *Auth) Reconcile(conf stnrv1.Config) error {
 		return err
 	}
 	atype, _ := stnrv1.NewAuthType(req.Type)
-	a.Log.Debugf("using authentication: %s", atype.String())
+	a.log.Debugf("using authentication: %s", atype.String())
 
 	a.authType = atype
-	a.Realm = req.Realm
-	a.Username, a.Password, a.Secret = "", "", ""
+	a.realm = req.Realm
+	a.username, a.password, a.secret = "", "", ""
 	switch atype {
 	case stnrv1.AuthTypeNone:
 	case stnrv1.AuthTypeStatic:
-		a.Username = req.Credentials["username"]
-		a.Password = req.Credentials["password"]
+		a.username = req.Credentials["username"]
+		a.password = req.Credentials["password"]
 	case stnrv1.AuthTypeEphemeral:
-		a.Secret = req.Credentials["secret"]
+		a.secret = req.Credentials["secret"]
 	}
 
 	// Publish the snapshot for the request path.
 	snap := &stnrv1.AuthConfig{
 		Type:        atype.String(),
-		Realm:       a.Realm,
+		Realm:       a.realm,
 		Credentials: make(map[string]string),
 	}
 	switch atype {
 	case stnrv1.AuthTypeNone:
 	case stnrv1.AuthTypeStatic:
-		snap.Credentials["username"] = a.Username
-		snap.Credentials["password"] = a.Password
+		snap.Credentials["username"] = a.username
+		snap.Credentials["password"] = a.password
 	case stnrv1.AuthTypeEphemeral:
-		snap.Credentials["secret"] = a.Secret
+		snap.Credentials["secret"] = a.secret
 	}
 	a.conf.Store(snap)
 	return nil

@@ -5,9 +5,20 @@ import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-type createRef struct {
-	Object runtime.Runnable
-	Parent runtime.Runnable
+// createPlan is a deferred construction: the plan walk records what to build (kind, config, and
+// parent identity), and the construct phase calls New parents-first once the walk is complete.
+type createPlan struct {
+	typ        runtime.ObjectType
+	config     stnrv1.Config
+	parentType runtime.ObjectType
+	parentName string
+}
+
+// constructedRef is an object built by the construct phase, awaiting registration. Registration
+// is deferred until after reconcile so a reconcile failure leaves the registry untouched.
+type constructedRef struct {
+	obj    runtime.Runnable
+	parent runtime.Runnable
 }
 
 type reconcileRef struct {
@@ -17,7 +28,7 @@ type reconcileRef struct {
 
 type ops struct {
 	reconcile      []reconcileRef
-	create         []createRef
+	create         []createPlan
 	delete         []runtime.Runnable
 	start          []runtime.Runnable
 	stop           []runtime.Runnable

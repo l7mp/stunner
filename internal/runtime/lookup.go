@@ -1,8 +1,6 @@
 package runtime
 
 import (
-	"strings"
-
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
@@ -93,24 +91,4 @@ func (rt *Runtime) reconcilable(objType ObjectType, name string) Reconcilable {
 		return nil
 	}
 	return r
-}
-
-// RelayName builds the registry name of a cluster relay node. It is the single authority on
-// relay naming: relays are keyed by cluster plus protocol today; when multiple relays per
-// protocol become possible (e.g., port-qualified relays), extend the key here.
-func RelayName(cluster string, proto stnrv1.ClusterProtocol) string {
-	return cluster + "/" + strings.ToLower(proto.String())
-}
-
-// GetRelay resolves the relay of a cluster for a given protocol from the registry.
-func (rt *Runtime) GetRelay(cluster string, proto stnrv1.ClusterProtocol) (Relay, bool) {
-	o, ok := rt.Registry.Get(TypeRelay, RelayName(cluster, proto))
-	if !ok {
-		return nil, false
-	}
-	r, ok := o.(Relay)
-	if !ok {
-		return nil, false
-	}
-	return r, true
 }

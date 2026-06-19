@@ -10,8 +10,6 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4"
 
-	"github.com/l7mp/stunner/internal/object/tcp"
-	"github.com/l7mp/stunner/internal/object/udp"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/util"
@@ -19,43 +17,43 @@ import (
 )
 
 // Cluster represents a set of upstream peers to which STUNner can relay traffic. Static clusters
-// hold IP/CIDR endpoints; strict-DNS clusters resolve domain names in the background. The actual
-// relay implementations live in the cluster's per-protocol RelayNode children; the cluster only
-// holds the reconciled endpoint state, published as an atomic snapshot for the packet path.
+// hold IP/CIDR endpoints; strict-DNS clusters resolve domain names in the background. The cluster
+// holds the reconciled state as an atomic snapshot for the packet path (read by the Router via
+// GetConfig) and owns the strict-DNS domain registration lifecycle.
 type Cluster struct {
-	name      string
-	clusterTy stnrv1.ClusterType
-	Protocol  stnrv1.ClusterProtocol
-	Endpoints []*util.Endpoint
-	Domains   []string
-	Resolver  resolver.DnsResolver
-	Net       transport.Net
+	name     string
+	resolver resolver.DnsResolver
+	net      transport.Net
 
-	// state is the atomic snapshot read by Match on the packet path.
+	// state is the atomic snapshot of reconciled cluster data, published by Reconcile and read
+	// back (via GetConfig) by the Router and config consumers without locking.
 	state atomic.Pointer[clusterState]
+
+	// registered holds the strict-DNS domains registered with the resolver by Start, so Close
+	// unregisters exactly those. Touched only on the reconcile path.
+	registered []string
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
 }
 
-// clusterState is the immutable endpoint snapshot published by Reconcile and read by the
-// dataplane (Match) without locking.
+// clusterState is the immutable snapshot of reconciled cluster data: the single source of truth
+// for a cluster's type, protocol, and endpoint set.
 type clusterState struct {
-	clusterTy stnrv1.ClusterType
-	endpoints []*util.Endpoint
-	domains   []string
+	clusterType stnrv1.ClusterType
+	protocol    stnrv1.ClusterProtocol
+	endpoints   []*util.Endpoint
+	domains     []string
 }
 
 // NewCluster creates a Cluster object.
 func NewCluster(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	if conf == nil {
 		return &Cluster{
-			Endpoints: []*util.Endpoint{},
-			Domains:   []string{},
-			Resolver:  rt.Resolver,
-			Net:       rt.Net,
-			rt:        rt,
-			log:       rt.Logger.NewLogger("cluster"),
+			resolver: rt.Resolver,
+			net:      rt.Net,
+			rt:       rt,
+			log:      rt.Logger.NewLogger("cluster"),
 		}, nil
 	}
 	req, ok := conf.(*stnrv1.ClusterConfig)
@@ -66,13 +64,11 @@ func NewCluster(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 		return nil, err
 	}
 	c := &Cluster{
-		name:      req.Name,
-		Endpoints: []*util.Endpoint{},
-		Domains:   []string{},
-		Resolver:  rt.Resolver,
-		Net:       rt.Net,
-		rt:        rt,
-		log:       rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
+		name:     req.Name,
+		resolver: rt.Resolver,
+		net:      rt.Net,
+		rt:       rt,
+		log:      rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
 	}
 	if err := c.Reconcile(req); err != nil {
 		return nil, err
@@ -82,13 +78,6 @@ func NewCluster(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 
 func (c *Cluster) Name() string             { return c.name }
 func (c *Cluster) Type() runtime.ObjectType { return runtime.TypeCluster }
-
-// Protocols returns the relay protocols this cluster serves. The relay-node kind derives the
-// desired relay set from this, so adding a protocol here spawns a new relay node on the next
-// reconcile without bouncing the existing ones.
-func (c *Cluster) Protocols() []stnrv1.ClusterProtocol {
-	return []stnrv1.ClusterProtocol{c.Protocol}
-}
 
 func (c *Cluster) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv1.ClusterConfig)
@@ -124,19 +113,20 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 		return err
 	}
 	c.log.Tracef("reconcile: %s", req.String())
-	c.name = req.Name
-	c.clusterTy, _ = stnrv1.NewClusterType(req.Type)
-	c.Protocol, _ = stnrv1.NewClusterProtocol(req.Protocol)
-	c.Endpoints = []*util.Endpoint{}
-	c.Domains = []string{}
 
-	switch c.Protocol {
+	c.name = req.Name
+	clusterType, _ := stnrv1.NewClusterType(req.Type)
+	protocol, _ := stnrv1.NewClusterProtocol(req.Protocol)
+
+	switch protocol {
 	case stnrv1.ClusterProtocolUDP, stnrv1.ClusterProtocolTCP:
 	default:
-		return fmt.Errorf("unsupported cluster protocol %q", c.Protocol.String())
+		return fmt.Errorf("unsupported cluster protocol %q", protocol.String())
 	}
 
-	switch c.clusterTy {
+	var endpoints []*util.Endpoint
+	var domains []string
+	switch clusterType {
 	case stnrv1.ClusterTypeStatic:
 		for _, e := range req.Endpoints {
 			ep, err := util.ParseEndpoint(e)
@@ -145,20 +135,21 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 					c.name, e, err.Error())
 				continue
 			}
-			c.Endpoints = append(c.Endpoints, ep)
+			endpoints = append(endpoints, ep)
 		}
 	case stnrv1.ClusterTypeStrictDNS:
-		if c.Resolver == nil {
+		if c.resolver == nil {
 			return fmt.Errorf("sTRICT_DNS cluster %q initialized with no DNS resolver", c.name)
 		}
-		c.Domains = append([]string(nil), req.Endpoints...)
+		domains = append([]string(nil), req.Endpoints...)
 	}
 
-	// Publish the endpoint snapshot for the packet path.
+	// Publish the snapshot for the packet path.
 	c.state.Store(&clusterState{
-		clusterTy: c.clusterTy,
-		endpoints: append([]*util.Endpoint(nil), c.Endpoints...),
-		domains:   append([]string(nil), c.Domains...),
+		clusterType: clusterType,
+		protocol:    protocol,
+		endpoints:   endpoints,
+		domains:     domains,
 	})
 
 	c.rt.Router.InvalidateCache()
@@ -166,16 +157,14 @@ func (c *Cluster) Reconcile(conf stnrv1.Config) error {
 }
 
 func (c *Cluster) GetConfig() stnrv1.Config {
-	conf := stnrv1.ClusterConfig{
-		Name:     c.name,
-		Protocol: c.Protocol.String(),
-		Type:     c.clusterTy.String(),
-	}
+	conf := stnrv1.ClusterConfig{Name: c.name}
 	state := c.state.Load()
 	if state == nil {
 		return &conf
 	}
-	switch state.clusterTy {
+	conf.Protocol = state.protocol.String()
+	conf.Type = state.clusterType.String()
+	switch state.clusterType {
 	case stnrv1.ClusterTypeStatic:
 		conf.Endpoints = make([]string, len(state.endpoints))
 		for i, e := range state.endpoints {
@@ -184,16 +173,29 @@ func (c *Cluster) GetConfig() stnrv1.Config {
 	case stnrv1.ClusterTypeStrictDNS:
 		conf.Endpoints = make([]string, len(state.domains))
 		copy(conf.Endpoints, state.domains)
-		conf.Endpoints = sort.StringSlice(conf.Endpoints)
+		sort.Strings(conf.Endpoints)
 	}
 	return &conf
 }
 
+// Start registers the cluster's strict-DNS domains with the resolver.
 func (c *Cluster) Start() error {
+	domains := c.strictDNSDomains()
+	for _, d := range domains {
+		if err := c.resolver.Register(d); err != nil {
+			return err
+		}
+	}
+	c.registered = domains
 	return nil
 }
 
+// Close unregisters the strict-DNS domains registered by Start and drops cached routing state.
 func (c *Cluster) Close(_ bool) error {
+	for _, d := range c.registered {
+		c.resolver.Unregister(d)
+	}
+	c.registered = nil
 	c.rt.Router.InvalidateCache()
 	return nil
 }
@@ -208,60 +210,24 @@ func (c *Cluster) Status() stnrv1.Status {
 	return status
 }
 
-// Route returns true if peer is in the cluster's endpoint set.
+// Route returns true if peer is in the cluster's endpoint set (admission via the Router).
 func (c *Cluster) Route(peer net.IP) bool { return c.Match(peer, 0) }
 
-// Match returns true if (peer, port) is in the cluster's endpoint set. If port==0, port is
-// ignored. Safe for concurrent use: reads the endpoint snapshot published by Reconcile.
+// Match returns true if (peer, port) is admitted by the cluster. If port==0, port is ignored.
+// Matching is implemented once, in the Router; this delegates so callers and tests can ask a
+// cluster directly.
 func (c *Cluster) Match(peer net.IP, port int) bool {
-	state := c.state.Load()
-	if state == nil {
-		return false
-	}
-	c.log.Tracef("match: cluster %q type %s peer %s", c.name, state.clusterTy.String(), peer.String())
-	switch state.clusterTy {
-	case stnrv1.ClusterTypeStatic:
-		for _, e := range state.endpoints {
-			if e.Match(peer, port) {
-				return true
-			}
-		}
-	case stnrv1.ClusterTypeStrictDNS:
-		for _, d := range state.domains {
-			hosts, err := c.Resolver.Lookup(d)
-			if err != nil {
-				continue
-			}
-			for _, h := range hosts {
-				if h.Equal(peer) {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return c.rt.Router.Match(c.name, peer, port)
 }
 
-// Relay returns the relay node for a protocol, resolved from the registry.
-func (c *Cluster) Relay(proto stnrv1.ClusterProtocol) (runtime.Relay, bool) {
-	return c.rt.GetRelay(c.name, proto)
-}
-
-// newRelayImpl builds the protocol-specific relay implementation from the cluster's current
-// endpoint snapshot. Called by the cluster's RelayNode children.
-func (c *Cluster) newRelayImpl(proto stnrv1.ClusterProtocol) (runtime.ManagedRelay, error) {
+// strictDNSDomains returns the cluster's strict-DNS domains from the current snapshot, or nil
+// for non-strict-DNS clusters. Used by Start/Close to (un)register domains with the resolver.
+func (c *Cluster) strictDNSDomains() []string {
 	state := c.state.Load()
-	if state == nil {
-		state = &clusterState{}
+	if state == nil || state.clusterType != stnrv1.ClusterTypeStrictDNS {
+		return nil
 	}
-	switch proto {
-	case stnrv1.ClusterProtocolUDP:
-		return udp.NewRelay(c.name, state.clusterTy, state.endpoints, state.domains, c.Resolver, c.Net), nil
-	case stnrv1.ClusterProtocolTCP:
-		return tcp.NewRelay(c.name, state.clusterTy, state.endpoints, state.domains, c.Resolver, c.Net), nil
-	default:
-		return nil, fmt.Errorf("unsupported cluster protocol %q", proto.String())
-	}
+	return append([]string(nil), state.domains...)
 }
 
 func sameStringSet(a, b []string) bool {

@@ -207,11 +207,11 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testRootType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testRootType)(), nil
 			},
 			Singleton:     true,
-			SingletonName: func(_ runtime.Runnable) string { return "root" },
+			SingletonName: func(_ string) string { return "root" },
 		},
 		object.KindSpec{
 			Type:     testGroupType,
@@ -219,7 +219,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testGroupType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testGroupType)(), nil
 			},
 		},
@@ -228,7 +228,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testItemType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ runtime.Runnable, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
 				return env.extractor(testItemType)(), nil
 			},
 		},

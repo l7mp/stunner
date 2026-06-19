@@ -4,7 +4,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/runtime"
@@ -42,24 +41,6 @@ func (o *fakeRunnable) Name() string             { return o.name }
 func (o *fakeRunnable) Type() runtime.ObjectType { return o.typ }
 func (o *fakeRunnable) Start() error             { return nil }
 func (o *fakeRunnable) Close(_ bool) error       { return nil }
-
-type fakeRelay struct {
-	fakeRunnable
-}
-
-func (r *fakeRelay) Validate() error { return nil }
-func (r *fakeRelay) AllocatePacketConn(turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
-	return nil, nil, nil
-}
-func (r *fakeRelay) AllocateListener(turn.AllocateListenerConfig) (net.Listener, net.Addr, error) {
-	return nil, nil, nil
-}
-func (r *fakeRelay) AllocateConn(turn.AllocateConnConfig) (net.Conn, error) {
-	return nil, nil
-}
-func (r *fakeRelay) ClusterName() string              { return "cluster-a" }
-func (r *fakeRelay) Protocol() stnrv1.ClusterProtocol { return stnrv1.ClusterProtocolUDP }
-func (r *fakeRelay) Match(_ net.IP, _ int) bool       { return true }
 
 func newRuntime(t *testing.T) *runtime.Runtime {
 	t.Helper()
@@ -124,17 +105,64 @@ func TestLookupSkipsLifecycleOnly(t *testing.T) {
 	require.Empty(t, rt.GetStatuses(runtime.TypeListenerServer))
 }
 
-func TestRelayLookup(t *testing.T) {
+// addCluster registers a static fake cluster so the Router can resolve and match it via GetConfig.
+func addCluster(t *testing.T, rt *runtime.Runtime, name string, proto stnrv1.ClusterProtocol, endpoints ...string) {
+	t.Helper()
+	c := &fakeReconcilable{
+		name: name,
+		typ:  runtime.TypeCluster,
+		config: &stnrv1.ClusterConfig{
+			Name:      name,
+			Type:      stnrv1.ClusterTypeStatic.String(),
+			Protocol:  proto.String(),
+			Endpoints: endpoints,
+		},
+	}
+	require.NoError(t, rt.Registry.Add(c, nil))
+}
+
+func TestRouterMatch(t *testing.T) {
 	rt := newRuntime(t)
+	addCluster(t, rt, "cluster-a", stnrv1.ClusterProtocolUDP, "10.0.0.0/8")
 
-	relayName := runtime.RelayName("cluster-a", stnrv1.ClusterProtocolUDP)
-	relay := &fakeRelay{fakeRunnable{name: relayName, typ: runtime.TypeRelay}}
-	require.NoError(t, rt.Registry.Add(relay, nil))
+	require.True(t, rt.Router.Match("cluster-a", net.ParseIP("10.0.0.1"), 0))
+	require.True(t, rt.Router.Match("cluster-a", net.ParseIP("10.1.2.3"), 1234))
+	require.False(t, rt.Router.Match("cluster-a", net.ParseIP("192.168.0.1"), 0))
+	require.False(t, rt.Router.Match("nonexistent", net.ParseIP("10.0.0.1"), 0))
+}
 
-	got, ok := rt.GetRelay("cluster-a", stnrv1.ClusterProtocolUDP)
+func TestRouteWithProtocol(t *testing.T) {
+	rt := newRuntime(t)
+	peer := net.ParseIP("10.0.0.1")
+
+	addCluster(t, rt, "cluster-udp", stnrv1.ClusterProtocolUDP, "10.0.0.0/8")
+	addCluster(t, rt, "cluster-tcp", stnrv1.ClusterProtocolTCP, "10.0.0.0/8")
+
+	routes := []string{"cluster-udp", "cluster-tcp"}
+
+	// UDP route resolves only the UDP cluster.
+	got, ok := rt.Router.Route("listener", routes, stnrv1.ClusterProtocolUDP, peer, 1234)
 	require.True(t, ok)
-	require.Equal(t, "cluster-a", got.ClusterName())
+	require.Equal(t, "cluster-udp", got)
 
-	_, ok = rt.GetRelay("cluster-a", stnrv1.ClusterProtocolTCP)
-	require.False(t, ok)
+	// TCP route resolves only the TCP cluster.
+	got, ok = rt.Router.Route("listener", routes, stnrv1.ClusterProtocolTCP, peer, 1234)
+	require.True(t, ok)
+	require.Equal(t, "cluster-tcp", got)
+
+	// Peer cache is keyed per-protocol: a cached UDP lookup does not collide with TCP.
+	gotUDP, okUDP := rt.Router.Route("listener", routes, stnrv1.ClusterProtocolUDP, peer, 80)
+	gotTCP, okTCP := rt.Router.Route("listener", routes, stnrv1.ClusterProtocolTCP, peer, 80)
+	require.True(t, okUDP)
+	require.True(t, okTCP)
+	require.Equal(t, "cluster-udp", gotUDP)
+	require.Equal(t, "cluster-tcp", gotTCP)
+
+	// First-match wins: two same-protocol clusters, first in route order is selected.
+	addCluster(t, rt, "cluster-udp2", stnrv1.ClusterProtocolUDP, "10.0.0.0/8")
+	routes2 := []string{"cluster-udp", "cluster-udp2"}
+	rt.Router.InvalidateCache()
+	got, ok = rt.Router.Route("listener2", routes2, stnrv1.ClusterProtocolUDP, peer, 5000)
+	require.True(t, ok)
+	require.Equal(t, "cluster-udp", got)
 }

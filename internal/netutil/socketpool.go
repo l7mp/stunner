@@ -1,4 +1,4 @@
-package util
+package netutil
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ func (p *defaultPacketConnPool) ListenPacket(network, address string) ([]net.Pac
 			"(REUSEPORT: false): %s", address, err)
 	}
 
-	conn = telemetry.NewPacketConn(conn, p.listenerName, telemetry.ListenerType, p.telemetry)
+	conn = NewPacketConn(conn, p.listenerName, telemetry.ListenerType, p.telemetry, nil, nil)
 	conns = append(conns, conn)
 	return conns, nil
 }

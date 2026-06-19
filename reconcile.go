@@ -21,8 +21,8 @@ func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
 	})
 
 	// Update loglevel after admin reconcile may have changed it.
-	if a := s.GetAdmin(); a != nil && a.LogLevel != "" {
-		s.logger.SetLevel(a.LogLevel)
+	if a := s.GetAdmin(); a != nil && a.LogLevel() != "" {
+		s.logger.SetLevel(a.LogLevel())
 	}
 
 	// Become ready unless we are shutting down, already ready, in rollback, or bootstrapping

@@ -1,6 +1,6 @@
 //go:build !linux
 
-package util
+package netutil
 
 import (
 	"github.com/l7mp/stunner/internal/telemetry"

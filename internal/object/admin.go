@@ -19,9 +19,9 @@ import (
 // Offload: Name/LogLevel/UserQuota/License. Everything that used to drag the whole struct
 // through close+start lives in the sibling Objects.
 type Admin struct {
-	name, LogLevel string
+	name, logLevel string
 	quota          int
-	LicenseManager licensecfg.ConfigManager
+	licenseManager licensecfg.ConfigManager
 	licenseConfig  *stnrv1.LicenseConfig
 
 	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
@@ -35,7 +35,7 @@ type Admin struct {
 // NewAdmin creates an Admin object.
 func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Admin{
-		LicenseManager: licensecfg.New(rt.Logger.NewLogger("license")),
+		licenseManager: licensecfg.New(rt.Logger.NewLogger("license")),
 		rt:             rt,
 		log:            rt.Logger.NewLogger("admin"),
 	}
@@ -116,14 +116,14 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	a.log.Tracef("reconcile: %s", req.String())
 
 	a.name = req.Name
-	a.LogLevel = req.LogLevel
+	a.logLevel = req.LogLevel
 	a.quota = req.UserQuota
-	a.LicenseManager.Reconcile(req.LicenseConfig)
+	a.licenseManager.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
 	a.conf.Store(&stnrv1.AdminConfig{
 		Name:          a.name,
-		LogLevel:      a.LogLevel,
+		LogLevel:      a.logLevel,
 		UserQuota:     a.quota,
 		LicenseConfig: a.licenseConfig,
 	})
@@ -150,8 +150,16 @@ func (a *Admin) Status() stnrv1.Status {
 		HealthCheckEndpoint: healthEndpoint,
 		UserQuota:           strconv.Itoa(conf.UserQuota),
 		OffloadStatus:       fmt.Sprintf("%s[%s]", conf.OffloadEngine, intfs),
-		LicensingInfo:       a.LicenseManager.Status(),
+		LicensingInfo:       a.licenseManager.Status(),
 	}
+}
+
+// LogLevel returns the configured log level. Safe for concurrent use.
+func (a *Admin) LogLevel() string {
+	if own := a.conf.Load(); own != nil {
+		return own.LogLevel
+	}
+	return ""
 }
 
 // UserQuota returns the configured per-user TURN allocation quota. Safe for concurrent use.

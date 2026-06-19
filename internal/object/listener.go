@@ -23,15 +23,15 @@ import (
 // ListenerServer child; the listener itself holds only the reconciled config, published as an
 // atomic snapshot for the TURN request path.
 type Listener struct {
-	name, Realm            string
-	Proto                  stnrv1.ListenerProtocol
-	Addr                   net.IP
-	Port, MinPort, MaxPort int
-	PublicAddr             string
-	PublicPort             int
+	name, realm            string
+	proto                  stnrv1.ListenerProtocol
+	addr                   net.IP
+	port, minPort, maxPort int
+	publicAddr             string
+	publicPort             int
 	rawAddr                string
-	Cert, Key              []byte
-	Routes                 []string
+	cert, key              []byte
+	routes                 []string
 
 	// conf is the atomic snapshot read by the TURN handlers on the request path.
 	conf atomic.Pointer[stnrv1.ListenerConfig]
@@ -39,7 +39,7 @@ type Listener struct {
 	rt           *runtime.Runtime
 	telemetry    *telemetry.Telemetry
 	udpThreadNum int
-	Net          transport.Net
+	net          transport.Net
 	logger       logger.LoggerFactory
 	log          logging.LeveledLogger
 }
@@ -51,7 +51,7 @@ func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error
 			rt:           rt,
 			telemetry:    rt.Telemetry,
 			udpThreadNum: rt.UdpThreadNum,
-			Net:          rt.Net,
+			net:          rt.Net,
 			logger:       rt.Logger,
 			log:          rt.Logger.NewLogger("listener"),
 		}, nil
@@ -66,7 +66,7 @@ func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error
 		rt:           rt,
 		telemetry:    rt.Telemetry,
 		udpThreadNum: rt.UdpThreadNum,
-		Net:          rt.Net,
+		net:          rt.Net,
 		logger:       rt.Logger,
 		log:          rt.Logger.NewLogger(fmt.Sprintf("listener-%s", name)),
 	}
@@ -100,13 +100,13 @@ func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (
 
 	// A restart is only avoidable when Routes and/or PublicIP/PublicPort are the only changes.
 	restart := !(l.name == req.Name &&
-		l.Proto == proto &&
+		l.proto == proto &&
 		l.rawAddr == req.Addr &&
-		l.Port == req.Port &&
-		bytes.Equal(l.Cert, cert) &&
-		bytes.Equal(l.Key, key))
+		l.port == req.Port &&
+		bytes.Equal(l.cert, cert) &&
+		bytes.Equal(l.key, key))
 
-	curRealm := l.Realm
+	curRealm := l.realm
 	if a := l.lookupAuthConfig(); a != nil {
 		curRealm = a.Realm
 	}
@@ -147,10 +147,10 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		return fmt.Errorf("invalid listener address: %s", req.Addr)
 	}
 
-	l.Proto = proto
-	l.Addr = ipAddr
+	l.proto = proto
+	l.addr = ipAddr
 	l.rawAddr = req.Addr
-	l.Port = req.Port
+	l.port = req.Port
 	if proto == stnrv1.ListenerProtocolTURNTLS || proto == stnrv1.ListenerProtocolTURNDTLS {
 		cert, err := base64.StdEncoding.DecodeString(req.Cert)
 		if err != nil {
@@ -160,18 +160,18 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		if err != nil {
 			return fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
 		}
-		l.Cert = cert
-		l.Key = key
+		l.cert = cert
+		l.key = key
 	}
-	l.Realm = stnrv1.DefaultRealm
+	l.realm = stnrv1.DefaultRealm
 	if a := l.lookupAuthConfig(); a != nil {
-		l.Realm = a.Realm
+		l.realm = a.Realm
 	}
-	l.PublicAddr = req.PublicAddr
-	l.PublicPort = req.PublicPort
+	l.publicAddr = req.PublicAddr
+	l.publicPort = req.PublicPort
 
-	l.Routes = make([]string, len(req.Routes))
-	copy(l.Routes, req.Routes)
+	l.routes = make([]string, len(req.Routes))
+	copy(l.routes, req.Routes)
 
 	// Publish the snapshot for the TURN request path.
 	l.conf.Store(l.buildConfig())
@@ -183,27 +183,27 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 // buildConfig renders the listener's live config from its fields. Only called from Reconcile;
 // readers go through the snapshot.
 func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
-	routes := make([]string, len(l.Routes))
-	copy(routes, l.Routes)
+	routes := make([]string, len(l.routes))
+	copy(routes, l.routes)
 	sort.Strings(routes)
 	c := &stnrv1.ListenerConfig{
 		Name:       l.name,
-		Protocol:   l.Proto.String(),
+		Protocol:   l.proto.String(),
 		Addr:       l.rawAddr,
-		Port:       l.Port,
-		PublicAddr: l.PublicAddr,
-		PublicPort: l.PublicPort,
+		Port:       l.port,
+		PublicAddr: l.publicAddr,
+		PublicPort: l.publicPort,
 		Routes:     routes,
 	}
-	c.Cert = string(l.Cert)
-	c.Key = string(l.Key)
+	c.Cert = string(l.cert)
+	c.Key = string(l.key)
 	return c
 }
 
 // String returns a short stable representation, safe as a map key.
 func (l *Listener) String() string {
-	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.name, strings.ToLower(l.Proto.String()),
-		l.Addr, l.Port, l.MinPort, l.MaxPort)
+	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.name, strings.ToLower(l.proto.String()),
+		l.addr, l.port, l.minPort, l.maxPort)
 }
 
 // GetConfig returns a copy of the live listener config. Safe for concurrent use.

@@ -40,140 +40,6 @@ type StunnerReconcileTestConfig struct {
 	tester func(t *testing.T, s *Stunner, err error)
 }
 
-func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
-	t.Helper()
-	if !assert.NotNil(t, h, "auth handler exists") {
-		return "", nil, false
-	}
-	return h(ra)
-}
-
-func mustAuthType(t *testing.T, auth *object.Auth) stnrv1.AuthType {
-	t.Helper()
-	conf, ok := auth.GetConfig().(*stnrv1.AuthConfig)
-	require.True(t, ok)
-	typ, err := stnrv1.NewAuthType(conf.Type)
-	require.NoError(t, err)
-	return typ
-}
-
-func mustClusterType(t *testing.T, cluster *object.Cluster) stnrv1.ClusterType {
-	t.Helper()
-	conf, ok := cluster.GetConfig().(*stnrv1.ClusterConfig)
-	require.True(t, ok)
-	typ, err := stnrv1.NewClusterType(conf.Type)
-	require.NoError(t, err)
-	return typ
-}
-
-func mustAdminName(t *testing.T, admin *object.Admin) string {
-	t.Helper()
-	conf, ok := admin.GetConfig().(*stnrv1.AdminConfig)
-	require.True(t, ok)
-	return conf.Name
-}
-
-func makeRaceConfig(realm string) stnrv1.StunnerConfig {
-	return stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin: stnrv1.AdminConfig{
-			LogLevel: stnrv1.DefaultLogLevel,
-		},
-		Auth: stnrv1.AuthConfig{
-			Type:  stnrv1.AuthTypeStatic.String(),
-			Realm: realm,
-			Credentials: map[string]string{
-				"username": "user",
-				"password": "pass",
-			},
-		},
-		Listeners: []stnrv1.ListenerConfig{{
-			Name:     "default-listener",
-			Protocol: stnrv1.ListenerProtocolTURNUDP.String(),
-			Addr:     "127.0.0.1",
-			Port:     3478,
-			Routes:   []string{"allow-any"},
-		}},
-		Clusters: []stnrv1.ClusterConfig{{
-			Name:      "allow-any",
-			Type:      stnrv1.ClusterTypeStatic.String(),
-			Protocol:  stnrv1.ClusterProtocolUDP.String(),
-			Endpoints: []string{"0.0.0.0/0"},
-		}},
-	}
-}
-
-func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv1.StunnerConfig) {
-	t.Helper()
-	err := s.Reconcile(c)
-	if err == nil {
-		return
-	}
-
-	var restarted stnrv1.ErrRestarted
-	require.True(t, errors.As(err, &restarted), "unexpected reconcile error: %v", err)
-}
-
-func TestConcurrentReadsDuringReconcile(t *testing.T) {
-	s := NewStunner(Options{
-		DryRun:           true,
-		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
-		SuppressRollback: true,
-	})
-	require.NotNil(t, s)
-	defer s.Close()
-
-	a := makeRaceConfig("realm-a")
-	b := makeRaceConfig("realm-b")
-
-	reconcileAllowRestart(t, s, &a)
-
-	stop := make(chan struct{})
-	var wg sync.WaitGroup
-
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-				}
-
-				cfg := s.GetConfig()
-				auth := newAuthHandler(s)
-				if auth != nil {
-					_, _, _ = auth(&turn.RequestAttributes{
-						Username: "user",
-						Realm:    cfg.Auth.Realm,
-						SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000},
-					})
-				}
-
-				for _, l := range s.GetListeners() {
-					p := newPermissionHandler(s, l)
-					if p != nil {
-						_ = p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000}, net.ParseIP("1.1.1.1"))
-					}
-				}
-			}
-		}()
-	}
-
-	for i := 0; i < 100; i++ {
-		if i%2 == 0 {
-			reconcileAllowRestart(t, s, &a)
-		} else {
-			reconcileAllowRestart(t, s, &b)
-		}
-	}
-
-	close(stop)
-	wg.Wait()
-}
-
 var testReconcileDefault = []StunnerReconcileTestConfig{
 	{
 		name: "reconcile-test: default admin",
@@ -211,8 +77,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "user", "username ok")
-			assert.Equal(t, auth.Password, "pass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -231,11 +97,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -243,9 +109,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 
@@ -483,8 +349,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "user", "username ok")
-			assert.Equal(t, auth.Password, "pass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -503,11 +369,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -515,9 +381,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -570,8 +436,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "user", "username ok")
-			assert.Equal(t, auth.Password, "pass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -590,11 +456,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -602,9 +468,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -665,8 +531,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "user", "username ok")
-			assert.Equal(t, auth.Password, "pass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -685,11 +551,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -697,9 +563,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -747,8 +613,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "newuser", "username ok")
-			assert.Equal(t, auth.Password, "pass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "newuser", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -772,11 +638,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -784,9 +650,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -833,8 +699,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
-			assert.Equal(t, auth.Username, "user", "username ok")
-			assert.Equal(t, auth.Password, "newpass", "password ok")
+			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
+			assert.Equal(t, authCreds(t, auth)["password"], "newpass", "password ok")
 
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
@@ -858,11 +724,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -870,9 +736,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -918,7 +784,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			auth := s.GetAuth()
 			assert.Equal(t, stnrv1.AuthTypeEphemeral, mustAuthType(t, auth), "auth type ok")
-			assert.Equal(t, auth.Secret, "newsecret")
+			assert.Equal(t, authCreds(t, auth)["secret"], "newsecret")
 
 			duration, _ := time.ParseDuration("10h")
 			username := a12n.GenerateTimeWindowedUsername(time.Now(), duration, "dummy_user")
@@ -950,11 +816,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
 
@@ -962,9 +828,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener  uses the open cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1021,13 +887,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
-			assert.Equal(t, l.Port, 12345, "listener port ok")
-			assert.Len(t, l.Routes, 2, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, 12345, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
 			// sorted!!!
-			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
@@ -1040,9 +906,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1090,11 +956,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("renamed-listener")
 			assert.NotNil(t, l, "renamed listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, "allow-any", l.Routes[0], "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, "allow-any", listenerConf(t, l).Routes[0], "listener route name ok")
 
 			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
@@ -1140,21 +1006,21 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
-			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Len(t, l.Routes, 2, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
 			// sorted!
-			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1238,19 +1104,19 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1270,13 +1136,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
-			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Len(t, l.Routes, 2, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
 			// sorted!
-			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
 
 			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
@@ -1338,21 +1204,21 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNDTLS, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
-			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNDTLS.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Cert), []byte("dummy-cert")), 0, "listener cert ok")
+			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Key), []byte("dummy-key")), 0, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1372,13 +1238,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
-			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Len(t, l.Routes, 2, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
 			// sorted!
-			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
 
 			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
@@ -1440,21 +1306,21 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTLS, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, bytes.Compare(l.Cert, []byte("dummy-cert")), 0, "listener cert ok")
-			assert.Equal(t, bytes.Compare(l.Key, []byte("dummy-key")), 0, "listener key ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTLS.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Cert), []byte("dummy-cert")), 0, "listener cert ok")
+			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Key), []byte("dummy-key")), 0, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			// listener uses the old cluster for routing
 			p := newPermissionHandler(s, l)
@@ -1474,13 +1340,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNTCP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.2", "listener address ok")
-			assert.Equal(t, l.Port, 1, "listener port ok")
-			assert.Len(t, l.Routes, 2, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
 			// sorted!
-			assert.Equal(t, l.Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, l.Routes[1], "none", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
 
 			p = newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
@@ -1532,21 +1398,21 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, l.Proto, stnrv1.ListenerProtocolTURNUDP, "listener proto ok")
-			assert.Equal(t, l.Addr.String(), "127.0.0.1", "listener address ok")
-			assert.Equal(t, l.Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Equal(t, l.PublicAddr, "127.0.0.2", "listener public address ok")
-			assert.Equal(t, l.PublicPort, 33478, "listener public port ok")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, l.Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Equal(t, listenerConf(t, l).PublicAddr, "127.0.0.2", "listener public address ok")
+			assert.Equal(t, listenerConf(t, l).PublicPort, 33478, "listener public port ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 		},
 	},
 	{
@@ -1615,10 +1481,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
 			_, n, _ := net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1668,14 +1534,14 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "renamed cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
-			assert.Len(t, l.Routes, 1, "listener route count ok")
-			assert.Equal(t, "renamed-cluster", l.Routes[0], "listener route name ok")
+			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
+			assert.Equal(t, "renamed-cluster", listenerConf(t, l).Routes[0], "listener route name ok")
 
 			p := newPermissionHandler(s, l)
 			assert.NotNil(t, p, "permission handler exists")
@@ -1718,10 +1584,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
 			_, n, _ := net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1775,9 +1641,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1:<1-2>", "cluster endpoint ok")
-			assert.Equal(t, c.Endpoints[1].String(), "2.0.0.0/8:<3-4>", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:<1-2>", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.0.0.0/8:<3-4>", "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1831,9 +1697,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1843,10 +1709,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
 			_, n, _ = net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
 
 			// listener still uses the old open cluster for routing
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
@@ -1897,9 +1763,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1909,10 +1775,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
 			_, n, _ = net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, c.Endpoints[1].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
 
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -1962,9 +1828,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 1, "cluster endpoint count ok")
+			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, c.Endpoints[0].String(), n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			p := newPermissionHandler(s, l)
@@ -1974,9 +1840,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
-			assert.Len(t, c.Endpoints, 2, "cluster endpoint count ok")
-			assert.Equal(t, c.Endpoints[0].String(), "1.1.1.1:<1-2>", "cluster endpoint ok")
-			assert.Equal(t, c.Endpoints[1].String(), "2.0.0.0/8:<3-4>", "cluster endpoint ok")
+			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:<1-2>", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.0.0.0/8:<3-4>", "cluster endpoint ok")
 
 			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
@@ -2203,6 +2069,69 @@ func TestStunnerReconcile(t *testing.T) {
 			s.Close()
 		})
 	}
+}
+
+// TestConcurrentReadsDuringReconcile asserts that lockless reads of the atomic snapshots
+// (Auth.conf, Listener.conf, Cluster.state) and the runtime.Router LRU caches stay race-free and
+// panic-free while reconciliation concurrently swaps configs and bounces listeners.
+func TestConcurrentReadsDuringReconcile(t *testing.T) {
+	s := NewStunner(Options{
+		DryRun:           true,
+		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
+		SuppressRollback: true,
+	})
+	require.NotNil(t, s)
+	defer s.Close()
+
+	a := makeRaceConfig("realm-a")
+	b := makeRaceConfig("realm-b")
+
+	reconcileAllowRestart(t, s, &a)
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+
+				cfg := s.GetConfig()
+				auth := newAuthHandler(s)
+				if auth != nil {
+					_, _, _ = auth(&turn.RequestAttributes{
+						Username: "user",
+						Realm:    cfg.Auth.Realm,
+						SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000},
+					})
+				}
+
+				for _, l := range s.GetListeners() {
+					p := newPermissionHandler(s, l)
+					if p != nil {
+						_ = p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000}, net.ParseIP("1.1.1.1"))
+					}
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < 100; i++ {
+		if i%2 == 0 {
+			reconcileAllowRestart(t, s, &a)
+		} else {
+			reconcileAllowRestart(t, s, &b)
+		}
+	}
+
+	close(stop)
+	wg.Wait()
 }
 
 /********************************************
@@ -3356,4 +3285,105 @@ func newPermissionHandler(s *Stunner, l *object.Listener) a12n.PermissionHandler
 	}
 
 	return objectturn.NewPermissionHandler(l.Name(), s.rt, s.log)
+}
+
+func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
+	t.Helper()
+	if !assert.NotNil(t, h, "auth handler exists") {
+		return "", nil, false
+	}
+	return h(ra)
+}
+
+func mustAuthType(t *testing.T, auth *object.Auth) stnrv1.AuthType {
+	t.Helper()
+	conf, ok := auth.GetConfig().(*stnrv1.AuthConfig)
+	require.True(t, ok)
+	typ, err := stnrv1.NewAuthType(conf.Type)
+	require.NoError(t, err)
+	return typ
+}
+
+func mustClusterType(t *testing.T, cluster *object.Cluster) stnrv1.ClusterType {
+	t.Helper()
+	conf, ok := cluster.GetConfig().(*stnrv1.ClusterConfig)
+	require.True(t, ok)
+	typ, err := stnrv1.NewClusterType(conf.Type)
+	require.NoError(t, err)
+	return typ
+}
+
+// clusterEndpoints returns a cluster's reconciled endpoints (or strict-DNS domains) via its
+// public config, used by tests as a proxy now that the cluster keeps no exported endpoint field.
+func clusterEndpoints(t *testing.T, c *object.Cluster) []string {
+	t.Helper()
+	conf, ok := c.GetConfig().(*stnrv1.ClusterConfig)
+	require.True(t, ok)
+	return conf.Endpoints
+}
+
+// listenerConf returns a listener's reconciled config via its public snapshot, used by tests as a
+// proxy now that the listener keeps no exported fields.
+func listenerConf(t *testing.T, l *object.Listener) *stnrv1.ListenerConfig {
+	t.Helper()
+	conf, ok := l.GetConfig().(*stnrv1.ListenerConfig)
+	require.True(t, ok)
+	return conf
+}
+
+// authCreds returns an auth object's reconciled credentials via its public config, used by tests
+// as a proxy now that the auth object keeps no exported credential fields.
+func authCreds(t *testing.T, a *object.Auth) map[string]string {
+	t.Helper()
+	conf, ok := a.GetConfig().(*stnrv1.AuthConfig)
+	require.True(t, ok)
+	return conf.Credentials
+}
+
+func mustAdminName(t *testing.T, admin *object.Admin) string {
+	t.Helper()
+	conf, ok := admin.GetConfig().(*stnrv1.AdminConfig)
+	require.True(t, ok)
+	return conf.Name
+}
+
+func makeRaceConfig(realm string) stnrv1.StunnerConfig {
+	return stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin: stnrv1.AdminConfig{
+			LogLevel: stnrv1.DefaultLogLevel,
+		},
+		Auth: stnrv1.AuthConfig{
+			Type:  stnrv1.AuthTypeStatic.String(),
+			Realm: realm,
+			Credentials: map[string]string{
+				"username": "user",
+				"password": "pass",
+			},
+		},
+		Listeners: []stnrv1.ListenerConfig{{
+			Name:     "default-listener",
+			Protocol: stnrv1.ListenerProtocolTURNUDP.String(),
+			Addr:     "127.0.0.1",
+			Port:     3478,
+			Routes:   []string{"allow-any"},
+		}},
+		Clusters: []stnrv1.ClusterConfig{{
+			Name:      "allow-any",
+			Type:      stnrv1.ClusterTypeStatic.String(),
+			Protocol:  stnrv1.ClusterProtocolUDP.String(),
+			Endpoints: []string{"0.0.0.0/0"},
+		}},
+	}
+}
+
+func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv1.StunnerConfig) {
+	t.Helper()
+	err := s.Reconcile(c)
+	if err == nil {
+		return
+	}
+
+	var restarted stnrv1.ErrRestarted
+	require.True(t, errors.As(err, &restarted), "unexpected reconcile error: %v", err)
 }

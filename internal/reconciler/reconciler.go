@@ -73,7 +73,7 @@ func (r *Reconciler) root() (runtime.Object, error) {
 	if !spec.Singleton || spec.SingletonName == nil {
 		return nil, fmt.Errorf("root kind %q must be a named singleton", spec.Type)
 	}
-	o, ok := r.rt.Registry.Get(spec.Type, spec.SingletonName(nil))
+	o, ok := r.rt.Registry.Get(spec.Type, spec.SingletonName(""))
 	if !ok {
 		return nil, fmt.Errorf("root object not registered")
 	}
@@ -84,12 +84,132 @@ func (r *Reconciler) root() (runtime.Object, error) {
 	return rootObj, nil
 }
 
-// prepareKind diffs the desired instances of one kind under `parent` against the registry,
-// classifies them into operations, and recurses into surviving instances' child kinds.
-func (r *Reconciler) prepareKind(parent runtime.Runnable, spec runtime.KindSpec,
-	full *stnrv1.StunnerConfig, ops *ops) error {
+// run performs one reconcile over the whole tree.
+func (r *Reconciler) run(req *stnrv1.StunnerConfig, dryRun bool) error {
+	// Phase 1: plan. Walk the catalog and classify every node into operations. Nothing is
+	// constructed or mutated here; the walk derives the whole desired tree from configs and
+	// names alone.
+	ops := newOps()
+	rootSpec, _ := r.catalog.Kind(runtime.TypeStunner)
+	if err := r.prepareKind(nil, "", "", rootSpec, req, ops); err != nil {
+		return err
+	}
 
-	desired, err := spec.ExtractConfigs(parent, full)
+	// Phase 2: construct newly desired objects (parents-first), but do not touch the registry
+	// yet: registration is deferred until after reconcile so a reconcile failure leaves the
+	// registry untouched. Construction is side-effect-light (servers start in the start phase),
+	// so it runs even on dry-run; only the lifecycle phases (stop/start) are suppressed.
+	created, err := r.construct(ops)
+	if err != nil {
+		return err
+	}
+
+	// Phase 3: close objects that are in the stop class (children-first within subtrees).
+	if !dryRun {
+		for _, o := range ops.stop {
+			r.log.Debugf("reconciliation: close %s/%s", o.Type(), o.Name())
+			if err := o.Close(false); err != nil {
+				r.log.Warnf("close %s/%s: %s", o.Type(), o.Name(), err.Error())
+			}
+		}
+	}
+
+	// Phase 4: reconcile existing objects whose state has changed.
+	for _, ref := range ops.reconcile {
+		r.log.Tracef("reconciliation: reconcile %s/%s", ref.Object.Type(), ref.Object.Name())
+		if err := ref.Object.Reconcile(ref.Config); err != nil {
+			return fmt.Errorf("reconcile %s/%s: %w", ref.Object.Type(), ref.Object.Name(), err)
+		}
+	}
+
+	// Phase 5: register the constructed objects with the registry (parents-first).
+	for _, cr := range created {
+		r.log.Debugf("reconciliation: add %s/%s", cr.obj.Type(), cr.obj.Name())
+		if err := r.rt.Registry.Add(cr.obj, cr.parent); err != nil {
+			return fmt.Errorf("add %s/%s to registry: %w", cr.obj.Type(), cr.obj.Name(), err)
+		}
+	}
+
+	// Phase 6: delete stale objects.
+	for _, o := range ops.delete {
+		r.log.Debugf("reconciliation: delete %s/%s", o.Type(), o.Name())
+		if err := r.rt.Registry.Remove(o); err != nil {
+			return fmt.Errorf("remove %s/%s from registry: %w", o.Type(), o.Name(), err)
+		}
+	}
+
+	// Phase 7: start objects that are in the start class (parents-first within subtrees).
+	if !dryRun {
+		for _, o := range ops.start {
+			r.log.Debugf("reconciliation: start %s/%s", o.Type(), o.Name())
+			if err := o.Start(); err != nil {
+				return fmt.Errorf("start %s/%s: %w", o.Type(), o.Name(), err)
+			}
+		}
+	}
+
+	r.log.Debugf("reconciliation: done (dry-run=%t) stats: close=%d reconcile=%d create=%d delete=%d start=%d restarted=%d",
+		dryRun, len(ops.stop), len(ops.reconcile), len(ops.create), len(ops.delete), len(ops.start),
+		len(ops.restartedNames))
+
+	return restartedErrorFromOps(ops)
+}
+
+// construct builds the planned new objects, parents-first, and returns them for later
+// registration. The plan walk appends each createPlan before its children's, so iterating in
+// order guarantees a parent is built before its children; a new parent is resolved from the
+// objects built earlier in this phase, an existing parent from the registry. Nothing is added to
+// the registry here (that happens after reconcile), and construction is side-effect-light:
+// servers start in the start phase.
+func (r *Reconciler) construct(ops *ops) ([]constructedRef, error) {
+	built := make(map[string]runtime.Runnable, len(ops.create))
+	out := make([]constructedRef, 0, len(ops.create))
+
+	for _, cp := range ops.create {
+		spec, ok := r.catalog.Kind(cp.typ)
+		if !ok {
+			return nil, fmt.Errorf("catalog missing type %q", cp.typ)
+		}
+
+		name := cp.config.ConfigName()
+
+		var parent runtime.Runnable
+		if cp.parentType != "" {
+			parentKey := string(cp.parentType) + "/" + cp.parentName
+			if p, ok := built[parentKey]; ok {
+				parent = p
+			} else if p, ok := r.rt.Registry.Get(cp.parentType, cp.parentName); ok {
+				parent = p
+			} else {
+				return nil, fmt.Errorf("create %s/%s: parent %s/%s not found",
+					cp.typ, name, cp.parentType, cp.parentName)
+			}
+		}
+
+		r.log.Debugf("reconciliation: create %s/%s", cp.typ, name)
+		obj, err := spec.New(parent, cp.config, r.rt)
+		if err != nil {
+			return nil, fmt.Errorf("create %s/%s: %w", cp.typ, name, err)
+		}
+		if obj == nil {
+			return nil, fmt.Errorf("create %s/%s: constructor returned nil object", cp.typ, name)
+		}
+
+		built[string(cp.typ)+"/"+name] = obj
+		out = append(out, constructedRef{obj: obj, parent: parent})
+		ops.addStart(obj)
+	}
+
+	return out, nil
+}
+
+// prepareKind diffs the desired instances of one kind against the registry, classifies them into
+// operations, and recurses into their child kinds. It is pure planning: it constructs nothing and
+// mutates no object. parentType/parentName identify the owning node (both "" at the root); parent
+// is the owning object (nil at the root and under not-yet-constructed parents) and is used only to
+// scope the stale-instance scan.
+func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.ObjectType, parentName string, spec runtime.KindSpec, full *stnrv1.StunnerConfig, ops *ops) error {
+	desired, err := spec.ExtractConfigs(parentName, full)
 	if err != nil {
 		return fmt.Errorf("kind %q desired-config resolver: %w", spec.Type, err)
 	}
@@ -101,9 +221,9 @@ func (r *Reconciler) prepareKind(parent runtime.Runnable, spec runtime.KindSpec,
 		if spec.SingletonName == nil {
 			return fmt.Errorf("kind %q is singleton but has no singleton-name resolver", spec.Type)
 		}
-		if name := desired[0].ConfigName(); name != spec.SingletonName(parent) {
+		if name := desired[0].ConfigName(); name != spec.SingletonName(parentName) {
 			return fmt.Errorf("kind %q singleton item must be named %q, got %q",
-				spec.Type, spec.SingletonName(parent), name)
+				spec.Type, spec.SingletonName(parentName), name)
 		}
 	}
 
@@ -114,18 +234,14 @@ func (r *Reconciler) prepareKind(parent runtime.Runnable, spec runtime.KindSpec,
 
 		obj, found := r.rt.Registry.Get(spec.Type, name)
 		if !found {
-			r.log.Debugf("reconciliation: create %s/%s", spec.Type, name)
-			newObj, err := spec.New(parent, conf, r.rt)
-			if err != nil {
-				return fmt.Errorf("create %s/%s: %w", spec.Type, name, err)
-			}
-			if newObj == nil {
-				return fmt.Errorf("create %s/%s: constructor returned nil object",
-					spec.Type, name)
-			}
-			ops.create = append(ops.create, createRef{Object: newObj, Parent: parent})
-			ops.addStart(newObj)
-			obj = newObj
+			// Plan the construction; the object (and its children) are built in the
+			// construct phase. obj stays nil, so the recursion plans a fresh subtree.
+			ops.create = append(ops.create, createPlan{
+				typ:        spec.Type,
+				config:     conf,
+				parentType: parentType,
+				parentName: parentName,
+			})
 		} else if reconcilable, ok := obj.(runtime.Object); ok {
 			decision, err := reconcilable.Inspect(reconcilable.GetConfig(), conf, full)
 			if err != nil {
@@ -154,7 +270,7 @@ func (r *Reconciler) prepareKind(parent runtime.Runnable, spec runtime.KindSpec,
 			if !ok {
 				return fmt.Errorf("catalog missing type %q", childType)
 			}
-			if err := r.prepareKind(obj, childSpec, full, ops); err != nil {
+			if err := r.prepareKind(obj, spec.Type, name, childSpec, full, ops); err != nil {
 				return err
 			}
 		}
@@ -169,66 +285,6 @@ func (r *Reconciler) prepareKind(parent runtime.Runnable, spec runtime.KindSpec,
 	}
 
 	return nil
-}
-
-// run performs one reconcile over the whole tree.
-func (r *Reconciler) run(req *stnrv1.StunnerConfig, dryRun bool) error {
-	// Phase 1: identify the objects that require reconciliation/restarting.
-	ops := newOps()
-	rootSpec, _ := r.catalog.Kind(runtime.TypeStunner)
-	if err := r.prepareKind(nil, rootSpec, req, ops); err != nil {
-		return err
-	}
-
-	// Phase 2: close objects that are in the stop class (children-first within subtrees).
-	if !dryRun {
-		for _, o := range ops.stop {
-			r.log.Debugf("reconciliation: close %s/%s", o.Type(), o.Name())
-			if err := o.Close(false); err != nil {
-				r.log.Warnf("close %s/%s: %s", o.Type(), o.Name(), err.Error())
-			}
-		}
-	}
-
-	// Phase 3: reconcile existing objects whose state has changed.
-	for _, ref := range ops.reconcile {
-		r.log.Tracef("reconciliation: reconcile %s/%s", ref.Object.Type(), ref.Object.Name())
-		if err := ref.Object.Reconcile(ref.Config); err != nil {
-			return fmt.Errorf("reconcile %s/%s: %w", ref.Object.Type(), ref.Object.Name(), err)
-		}
-	}
-
-	// Phase 4: register newly created objects with the registry (parents-first).
-	for _, cr := range ops.create {
-		r.log.Debugf("reconciliation: add %s/%s", cr.Object.Type(), cr.Object.Name())
-		if err := r.rt.Registry.Add(cr.Object, cr.Parent); err != nil {
-			return fmt.Errorf("add %s/%s to registry: %w", cr.Object.Type(), cr.Object.Name(), err)
-		}
-	}
-
-	// Phase 5: delete stale objects.
-	for _, o := range ops.delete {
-		r.log.Debugf("reconciliation: delete %s/%s", o.Type(), o.Name())
-		if err := r.rt.Registry.Remove(o); err != nil {
-			return fmt.Errorf("remove %s/%s from registry: %w", o.Type(), o.Name(), err)
-		}
-	}
-
-	// Phase 6: start objects that are in the start class (parents-first within subtrees).
-	if !dryRun {
-		for _, o := range ops.start {
-			r.log.Debugf("reconciliation: start %s/%s", o.Type(), o.Name())
-			if err := o.Start(); err != nil {
-				return fmt.Errorf("start %s/%s: %w", o.Type(), o.Name(), err)
-			}
-		}
-	}
-
-	r.log.Debugf("reconciliation: done (dry-run=%t) stats: close=%d reconcile=%d create=%d delete=%d start=%d restarted=%d",
-		dryRun, len(ops.stop), len(ops.reconcile), len(ops.create), len(ops.delete), len(ops.start),
-		len(ops.restartedNames))
-
-	return restartedErrorFromOps(ops)
 }
 
 // Shutdown closes every object in the tree with shutdown=true (children-first) and removes it

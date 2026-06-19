@@ -99,10 +99,11 @@ func NewPermissionHandler(name string, rt *objruntime.Runtime, log logging.Level
 			return false
 		}
 
-		relay, ok := rt.Router.Route(name, conf.Routes, peer, 0)
+		// Grant if the peer is routable via *any* cluster on the listener's routes.
+		cluster, ok := objruntime.RouteAny(rt, name, conf.Routes, peer)
 		if ok {
 			log.Debugf("permission granted on listener %q for client %q to peer %s via cluster %q",
-				name, src.String(), peerIP, relay.ClusterName())
+				name, src.String(), peerIP, cluster)
 			return true
 		}
 
@@ -170,8 +171,8 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 		OnPermissionCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
 			cluster := ""
 			if conf, ok := rt.GetConfig(objruntime.TypeListener, name).(*stnrv1.ListenerConfig); ok && conf != nil {
-				if relay, ok := rt.Router.Route(name, conf.Routes, peer, 0); ok {
-					cluster = relay.ClusterName()
+				if c, ok := objruntime.RouteAny(rt, name, conf.Routes, peer); ok {
+					cluster = c
 				}
 			}
 			log.Debugf("permission created: client=%s, relay-addr=%s, peer=%s, cluster=%s",
@@ -188,8 +189,8 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 				return
 			}
 			if conf, ok := rt.GetConfig(objruntime.TypeListener, name).(*stnrv1.ListenerConfig); ok && conf != nil {
-				if relay, ok := rt.Router.Route(name, conf.Routes, peerAddr.IP, 0); ok {
-					cluster = relay.ClusterName()
+				if c, ok := rt.Router.Route(name, conf.Routes, stnrv1.ClusterProtocolUDP, peerAddr.IP, 0); ok {
+					cluster = c
 				}
 			}
 			log.Debugf("channel created: listener=%s, cluster=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
