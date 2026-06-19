@@ -42,6 +42,58 @@ func TestBracketIPv6HostPort(t *testing.T) {
 	}
 }
 
+func TestBracketIPv6InURL(t *testing.T) {
+	// Direct coverage of the wrapper. The prefixed-URL cases are the
+	// production input shape — the operator hands stunnerd CDS addresses
+	// with the scheme already attached, and the original #213 patch
+	// missed this branch.
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		// No scheme — wrapper just delegates to bracketIPv6HostPort.
+		{"bare ipv4:port", "1.2.3.4:8080", "1.2.3.4:8080"},
+		{"bare ipv6:port", "2001:db8::1:8080", "[2001:db8::1]:8080"},
+		{"bare hostname:port", "example.com:8080", "example.com:8080"},
+		{"empty", "", ""},
+
+		// http:// prefix only.
+		{"http ipv4", "http://1.2.3.4:8080", "http://1.2.3.4:8080"},
+		{"http ipv6 short", "http://::1:8080", "http://[::1]:8080"},
+		{
+			name: "http production stunner CDS endpoint",
+			in:   "http://2600:1f14:1e98:4505:14dc::9:13478",
+			want: "http://[2600:1f14:1e98:4505:14dc::9]:13478",
+		},
+		{"http already bracketed", "http://[2001:db8::1]:8080", "http://[2001:db8::1]:8080"},
+
+		// With path and query, which is what wsURI ultimately builds.
+		{
+			name: "ws ipv6 with path and query",
+			in:   "ws://2600:1f14:1e98:4505:14dc::9:13478/api/v1/configs/ns/gw?watch=true",
+			want: "ws://[2600:1f14:1e98:4505:14dc::9]:13478/api/v1/configs/ns/gw?watch=true",
+		},
+		{
+			name: "http ipv6 with path only",
+			in:   "http://2001:db8::1:8080/foo/bar",
+			want: "http://[2001:db8::1]:8080/foo/bar",
+		},
+
+		// Don't mangle file:// URLs (no authority).
+		{"file path", "file:///etc/stunnerd.conf", "file:///etc/stunnerd.conf"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := bracketIPv6InURL(tc.in)
+			if got != tc.want {
+				t.Errorf("bracketIPv6InURL(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetURI_IPv6HostPort(t *testing.T) {
 	// Regression test for #213: getURI must not return a URL whose host
 	// retains unbracketed IPv6, because url.Parse can't read that form
@@ -68,6 +120,27 @@ func TestGetURI_IPv6HostPort(t *testing.T) {
 			name:     "ipv4 host:port still works",
 			in:       "10.0.0.1:8080",
 			wantHost: "10.0.0.1",
+			wantPort: "8080",
+		},
+		// Production input shape: operator pre-prefixes the scheme.
+		// These cases failed silently before the bracketIPv6InURL fix —
+		// the test gap that let #213 ship as broken.
+		{
+			name:     "http-prefixed unbracketed ipv6",
+			in:       "http://2001:db8::1:8080",
+			wantHost: "2001:db8::1",
+			wantPort: "8080",
+		},
+		{
+			name:     "ws-prefixed unbracketed ipv6 — production CDS shape",
+			in:       "ws://2600:1f14:1e98:4505:14dc::9:13478",
+			wantHost: "2600:1f14:1e98:4505:14dc::9",
+			wantPort: "13478",
+		},
+		{
+			name:     "http-prefixed already-bracketed (no-op)",
+			in:       "http://[2001:db8::1]:8080",
+			wantHost: "2001:db8::1",
 			wantPort: "8080",
 		},
 	}
