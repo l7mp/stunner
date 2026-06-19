@@ -2,7 +2,9 @@ package client
 
 import (
 	"encoding/json"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -33,7 +35,12 @@ func getURI(addr string) (*url.URL, error) {
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") &&
 		!strings.HasPrefix(addr, "ws://") && !strings.HasPrefix(addr, "wss://") &&
 		!strings.HasPrefix(addr, "file://") {
-		addr = "http://" + addr
+		// Bracket unbracketed IPv6 host:port (RFC 3986) so url.Parse can
+		// read the resulting URL. Without this, an input like
+		// "2001:db8::1:8080" becomes "http://2001:db8::1:8080" which
+		// fails to parse, and downstream dial calls fail with
+		// "too many colons in address". Fixes #213.
+		addr = "http://" + bracketIPv6HostPort(addr)
 	}
 
 	url, err := url.Parse(addr)
@@ -41,6 +48,46 @@ func getURI(addr string) (*url.URL, error) {
 		return nil, err
 	}
 	return url, nil
+}
+
+// bracketIPv6HostPort returns addr unchanged for IPv4:port, hostname:port,
+// already-bracketed [ipv6]:port, and inputs that don't look like host:port
+// at all. For unbracketed IPv6 host:port inputs (e.g. "::1:8080" or
+// "2001:db8::1:8080"), it returns the bracketed form ("[::1]:8080",
+// "[2001:db8::1]:8080") so url.Parse handles them correctly.
+//
+// Note: strings like "::1:8080" are syntactically ambiguous — they are
+// simultaneously valid bare IPv6 addresses and IPv6 host:port pairs. In
+// the CDS client this helper is always called with operator-built
+// host:port input, so the function deliberately biases toward the
+// host:port interpretation when both are plausible. Callers that need to
+// pass a bare IPv6 should bracket it themselves.
+func bracketIPv6HostPort(addr string) string {
+	// Already bracketed.
+	if strings.HasPrefix(addr, "[") {
+		return addr
+	}
+	// net.SplitHostPort succeeds for IPv4:port, hostname:port, [ipv6]:port.
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+	// Otherwise: candidate unbracketed IPv6:port. Split on the last colon
+	// and validate that the suspected port is numeric and the host portion
+	// is a valid IPv6 address. This path also rejects bare IPv6 cleanly
+	// (the trailing colon makes the host portion not parse as IP), so a
+	// caller passing "2001:db8::1" gets it back unchanged.
+	i := strings.LastIndex(addr, ":")
+	if i < 0 {
+		return addr
+	}
+	host, port := addr[:i], addr[i+1:]
+	if _, err := strconv.Atoi(port); err != nil {
+		return addr
+	}
+	if !strings.Contains(host, ":") || net.ParseIP(host) == nil {
+		return addr
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // wsURI returns a websocket url from a HTTP URI.
