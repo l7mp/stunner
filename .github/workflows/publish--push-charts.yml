@@ -20,7 +20,7 @@ jobs:
 
       - name: Trigger release workflow in the stunner-helm repo
         if: ${{ inputs.dev == false || inputs.dev == 'false' }}
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26
         with:
           token: ${{ secrets.WEB_PAT_TOKEN }}
           repo: l7mp/stunner-helm
@@ -29,7 +29,7 @@ jobs:
 
       - name: Trigger release workflow in the stunner-helm repo
         if: ${{ inputs.dev == true || inputs.dev == 'true' }}
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26
         with:
           token: ${{ secrets.WEB_PAT_TOKEN }}
           repo: l7mp/stunner-helm
