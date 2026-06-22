@@ -102,10 +102,6 @@ func bracketIPv6HostPort(addr string) string {
 	if strings.HasPrefix(addr, "[") {
 		return addr
 	}
-	// If the entire string is a valid bare IPv6 address, return it unchanged.
-	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
-		return addr
-	}
 	// net.SplitHostPort succeeds for IPv4:port, hostname:port, [ipv6]:port.
 	if _, _, err := net.SplitHostPort(addr); err == nil {
 		return addr
