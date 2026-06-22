@@ -54,8 +54,8 @@ func getURI(addr string) (*url.URL, error) {
 	return url, nil
 }
 
-// bracketIPv6InURL splits addr into [scheme://][authority][path/query],
-// calls bracketIPv6HostPort on the authority, and rejoins. Required
+// bracketIPv6InURL splits addr into [scheme://][userinfo@][host:port][path/query],
+// calls bracketIPv6HostPort on the host:port portion, and rejoins. Required
 // because the gateway-operator hands stunnerd CDS addresses with the
 // scheme already prefixed (e.g. "http://<ipv6>:<port>") — applying
 // bracketIPv6HostPort to the full string would not match the host:port
@@ -74,7 +74,15 @@ func bracketIPv6InURL(addr string) string {
 		hostport = addr[:pathStart]
 		tail = addr[pathStart:]
 	}
-	return scheme + bracketIPv6HostPort(hostport) + tail
+
+	// Separate userinfo credentials if present
+	userinfo := ""
+	if idx := strings.LastIndex(hostport, "@"); idx != -1 {
+		userinfo = hostport[:idx+1]
+		hostport = hostport[idx+1:]
+	}
+
+	return scheme + userinfo + bracketIPv6HostPort(hostport) + tail
 }
 
 // bracketIPv6HostPort returns addr unchanged for IPv4:port, hostname:port,
@@ -92,6 +100,10 @@ func bracketIPv6InURL(addr string) string {
 func bracketIPv6HostPort(addr string) string {
 	// Already bracketed.
 	if strings.HasPrefix(addr, "[") {
+		return addr
+	}
+	// If the entire string is a valid bare IPv6 address, return it unchanged.
+	if ip := net.ParseIP(addr); ip != nil && ip.To4() == nil {
 		return addr
 	}
 	// net.SplitHostPort succeeds for IPv4:port, hostname:port, [ipv6]:port.
