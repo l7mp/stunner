@@ -36,16 +36,22 @@ func (req *StunnerConfig) Validate() error {
 		return err
 	}
 
-	if req.Listeners == nil {
-		req.Listeners = []ListenerConfig{}
-	} else {
-		for i, l := range req.Listeners {
-			if err := l.Validate(); err != nil {
+	expandedListeners := []ListenerConfig{}
+	for _, l := range req.Listeners {
+		addrs := strings.Split(l.Addr, ",")
+		for i, addr := range addrs {
+			newListener := l
+			if len(addrs) > 1 {
+				newListener.Name = fmt.Sprintf("%s-%d", newListener.Name, i)
+			}
+			newListener.Addr = addr
+			if err := newListener.Validate(); err != nil {
 				return err
 			}
-			req.Listeners[i] = l
+			expandedListeners = append(expandedListeners, newListener)
 		}
 	}
+	req.Listeners = expandedListeners
 
 	if req.Clusters == nil {
 		req.Clusters = []ClusterConfig{}
