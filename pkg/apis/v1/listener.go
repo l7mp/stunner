@@ -2,8 +2,10 @@ package v1
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -111,7 +113,7 @@ func (req *ListenerConfig) String() string {
 		addr = req.Addr
 	}
 
-	status = append(status, fmt.Sprintf("turn://%s:%d?transport=%s", addr, req.Port, req.Protocol))
+	status = append(status, fmt.Sprintf("turn://%s?transport=%s", net.JoinHostPort(addr, strconv.Itoa(req.Port)), req.Protocol))
 
 	a, p := "-", "-"
 	if req.PublicAddr != "" {
@@ -177,9 +179,9 @@ func (req *ListenerConfig) GetListenerURI(rfc7065 bool) (string, error) {
 
 	var uri string
 	if rfc7065 {
-		uri = fmt.Sprintf("%s:%s:%d?transport=%s", service, addr, port, protocol)
+		uri = fmt.Sprintf("%s:%s?transport=%s", service, net.JoinHostPort(addr, strconv.Itoa(port)), protocol)
 	} else {
-		uri = fmt.Sprintf("%s://%s:%d?transport=%s", service, addr, port, protocol)
+		uri = fmt.Sprintf("%s://%s?transport=%s", service, net.JoinHostPort(addr, strconv.Itoa(port)), protocol)
 	}
 	return uri, nil
 }
