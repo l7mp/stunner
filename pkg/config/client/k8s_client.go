@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -176,7 +177,7 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 	// if CDS server address is specified, return it
 	if cdsFlags.Addr != "" {
 		return PodInfo{
-			Addr:  fmt.Sprintf("%s:%d", cdsFlags.Addr, cdsFlags.Port),
+			Addr:  net.JoinHostPort(cdsFlags.Addr, strconv.Itoa(cdsFlags.Port)),
 			Proxy: false,
 		}, nil
 	}
@@ -224,7 +225,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 	// direct connection
 	if podFlags.Addr != "" {
 		return []PodInfo{{
-			Addr:  fmt.Sprintf("%s:%d", podFlags.Addr, podFlags.Port),
+			Addr:  net.JoinHostPort(podFlags.Addr, strconv.Itoa(podFlags.Port)),
 			Proxy: false,
 		}}, nil
 	}

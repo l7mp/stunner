@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -201,8 +202,8 @@ func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
 
 // String returns a short stable representation, safe as a map key.
 func (l *Listener) String() string {
-	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.name, strings.ToLower(l.proto.String()),
-		l.addr, l.port, l.minPort, l.maxPort)
+	return fmt.Sprintf("%s: [%s://%s<%d:%d>]", l.name, strings.ToLower(l.proto.String()),
+		net.JoinHostPort(l.addr.String(), strconv.Itoa(l.port)), l.minPort, l.maxPort)
 }
 
 // GetConfig returns a copy of the live listener config. Safe for concurrent use.
