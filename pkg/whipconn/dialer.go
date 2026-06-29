@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -66,7 +67,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to create PeerConnection: %w", err)
 	}
 
-	d.log.Trace("Creating DataChannel")
+	d.log.Trace("creating DataChannel")
 	dataChannel, err := peerConn.CreateDataChannel("whipconn", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DataChannel: %w", err)
@@ -99,7 +100,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 			return
 		}
 
-		conn.log.Debugf("Creating new connection in data channel %s-%d",
+		conn.log.Debugf("creating new connection in data channel %s-%d",
 			dataChannel.Label(), dataChannel.ID())
 
 		raw, err := dataChannel.Detach()
@@ -117,7 +118,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 
 	// If PeerConnection is closed, close the client
 	peerConn.OnConnectionStateChange(func(p webrtc.PeerConnectionState) {
-		conn.log.Infof("Connection state has changed: %s", p)
+		conn.log.Infof("connection state has changed: %s", p)
 		if p == webrtc.PeerConnectionStateFailed || p == webrtc.PeerConnectionStateClosed {
 			if stopped.Load() {
 				conn.Close() //nolint
@@ -165,7 +166,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("failed to POST WHIP request: %w", err)
 	}
 
-	d.log.Tracef("Received POST response with status code: %d", resp.StatusCode)
+	d.log.Tracef("received POST response with status code: %d", resp.StatusCode)
 
 	if resp.StatusCode != 201 {
 		conn.Close() //nolint
@@ -199,7 +200,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	// Waiting for the connection or errors surfaced from the callbacks
 	select {
 	case <-connCh:
-		d.log.Infof("Creating new connection %s", conn.String())
+		d.log.Infof("creating new connection %s", conn.String())
 		return conn, nil
 	case err := <-errCh:
 		conn.Close() //nolint:errcheck
@@ -216,37 +217,42 @@ type DialerConn struct {
 	peerConn   *webrtc.PeerConnection
 	dataConn   datachannel.ReadWriteCloser
 	resourceId string
-	closed     bool
+	closed     atomic.Bool
+	closeOnce  sync.Once
+	closeErr   error
 	log        logging.LeveledLogger
 }
 
 func (c *DialerConn) Close() error {
-	if c.closed {
-		return nil
-	}
-	c.closed = true
+	c.closeOnce.Do(func() {
+		c.closed.Store(true)
+		c.log.Trace("closing WHIP client connection")
 
-	c.log.Trace("Closing WHIP client connection")
+		uri := makeURL(c.addr, makeResourceURL(c.dialer.config.WHIPEndpoint, c.resourceId))
+		req, err := http.NewRequest("DELETE", uri.String(), nil)
+		if err != nil {
+			c.closeErr = fmt.Errorf("unexpected error building http request: %w", err)
+			return
+		}
+		if c.dialer.config.BearerToken != "" {
+			req.Header.Add("Authorization", "Bearer "+c.dialer.config.BearerToken)
+		}
 
-	uri := makeURL(c.addr, makeResourceURL(c.dialer.config.WHIPEndpoint, c.resourceId))
-	req, err := http.NewRequest("DELETE", uri.String(), nil)
-	if err != nil {
-		return fmt.Errorf("unexpected error building http request: %w", err)
-	}
-	if c.dialer.config.BearerToken != "" {
-		req.Header.Add("Authorization", "Bearer "+c.dialer.config.BearerToken)
-	}
+		if _, err = http.DefaultClient.Do(req); err != nil {
+			c.closeErr = fmt.Errorf("failed WHIP DELETE request: %w", err)
+			return
+		}
 
-	if _, err = http.DefaultClient.Do(req); err != nil {
-		return fmt.Errorf("failed WHIP DELETE request: %w", err)
-	}
+		if err := c.peerConn.Close(); err != nil {
+			c.closeErr = fmt.Errorf("failed to close PeerConnection: %w", err)
+		}
+	})
 
-	// Close the peerconnection
-	if err := c.peerConn.Close(); err != nil {
-		return fmt.Errorf("failed to close PeerConnection: %w", err)
-	}
+	return c.closeErr
+}
 
-	return nil
+func (c *DialerConn) IsClosed() bool {
+	return c.closed.Load()
 }
 
 func (c *DialerConn) Read(b []byte) (int, error) {

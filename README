@@ -1,0 +1,123 @@
+* Local test
+
+- start stunnerd as the dataplane for the Gateway "stunner/udp-gateway":
+
+cd /export/l7mp/stunner
+STUNNER_ADDR=127.0.0.1 STUNNER_NAME=udp-gateway STUNNER_NAMESPACE=stunner STUNNER_CONFIG_ORIGIN=http://127.0.0.1:13478 go run cmd/stunnerd/main.go -l all:TRACE -w --udp-thread-num=1
+
+- start the operator
+
+cd /export/l7mp/stunner-gateway-operator
+go run main.go  -zap-log-level 10
+
+- setup the iperf test:
+    
+cd /export/l7mp/stunner
+kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml 
+kubectl apply -f docs/examples/simple-tunnel/iperf-stunner.yaml
+
+* Benchmark
+
+- run benchmarks
+go test -cpuprofile cpu.prof -bench=. -run=XXX -benchtime=10s
+
+- view profile
+go tool pprof -http=":8001" ./cpu.prof &
+
+* Minikube
+
+minikube start --memory=4096 --cpus=2 --driver=podman --container-runtime=cri-o
+minikube -p minikube podman-env
+
+podman -r build  -t l7mp/stunnerd .
+
+* Dev install
+
+helm repo add stunner https://l7mp.io/stunner
+helm repo update
+helm install stunner-gateway-operator stunner/stunner-gateway-operator-dev --create-namespace --namespace=stunner-system
+helm install stunner stunner/stunner-dev --create-namespace --namespace=stunner
+
+* TLS
+
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -days 365 -key ca.key -out ca.crt -subj "/CN=yourdomain.com"
+kubectl -n stunner create secret tls tls-secret --key ca.key --cert ca.crt
+
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is a WebRTC media gateway for Kubernetes"
+EOF
+
+kubectl apply -f - <<EOF
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: GatewayConfig
+metadata:
+  name: stunner-gatewayconfig
+  namespace: stunner
+spec:
+  logLevel: "all:TRACE"
+  realm: stunner.l7mp.io
+  authType: plaintext
+  userName: "user-1"
+  password: "pass-1"
+EOF
+
+kubectl apply -f - <<EOF                                                                                             
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: Gateway
+metadata:
+  name: tls-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: tls-listener
+      port: 3478
+      protocol: TLS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            namespace: stunner
+            name: tls-secret
+EOF
+
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: media-plane
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: tls-gateway
+  rules:
+    - backendRefs:
+        - name: media-plane
+          namespace: default
+EOF
+
+* running conf
+
+kubectl -n stunner get cm stunnerd-config -o jsonpath='{.data.stunnerd\.conf}' | jq .
+
+* turncat
+
+kubectl apply -f deploy/manifests/udp-greeter.yaml
+export PEER_IP=$(kubectl get svc media-plane -o jsonpath='{.spec.clusterIP}')
+./turncat -i - k8s://stunner/stunnerd-config:tls-listener udp://${PEER_IP}:9001
+
+# local variables:
+# mode: org
+# end:

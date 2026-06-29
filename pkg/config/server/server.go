@@ -61,16 +61,16 @@ func (s *Server) Start(ctx context.Context) error {
 	s.Server = &http.Server{Addr: s.addr, Handler: s.router}
 	l, err := net.Listen("tcp", s.addr)
 	if err != nil {
-		return fmt.Errorf("CDS server failed to listen: %w", err)
+		return fmt.Errorf("cDS server failed to listen: %w", err)
 	}
 
 	go func() {
-		s.log.Info("Starting CDS server", "address", s.addr, "config-patcher-enabled", s.patcher != nil)
+		s.log.Info("starting CDS server", "address", s.addr, "config-patcher-enabled", s.patcher != nil)
 
 		err := s.Serve(l)
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) || errors.Is(err, http.ErrServerClosed) {
-				s.log.Info("Closing config discovery server")
+				s.log.Info("closing config discovery server")
 			} else {
 				s.log.Error(err, "Error closing config discovery server", "error", err.Error())
 			}
@@ -111,7 +111,7 @@ func (s *Server) GetConnTrack() *ConnTrack {
 // RemoveClient forcefully closes a client connection. This is used mainly for testing.
 func (s *Server) RemoveClient(id string) {
 	if conn := s.conns.Get(id); conn != nil {
-		s.log.V(1).Info("Forcefully removing client connection", "config-id", id,
+		s.log.V(1).Info("forcefully removing client connection", "config-id", id,
 			"client", conn.RemoteAddr().String())
 		s.closeConn(conn)
 	}
@@ -120,12 +120,12 @@ func (s *Server) RemoveClient(id string) {
 // PusNodeConfig updates the config at each known client that is subscribed for updates on a
 // given node. This is useful for force pushing a new config when some node address changes.
 func (s *Server) PushNodeConfig(node string) {
-	s.log.V(4).Info("Pusing configs for node", "node", node)
+	s.log.V(4).Info("pusing configs for node", "node", node)
 	s.configs.Push(node)
 }
 
 func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
-	s.log.V(4).Info("Upserting config", "config-id", id, "config", c.String())
+	s.log.V(4).Info("upserting config", "config-id", id, "config", c.String())
 	if namespace, name, ok := NamespacedName(id); ok {
 		s.configs.Upsert(namespace, name, c)
 	}
@@ -138,7 +138,7 @@ func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
 // graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with all active
 // connections allocated to them.
 func (s *Server) DeleteConfig(id string) {
-	s.log.V(4).Info("Deleting config", "config-id", id)
+	s.log.V(4).Info("deleting config", "config-id", id)
 
 	namespace, name, ok := NamespacedName(id)
 	if !ok {
@@ -147,7 +147,7 @@ func (s *Server) DeleteConfig(id string) {
 
 	config := client.ZeroConfig(id)
 	if SuppressConfigDeletion {
-		s.log.Info("Suppressing config update for deleted config", "config-id", id)
+		s.log.Info("suppressing config update for deleted config", "config-id", id)
 		config = nil
 	}
 
@@ -157,7 +157,7 @@ func (s *Server) DeleteConfig(id string) {
 // UpdateConfig receives a set of ids and newConfigs that represent the state-of-the-world at a
 // particular instance of time and generates an update per each change.
 func (s *Server) UpdateConfig(newConfigs []Config) error {
-	s.log.V(4).Info("Processing config updates", "num-configs", len(newConfigs))
+	s.log.V(4).Info("processing config updates", "num-configs", len(newConfigs))
 	oldConfigs := s.configs.Snapshot()
 
 	for _, oldC := range oldConfigs {
@@ -165,11 +165,11 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		for _, newC := range newConfigs {
 			if oldC.Id() == newC.Id() {
 				if !oldC.Config.DeepEqual(newC.Config) {
-					s.log.V(2).Info("Updating config", "config-id", newC.Id(), "config",
+					s.log.V(2).Info("updating config", "config-id", newC.Id(), "config",
 						newC.Config.String())
 					s.UpsertConfig(newC.Id(), newC.Config)
 				} else {
-					s.log.V(2).Info("Config unchanged", "config-id", newC.Id(),
+					s.log.V(2).Info("config unchanged", "config-id", newC.Id(),
 						"old-config", oldC.Config.String(),
 						"new-config", newC.Config.String())
 				}
@@ -179,7 +179,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("Removing config", "config-id", oldC.Id())
+			s.log.V(2).Info("removing config", "config-id", oldC.Id())
 			s.DeleteConfig(oldC.Id())
 		}
 	}
@@ -194,7 +194,7 @@ func (s *Server) UpdateConfig(newConfigs []Config) error {
 		}
 
 		if !found {
-			s.log.V(2).Info("Adding config", "config-id", newC.Id(), "config", newC.Config)
+			s.log.V(2).Info("adding config", "config-id", newC.Id(), "config", newC.Config)
 			s.UpsertConfig(newC.Id(), newC.Config)
 		}
 	}

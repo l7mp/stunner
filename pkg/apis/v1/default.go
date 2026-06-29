@@ -15,6 +15,11 @@ const (
 	DefaultClusterType                   = "STATIC"
 	DefaultAdminName                     = "default-admin-config"
 	DefaultAuthName                      = "default-auth-config"
+	DefaultListenerListName              = "default-listener-list"
+	DefaultClusterListName               = "default-cluster-list"
+	DefaultHealthName                    = "default-health"
+	DefaultMetricsName                   = "default-metrics"
+	DefaultOffloadName                   = "default-offload"
 	DefaultNodeAddressPlaceholder        = "__node_address_placeholder" // guaranteed to not parse as a valid IP
 )
 

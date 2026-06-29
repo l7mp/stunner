@@ -1,0 +1,87 @@
+* Tasks
+
+** Standalone/public TURN server
+- Functionality:
+  - Managed dataplane (coding) (*)
+  - Routing/open-cluster: StaticRoute (coding)
+  - TCP relay (integration)
+  - IPv6 support (coding + integration)
+- Performance:
+  - channel/UDP offload -> eBPF/XDP (coding) (*)
+  - load-testing with iperf and livekit (integration) (*) 
+  - send-indication/UDP offload -> eBPF/XDP (coding)
+  - TCP/TLS offload -> eBFP/sockmap (coding)
+- Observability:
+  - Prometheus fine-tuning/dashboards (integration)
+- Scaling:
+  - STUNner pod/node autoscaling for public-TURN/hostNetwork and media-plane (integration) (*)
+- Security:
+  - TLS/cert-manager (coding + integration)
+  - STUNner mTLS support (coding)
+- Traffic management
+  - Geo-DNS (using External DNS)
+
+** Cloud-native WebRTC media plane/service-mesh
+- STUNner + Scaling + Observability (Prometheus + Grafana) + cloud-integration (DO)
+- Functionality:
+  - Managed dataplane (coding) (*)
+- Performance:
+  - channel/UDP offload -> eBPF/XDP (coding) (*)
+  - load-testing with iperf and livekit (integration) (*) 
+  - send-indication/UDP offload -> eBPF/XDP (coding) (*)
+- Observability:
+  - Prometheus fine-tuning/dashboards (integration) (*)
+- Scaling:
+  - STUNner pod/node autoscaling for public-TURN/hostNetwork and media-plane (integration) (*)
+- Security:
+  - TLS/cert-manager (coding + integration)
+  - STUNner mTLS support (coding)
+- Traffic management
+  - Geo-DNS (integration w/ External DNS)
+  - canary, A/B testing
+  - staged rollouts
+
+** Media server integration/operators
+- Livekit operator
+  - STUNner integration
+  - livekit server
+  - ingress + egress
+
+** Long-term
+- Multi-cluster
+- AI
+- Hoster CPaaS
+- WebTransport
+
+* Milestones
+
+* 2023/Q3:
+- *Product:* -- STUNner operator with different profiles for public-TURN and media-plane
+- Functionality:
+  - Managed dataplane (coding) (*)
+  - Routing/open-cluster: StaticRoute (coding)
+- Performance:
+  - channel/UDP offload -> eBPF/XDP (coding) (*)
+  - load-testing with iperf and livekit (integration) (*) 
+Observability:
+  - Prometheus fine-tuning/dashboards (integration)
+- Scaling:
+  - STUNner pod/node autoscaling for public-TURN/hostNetwork and media-plane (integration) (*)
+
+* 2023/Q4:
+- *Product:* LiveKit operator -> STUNner integration
+- Livekit operator
+  - STUNner integration
+  - livekit server
+- Security:
+  - TLS/cert-manager (coding + integration)
+
+* 2024/Q1:
+- *Product:* Multicluster/Edge + Argo (EW-traffic???) -- for-profit??
+- Traffic management
+  - Geo-DNS (using External DNS)
+
+* 2024/Q2:
+- *Product:* ??
+
+    

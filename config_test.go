@@ -2,6 +2,7 @@ package stunner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -25,10 +26,9 @@ import (
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-var testerLogLevel = zapcore.Level(-10)
-
+// var testerLogLevel = zapcore.Level(-10)
 // var testerLogLevel = zapcore.DebugLevel
-// var testerLogLevel = zapcore.ErrorLevel
+var testerLogLevel = zapcore.ErrorLevel
 
 func mustReadConfig(t *testing.T, ch <-chan *stnrv1.StunnerConfig, timeout time.Duration) *stnrv1.StunnerConfig {
 	t.Helper()
@@ -106,7 +106,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, "user1", "passwd1", net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, true, loggerFactory}
+				"1.2.3.5:5678", true, true, true, loggerFactory, ""}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -525,11 +525,10 @@ func TestStunnerConfigPatcher(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case c := <-confChan:
-				err := stunner.Reconcile(c)
-				if err == ErrRestartRequired {
-					continue
+				if err := stunner.Reconcile(c); err != nil {
+					var restarted stnrv1.ErrRestarted
+					assert.True(t, errors.As(err, &restarted), "reconcile: %v", err)
 				}
-				assert.NoError(t, stunner.Reconcile(c), "reconcile")
 			}
 		}
 	}()

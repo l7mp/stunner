@@ -88,7 +88,8 @@ func (req *StunnerConfig) Validate() error {
 
 // Name returns the name of the object to be configured.
 func (req *StunnerConfig) ConfigName() string {
-	return req.Admin.Name
+	// Singleton root object.
+	return DefaultStunnerName
 }
 
 // DeepEqual compares two configurations.

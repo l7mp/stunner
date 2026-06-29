@@ -7,130 +7,138 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4"
-	"github.com/pion/turn/v5"
 
-	"github.com/l7mp/stunner/internal/util"
+	"github.com/l7mp/stunner/internal/runtime"
+	"github.com/l7mp/stunner/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	"github.com/l7mp/stunner/pkg/logger"
 )
 
-// Listener implements a STUNner listener.
+// Listener implements a STUNner listener. The TURN server it drives lives in the listener's
+// ListenerServer child; the listener itself holds only the reconciled config, published as an
+// atomic snapshot for the TURN request path.
 type Listener struct {
-	Name, Realm            string
-	Proto                  stnrv1.ListenerProtocol
-	Addr                   net.IP
-	Port, MinPort, MaxPort int
-	PublicAddr             string // for GetConfig()
-	PublicPort             int    // for GetConfig()
-	rawAddr                string // net.IP.String() may rewrite the string representation
-	Cert, Key              []byte
-	Conns                  []any // either a set of turn.ListenerConfigs or turn.PacketConnConfigs
-	Server                 *turn.Server
-	Routes                 []string
-	Net                    transport.Net
-	getRealm               RealmHandler
-	getStats               OffloadStatsHandler
-	logger                 logging.LoggerFactory
-	log                    logging.LeveledLogger
+	name, realm            string
+	proto                  stnrv1.ListenerProtocol
+	addr                   net.IP
+	port, minPort, maxPort int
+	publicAddr             string
+	publicPort             int
+	rawAddr                string
+	cert, key              []byte
+	routes                 []string
+
+	// conf is the atomic snapshot read by the TURN handlers on the request path.
+	conf atomic.Pointer[stnrv1.ListenerConfig]
+
+	rt           *runtime.Runtime
+	telemetry    *telemetry.Telemetry
+	udpThreadNum int
+	net          transport.Net
+	logger       logger.LoggerFactory
+	log          logging.LeveledLogger
 }
 
-// NewListener creates a new listener. Requires a server restart (returns ErrRestartRequired)
-func NewListener(conf stnrv1.Config, net transport.Net, realmHandler RealmHandler, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) (Object, error) {
-	req, ok := conf.(*stnrv1.ListenerConfig)
-	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+// NewListener creates a Listener object.
+func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+	if conf == nil {
+		return &Listener{
+			rt:           rt,
+			telemetry:    rt.Telemetry,
+			udpThreadNum: rt.UdpThreadNum,
+			net:          rt.Net,
+			logger:       rt.Logger,
+			log:          rt.Logger.NewLogger("listener"),
+		}, nil
 	}
-
-	// make sure req.Name is correct
+	req := conf.(*stnrv1.ListenerConfig)
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-
-	l := Listener{
-		Name:       req.Name,
-		PublicAddr: req.PublicAddr,
-		PublicPort: req.PublicPort,
-		Net:        net,
-		getRealm:   realmHandler,
-		getStats:   offloadStatsHandler,
-		Conns:      []any{},
-		logger:     logger,
-		log:        logger.NewLogger(fmt.Sprintf("listener-%s", req.Name)),
+	name := req.Name
+	l := &Listener{
+		name:         name,
+		rt:           rt,
+		telemetry:    rt.Telemetry,
+		udpThreadNum: rt.UdpThreadNum,
+		net:          rt.Net,
+		logger:       rt.Logger,
+		log:          rt.Logger.NewLogger(fmt.Sprintf("listener-%s", name)),
 	}
-
-	l.log.Tracef("NewListener: %s", req.String())
-
-	if err := l.Reconcile(req); err != nil && err != ErrRestartRequired {
+	if err := l.Reconcile(req); err != nil {
 		return nil, err
 	}
-
-	return &l, ErrRestartRequired
+	return l, nil
 }
 
-// Inspect examines whether a configuration change requires a reconciliation (returns true if it
-// does) or restart (returns ErrRestartRequired).
-func (l *Listener) Inspect(old, new, full stnrv1.Config) (bool, error) {
-	req, ok := new.(*stnrv1.ListenerConfig)
-	if !ok {
-		return false, stnrv1.ErrInvalidConf
+func (l *Listener) Name() string             { return l.name }
+func (l *Listener) Type() runtime.ObjectType { return runtime.TypeListener }
+
+func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (runtime.Action, error) {
+	req := new.(*stnrv1.ListenerConfig)
+	if err := req.Validate(); err != nil {
+		return runtime.ActionNone, err
 	}
 
-	stunnerConf, ok := full.(*stnrv1.StunnerConfig)
-	if !ok {
-		return false, stnrv1.ErrInvalidConf
-	}
-
-	changed := !old.DeepEqual(req)
+	cur := old.(*stnrv1.ListenerConfig)
+	changed := !cur.DeepEqual(req)
 
 	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
 	cert, err := base64.StdEncoding.DecodeString(req.Cert)
 	if err != nil {
-		return false, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
+		return runtime.ActionNone, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
 	}
 	key, err := base64.StdEncoding.DecodeString(req.Key)
 	if err != nil {
-		return false, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
+		return runtime.ActionNone, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
 	}
 
-	// the only chance we don't need a restart if only the Routes and/or PublicIP/PublicPort change
-	restart := ErrRestartRequired
-	if l.Name == req.Name && // name unchanged (should always be true)
-		l.Proto == proto && // protocol unchanged
-		l.rawAddr == req.Addr && // address unchanged
-		l.Port == req.Port && // ports unchanged
-		bytes.Equal(l.Cert, cert) && // TLS creds unchanged
-		bytes.Equal(l.Key, key) {
-		restart = nil
-	}
+	// A restart is only avoidable when Routes and/or PublicIP/PublicPort are the only changes.
+	restart := !(l.name == req.Name && //nolint:staticcheck
+		l.proto == proto &&
+		l.rawAddr == req.Addr &&
+		l.port == req.Port &&
+		bytes.Equal(l.cert, cert) &&
+		bytes.Equal(l.key, key))
 
-	// if the realm changes then we have to restart
-	if l.Realm != stunnerConf.Auth.Realm {
-		l.log.Tracef("listener %s restarts due to changing auth realm", l.Name)
+	curRealm := l.realm
+	if a := l.lookupAuthConfig(); a != nil {
+		curRealm = a.Realm
+	}
+	desiredRealm := full.Auth.Realm
+	if curRealm != desiredRealm {
+		l.log.Tracef("listener %s restarts due to changing auth realm", l.name)
 		changed = true
-		restart = ErrRestartRequired
+		restart = true
 	}
-
-	return changed, restart
+	if !changed {
+		return runtime.ActionNone, nil
+	}
+	if restart {
+		return runtime.ActionRestart, nil
+	}
+	return runtime.ActionReconcile, nil
 }
 
-// Reconcile updates a listener.
 func (l *Listener) Reconcile(conf stnrv1.Config) error {
-	req, ok := conf.(*stnrv1.ListenerConfig)
-	if !ok {
-		return stnrv1.ErrInvalidConf
-	}
-
-	l.log.Tracef("Reconcile: %s", req.String())
-
+	req := conf.(*stnrv1.ListenerConfig)
+	l.log.Tracef("reconcile: %s", req.String())
 	if err := req.Validate(); err != nil {
 		return err
+	}
+	if l.name == "" {
+		l.name = req.Name
+	}
+	if l.name != req.Name {
+		return fmt.Errorf("cannot rename listener %q to %q", l.name, req.Name)
 	}
 
 	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
 	ipAddr := net.ParseIP(req.Addr)
-	// special-case "localhost"
 	if ipAddr == nil && req.Addr == "localhost" {
 		ipAddr = net.ParseIP("127.0.0.1")
 	}
@@ -138,10 +146,10 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		return fmt.Errorf("invalid listener address: %s", req.Addr)
 	}
 
-	l.Proto = proto
-	l.Addr = ipAddr
+	l.proto = proto
+	l.addr = ipAddr
 	l.rawAddr = req.Addr
-	l.Port = req.Port
+	l.port = req.Port
 	if proto == stnrv1.ListenerProtocolTURNTLS || proto == stnrv1.ListenerProtocolTURNDTLS {
 		cert, err := base64.StdEncoding.DecodeString(req.Cert)
 		if err != nil {
@@ -151,125 +159,102 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		if err != nil {
 			return fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
 		}
-		l.Cert = cert
-		l.Key = key
+		l.cert = cert
+		l.key = key
 	}
-	l.Realm = l.getRealm()
+	l.realm = stnrv1.DefaultRealm
+	if a := l.lookupAuthConfig(); a != nil {
+		l.realm = a.Realm
+	}
+	l.publicAddr = req.PublicAddr
+	l.publicPort = req.PublicPort
 
-	l.PublicAddr = req.PublicAddr
-	l.PublicPort = req.PublicPort
+	l.routes = make([]string, len(req.Routes))
+	copy(l.routes, req.Routes)
 
-	l.Routes = make([]string, len(req.Routes))
-	copy(l.Routes, req.Routes)
+	// Publish the snapshot for the TURN request path.
+	l.conf.Store(l.buildConfig())
 
+	l.rt.Router.InvalidateCache()
 	return nil
 }
 
-// String returns a short stable string representation of the listener, safe for applying as a key in a map.
-func (l *Listener) String() string {
-	uri := fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.Name, strings.ToLower(l.Proto.String()),
-		l.Addr, l.Port, l.MinPort, l.MaxPort)
-	return uri
-}
-
-// ObjectName returns the name of the object.
-func (l *Listener) ObjectName() string {
-	return l.Name
-}
-
-// ObjectType returns the type of the object.
-func (l *Listener) ObjectType() string {
-	return "listener"
-}
-
-// GetConfig returns the configuration of the running listener.
-func (l *Listener) GetConfig() stnrv1.Config {
-	// must be sorted!
-	sort.Strings(l.Routes)
-
+// buildConfig renders the listener's live config from its fields. Only called from Reconcile;
+// readers go through the snapshot.
+func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
+	routes := make([]string, len(l.routes))
+	copy(routes, l.routes)
+	sort.Strings(routes)
 	c := &stnrv1.ListenerConfig{
-		Name:       l.Name,
-		Protocol:   l.Proto.String(),
+		Name:       l.name,
+		Protocol:   l.proto.String(),
 		Addr:       l.rawAddr,
-		Port:       l.Port,
-		PublicAddr: l.PublicAddr,
-		PublicPort: l.PublicPort,
+		Port:       l.port,
+		PublicAddr: l.publicAddr,
+		PublicPort: l.publicPort,
+		Routes:     routes,
 	}
-
-	c.Cert = string(l.Cert)
-	c.Key = string(l.Key)
-
-	c.Routes = make([]string, len(l.Routes))
-	copy(c.Routes, l.Routes)
-
+	c.Cert = string(l.cert)
+	c.Key = string(l.key)
 	return c
 }
 
-// Close closes the TURN server that belongs to the listener.
-func (l *Listener) Close() error {
-	l.log.Tracef("closing %s listener at %s", l.Proto.String(), l.Addr)
+// String returns a short stable representation, safe as a map key.
+func (l *Listener) String() string {
+	return fmt.Sprintf("%s: [%s://%s:%d<%d:%d>]", l.name, strings.ToLower(l.proto.String()),
+		l.addr, l.port, l.minPort, l.maxPort)
+}
 
-	if l.Server != nil {
-		if err := l.Server.Close(); err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
-			return err
-		}
+// GetConfig returns a copy of the live listener config. Safe for concurrent use.
+func (l *Listener) GetConfig() stnrv1.Config {
+	snap := l.conf.Load()
+	if snap == nil {
+		return &stnrv1.ListenerConfig{Name: l.name}
 	}
-	l.Server = nil
+	cp := *snap
+	cp.Routes = make([]string, len(snap.Routes))
+	copy(cp.Routes, snap.Routes)
+	return &cp
+}
 
-	for _, c := range l.Conns {
-		switch l.Proto {
-		case stnrv1.ListenerProtocolTURNUDP:
-			conn, ok := c.(turn.PacketConnConfig)
-			if !ok {
-				continue
-			}
-			_ = conn.PacketConn.Close()
-		case stnrv1.ListenerProtocolTURNTCP, stnrv1.ListenerProtocolTURNTLS, stnrv1.ListenerProtocolTURNDTLS:
-			conn, ok := c.(turn.ListenerConfig)
-			if !ok {
-				continue
-			}
-			_ = conn.Listener.Close()
-		}
-	}
-	l.Conns = []any{}
-
+func (l *Listener) Start() error {
 	return nil
 }
 
-// Status returns the status of the object.
+func (l *Listener) Close(_ bool) error {
+	l.rt.Router.InvalidateCache()
+	return nil
+}
+
 func (l *Listener) Status() stnrv1.Status {
-	return &stnrv1.ListenerStatus{
-		ListenerConfig: l.GetConfig().(*stnrv1.ListenerConfig),
-		Stats:          l.getStats(l.Name, stnrv1.ListenerStat),
+	conf := l.GetConfig().(*stnrv1.ListenerConfig)
+	status := &stnrv1.ListenerStatus{
+		ListenerConfig: conf,
 	}
+	if offloadStatus, ok := l.rt.GetStatus(runtime.TypeOffload, "").(*stnrv1.OffloadStatus); ok {
+		status.Stats = offloadStatus.Listeners[conf.Name]
+	}
+	return status
 }
 
-// ///////////
-// ListenerFactory can create now Listener objects
-type ListenerFactory struct {
-	net                 transport.Net
-	realmHandler        RealmHandler
-	offloadStatsHandler OffloadStatsHandler
-	logger              logging.LoggerFactory
+// AllocationCount returns the number of active allocations on the listener's TURN server.
+func (l *Listener) AllocationCount() int {
+	o, ok := l.rt.Registry.Get(runtime.TypeListenerServer, l.name)
+	if !ok {
+		return 0
+	}
+	s, ok := o.(interface {
+		AllocationCount() int
+	})
+	if !ok {
+		return 0
+	}
+	return s.AllocationCount()
 }
 
-// NewListenerFactory creates a new factory for Listener objects
-func NewListenerFactory(net transport.Net, realmHandler RealmHandler, offloadStatsHandler OffloadStatsHandler, logger logging.LoggerFactory) Factory {
-	return &ListenerFactory{
-		net:                 net,
-		realmHandler:        realmHandler,
-		offloadStatsHandler: offloadStatsHandler,
-		logger:              logger,
-	}
-}
-
-// New can produce a new Listener object from the given configuration. A nil config will create an
-// empty listener object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *ListenerFactory) New(conf stnrv1.Config) (Object, error) {
-	if conf == nil {
-		return &Listener{}, nil
-	}
-
-	return NewListener(conf, f.net, f.realmHandler, f.offloadStatsHandler, f.logger)
+// lookupAuthConfig is the runtime-backed cross-reference used at reconcile time to track auth
+// realm changes.
+func (l *Listener) lookupAuthConfig() *stnrv1.AuthConfig {
+	a, _ := l.rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
+	return a
 }

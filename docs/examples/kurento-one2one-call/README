@@ -1,0 +1,9 @@
+* Build image in minikube
+
+minikube image build -t l7mp/kurento-one2one-call-server .
+minikube -v=5 --alsologtostderr image save l7mp/kurento-one2one-call-server:latest /tmp/img.tar
+sudo podman load -i /tmp/img.tar 
+<possibly podman untag/tag>
+sudo podman login docker.io
+sudo podman push l7mp/kurento-one2one-call-server:latest
+

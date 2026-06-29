@@ -44,8 +44,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Check security vulnerabilites
+        id: scan
         uses: anchore/scan-action@v7
         with:
           path: "."
           fail-build: true
           severity-cutoff: critical
+          output-format: table
+          output-file: grype-results.txt
+      - name: Surface vulnerability report
+        if: always()
+        run: |
+          echo "::group::Grype vulnerability report"
+          cat grype-results.txt || echo "no grype report was produced"
+          echo "::endgroup::"

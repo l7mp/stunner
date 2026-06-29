@@ -39,17 +39,17 @@ var testerTestCases = []struct {
 	{
 		name: "Basic connectivity",
 		tester: func(t *testing.T, ctx context.Context) {
-			log.Debug("Creating dialer")
+			log.Debug("creating dialer")
 			d := whipconn.NewDialer(defaultConfig, loggerFactory)
 			assert.NotNil(t, d)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, defaultICETesterAddr)
 			assert.NoError(t, err)
 
-			log.Debug("Echo test round 1")
+			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
-			log.Debug("Echo test round 2")
+			log.Debug("echo test round 2")
 			echoTest(t, clientConn, "test2")
 
 			assert.NoError(t, clientConn.Close(), "client conn close")
@@ -72,7 +72,7 @@ func TestICETesterConn(t *testing.T) {
 				config = *c.config
 			}
 
-			log.Debug("Running listener loop")
+			log.Debug("running listener loop")
 			go func() {
 				err := runICETesterListener(ctx, defaultICETesterAddr, config)
 				assert.NoError(t, err)

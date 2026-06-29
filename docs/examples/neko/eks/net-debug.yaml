@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: net-debug
+  name: net-debug
+spec:
+  selector:
+    matchLabels:
+      app: net-debug
+  template:
+    metadata:
+      labels:
+        app: net-debug
+    spec:
+      containers:
+      - name: net-debug
+        image: l7mp/net-debug
+
+---        
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: net-debug
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  ports:
+    - port: 5001
+      protocol: UDP
+  type: LoadBalancer
+  selector:
+    app: net-debug

@@ -17,6 +17,6 @@ func NewStub(log logging.LeveledLogger) ConfigManager {
 }
 
 func (s *Stub) Reconcile(config *stnrv1.LicenseConfig) {
-	s.log.Tracef("Licensing status update triggered using config %q", stnrv1.LicensingStatus(config))
+	s.log.Tracef("licensing status update triggered using config %q", stnrv1.LicensingStatus(config))
 	s.baseManager.Reconcile(config)
 }

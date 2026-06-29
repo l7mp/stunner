@@ -8,7 +8,7 @@ import (
 
 // UpdateLicenseStatus updates the licensing status that is served by the server.
 func (s *Server) UpdateLicenseStatus(status stnrv1.LicenseStatus) {
-	s.log.V(4).Info("Processing license status update", "status", status.String())
+	s.log.V(4).Info("processing license status update", "status", status.String())
 	s.licenseStore.Upsert(status)
 }
 

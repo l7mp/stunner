@@ -55,6 +55,7 @@ Let the new version be vX.Y.Z.
 ## License manager
 
 - pull-rebase origin/main: `git pull --rebase origin main`
+- pull-rebase stunner-gateway-operator/main: `git pull --rebase stunner main` and fix conflicts
 - bump `github.com/l7mp/stunner-priv` version to vX.Y.Z in the `go.mod`
 - `go mod tidy`
 - make sure `make test` passes

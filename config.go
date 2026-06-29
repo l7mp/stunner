@@ -9,6 +9,7 @@ import (
 	"github.com/pion/transport/v4"
 
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/config/client"
 )
@@ -54,7 +55,8 @@ type Options struct {
 // NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a server running on the localhost at UDP port 3478, with plain-text authentication using the
-// username/password pair `user:pass`. Health-checks and metric scarping are disabled.
+// username/password pair `user:pass`. Health-checking is enabled at the default endpoint, metric
+// scraping is disabled.
 func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	u, err := ParseUri(uri)
 	if err != nil {
@@ -65,7 +67,9 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
 
-	h := ""
+	// Health-checking is enabled at the default endpoint; this is what Validate would default a
+	// nil pointer to anyway, we just make the intention explicit.
+	h := fmt.Sprintf("http://:%d", stnrv1.DefaultHealthCheckPort)
 	c := &stnrv1.StunnerConfig{
 		ApiVersion: stnrv1.ApiVersion,
 		Admin: stnrv1.AdminConfig{
@@ -112,42 +116,15 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 	return c, nil
 }
 
-// GetConfig returns the configuration of the running STUNner daemon.
+// GetConfig returns the configuration of the running STUNner daemon. The root Object assembles
+// the StunnerConfig from its descendants — see internal/object/stunner.go.
 func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
-	s.log.Tracef("GetConfig")
-
-	// singletons, but we want to avoid panics when GetConfig is called on an uninitialized
-	// STUNner object
-	adminConf := stnrv1.AdminConfig{}
-	if len(s.adminManager.Keys()) > 0 {
-		adminConf = *s.GetAdmin().GetConfig().(*stnrv1.AdminConfig)
+	s.log.Tracef("getConfig")
+	if c, ok := s.rt.GetConfig(runtime.TypeStunner, "").(*stnrv1.StunnerConfig); ok && c != nil {
+		c.ApiVersion = s.version
+		return c
 	}
-
-	authConf := stnrv1.AuthConfig{}
-	if len(s.authManager.Keys()) > 0 {
-		authConf = *s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
-	}
-
-	listeners := s.listenerManager.Keys()
-	clusters := s.clusterManager.Keys()
-
-	c := stnrv1.StunnerConfig{
-		ApiVersion: s.version,
-		Admin:      adminConf,
-		Auth:       authConf,
-		Listeners:  make([]stnrv1.ListenerConfig, len(listeners)),
-		Clusters:   make([]stnrv1.ClusterConfig, len(clusters)),
-	}
-
-	for i, name := range listeners {
-		c.Listeners[i] = *s.GetListener(name).GetConfig().(*stnrv1.ListenerConfig)
-	}
-
-	for i, name := range clusters {
-		c.Clusters[i] = *s.GetCluster(name).GetConfig().(*stnrv1.ClusterConfig)
-	}
-
-	return &c
+	return &stnrv1.StunnerConfig{ApiVersion: s.version}
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.

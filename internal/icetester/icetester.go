@@ -155,7 +155,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	///////// EventInit in-progress
 	t.sendEventInit(EventInit, nil) //nolint:errcheck
 
-	log.Infof("Creating a Kubernetes client")
+	log.Infof("creating a Kubernetes client")
 	k8sConfig, err := t.k8sConfigFlags.ToRESTConfig()
 	if err != nil {
 		return t.sendEventComplete(EventInit,
@@ -176,18 +176,18 @@ func (t *iceTester) Start(ctx context.Context) error {
 	}
 	t.DynamicClient = cs
 
-	// log.Infof("Checking basic connectivity")
+	// log.Infof("checking basic connectivity")
 	// apiGroupList := &unstructured.Unstructured{}
 	// apiGroupList.SetGroupVersionKind(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "APIGroup"})
 	// if _, err := t.get(ctx, apiGroupList, metav1.GetOptions{}); err != nil {
 	// 	return t.sendEventComplete(EventInit,
-	// 		fmt.Errorf("Failed to query API server: %w", err),
+	// 		fmt.Errorf("failed to query API server: %w", err),
 	// 		diagK8sClientError,
 	// 		nil,
 	// 	)
 	// }
 
-	log.Infof("Creating a namespace for testing")
+	log.Infof("creating a namespace for testing")
 	ns := newICETesterNamespace(t.namespace)
 	if _, err := t.get(ctx, ns, metav1.GetOptions{}); err == nil {
 		if t.forceCleanup {
@@ -224,11 +224,11 @@ func (t *iceTester) Start(ctx context.Context) error {
 	defer func() {
 		// do not use ctx: it might have timed out
 		if err := t.delete(context.TODO(), ns, metav1.DeleteOptions{}); err != nil {
-			log.Errorf("Error deleting namespace: %s", err.Error())
+			log.Errorf("error deleting namespace: %s", err.Error())
 		}
 	}()
 
-	log.Infof("Creating custom Dataplane")
+	log.Infof("creating custom Dataplane")
 	d, err := t.makeDataplane(ctx)
 	if err != nil {
 		return t.sendEventComplete(EventInit,
@@ -240,7 +240,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	defer func() {
 		// do not use ctx: it might have timed out
 		if err := t.delete(context.TODO(), d, metav1.DeleteOptions{}); err != nil {
-			log.Errorf("Error deleting custom Dataplane: %s", err.Error())
+			log.Errorf("error deleting custom Dataplane: %s", err.Error())
 		}
 	}()
 
@@ -250,7 +250,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	///////// EventInstallationComplete in-progress
 	t.sendEventInit(EventInstallationComplete, nil) //nolint:errcheck
 
-	log.Infof("Querying CRDs")
+	log.Infof("querying CRDs")
 	for _, crd := range crdCheckList {
 		if _, err := t.getCRD(ctx, crd, metav1.GetOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
@@ -261,7 +261,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		}
 	}
 
-	log.Infof("Inserting tester artifacts")
+	log.Infof("inserting tester artifacts")
 	for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage, t.transports) {
 		if err := t.safelyRemove(ctx, obj, metav1.GetOptions{}, metav1.DeleteOptions{}); err != nil {
 			return t.sendEventComplete(EventInstallationComplete,
@@ -281,23 +281,23 @@ func (t *iceTester) Start(ctx context.Context) error {
 			)
 		}
 
-		log.Debugf("Created resource %s/%s of kind %s", obj.GetNamespace(),
+		log.Debugf("created resource %s/%s of kind %s", obj.GetNamespace(),
 			obj.GetName(), obj.GetKind())
 	}
 	defer func() {
 		for _, obj := range newICETesterICETesterResources(t.namespace, t.iceTesterImage, t.transports) {
 			// do not use ctx: it might have timed out
 			if err := t.delete(context.TODO(), obj, metav1.DeleteOptions{}); err != nil {
-				log.Errorf("Error deleting resource: %s", err.Error())
+				log.Errorf("error deleting resource: %s", err.Error())
 			}
 		}
 	}()
 
-	log.Infof("Checking tester backend")
+	log.Infof("checking tester backend")
 	iceTesterPod := newICETesterBackendPod(t.namespace, t.iceTesterImage)
 	if err := eventually(ctx, t.podStatusChecker(iceTesterPod, metav1.GetOptions{}), 30*time.Second, 250*time.Millisecond); err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
-			fmt.Errorf("ICE tester backend %s/%s not running or ready: %w",
+			fmt.Errorf("iCE tester backend %s/%s not running or ready: %w",
 				iceTesterPod.GetNamespace(), iceTesterPod.GetName(), err),
 			diagFailedToQueryOrCreateArtifacts,
 			nil,
@@ -314,7 +314,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		)
 	}
 
-	log.Info("Searching for CDS server")
+	log.Info("searching for CDS server")
 	cdsPod, err := cdsclient.DiscoverK8sCDSServer(ctx, t.k8sConfigFlags, t.cdsConfigFlags,
 		t.logger.NewLogger("cds-fwd"))
 	if err != nil {
@@ -325,7 +325,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		)
 	}
 
-	log.Info("Searching for authentication service")
+	log.Info("searching for authentication service")
 	authPod, err := cdsclient.DiscoverK8sAuthServer(ctx, t.k8sConfigFlags, t.authConfigFlags,
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
@@ -342,11 +342,11 @@ func (t *iceTester) Start(ctx context.Context) error {
 	///////// EventGatewayAvailable in-progress
 	t.sendEventInit(EventGatewayAvailable, nil) //nolint:errcheck
 
-	log.Info("Checking dataplane")
+	log.Info("checking dataplane")
 	for _, proto := range t.transports {
 		gw := gwFromProto(proto, t.namespace)
 
-		log.Infof("Checing public address for Gateway %s", gw.GetName())
+		log.Infof("checing public address for Gateway %s", gw.GetName())
 		cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsPod.Addr, t.namespace, gw.GetName(), "",
 			t.logger.NewLogger("cds-client"))
 		if err != nil {
@@ -361,7 +361,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		if err := eventually(ctx, func(ctx context.Context) (bool, error) {
 			confs, err := cds.Get(ctx)
 			if err != nil {
-				// log.Tracef("Could not get dataplane config: %w", err)
+				// log.Tracef("could not get dataplane config: %w", err)
 				return false, nil
 			}
 
@@ -402,7 +402,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			)
 		}
 
-		log.Infof("Checking dataplane pod for Gateway %s/%s", gw.GetNamespace(), gw.GetName())
+		log.Infof("checking dataplane pod for Gateway %s/%s", gw.GetNamespace(), gw.GetName())
 		// name is unstable, choose by label
 		opts := metav1.ListOptions{LabelSelector: makeSelector(map[string]string{"app": "my-app", "some-label": "some-value"})}
 		if err := eventually(ctx, t.podListStatusChecker(opts), 60*time.Second, 250*time.Millisecond); err != nil {
@@ -423,11 +423,11 @@ func (t *iceTester) Start(ctx context.Context) error {
 
 	iceServers := map[v1.ListenerProtocol]webrtc.Configuration{}
 	for _, proto := range t.transports {
-		log.Infof("Testing ICE connection over TURN transport %s", proto.String())
+		log.Infof("testing ICE connection over TURN transport %s", proto.String())
 
 		gw := gwFromProto(proto, t.namespace)
 
-		log.Infof("Obtaining ICE server config for Gateway %s/%s", t.namespace, gw.GetName())
+		log.Infof("obtaining ICE server config for Gateway %s/%s", t.namespace, gw.GetName())
 		if err := eventually(ctx, func(ctx context.Context) (bool, error) {
 			u := url.URL{
 				Scheme: "http",
@@ -496,7 +496,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 			///////// EventICETestComplete in-progress
 			t.sendEventInit(eventType, map[string]any{"ICETransport": proto.String()}) //nolint:errcheck
 
-			log.Infof("Performing %s ICE test for ICE transport %s", iceTestType.String(), proto.String())
+			log.Infof("performing %s ICE test for ICE transport %s", iceTestType.String(), proto.String())
 
 			listenerConfig := whipconn.Config{}
 			// in symmetric tests the listener uses the same ICE servers as the dialer
@@ -504,7 +504,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 				listenerConfig.ICEServers = t.updateICEServerAddr(iceConfig.ICEServers, proto)
 				listenerConfig.ICETransportPolicy = webrtc.ICETransportPolicyRelay
 			}
-			log.Debugf("Setting ICE tester listener config: %#v", listenerConfig)
+			log.Debugf("setting ICE tester listener config: %#v", listenerConfig)
 			if err := eventually(ctx, func(ctx context.Context) (bool, error) {
 				uri := url.URL{
 					Scheme: "http",
@@ -552,9 +552,9 @@ func (t *iceTester) Start(ctx context.Context) error {
 			dialerConfig.ICEServers = iceConfig.ICEServers
 			dialerConfig.ICETransportPolicy = webrtc.ICETransportPolicyRelay
 			dialerConfig.WHIPEndpoint = whipconn.WhipEndpoint
-			log.Debugf("Using ICE tester dialer config: %#v", dialerConfig)
+			log.Debugf("using ICE tester dialer config: %#v", dialerConfig)
 
-			log.Debug("Dialing")
+			log.Debug("dialing")
 			var clientConn net.Conn
 			if err := eventually(ctx, func(ctx context.Context) (bool, error) {
 				conn, err := whipconn.NewDialer(dialerConfig, t.logger).DialContext(ctx, whipEndpoint.Addr)

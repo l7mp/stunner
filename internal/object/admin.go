@@ -1,435 +1,179 @@
 package object
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/pion/logging"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
-	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 )
 
-const DefaultAdminObjectName = "DefaultAdmin"
-
-// Admin is the main object holding STUNner administration info.
+// Admin holds the bits of STUNner administration that aren't carved out into
+// Health/Metrics/Offload: Name/LogLevel/UserQuota/License.
 type Admin struct {
-	Name, LogLevel                       string
-	DryRun                               bool
-	MetricsEndpoint, HealthCheckEndpoint string
-	metricsServer, healthCheckServer     *http.Server
-	health                               *http.ServeMux
-	quota                                int
-	offload                              stnrv1.OffloadMode
-	offloadIntfs                         []string
-	LicenseManager                       licensecfg.ConfigManager
-	licenseConfig                        *stnrv1.LicenseConfig
-	log                                  logging.LeveledLogger
+	name, logLevel string
+	quota          int
+	licenseConfig  *stnrv1.LicenseConfig
+
+	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
+	// the allocation path via GetConfig.
+	conf atomic.Pointer[stnrv1.AdminConfig]
+
+	rt  *runtime.Runtime
+	log logging.LeveledLogger
 }
 
-// NewAdmin creates a new Admin object.
-func NewAdmin(conf stnrv1.Config, dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) (Object, error) {
+// NewAdmin creates an Admin object.
+func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+	a := &Admin{
+		rt:  rt,
+		log: rt.Logger.NewLogger("admin"),
+	}
+	if conf == nil {
+		return a, nil
+	}
 	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
 		return nil, stnrv1.ErrInvalidConf
 	}
-
-	admin := Admin{
-		DryRun:         dryRun,
-		health:         http.NewServeMux(),
-		LicenseManager: licensecfg.New(logger.NewLogger("license")),
-		offload:        stnrv1.OffloadEngineNone,
-		log:            logger.NewLogger("admin"),
-	}
-	admin.log.Tracef("NewAdmin: %s", req.String())
-
-	// health checker
-	// liveness probe always succeeds once we got here
-	admin.health.HandleFunc("/live", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{}\n")) //nolint:errcheck
-	})
-
-	// readniness checker calls the checker from the factory
-	admin.health.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if err := rc(); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusServiceUnavailable, err.Error())
-		} else {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusOK, "READY")
-		}
-	})
-
-	// status handler returns the status
-	admin.health.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		if js, err := json.Marshal(status()); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
-				http.StatusInternalServerError, err.Error())
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write(js) //nolint:errcheck
-		}
-	})
-
-	if err := admin.Reconcile(req); err != nil && !errors.Is(err, ErrRestartRequired) {
+	if err := a.Reconcile(req); err != nil {
 		return nil, err
 	}
-
-	return &admin, nil
+	return a, nil
 }
 
-// Inspect examines whether a configuration change requires a reconciliation (returns true if it
-// does) or restart (returns ErrRestartRequired).
-func (a *Admin) Inspect(old, new, full stnrv1.Config) (bool, error) {
-	oldConf, ok := old.(*stnrv1.AdminConfig)
-	if !ok {
-		return false, stnrv1.ErrInvalidConf
+func (a *Admin) Name() string             { return stnrv1.DefaultAdminName }
+func (a *Admin) Type() runtime.ObjectType { return runtime.TypeAdmin }
+
+// GetConfig returns the full AdminConfig, combining the admin's own snapshot with the
+// Health/Metrics/Offload pieces pulled from the live children. Safe for concurrent use.
+func (a *Admin) GetConfig() stnrv1.Config {
+	a.log.Tracef("getConfig")
+
+	out := &stnrv1.AdminConfig{}
+	if own := a.conf.Load(); own != nil {
+		*out = *own
 	}
 
-	newConf, ok := new.(*stnrv1.AdminConfig)
-	if !ok {
-		return false, stnrv1.ErrInvalidConf
+	healthEndpoint := ""
+	if hc, ok := a.rt.GetConfig(runtime.TypeHealth, "").(*HealthConfig); ok && hc != nil {
+		healthEndpoint = hc.Endpoint
+	}
+	out.HealthCheckEndpoint = &healthEndpoint
+
+	if mc, ok := a.rt.GetConfig(runtime.TypeMetrics, "").(*MetricsConfig); ok && mc != nil {
+		out.MetricsEndpoint = mc.Endpoint
 	}
 
-	changed := !oldConf.DeepEqual(newConf)
-
-	// restart the admin object if the offload engine or the interfaces change
-	var restart error
-	if oldConf.OffloadEngine != newConf.OffloadEngine ||
-		!reflect.DeepEqual(oldConf.OffloadInterfaces, newConf.OffloadInterfaces) {
-		restart = ErrRestartRequired
+	out.OffloadEngine = stnrv1.OffloadEngineNone.String()
+	out.OffloadInterfaces = []string{}
+	if oc, ok := a.rt.GetConfig(runtime.TypeOffload, "").(*OffloadConfig); ok && oc != nil {
+		out.OffloadEngine = oc.Engine
+		out.OffloadInterfaces = append([]string{}, oc.Interfaces...)
 	}
-	return changed, restart
+
+	return out
 }
 
-// Reconcile updates the authenticator for a new configuration. Requires a valid reconciliation
-// request.
+func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+	req, ok := new.(*stnrv1.AdminConfig)
+	if !ok {
+		return runtime.ActionNone, stnrv1.ErrInvalidConf
+	}
+	cur := old.(*stnrv1.AdminConfig)
+	// Only compare own-state fields. Sub-fields (Health/Metrics/Offload) are inspected by
+	// their owning Objects.
+	changed := req.Name != cur.Name ||
+		req.LogLevel != cur.LogLevel ||
+		req.UserQuota != cur.UserQuota ||
+		!reflect.DeepEqual(req.LicenseConfig, cur.LicenseConfig)
+	// Admin owns no restartable resources of its own: name/loglevel/quota/license can be
+	// updated in place.
+	if changed {
+		return runtime.ActionReconcile, nil
+	}
+	return runtime.ActionNone, nil
+}
+
 func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	req, ok := conf.(*stnrv1.AdminConfig)
 	if !ok {
 		return stnrv1.ErrInvalidConf
 	}
-
 	if err := req.Validate(); err != nil {
 		return err
 	}
+	a.log.Tracef("reconcile: %s", req.String())
 
-	a.log.Tracef("Reconcile: %s", req.String())
-
-	a.Name = req.Name
-	a.LogLevel = req.LogLevel
-
-	// metrics server reconciliation errors are NOT FATAL: just warn if something goes wrong
-	// but otherwise go on with reconciliation
-	if err := a.reconcileMetrics(req); err != nil {
-		a.log.Warnf("error reconciling metrics server: %s", err.Error())
-	}
-
-	// health-check server reconciliation errors are FATAL (may break Kubernetes
-	// liveness/readiness checks): return any error encountered
-	if err := a.reconcileHealthCheck(req); err != nil {
-		return err
-	}
-
+	a.name = req.Name
+	a.logLevel = req.LogLevel
 	a.quota = req.UserQuota
-
-	a.offload, _ = stnrv1.NewOffloadEngine(req.OffloadEngine)
-	a.offloadIntfs = req.OffloadInterfaces
-
-	a.LicenseManager.Reconcile(req.LicenseConfig)
+	a.rt.License.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
+	a.conf.Store(&stnrv1.AdminConfig{
+		Name:          a.name,
+		LogLevel:      a.logLevel,
+		UserQuota:     a.quota,
+		LicenseConfig: a.licenseConfig,
+	})
 	return nil
 }
 
-// ObjectName returns the name of the object.
-func (a *Admin) ObjectName() string {
-	return stnrv1.DefaultAdminName
-}
+func (a *Admin) Start() error       { return nil }
+func (a *Admin) Close(_ bool) error { return nil }
 
-// ObjectType returns the type of the object.
-func (a *Admin) ObjectType() string {
-	return "admin"
-}
-
-// GetConfig returns the configuration of the running object.
-func (a *Admin) GetConfig() stnrv1.Config {
-	a.log.Tracef("GetConfig")
-
-	// use a copy when taking the pointer: we don't want anyone downstream messing with our own
-	// copies
-	h := a.HealthCheckEndpoint
-
-	return &stnrv1.AdminConfig{
-		Name:                a.Name,
-		LogLevel:            a.LogLevel,
-		MetricsEndpoint:     a.MetricsEndpoint,
-		HealthCheckEndpoint: &h,
-		UserQuota:           a.quota,
-		OffloadEngine:       a.offload.String(),
-		OffloadInterfaces:   a.offloadIntfs,
-		LicenseConfig:       a.licenseConfig,
-	}
-}
-
-// Close closes the Admin object.
-func (a *Admin) Close() error {
-	a.log.Tracef("Close")
-
-	if a.healthCheckServer != nil {
-		if err := a.healthCheckServer.Close(); err != nil {
-			hcAddr := getHealthAddr(a.HealthCheckEndpoint)
-			a.log.Debugf("error closing healthcheck server http://%s: %s",
-				hcAddr, err.Error())
-		}
-	}
-
-	if a.metricsServer != nil {
-		if err := a.metricsServer.Close(); err != nil {
-			mAddr, mPath := getMetricsAddr(a.MetricsEndpoint)
-			a.log.Debugf("error closing metrics server http://%s/%s: %s",
-				mAddr, mPath, a.MetricsEndpoint, err.Error())
-		}
-	}
-
-	return nil
-}
-
-// Status returns the status of the object.
 func (a *Admin) Status() stnrv1.Status {
-	adminConf := a.GetConfig().(*stnrv1.AdminConfig)
+	conf := a.GetConfig().(*stnrv1.AdminConfig)
+	healthEndpoint := ""
+	if conf.HealthCheckEndpoint != nil {
+		healthEndpoint = *conf.HealthCheckEndpoint
+	}
 	intfs := "all"
-	if adminConf.OffloadEngine != "None" && len(adminConf.OffloadInterfaces) > 0 {
-		intfs = strings.Join(adminConf.OffloadInterfaces, ",")
+	if conf.OffloadEngine != stnrv1.OffloadEngineNone.String() && len(conf.OffloadInterfaces) > 0 {
+		intfs = strings.Join(conf.OffloadInterfaces, ",")
 	}
-	s := stnrv1.AdminStatus{
-		Name:                a.Name,
-		LogLevel:            a.LogLevel,
-		MetricsEndpoint:     a.MetricsEndpoint,
-		HealthCheckEndpoint: a.HealthCheckEndpoint,
-		UserQuota:           fmt.Sprintf("%d", a.quota),
-		OffloadStatus:       fmt.Sprintf("%s[%s]", adminConf.OffloadEngine, intfs),
-		LicensingInfo:       a.LicenseManager.Status(),
+	return &stnrv1.AdminStatus{
+		Name:                conf.Name,
+		LogLevel:            conf.LogLevel,
+		MetricsEndpoint:     conf.MetricsEndpoint,
+		HealthCheckEndpoint: healthEndpoint,
+		UserQuota:           strconv.Itoa(conf.UserQuota),
+		OffloadStatus:       fmt.Sprintf("%s[%s]", conf.OffloadEngine, intfs),
+		LicensingInfo:       a.rt.License.Status(),
 	}
-	return &s
 }
 
-func (a *Admin) reconcileMetrics(req *stnrv1.AdminConfig) error {
-	a.log.Trace("reconcileMetrics")
-
-	if a.DryRun {
-		goto end
+// LogLevel returns the configured log level. Safe for concurrent use.
+func (a *Admin) LogLevel() string {
+	if own := a.conf.Load(); own != nil {
+		return own.LogLevel
 	}
-
-	// close if: running and new endpoint is empty or differs from the old one
-	if a.metricsServer != nil && req.MetricsEndpoint != a.MetricsEndpoint {
-		mAddr, mPath := getMetricsAddr(a.MetricsEndpoint)
-		mEndpoint := fmt.Sprintf("http://%s/%s", mAddr, mPath)
-
-		a.log.Tracef("closing metrics server at %s", mEndpoint)
-
-		if err := a.metricsServer.Shutdown(context.Background()); err != nil {
-			return fmt.Errorf("failed to stop metrics server at %s: %w",
-				mEndpoint, err)
-		}
-		a.metricsServer = nil
-	}
-
-	// start if: new endpoint differs from the old one
-	if req.MetricsEndpoint != a.MetricsEndpoint && req.MetricsEndpoint != "" {
-		a.log.Tracef("starting metrics server at %s", req.MetricsEndpoint)
-
-		mAddr, mPath := getMetricsAddr(req.MetricsEndpoint)
-		mEndpoint := fmt.Sprintf("http://%s/%s", mAddr, mPath)
-
-		mux := http.NewServeMux()
-		mux.Handle(mPath, promhttp.Handler())
-		a.metricsServer = &http.Server{
-			Addr:    mAddr,
-			Handler: mux,
-		}
-
-		// we separate Listen() and Serve(), so that we can return errors from the listener
-		ln, err := net.Listen("tcp", mAddr)
-		if err != nil {
-			return fmt.Errorf("cannot start metrics server at %s: %w",
-				mEndpoint, err)
-		}
-
-		go func() {
-			if err := a.metricsServer.Serve(ln); err != nil {
-				if errors.Is(err, http.ErrServerClosed) {
-					a.log.Tracef("metrics server: normal shutdown")
-				} else {
-					a.log.Warnf("metrics server error at %s: %s",
-						mEndpoint, err.Error())
-					a.metricsServer = nil
-				}
-			}
-		}()
-	}
-
-end:
-	a.MetricsEndpoint = req.MetricsEndpoint
-
-	return nil
+	return ""
 }
 
-// req MUST be validated!
-func (a *Admin) reconcileHealthCheck(req *stnrv1.AdminConfig) error {
-	a.log.Trace("reconcileHealthCheck")
-
-	// if req is validated then either
-	// (1) *req.HealthCheckEndpoint="", which means caller does not want healthchecking, or
-	// (2) *req.HealthCheckEndpoint=default | what is specified by the caller
-	if req.HealthCheckEndpoint == nil {
-		return fmt.Errorf("internal error: processing unvalidated AdminConfig: %#v", req)
-	}
-
-	if a.DryRun {
-		goto end
-	}
-
-	// close if: running and new endpoint is empty or differs from the old one
-	if a.healthCheckServer != nil && *req.HealthCheckEndpoint != a.HealthCheckEndpoint {
-		hcAddr := getHealthAddr(a.HealthCheckEndpoint)
-		hcEndpoint := fmt.Sprintf("http://%s", hcAddr)
-
-		a.log.Tracef("closing healthCheck server at %s", hcEndpoint)
-
-		if err := a.healthCheckServer.Close(); err != nil {
-			return fmt.Errorf("error stopping healthCheck server at %s: %w",
-				hcEndpoint, err)
-		}
-		a.healthCheckServer = nil
-	}
-
-	// start if: new endpoint differs from the old one
-	if *req.HealthCheckEndpoint != a.HealthCheckEndpoint && *req.HealthCheckEndpoint != "" {
-		hcAddr := getHealthAddr(*req.HealthCheckEndpoint)
-		hcEndpoint := fmt.Sprintf("http://%s", hcAddr)
-
-		a.log.Tracef("starting healthcheck server at %s", hcEndpoint)
-		a.healthCheckServer = &http.Server{
-			Addr:    hcAddr,
-			Handler: a.health,
-		}
-
-		// we separate Listen() and Serve(), so that we can return errors from the listener
-		ln, err := net.Listen("tcp", hcAddr)
-		if err != nil {
-			return fmt.Errorf("cannot start healthcheck server at %s: %w",
-				hcEndpoint, err)
-		}
-
-		go func() {
-			if err := a.healthCheckServer.Serve(ln); err != nil {
-				if errors.Is(err, http.ErrServerClosed) {
-					a.log.Tracef("healthcheck server: normal shutdown")
-				} else {
-					a.log.Warnf("healthcheck server error at %s: %s",
-						hcEndpoint, err.Error())
-					a.healthCheckServer = nil
-				}
-			}
-		}()
-	}
-
-end:
-	a.HealthCheckEndpoint = ""
-	if req.HealthCheckEndpoint != nil {
-		a.HealthCheckEndpoint = *req.HealthCheckEndpoint
-	}
-
-	return nil
-}
-
-// AdminFactory can create now Admin objects
-type AdminFactory struct {
-	dry    bool
-	rc     ReadinessHandler
-	status StatusHandler
-	logger logging.LoggerFactory
-}
-
-// NewAdminFactory creates a new factory for Admin objects
-func NewAdminFactory(dryRun bool, rc ReadinessHandler, status StatusHandler, logger logging.LoggerFactory) Factory {
-	return &AdminFactory{dry: dryRun, rc: rc, status: status, logger: logger}
-}
-
-// New can produce a new Admin object from the given configuration. A nil config will create an
-// empty admin object (useful for creating throwaway objects for, e.g., calling Inpect)
-func (f *AdminFactory) New(conf stnrv1.Config) (Object, error) {
-	if conf == nil {
-		return &Admin{}, nil
-	}
-
-	return NewAdmin(conf, f.dry, f.rc, f.status, f.logger)
-}
-
-func getHealthAddr(e string) string {
-	// health-check disabled
+// getAddrFromURL is reused by Health and Metrics for parsing URI-style endpoints.
+func getAddrFromURL(e string, defaultPort int) (string, string) {
 	if e == "" {
-		return ""
+		return "", ""
 	}
-
 	u, err := url.Parse(e)
-
-	// this should never happen: endpoint is validated
 	if err != nil {
-		return ""
+		return "", ""
 	}
-
 	addr := u.Hostname()
 	if addr == "" {
 		addr = "0.0.0.0"
 	}
-
 	port := u.Port()
 	if port == "" {
-		port = fmt.Sprintf("%d", stnrv1.DefaultHealthCheckPort)
-	}
-
-	return addr + ":" + port
-}
-
-func getMetricsAddr(e string) (string, string) {
-	// metric scraping disabled
-	if e == "" {
-		return "", ""
-	}
-
-	u, err := url.Parse(e)
-
-	// this should never happen: endpoint is validated
-	if err != nil {
-		return "", ""
-	}
-
-	addr := u.Hostname()
-	if addr == "" {
-		addr = "0.0.0.0"
-	}
-
-	port := u.Port()
-	if port == "" {
-		port = strconv.Itoa(stnrv1.DefaultMetricsPort)
+		port = strconv.Itoa(defaultPort)
 	}
 	addr = addr + ":" + port
 
@@ -437,6 +181,5 @@ func getMetricsAddr(e string) (string, string) {
 	if path == "" {
 		path = "/"
 	}
-
 	return addr, path
 }

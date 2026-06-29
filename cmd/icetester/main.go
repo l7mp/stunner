@@ -65,13 +65,13 @@ func main() {
 	log = loggerFactory.NewLogger("icester")
 
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
-	log.Debugf("Starting icetester %s", buildInfo.String())
+	log.Debugf("starting icetester %s", buildInfo.String())
 
 	iceServers := defaultICEServers
 	if os.Getenv(EnvVarNameICEServers) != "" {
 		s := []webrtc.ICEServer{}
 		if err := json.Unmarshal([]byte(os.Getenv(EnvVarNameICEServers)), &s); err != nil {
-			log.Errorf("Environment ICE_SERVERS is invalid: %s", err.Error())
+			log.Errorf("environment ICE_SERVERS is invalid: %s", err.Error())
 			os.Exit(1)
 		}
 		iceServers = s
@@ -91,7 +91,7 @@ func main() {
 	if os.Getenv(EnvVarNameWHIPEndpoint) != "" {
 		endpoint := os.Getenv(EnvVarNameWHIPEndpoint)
 		if endpoint[0] != '/' {
-			log.Errorf("Environment WHIP_ENDPOINT is invalid: %s, expecting a leading slash '/'", endpoint)
+			log.Errorf("environment WHIP_ENDPOINT is invalid: %s, expecting a leading slash '/'", endpoint)
 			os.Exit(1)
 		}
 		whipEndpoint = endpoint
@@ -108,7 +108,7 @@ func main() {
 	defer stop()
 
 	if err := runICETesterListener(ctx, *whipServerAddr, whipServerConfig); err != nil {
-		log.Errorf("Could not create WHIP server listener: %s", err.Error())
+		log.Errorf("could not create WHIP server listener: %s", err.Error())
 		os.Exit(1)
 	}
 
@@ -116,13 +116,13 @@ func main() {
 }
 
 func runICETesterListener(ctx context.Context, addr string, config whipconn.Config) error {
-	log.Infof("Creating WHIP server listener with config %#v", config)
+	log.Infof("creating WHIP server listener with config %#v", config)
 	l, err := whipconn.NewListener(addr, config, loggerFactory)
 	if err != nil {
 		return fmt.Errorf("could not create WHIP server listener: %s", err.Error())
 	}
 
-	log.Debug("Creating echo service")
+	log.Debug("creating echo service")
 	go func() {
 		for {
 			conn, err := l.Accept()
@@ -130,7 +130,7 @@ func runICETesterListener(ctx context.Context, addr string, config whipconn.Conf
 				return
 			}
 
-			log.Debugf("Accepting WHIP server connection with resource ID: %s",
+			log.Debugf("accepting WHIP server connection with resource ID: %s",
 				conn.(*whipconn.ListenerConn).ResourceUrl)
 
 			// readloop
@@ -156,7 +156,7 @@ func runICETesterListener(ctx context.Context, addr string, config whipconn.Conf
 	for _, conn := range l.GetConns() {
 		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) &&
 			!errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("WHIP connection close error: %s", err.Error())
+			return fmt.Errorf("wHIP connection close error: %s", err.Error())
 		}
 	}
 

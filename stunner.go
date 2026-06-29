@@ -1,4 +1,4 @@
-// Package stunner contains the public API for l7mp/stunner, a Kubernetes ingress gateway for WebRTC
+// Package stunner contains the public API for l7mp/stunner, a Kubernetes ingress gateway for WebRTC.
 package stunner
 
 import (
@@ -11,9 +11,13 @@ import (
 	"github.com/pion/transport/v4/stdnet"
 	"golang.org/x/time/rate"
 
-	"github.com/l7mp/stunner/internal/manager"
 	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/offload"
+	"github.com/l7mp/stunner/internal/quota"
+	"github.com/l7mp/stunner/internal/reconciler"
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/router"
+	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	licensecfg "github.com/l7mp/stunner/pkg/config/license"
@@ -23,41 +27,51 @@ import (
 // DefaultLogLevel indicates the default log level.
 const DefaultLogLevel = "all:WARN"
 
+// LogRateLimit is the default number of log events per second reported at ERROR, WARN and INFO
+// loglevel (logging at DEBUG and TRACE levels is not rate-limited).
+var LogRateLimit rate.Limit = 50.0
+
+// LogBurst is the default burst size for rate-limited logging at ERROR, WARN and INFO loglevel
+// (logging at DEBUG and TRACE levels is not rate-limited).
+var LogBurst = 3
+
 // DefaultInstanceId is the default instance id for stunnerd processes.
 var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 
 // ErrRestartRequired is returned by Reconcile to indicate that some server components have been
 // restarted but otherwise reconciliation occured smoothly. It is safe to ignore this error.
-var ErrRestartRequired = object.ErrRestartRequired
+var ErrRestartRequired = runtime.ErrRestartRequired
 
 // LogOptions configures logging behavior for STUNner.
 type LogOptions = logger.Options
 
-// Stunner is an instance of the STUNner deamon.
+// Stunner is an instance of the STUNner daemon.
 type Stunner struct {
-	name, version                                              string
-	adminManager, authManager, listenerManager, clusterManager manager.Manager
-	suppressRollback, dryRun                                   bool
-	resolver                                                   resolver.DnsResolver
-	udpThreadNum                                               int
-	logRateLimit                                               rate.Limit
-	logBurst                                                   int
-	telemetry                                                  *telemetry.Telemetry
-	logger                                                     logger.LoggerFactory
-	log                                                        logging.LeveledLogger
-	quotaHandler                                               QuotaHandler
-	offloadHandler                                             OffloadHandler
-	node                                                       string
-	net                                                        transport.Net
-	ready, shutdown, forceReady                                bool
+	// Object-wide config.
+	name, version string
+	node          string
+	udpThreadNum  int
+
+	// Flags.
+	forceReady, suppressRollback, dryRun bool
+
+	// Subsystems shared across object factories.
+	reconciler *reconciler.Reconciler
+	resolver   resolver.DnsResolver
+	telemetry  *telemetry.Telemetry
+	rt         *runtime.Runtime
+	net        transport.Net
+
+	// Logging.
+	logRateLimit rate.Limit
+	logBurst     int
+	log          logging.LeveledLogger
+	logger       logger.LoggerFactory
 }
 
 // NewStunner creates a new STUNner deamon for the specified Options. Call Reconcile to reconcile
-// the daemon for a new configuration. Object lifecycle is as follows: the daemon is "alive"
-// (answers liveness probes if healthchecking is enabled) once the main object is successfully
-// initialized, and "ready" after the first successful reconciliation (answers readiness probes if
-// healthchecking is enabled). Calling program should catch SIGTERM signals and call Shutdown(),
-// which will keep on serving connections but will fail readiness probes.
+// the daemon for a new configuration. The daemon is "alive" once the main object is initialized,
+// and "ready" after the first successful reconciliation.
 func NewStunner(options Options) *Stunner {
 	var logFactory logger.LoggerFactory
 	if options.LogOptions.Format == "json" {
@@ -77,15 +91,15 @@ func NewStunner(options Options) *Stunner {
 
 	var vnet transport.Net
 	if options.Net == nil {
-		net, err := stdnet.NewNet() // defaults to native operation
+		net, err := stdnet.NewNet()
 		if err != nil {
-			log.Error("Could not create vnet")
+			log.Error("could not create vnet")
 			return nil
 		}
 		vnet = net
 	} else {
 		vnet = options.Net
-		log.Warn("Virtual net (vnet) is enabled")
+		log.Warn("virtual net (vnet) is enabled")
 	}
 
 	udpThreadNum := 0
@@ -128,30 +142,68 @@ func NewStunner(options Options) *Stunner {
 		logBurst:         logBurst,
 	}
 
-	s.offloadHandler = s.NewOffloadHandler()
-	statsHandler := func(name string, marker stnrv1.StatType) stnrv1.OffloadDirStat {
-		return s.offloadHandler.Stats(name, marker)
-	}
+	// The license manager is a process-wide service: created once here, reconciled in place by
+	// the Admin object, and queried from the data path (quota, offload) for feature gating.
+	licenseMgr := licensecfg.New(logFactory.NewLogger("license"))
 
-	s.adminManager = manager.NewManager("admin-manager",
-		object.NewAdminFactory(options.DryRun, s.NewReadinessHandler(), s.NewStatusHandler(), logFactory), logFactory)
-	s.authManager = manager.NewManager("auth-manager",
-		object.NewAuthFactory(logFactory), logFactory)
-	s.listenerManager = manager.NewManager("listener-manager",
-		object.NewListenerFactory(vnet, s.NewRealmHandler(), statsHandler, logFactory), logFactory)
-	s.clusterManager = manager.NewManager("cluster-manager",
-		object.NewClusterFactory(r, statsHandler, logFactory), logFactory)
-	s.quotaHandler = s.NewQuotaHandler()
-
+	// Telemetry needs the live allocation count via callback. We capture s by reference so the
+	// callback reads the running value after Listeners exist.
 	telemetryCallbacks := telemetry.Callbacks{
 		GetAllocationCount: func() int64 { return s.GetActiveConnections() },
 	}
 	t, err := telemetry.New(telemetryCallbacks, s.dryRun, logFactory.NewLogger("metrics"))
 	if err != nil {
-		log.Errorf("Could not initialize metric provider: %s", err.Error())
+		log.Errorf("could not initialize metric provider: %s", err.Error())
 		return nil
 	}
 	s.telemetry = t
+
+	// The offload engine is a process-wide singleton with the lifetime of the server: created and
+	// started here, reconciled in place by the Offload object, and closed on shutdown. The eBPF
+	// map pin/unpin is heavy, so it must never be bounced by a reconcile.
+	offloadEngine := offload.New(offload.Deps{
+		Telemetry: s.telemetry,
+		License:   licenseMgr,
+		Log:       logFactory.NewLogger("offload"),
+	})
+
+	// Build the Runtime: a subsystem registry used throughout the code.
+	rt := runtime.New(runtime.Config{
+		Logger:        s.logger,
+		DryRun:        s.dryRun,
+		Resolver:      s.resolver,
+		Telemetry:     s.telemetry,
+		License:       licenseMgr,
+		OffloadEngine: offloadEngine,
+		UdpThreadNum:  s.udpThreadNum,
+		Net:           s.net,
+	})
+	rt.Router = router.NewRouter(rt)
+	rt.QuotaHandler = quota.New(rt)
+	rt.SetForceReady(s.forceReady)
+	s.rt = rt
+
+	// Catalog describes the object hierarchy.
+	catalog := object.NewCatalog()
+	rootSpec, ok := catalog.Kind(runtime.TypeStunner)
+	if !ok {
+		log.Errorf("object catalog missing type: %s", runtime.TypeStunner)
+		return nil
+	}
+
+	// Register the root Stunner object.
+	root, err := rootSpec.New(nil, nil, rt)
+	if err != nil {
+		log.Errorf("root factory: %s", err.Error())
+		return nil
+	}
+	if err := rt.Registry.Add(root, nil); err != nil {
+		log.Errorf("register root: %s", err.Error())
+		return nil
+	}
+
+	// Create a reconciler.
+	s.reconciler = reconciler.New(catalog, rt, s.logger)
 
 	if !s.dryRun {
 		s.resolver.Start()
@@ -161,186 +213,126 @@ func NewStunner(options Options) *Stunner {
 }
 
 // GetId returns the id of the current stunnerd instance.
-func (s *Stunner) GetId() string {
-	return s.name
-}
+func (s *Stunner) GetId() string { return s.name }
 
 // GetVersion returns the STUNner API version.
-func (s *Stunner) GetVersion() string {
-	return s.version
-}
+func (s *Stunner) GetVersion() string { return s.version }
 
 // IsReady returns true if the STUNner instance is ready to serve allocation requests.
-func (s *Stunner) IsReady() bool {
-	return s.ready
-}
+func (s *Stunner) IsReady() bool { return s.rt.IsReady() }
 
-// Shutdown causes STUNner to fail the readiness check. Manwhile, it will keep on serving
+// Shutdown causes STUNner to fail the readiness check. Meanwhile, it will keep on serving
 // connections. This function should be called after the main program catches a SIGTERM.
 func (s *Stunner) Shutdown() {
-	s.shutdown = true
-	s.ready = false
+	s.rt.SetShutdown(true)
 }
 
-// GetAdmin returns the admin object. Panics if no admin object is available.
+// GetLogger returns the logger factory of the running daemon.
+func (s *Stunner) GetLogger() logging.LoggerFactory { return s.logger }
+
+// SetLogLevel sets the loglevel.
+func (s *Stunner) SetLogLevel(levelSpec string) { s.logger.SetLevel(levelSpec) }
+
+// AllocationCount returns the number of active allocations summed over all listeners.
+func (s *Stunner) AllocationCount() int {
+	n := 0
+	for _, l := range s.GetListeners() {
+		n += l.AllocationCount()
+	}
+	return n
+}
+
+// GetStatus returns the root status. The root Object aggregates from its descendants.
+func (s *Stunner) GetStatus() stnrv1.Status {
+	status := s.rt.GetStatus(runtime.TypeStunner, "").(*stnrv1.StunnerStatus)
+	status.AllocationCount = s.AllocationCount()
+	stat := "READY"
+	if !s.rt.IsReady() {
+		stat = "NOT-READY"
+	}
+	if s.rt.IsShutdown() {
+		stat = "TERMINATING"
+	}
+	status.Status = stat
+	return status
+}
+
+// Close stops the STUNner daemon, cleans up any internal state, and closes all connections.
+func (s *Stunner) Close() {
+	s.log.Info("closing STUNner")
+	if s.reconciler != nil {
+		_ = s.reconciler.Shutdown()
+	}
+	if s.rt != nil && s.rt.OffloadEngine != nil {
+		if err := s.rt.OffloadEngine.Close(); err != nil {
+			s.log.Errorf("could not close offload engine cleanly: %s", err.Error())
+		}
+	}
+	if s.telemetry != nil {
+		if err := s.telemetry.Close(); err != nil {
+			s.log.Errorf("could not shutdown metric provider cleanly: %s", err.Error())
+		}
+	}
+	if s.resolver != nil {
+		s.resolver.Close()
+	}
+}
+
+// GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
+func (s *Stunner) GetActiveConnections() int64 { return int64(s.AllocationCount()) }
+
+// GetAdmin returns the Admin Object, or nil if not registered.
 func (s *Stunner) GetAdmin() *object.Admin {
-	a, found := s.adminManager.Get(stnrv1.DefaultAdminName)
-	if !found {
-		panic("internal error: no Admin found")
+	a, ok := s.rt.Registry.Get(runtime.TypeAdmin, stnrv1.DefaultAdminName)
+	if !ok {
+		return nil
 	}
 	return a.(*object.Admin)
 }
 
-// GetLicenseConfigManager returns the manager handling license status. Panics if no manager is
-// available.
-func (s *Stunner) GetLicenseConfigManager() licensecfg.ConfigManager {
-	return s.GetAdmin().LicenseManager
-}
-
-// GetAuth returns the authenitation object. Panics if no auth object is available.
+// GetAuth returns the Auth Object, or nil if not registered.
 func (s *Stunner) GetAuth() *object.Auth {
-	a, found := s.authManager.Get(stnrv1.DefaultAuthName)
-	if !found {
-		panic("internal error: no Auth found")
+	a, ok := s.rt.Registry.Get(runtime.TypeAuth, stnrv1.DefaultAuthName)
+	if !ok {
+		return nil
 	}
 	return a.(*object.Auth)
 }
 
-// GetListener returns a STUNner listener or nil of no listener with the given name was found.
+// GetListeners returns every Listener in stable order.
+func (s *Stunner) GetListeners() []*object.Listener {
+	objs := s.rt.Registry.List(runtime.TypeListener)
+	out := make([]*object.Listener, 0, len(objs))
+	for _, o := range objs {
+		out = append(out, o.(*object.Listener))
+	}
+	return out
+}
+
+// GetListener returns a Listener by name, or nil if not found.
 func (s *Stunner) GetListener(name string) *object.Listener {
-	l, found := s.listenerManager.Get(name)
-	if !found {
+	l, ok := s.rt.Registry.Get(runtime.TypeListener, name)
+	if !ok {
 		return nil
 	}
 	return l.(*object.Listener)
 }
 
-// GetCluster returns a STUNner cluster or nil if no cluster with the given name was found.
+// GetClusters returns every Cluster in stable order.
+func (s *Stunner) GetClusters() []*object.Cluster {
+	objs := s.rt.Registry.List(runtime.TypeCluster)
+	out := make([]*object.Cluster, 0, len(objs))
+	for _, o := range objs {
+		out = append(out, o.(*object.Cluster))
+	}
+	return out
+}
+
+// GetCluster returns a Cluster by name, or nil if not found.
 func (s *Stunner) GetCluster(name string) *object.Cluster {
-	l, found := s.clusterManager.Get(name)
-	if !found {
+	c, ok := s.rt.Registry.Get(runtime.TypeCluster, name)
+	if !ok {
 		return nil
 	}
-	return l.(*object.Cluster)
-}
-
-// GetRealm returns the current STUN/TURN authentication realm.
-func (s *Stunner) GetRealm() string {
-	auth := s.GetAuth()
-	if auth == nil {
-		return ""
-	}
-	return auth.Realm
-}
-
-// GetLogger returns the logger factory of the running daemon. Useful for creating a sub-logger.
-func (s *Stunner) GetLogger() logging.LoggerFactory {
-	return s.logger
-}
-
-// SetLogLevel sets the loglevel.
-func (s *Stunner) SetLogLevel(levelSpec string) {
-	s.logger.SetLevel(levelSpec)
-}
-
-// GetAllocations returns the number of active allocations summed over all listeners.  It can be
-// used to drain the server before closing.
-func (s *Stunner) AllocationCount() int {
-	n := 0
-	listeners := s.listenerManager.Keys()
-	for _, name := range listeners {
-		l := s.GetListener(name)
-		if l.Server != nil {
-			n += l.Server.AllocationCount()
-		}
-	}
-	return n
-}
-
-// Status returns the status for the running STUNner instance.
-func (s *Stunner) Status() stnrv1.Status {
-	status := stnrv1.StunnerStatus{ApiVersion: s.version}
-	if admin := s.GetAdmin(); admin != nil {
-		status.Admin = admin.Status().(*stnrv1.AdminStatus)
-	}
-	if auth := s.GetAuth(); auth != nil {
-		status.Auth = auth.Status().(*stnrv1.AuthStatus)
-	}
-
-	ls := s.listenerManager.Keys()
-	status.Listeners = make([]*stnrv1.ListenerStatus, len(ls))
-	for i, lName := range ls {
-		if l := s.GetListener(lName); l != nil {
-			status.Listeners[i] = l.Status().(*stnrv1.ListenerStatus)
-		}
-	}
-
-	cs := s.clusterManager.Keys()
-	status.Clusters = make([]*stnrv1.ClusterStatus, len(cs))
-	for i, cName := range cs {
-		if c := s.GetCluster(cName); c != nil {
-			status.Clusters[i] = c.Status().(*stnrv1.ClusterStatus)
-		}
-	}
-
-	status.AllocationCount = s.AllocationCount()
-	stat := "READY"
-	if !s.ready {
-		stat = "NOT-READY"
-	}
-	if s.shutdown {
-		stat = "TERMINATING"
-	}
-	status.Status = stat
-
-	return &status
-}
-
-// Close stops the STUNner daemon, cleans up any internal state, and closes all connections
-// including the health-check and the metrics server listeners.
-func (s *Stunner) Close() {
-	s.log.Info("closing STUNner")
-
-	// ignore restart-required errors
-	if len(s.adminManager.Keys()) > 0 {
-		_ = s.GetAdmin().Close()
-	}
-
-	if len(s.authManager.Keys()) > 0 {
-		_ = s.GetAuth().Close()
-	}
-
-	listeners := s.listenerManager.Keys()
-	for _, name := range listeners {
-		l := s.GetListener(name)
-		if err := l.Close(); err != nil && err != object.ErrRestartRequired {
-			s.log.Errorf("Error closing listener %q at adddress %s: %s",
-				l.Proto.String(), l.Addr, err.Error())
-		}
-	}
-
-	clusters := s.clusterManager.Keys()
-	for _, name := range clusters {
-		c := s.GetCluster(name)
-		if err := c.Close(); err != nil && err != object.ErrRestartRequired {
-			s.log.Errorf("Error closing cluster %q: %s", c.ObjectName(),
-				err.Error())
-		}
-	}
-
-	if err := s.offloadHandler.Close(); err != nil {
-		s.log.Errorf("Could not shutdown offload handler cleanly: %s", err.Error())
-	}
-
-	if err := s.telemetry.Close(); err != nil { // blocks until finished
-		s.log.Errorf("Could not shutdown metric provider cleanly: %s", err.Error())
-	}
-
-	s.resolver.Close()
-}
-
-// GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
-func (s *Stunner) GetActiveConnections() int64 {
-	count := s.AllocationCount()
-	return int64(count)
+	return c.(*object.Cluster)
 }

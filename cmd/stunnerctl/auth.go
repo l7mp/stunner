@@ -16,7 +16,7 @@ func runAuth(_ *cobra.Command, args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Debug("Searching for authentication server")
+	log.Debug("searching for authentication server")
 	pod, err := cdsclient.DiscoverK8sAuthServer(ctx, k8sConfigFlags, authConfigFlags,
 		loggerFactory.NewLogger("auth-fwd"))
 	if err != nil {
@@ -49,13 +49,13 @@ func runAuth(_ *cobra.Command, args []string) error {
 		u.RawQuery = q.Encode()
 	}
 
-	log.Debugf("Querying to authentication server %s using URL %q", pod.String(), u.String())
+	log.Debugf("querying to authentication server %s using URL %q", pod.String(), u.String())
 	res, err := http.Get(u.String())
 	if err != nil {
 		return fmt.Errorf("error querying auth service %s: %w", pod.String(), err)
 	}
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP error querying auth service %s: expected status %d, got %d",
+		return fmt.Errorf("hTTP error querying auth service %s: expected status %d, got %d",
 			pod.String(), http.StatusOK, res.StatusCode)
 	}
 
