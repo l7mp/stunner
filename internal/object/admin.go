@@ -12,16 +12,13 @@ import (
 
 	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
-	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 )
 
-// Admin holds the bits of STUNner administration that aren't carved out into Health/Metrics/
-// Offload: Name/LogLevel/UserQuota/License. Everything that used to drag the whole struct
-// through close+start lives in the sibling Objects.
+// Admin holds the bits of STUNner administration that aren't carved out into
+// Health/Metrics/Offload: Name/LogLevel/UserQuota/License.
 type Admin struct {
 	name, logLevel string
 	quota          int
-	licenseManager licensecfg.ConfigManager
 	licenseConfig  *stnrv1.LicenseConfig
 
 	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
@@ -35,9 +32,8 @@ type Admin struct {
 // NewAdmin creates an Admin object.
 func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Admin{
-		licenseManager: licensecfg.New(rt.Logger.NewLogger("license")),
-		rt:             rt,
-		log:            rt.Logger.NewLogger("admin"),
+		rt:  rt,
+		log: rt.Logger.NewLogger("admin"),
 	}
 	if conf == nil {
 		return a, nil
@@ -118,7 +114,7 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	a.name = req.Name
 	a.logLevel = req.LogLevel
 	a.quota = req.UserQuota
-	a.licenseManager.Reconcile(req.LicenseConfig)
+	a.rt.License.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
 	a.conf.Store(&stnrv1.AdminConfig{
@@ -150,7 +146,7 @@ func (a *Admin) Status() stnrv1.Status {
 		HealthCheckEndpoint: healthEndpoint,
 		UserQuota:           strconv.Itoa(conf.UserQuota),
 		OffloadStatus:       fmt.Sprintf("%s[%s]", conf.OffloadEngine, intfs),
-		LicensingInfo:       a.licenseManager.Status(),
+		LicensingInfo:       a.rt.License.Status(),
 	}
 }
 
@@ -160,14 +156,6 @@ func (a *Admin) LogLevel() string {
 		return own.LogLevel
 	}
 	return ""
-}
-
-// UserQuota returns the configured per-user TURN allocation quota. Safe for concurrent use.
-func (a *Admin) UserQuota() int {
-	if own := a.conf.Load(); own != nil {
-		return own.UserQuota
-	}
-	return 0
 }
 
 // getAddrFromURL is reused by Health and Metrics for parsing URI-style endpoints.

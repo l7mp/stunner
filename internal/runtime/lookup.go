@@ -2,6 +2,7 @@ package runtime
 
 import (
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 )
 
 var defaultSingletonNames = map[ObjectType]string{
@@ -13,20 +14,24 @@ var defaultSingletonNames = map[ObjectType]string{
 	TypeOffload: stnrv1.DefaultOffloadName,
 }
 
-// DefaultSingletonName returns the canonical singleton object name for an object type.
-func DefaultSingletonName(objType ObjectType) (string, bool) {
+// defaultSingletonName returns the canonical singleton object name for an object type.
+func defaultSingletonName(objType ObjectType) (string, bool) {
 	name, ok := defaultSingletonNames[objType]
 	return name, ok
 }
 
-// MustDefaultSingletonName returns the canonical singleton object name for an object type.
-func MustDefaultSingletonName(objType ObjectType) string {
-	name, ok := DefaultSingletonName(objType)
+// mustDefaultSingletonName returns the canonical singleton object name for an object type and
+// panics if the type has none.
+func mustDefaultSingletonName(objType ObjectType) string {
+	name, ok := defaultSingletonName(objType)
 	if !ok {
 		panic("no default singleton name for type: " + string(objType))
 	}
 	return name
 }
+
+// LicenseManager returns the process license config manager.
+func (rt *Runtime) LicenseManager() licensecfg.ConfigManager { return rt.License }
 
 // GetConfig returns the live config of a node. An empty name resolves to the canonical
 // singleton name of the type. Returns nil if the node is missing or not Reconcilable.
@@ -80,7 +85,7 @@ func (rt *Runtime) GetStatuses(objType ObjectType) []stnrv1.Status {
 
 func (rt *Runtime) reconcilable(objType ObjectType, name string) Reconcilable {
 	if name == "" {
-		name = MustDefaultSingletonName(objType)
+		name = mustDefaultSingletonName(objType)
 	}
 	o, ok := rt.Registry.Get(objType, name)
 	if !ok {

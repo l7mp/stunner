@@ -12,12 +12,15 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/internal/object"
+	"github.com/l7mp/stunner/internal/offload"
 	"github.com/l7mp/stunner/internal/quota"
 	"github.com/l7mp/stunner/internal/reconciler"
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/router"
 	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
+	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
@@ -37,7 +40,7 @@ var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 
 // ErrRestartRequired is returned by Reconcile to indicate that some server components have been
 // restarted but otherwise reconciliation occured smoothly. It is safe to ignore this error.
-var ErrRestartRequired = object.ErrRestartRequired
+var ErrRestartRequired = runtime.ErrRestartRequired
 
 // LogOptions configures logging behavior for STUNner.
 type LogOptions = logger.Options
@@ -55,7 +58,6 @@ type Stunner struct {
 	// Subsystems shared across object factories.
 	reconciler *reconciler.Reconciler
 	resolver   resolver.DnsResolver
-	quotaStore quota.Store
 	telemetry  *telemetry.Telemetry
 	rt         *runtime.Runtime
 	net        transport.Net
@@ -132,7 +134,6 @@ func NewStunner(options Options) *Stunner {
 		suppressRollback: options.SuppressRollback,
 		dryRun:           options.DryRun,
 		resolver:         r,
-		quotaStore:       quota.NewStore(),
 		udpThreadNum:     udpThreadNum,
 		node:             options.NodeName,
 		forceReady:       options.ForceReadyDuringTermination,
@@ -140,6 +141,10 @@ func NewStunner(options Options) *Stunner {
 		logRateLimit:     logRateLimit,
 		logBurst:         logBurst,
 	}
+
+	// The license manager is a process-wide service: created once here, reconciled in place by
+	// the Admin object, and queried from the data path (quota, offload) for feature gating.
+	licenseMgr := licensecfg.New(logFactory.NewLogger("license"))
 
 	// Telemetry needs the live allocation count via callback. We capture s by reference so the
 	// callback reads the running value after Listeners exist.
@@ -153,16 +158,28 @@ func NewStunner(options Options) *Stunner {
 	}
 	s.telemetry = t
 
+	// The offload engine is a process-wide singleton with the lifetime of the server: created and
+	// started here, reconciled in place by the Offload object, and closed on shutdown. The eBPF
+	// map pin/unpin is heavy, so it must never be bounced by a reconcile.
+	offloadEngine := offload.New(offload.Deps{
+		Telemetry: s.telemetry,
+		License:   licenseMgr,
+		Log:       logFactory.NewLogger("offload"),
+	})
+
 	// Build the Runtime: a subsystem registry used throughout the code.
 	rt := runtime.New(runtime.Config{
-		Logger:       s.logger,
-		DryRun:       s.dryRun,
-		Resolver:     s.resolver,
-		Telemetry:    s.telemetry,
-		QuotaStore:   s.quotaStore,
-		UdpThreadNum: s.udpThreadNum,
-		Net:          s.net,
+		Logger:        s.logger,
+		DryRun:        s.dryRun,
+		Resolver:      s.resolver,
+		Telemetry:     s.telemetry,
+		License:       licenseMgr,
+		OffloadEngine: offloadEngine,
+		UdpThreadNum:  s.udpThreadNum,
+		Net:           s.net,
 	})
+	rt.Router = router.NewRouter(rt)
+	rt.QuotaHandler = quota.New(rt)
 	rt.SetForceReady(s.forceReady)
 	s.rt = rt
 
@@ -245,6 +262,11 @@ func (s *Stunner) Close() {
 	s.log.Info("closing STUNner")
 	if s.reconciler != nil {
 		_ = s.reconciler.Shutdown()
+	}
+	if s.rt != nil && s.rt.OffloadEngine != nil {
+		if err := s.rt.OffloadEngine.Close(); err != nil {
+			s.log.Errorf("could not close offload engine cleanly: %s", err.Error())
+		}
 	}
 	if s.telemetry != nil {
 		if err := s.telemetry.Close(); err != nil {

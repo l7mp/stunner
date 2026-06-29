@@ -12,7 +12,6 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/transport/v4"
 
-	objectturn "github.com/l7mp/stunner/internal/object/turn"
 	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
@@ -99,7 +98,7 @@ func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (
 	}
 
 	// A restart is only avoidable when Routes and/or PublicIP/PublicPort are the only changes.
-	restart := !(l.name == req.Name &&
+	restart := !(l.name == req.Name && //nolint:staticcheck
 		l.proto == proto &&
 		l.rawAddr == req.Addr &&
 		l.port == req.Port &&
@@ -258,18 +257,4 @@ func (l *Listener) AllocationCount() int {
 func (l *Listener) lookupAuthConfig() *stnrv1.AuthConfig {
 	a, _ := l.rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
 	return a
-}
-
-func (l *Listener) getOffload() objectturn.OffloadHandler {
-	o, ok := l.rt.Registry.Get(runtime.TypeOffload, stnrv1.DefaultOffloadName)
-	if !ok {
-		return objectturn.NewOffloadHandlerStub()
-	}
-	p, ok := o.(interface {
-		Handler() objectturn.OffloadHandler
-	})
-	if !ok {
-		return objectturn.NewOffloadHandlerStub()
-	}
-	return p.Handler()
 }

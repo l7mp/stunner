@@ -30,7 +30,7 @@ type Server struct {
 }
 
 // NewServer starts the TURN server for a listener context.
-func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) (*Server, error) {
+func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 	conf := rt.GetConfig(objruntime.TypeListener, listener).(*stnrv1.ListenerConfig)
 	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
 	if err != nil {
@@ -150,7 +150,7 @@ func NewServer(listener string, rt *objruntime.Runtime, offload OffloadHandler) 
 	server, err := turn.NewServer(turn.ServerConfig{
 		Realm:             auth.Realm,
 		AuthHandler:       NewAuthHandler(rt, log),
-		EventHandler:      NewEventHandler(listener, rt, log, q, offload),
+		EventHandler:      NewEventHandler(listener, rt, log, q),
 		QuotaHandler:      q.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,

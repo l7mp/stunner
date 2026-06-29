@@ -5,12 +5,13 @@ package object
 import (
 	"fmt"
 
+	"github.com/l7mp/stunner/internal/reconciler"
 	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-type KindSpec = runtime.KindSpec
-type Catalog = runtime.Catalog
+type KindSpec = reconciler.KindSpec
+type Catalog = reconciler.Catalog
 
 // NewCatalog builds the default object catalog:
 //
@@ -167,10 +168,5 @@ func NewCatalog() *Catalog {
 		},
 	})
 
-	return runtime.NewCatalogFromKinds(specs...)
-}
-
-// NewCatalogFromKinds builds a catalog from explicit kind specs. Used by reconciler tests.
-func NewCatalogFromKinds(specs ...KindSpec) *Catalog {
-	return runtime.NewCatalogFromKinds(specs...)
+	return reconciler.NewCatalogFromKinds(specs...)
 }

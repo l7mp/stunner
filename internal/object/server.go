@@ -32,7 +32,7 @@ func (s *ListenerServer) Type() runtime.ObjectType { return runtime.TypeListener
 
 func (s *ListenerServer) Start() error {
 	s.listener.log.Infof("listener %s (re)starting", s.listener.String())
-	t, err := objectturn.NewServer(s.name, s.rt, s.listener.getOffload())
+	t, err := objectturn.NewServer(s.name, s.rt)
 	if err != nil {
 		return fmt.Errorf("failed to start TURN server for listener %s: %w", s.name, err)
 	}

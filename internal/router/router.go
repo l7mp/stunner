@@ -1,4 +1,8 @@
-package runtime
+// Package router resolves which cluster serves a peer and whether a cluster admits a peer. It is
+// the single authority on routing and admission for the relay path: cluster endpoint matching
+// lives here, not on the cluster objects. The router is not TURN-specific — clusters are plain
+// UDP or TCP — so it can be reused by future pure UDP/TCP listeners.
+package router
 
 import (
 	"net"
@@ -9,6 +13,7 @@ import (
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/internal/runtime"
 	"github.com/l7mp/stunner/internal/util"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
@@ -19,24 +24,12 @@ const (
 	peerRouteCacheSize     = 4096
 )
 
-var _ Router = (*router)(nil)
+var _ runtime.Router = (*router)(nil)
 
-// Router resolves which cluster serves a peer and whether a cluster admits a peer. It is the
-// single authority on routing and admission: matching lives here, not on the cluster objects.
-type Router interface {
-	// Route returns the name of the cluster on the listener's routes that admits (peer, port)
-	// for the given protocol, or ("", false) if none does. port==0 ignores the port.
-	Route(listener string, routes []string, proto stnrv1.ClusterProtocol, peer net.IP, port int) (string, bool)
-	// Match reports whether the named cluster admits (peer, port). port==0 ignores the port.
-	Match(cluster string, peer net.IP, port int) bool
-	// InvalidateCache drops all cached routing state; call after a config change.
-	InvalidateCache()
-}
-
-// router is the default Router. The hot path is served entirely from caches; the slow path
-// resolves cluster endpoint state from the registry via rt.GetConfig and parses it once.
+// router is the default runtime.Router. The hot path is served entirely from caches; the slow
+// path resolves cluster endpoint state from the registry via rt.GetConfig and parses it once.
 type router struct {
-	rt           *Runtime
+	rt           *runtime.Runtime
 	matcherCache *lru.Cache // cluster name -> *clusterMatcher
 	routeCache   *lru.Cache // listener -> *routeCacheEntry
 	peerCache    *lru.Cache // listener|proto|peer -> *peerCacheValue
@@ -68,8 +61,20 @@ type peerCacheValue struct {
 	cluster string
 }
 
+// RouteAny resolves the cluster serving a peer across all cluster protocols (UDP preferred). Used
+// for IP-level permission decisions where the flow protocol is not yet known: protocol and port
+// specificity are enforced at flow establishment.
+func RouteAny(rt *runtime.Runtime, listener string, routes []string, peer net.IP) (string, bool) {
+	for _, proto := range []stnrv1.ClusterProtocol{stnrv1.ClusterProtocolUDP, stnrv1.ClusterProtocolTCP} {
+		if cluster, ok := rt.Router.Route(listener, routes, proto, peer, 0); ok {
+			return cluster, true
+		}
+	}
+	return "", false
+}
+
 // NewRouter returns the default Router.
-func NewRouter(rt *Runtime) Router {
+func NewRouter(rt *runtime.Runtime) runtime.Router {
 	return &router{
 		rt:           rt,
 		matcherCache: lru.New(matcherCacheSize),
@@ -149,7 +154,7 @@ func (r *router) getMatcher(cluster string) *clusterMatcher {
 	}
 
 	m := &clusterMatcher{epoch: curEpoch}
-	if conf, ok := r.rt.GetConfig(TypeCluster, cluster).(*stnrv1.ClusterConfig); ok && conf != nil {
+	if conf, ok := r.rt.GetConfig(runtime.TypeCluster, cluster).(*stnrv1.ClusterConfig); ok && conf != nil {
 		m.typ, _ = stnrv1.NewClusterType(conf.Type)
 		m.proto, _ = stnrv1.NewClusterProtocol(conf.Protocol)
 		switch m.typ {

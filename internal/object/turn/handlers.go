@@ -7,6 +7,8 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
+	"github.com/l7mp/stunner/internal/offload"
+	"github.com/l7mp/stunner/internal/router"
 	objruntime "github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/pkg/authentication"
@@ -100,7 +102,7 @@ func NewPermissionHandler(name string, rt *objruntime.Runtime, log logging.Level
 		}
 
 		// Grant if the peer is routable via *any* cluster on the listener's routes.
-		cluster, ok := objruntime.RouteAny(rt, name, conf.Routes, peer)
+		cluster, ok := router.RouteAny(rt, name, conf.Routes, peer)
 		if ok {
 			log.Debugf("permission granted on listener %q for client %q to peer %s via cluster %q",
 				name, src.String(), peerIP, cluster)
@@ -134,19 +136,19 @@ func NewQuotaHandler(rt *objruntime.Runtime) *quotaHandler {
 func (q *quotaHandler) QuotaHandler() turn.QuotaHandler {
 	return func(username, realm string, _ net.Addr) bool {
 		admin := q.runtime.GetConfig(objruntime.TypeAdmin, "").(*stnrv1.AdminConfig)
-		return q.runtime.QuotaStore.CheckAndIncrement(username, realm, admin.UserQuota)
+		return q.runtime.QuotaHandler.CheckAndIncrement(username, realm, admin.UserQuota)
 	}
 }
 
 // AllocationHandler updates quota accounting on allocation lifecycle events.
 func (q *quotaHandler) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, realm string, event AllocationEventType) {
 	if event == AllocationDeleted {
-		q.runtime.QuotaStore.Decrement(username, realm)
+		q.runtime.QuotaHandler.Decrement(username, realm)
 	}
 }
 
 // NewEventHandler creates a set of callbacks for tracking the lifecycle of TURN allocations.
-func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLogger, q *quotaHandler, o OffloadHandler) turn.EventHandler {
+func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLogger, q *quotaHandler) turn.EventHandler {
 	return turn.EventHandler{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
@@ -171,7 +173,7 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 		OnPermissionCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
 			cluster := ""
 			if conf, ok := rt.GetConfig(objruntime.TypeListener, name).(*stnrv1.ListenerConfig); ok && conf != nil {
-				if c, ok := objruntime.RouteAny(rt, name, conf.Routes, peer); ok {
+				if c, ok := router.RouteAny(rt, name, conf.Routes, peer); ok {
 					cluster = c
 				}
 			}
@@ -196,13 +198,22 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 			log.Debugf("channel created: listener=%s, cluster=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				name, cluster, dumpClient(src, dst, proto, username, realm),
 				relayAddr.String(), peer.String(), chanNum)
-			o.HandleChannelCreate(src, dst, proto, username, realm, relayAddr, peer, chanNum, name, cluster)
+			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
+			peerConn := offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto}
+			if err := rt.OffloadEngine.Upsert(client, peerConn, name, cluster); err != nil {
+				log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
+					client.String(), name, peerConn.String(), cluster, err.Error())
+			}
 		},
 		OnChannelDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
 			log.Debugf("channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
-			o.HandleChannelDelete(src, dst, proto, username, realm, relayAddr, peer, chanNum)
+			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
+			peerConn := offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto}
+			if err := rt.OffloadEngine.Remove(client, peerConn); err != nil {
+				log.Errorf("could not remove offload %s->%s: %s", client.String(), peerConn.String(), err.Error())
+			}
 		},
 	}
 }

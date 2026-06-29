@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/l7mp/stunner/internal/object"
 	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
@@ -109,7 +108,7 @@ func (f *fakeFactory) New(conf stnrv1.Config) (runtime.Runnable, error) {
 	case fakeErrFatal:
 		return nil, errCreate
 	case fakeErrRestartRequired:
-		return obj, object.ErrRestartRequired
+		return obj, runtime.ErrRestartRequired
 	default:
 		return obj, nil
 	}
@@ -153,7 +152,7 @@ func (o *fakeObject) Reconcile(conf stnrv1.Config) error {
 	case fakeErrFatal:
 		return errReconcile
 	case fakeErrRestartRequired:
-		return object.ErrRestartRequired
+		return runtime.ErrRestartRequired
 	default:
 		return nil
 	}
@@ -200,8 +199,8 @@ func newTestEnv(t *testing.T) *testEnv {
 		desired: map[runtime.ObjectType][]stnrv1.Config{},
 	}
 
-	catalog := object.NewCatalogFromKinds(
-		object.KindSpec{
+	catalog := NewCatalogFromKinds(
+		KindSpec{
 			Type:     testRootType,
 			Children: []runtime.ObjectType{testGroupType},
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
@@ -213,7 +212,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			Singleton:     true,
 			SingletonName: func(_ string) string { return "root" },
 		},
-		object.KindSpec{
+		KindSpec{
 			Type:     testGroupType,
 			Children: []runtime.ObjectType{testItemType},
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
@@ -223,7 +222,7 @@ func newTestEnv(t *testing.T) *testEnv {
 				return env.extractor(testGroupType)(), nil
 			},
 		},
-		object.KindSpec{
+		KindSpec{
 			Type: testItemType,
 			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testItemType, rec: rec}).New(conf)
@@ -477,7 +476,7 @@ func TestReconcileRestartRequired(t *testing.T) {
 	)
 
 	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
-	require.ErrorIs(t, err, object.ErrRestartRequired)
+	require.ErrorIs(t, err, runtime.ErrRestartRequired)
 
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{"reconcile:test-item/existing"})
@@ -494,7 +493,7 @@ func TestCreateRestartRequired(t *testing.T) {
 	)
 
 	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
-	require.ErrorIs(t, err, object.ErrRestartRequired)
+	require.ErrorIs(t, err, runtime.ErrRestartRequired)
 
 	_, found := env.rt.Registry.Get(testItemType, "new")
 	require.False(t, found)

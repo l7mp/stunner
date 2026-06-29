@@ -6,32 +6,20 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/pion/logging"
-
-	objectturn "github.com/l7mp/stunner/internal/object/turn"
+	"github.com/l7mp/stunner/internal/offload"
 	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 )
 
-// Offload wraps the TURN offload handler in its own Object so reconciliations don't accidentally
-// bounce the eBPF engine.
-//
-// INVARIANT (intentional, do not "fix"): Close(false) is a NO-OP and Start is idempotent. The
-// engine only goes down on process shutdown (Close(true)). Even when Inspect signals a restart
-// for an engine/interfaces change, the reconcile-driven Close(false) keeps the engine running:
-// swapping engine internals on a config change is the offload handler's concern, not the object
-// lifecycle's. The payoff of this split: changes to Health or Metrics endpoints never drag
-// Offload through close+start.
+// Offload is the reconciliation representative of the process-wide offload engine
+// (rt.OffloadEngine). It owns no engine lifecycle — the engine is created/started at server
+// startup and closed at shutdown — it only pushes config changes (engine mode, interfaces) to the
+// engine in place and surfaces its statistics as status.
 type Offload struct {
-	engine     stnrv1.OffloadMode
-	interfaces []string
-	handler    objectturn.OffloadHandler
-	started    bool
+	rt *runtime.Runtime
 
 	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
 	conf atomic.Pointer[OffloadConfig]
-
-	log logging.LeveledLogger
 }
 
 // OffloadConfig is the typed subconfig consumed by Offload.
@@ -69,11 +57,7 @@ func (c *OffloadConfig) String() string {
 
 // NewOffload creates an Offload object.
 func NewOffload(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
-	o := &Offload{
-		engine:  stnrv1.OffloadEngineNone,
-		handler: objectturn.NewOffloadHandlerStub(),
-		log:     rt.Logger.NewLogger("offload"),
-	}
+	o := &Offload{rt: rt}
 	if conf == nil {
 		return o, nil
 	}
@@ -109,17 +93,42 @@ func (o *Offload) Status() stnrv1.Status {
 		Listeners:  map[string]stnrv1.OffloadDirStat{},
 		Clusters:   map[string]stnrv1.OffloadDirStat{},
 	}
-	if o.handler == nil {
+	stats, err := o.rt.OffloadEngine.Stats()
+	if err != nil {
 		return status
 	}
-	runtimeStatus := o.handler.Status()
-	for k, v := range runtimeStatus.Listeners {
-		status.Listeners[k] = v
-	}
-	for k, v := range runtimeStatus.Clusters {
-		status.Clusters[k] = v
+	listeners := o.nameIndex(runtime.TypeListener)
+	clusters := o.nameIndex(runtime.TypeCluster)
+	for k, v := range stats {
+		info := stnrv1.OffloadStatInfo{Pkts: v.Pkts, Bytes: v.Bytes, TimestampLast: v.TimestampLast}
+		dst := status.Clusters
+		index := clusters
+		if offload.IsListener(k.Flags) {
+			dst = status.Listeners
+			index = listeners
+		}
+		name, ok := index[k.NameHash]
+		if !ok {
+			continue
+		}
+		ds := dst[name]
+		if offload.IsDirIn(k.Flags) {
+			ds.Rx = info
+		} else {
+			ds.Tx = info
+		}
+		dst[name] = ds
 	}
 	return status
+}
+
+// nameIndex maps offload name-hashes back to object names for the given type.
+func (o *Offload) nameIndex(typ runtime.ObjectType) map[uint16]string {
+	ret := map[uint16]string{}
+	for _, n := range o.rt.Registry.List(typ) {
+		ret[offload.NameHash(n.Name())] = n.Name()
+	}
+	return ret
 }
 
 func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
@@ -136,9 +145,10 @@ func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runt
 	if err != nil {
 		return runtime.ActionNone, err
 	}
-	changed := newEngine != curEngine || !reflect.DeepEqual(req.Interfaces, cur.Interfaces)
-	// Only an actual engine/interfaces change requires the engine to be torn down.
-	if changed {
+	// An engine/interfaces change requires the engine to be re-pinned: the reconciler drives a
+	// Close()+Start() on the singleton via this object's restart. Unrelated reconciles return
+	// ActionNone and never touch the engine.
+	if newEngine != curEngine || !reflect.DeepEqual(req.Interfaces, cur.Interfaces) {
 		return runtime.ActionRestart, nil
 	}
 	return runtime.ActionNone, nil
@@ -153,8 +163,6 @@ func (o *Offload) Reconcile(conf stnrv1.Config) error {
 	if err != nil {
 		return err
 	}
-	o.engine = eng
-	o.interfaces = append([]string(nil), req.Interfaces...)
 	o.conf.Store(&OffloadConfig{
 		Engine:     eng.String(),
 		Interfaces: append([]string(nil), req.Interfaces...),
@@ -162,35 +170,19 @@ func (o *Offload) Reconcile(conf stnrv1.Config) error {
 	return nil
 }
 
+// Start (re-)pins the process-wide offload engine with the current config. The reconciler calls it
+// only on object create/restart, i.e. on an actual offload-config change.
 func (o *Offload) Start() error {
-	if o.started {
-		return nil
-	}
-	if o.handler == nil {
-		return nil
-	}
-	if err := o.handler.Start(); err != nil {
-		return err
-	}
-	o.started = true
-	return nil
+	conf := o.GetConfig().(*OffloadConfig)
+	return o.rt.OffloadEngine.Start(conf.Engine, conf.Interfaces)
 }
 
-// Close stops the object. Offload objects are special: a reconcile-driven Close(false) MUST
-// NOT tear the engine down, only an explicit shutdown (Close(true)) really closes it. See the
-// type-level invariant comment.
+// Close tears the engine down. On a reconcile-driven restart (shutdown=false) the engine is
+// closed so the following Start re-pins it; on process shutdown the engine is closed by
+// Stunner.Close, so this is a no-op.
 func (o *Offload) Close(shutdown bool) error {
-	if !shutdown {
+	if shutdown {
 		return nil
 	}
-	if o.handler == nil {
-		return nil
-	}
-	err := o.handler.Close()
-	o.started = false
-	return err
+	return o.rt.OffloadEngine.Close()
 }
-
-// Handler exposes the underlying offload handler. Used by the TURN server to wire up
-// per-allocation channel offload events.
-func (o *Offload) Handler() objectturn.OffloadHandler { return o.handler }

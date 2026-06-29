@@ -123,7 +123,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 			if stopped.Load() {
 				conn.Close() //nolint
 			} else {
-				sendErr(fmt.Errorf("iCE connection terminated with state: %s", p.String()))
+				sendErr(fmt.Errorf("ICE connection terminated with state: %s", p.String()))
 			}
 		}
 	})
@@ -145,7 +145,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 	gatherComplete := webrtc.GatheringCompletePromise(peerConn)
 	<-gatherComplete
 
-	d.log.Debugf("iCE gathering complete: %s", peerConn.LocalDescription().SDP)
+	d.log.Debugf("ICE gathering complete: %s", peerConn.LocalDescription().SDP)
 
 	sdp := []byte(peerConn.LocalDescription().SDP)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
@@ -170,7 +170,7 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 
 	if resp.StatusCode != 201 {
 		conn.Close() //nolint
-		return nil, fmt.Errorf("pOST request returned invalid status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("POST request returned invalid status: %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)

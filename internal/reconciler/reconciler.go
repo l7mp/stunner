@@ -23,13 +23,13 @@ type Policy struct {
 
 // Reconciler converges the object tree to a desired config, driven by the catalog.
 type Reconciler struct {
-	catalog *runtime.Catalog
+	catalog *Catalog
 	rt      *runtime.Runtime
 	log     logging.LeveledLogger
 }
 
 // New creates a Reconciler over a catalog and a runtime.
-func New(catalog *runtime.Catalog, rt *runtime.Runtime, logger logging.LoggerFactory) *Reconciler {
+func New(catalog *Catalog, rt *runtime.Runtime, logger logging.LoggerFactory) *Reconciler {
 	return &Reconciler{
 		catalog: catalog,
 		rt:      rt,
@@ -208,7 +208,7 @@ func (r *Reconciler) construct(ops *ops) ([]constructedRef, error) {
 // mutates no object. parentType/parentName identify the owning node (both "" at the root); parent
 // is the owning object (nil at the root and under not-yet-constructed parents) and is used only to
 // scope the stale-instance scan.
-func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.ObjectType, parentName string, spec runtime.KindSpec, full *stnrv1.StunnerConfig, ops *ops) error {
+func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.ObjectType, parentName string, spec KindSpec, full *stnrv1.StunnerConfig, ops *ops) error {
 	desired, err := spec.ExtractConfigs(parentName, full)
 	if err != nil {
 		return fmt.Errorf("kind %q desired-config resolver: %w", spec.Type, err)

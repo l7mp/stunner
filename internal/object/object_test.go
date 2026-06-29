@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/internal/resolver"
+	"github.com/l7mp/stunner/internal/router"
 	"github.com/l7mp/stunner/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/pkg/apis/v1"
 	"github.com/l7mp/stunner/pkg/logger"
@@ -55,6 +56,7 @@ func newTestEnv() *testEnv {
 	log := logger.NewLoggerFactory(stnrv1.DefaultLogLevel)
 	r := resolver.NewMockResolver(map[string][]string{}, log)
 	rt := runtime.New(runtime.Config{Logger: log, DryRun: true, Resolver: r})
+	rt.Router = router.NewRouter(rt)
 	return &testEnv{rt: rt}
 }
 

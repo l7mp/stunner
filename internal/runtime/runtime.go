@@ -10,21 +10,27 @@ import (
 
 	"github.com/pion/transport/v4"
 
-	"github.com/l7mp/stunner/internal/quota"
+	"github.com/l7mp/stunner/internal/offload"
 	"github.com/l7mp/stunner/internal/resolver"
 	"github.com/l7mp/stunner/internal/telemetry"
+	licensecfg "github.com/l7mp/stunner/pkg/config/license"
 	"github.com/l7mp/stunner/pkg/logger"
 )
 
-// Config carries the process-wide dependencies shared by all objects. Set once at startup.
+// Config carries the process-wide dependencies shared by all objects. Set once at startup. The
+// service interfaces (QuotaHandler, Router) are declared in api.go; their implementations live in
+// internal/quota and internal/router. OffloadEngine is a process-wide singleton owned by the
+// Runtime (its eBPF lifetime is the server's lifetime); internal/offload is a one-way dependency.
 type Config struct {
-	Logger       logger.LoggerFactory
-	DryRun       bool
-	Resolver     resolver.DnsResolver
-	Telemetry    *telemetry.Telemetry
-	QuotaStore   quota.Store
-	UdpThreadNum int
-	Net          transport.Net
+	Logger        logger.LoggerFactory
+	DryRun        bool
+	Resolver      resolver.DnsResolver
+	Telemetry     *telemetry.Telemetry
+	QuotaHandler  QuotaHandler
+	License       licensecfg.ConfigManager
+	OffloadEngine offload.Engine
+	UdpThreadNum  int
+	Net           transport.Net
 }
 
 // Runtime is the single cross-object access point: process-wide dependencies, the object
@@ -42,11 +48,20 @@ type Runtime struct {
 	forceReady atomic.Bool
 }
 
-// New creates a Runtime with an empty Registry and a default Router.
+// New creates a Runtime with an empty Registry. The caller wires rt.Router via
+// router.NewRouter(rt) (kept out of the kernel to avoid importing the router implementation).
 func New(deps Config) *Runtime {
-	rt := &Runtime{Config: deps, Registry: NewRegistry()}
-	rt.Router = NewRouter(rt)
-	return rt
+	if deps.License == nil {
+		deps.License = licensecfg.New(deps.Logger.NewLogger("license"))
+	}
+	if deps.OffloadEngine == nil {
+		deps.OffloadEngine = offload.New(offload.Deps{
+			Telemetry: deps.Telemetry,
+			License:   deps.License,
+			Log:       deps.Logger.NewLogger("offload"),
+		})
+	}
+	return &Runtime{Config: deps, Registry: NewRegistry()}
 }
 
 // IsReady returns true if STUNner is ready to serve requests.
