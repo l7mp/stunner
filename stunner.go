@@ -56,11 +56,12 @@ type Stunner struct {
 	forceReady, suppressRollback, dryRun bool
 
 	// Subsystems shared across object factories.
-	reconciler *reconciler.Reconciler
-	resolver   resolver.DnsResolver
-	telemetry  *telemetry.Telemetry
-	rt         *runtime.Runtime
-	net        transport.Net
+	reconciler      *reconciler.Reconciler
+	resolver        resolver.DnsResolver
+	telemetry       *telemetry.Telemetry
+	offloadReporter *offload.StatsReporter
+	rt              *runtime.Runtime
+	net             transport.Net
 
 	// Logging.
 	logRateLimit rate.Limit
@@ -205,8 +206,25 @@ func NewStunner(options Options) *Stunner {
 	// Create a reconciler.
 	s.reconciler = reconciler.New(catalog, rt, s.logger)
 
+	// The offload stats reporter backfills the offloaded packet/byte totals from the offload engine
+	// into the shared telemetry counters. With the null engine the sample is empty, so the counters
+	// reflect userspace traffic only; a real engine adds the offloaded portion.
+	s.offloadReporter = offload.NewStatsReporter(rt.OffloadEngine, s.telemetry,
+		func() (listeners, clusters map[uint16]string) {
+			listeners = map[uint16]string{}
+			for _, n := range rt.Registry.List(runtime.TypeListener) {
+				listeners[offload.NameHash(n.Name())] = n.Name()
+			}
+			clusters = map[uint16]string{}
+			for _, n := range rt.Registry.List(runtime.TypeCluster) {
+				clusters[offload.NameHash(n.Name())] = n.Name()
+			}
+			return
+		}, logFactory.NewLogger("offload-stats"))
+
 	if !s.dryRun {
 		s.resolver.Start()
+		s.offloadReporter.Start()
 	}
 
 	return s
@@ -262,6 +280,9 @@ func (s *Stunner) Close() {
 	s.log.Info("closing STUNner")
 	if s.reconciler != nil {
 		_ = s.reconciler.Shutdown()
+	}
+	if s.offloadReporter != nil {
+		s.offloadReporter.Close()
 	}
 	if s.rt != nil && s.rt.OffloadEngine != nil {
 		if err := s.rt.OffloadEngine.Close(); err != nil {
