@@ -201,7 +201,3 @@ func (c *PacketConn) Close() error {
 	c.telemetry.SubConnection(c.name, c.connType)
 	return c.PacketConn.Close()
 }
-
-// Unwrap returns the wrapped packet connection, so its capabilities beyond net.PacketConn
-// stay reachable behind the telemetry wrap.
-func (c *PacketConn) Unwrap() net.PacketConn { return c.PacketConn }

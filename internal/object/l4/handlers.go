@@ -95,14 +95,6 @@ func flowIdentity(rt *objruntime.Runtime, srcAddr net.Addr) (username, realm str
 	}
 }
 
-// minChannelNumber is the TURN channel number floor (RFC 5766); the pion client assigns
-// binding numbers sequentially from it per allocation. Per-flow upstream sessions bind a
-// single peer, so its channel sits inside a small window at the floor.
-const (
-	minChannelNumber   uint16 = 0x4000
-	channelProbeWindow uint16 = 16
-)
-
 // channelPollBackoff and channelPollAttempts pace the channel learning of tunnel-mode
 // flows: the pion client assigns the channel at the first client write towards the peer and
 // binds it asynchronously.
@@ -110,16 +102,6 @@ const (
 	channelPollBackoff  = 100 * time.Millisecond
 	channelPollAttempts = 5
 )
-
-// probeChannel scans the probe window for the channel the TURN client bound for the peer.
-func probeChannel(leg upstreamLeg, peer net.Addr) (uint16, bool) {
-	for n := minChannelNumber; n < minChannelNumber+channelProbeWindow; n++ {
-		if addr, ok := leg.FindAddrByChannelNumber(n); ok && addr.String() == peer.String() {
-			return n, true
-		}
-	}
-	return 0, false
-}
 
 // offloadPair is the connection pair a flow is registered with on the offload engine.
 type offloadPair struct {
@@ -145,14 +127,16 @@ func newOffloadHandler(listener string, rt *objruntime.Runtime, log logging.Leve
 // upsert registers a flow with the offload engine. The connection pair encodes the directions: the
 // client connection is the ingress side (raw traffic arrives from the client at the listener
 // socket), the peer connection the egress side, and channel semantics are per side. The channel
-// exists only after the first client write, so a goroutine retries the probe with doubling
-// backoff, giving up when the flow closes or after the last attempt, leaving the flow unoffloaded.
+// upstream channel is assigned at the first client write and bound a round-trip later, so a
+// goroutine retries until the transport reports live framing, giving up when the flow closes or
+// after the last attempt, leaving the flow unoffloaded. Offloading an unbound channel would put
+// ChannelData on the wire that the upstream server drops.
 func (h *offloadHandler) upsert(f *flow) {
 	// ingress: raw client traffic from SrcAddr arriving at the listener socket DstAddr
 	client := offload.Connection{RemoteAddr: f.ev.SrcAddr, LocalAddr: f.ev.DstAddr,
 		Protocol: f.ev.Protocol}
 
-	if f.finder == nil {
+	if f.ev.ServerAddr == nil {
 		// egress: raw traffic from the relay socket to the pinned peer
 		peer := offload.Connection{RemoteAddr: f.ev.Peer, LocalAddr: f.ev.RelayAddr,
 			Protocol: f.ev.PeerProtocol}
@@ -168,7 +152,7 @@ func (h *offloadHandler) upsert(f *flow) {
 			if f.closed.Load() {
 				return
 			}
-			ch, ok := probeChannel(f.finder, f.ev.Peer)
+			ch, ok := f.relayPacket.Channel(f.ev.Peer)
 			if !ok {
 				continue
 			}

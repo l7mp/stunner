@@ -14,6 +14,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
+	"github.com/l7mp/stunner/v2/internal/upstream"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
@@ -89,7 +90,7 @@ type Dialer struct {
 // permission for each new peer written to), and LocalAddr is the server-relayed transport
 // address. The network and local address of the allocation are the server's business, so both
 // parameters are ignored; they exist to mirror net.ListenConfig.ListenPacket.
-func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (net.PacketConn, error) {
+func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (upstream.PacketConn, error) {
 	client, transport, err := dial(d.Config)
 	if err != nil {
 		return nil, err
@@ -123,7 +124,7 @@ func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (net.PacketConn, 
 // DialContext makes a TCP (RFC 6062) allocation on the TURN server and opens a relayed connection
 // to the peer at address (host:port). Only "tcp" is a valid network, and only over TURN-TCP and
 // TURN-TLS: RFC 6062 requires the control connection to be TCP or TLS.
-func (d Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+func (d Dialer) DialContext(ctx context.Context, network, address string) (upstream.Conn, error) {
 	if network != "tcp" {
 		return nil, fmt.Errorf("TURN relayed connections are TCP only, got network %q", network)
 	}
@@ -261,6 +262,11 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 	return client, turnConn, nil
 }
 
+var (
+	_ upstream.PacketConn = &packetConn{}
+	_ upstream.Conn       = &conn{}
+)
+
 // packetConn is a UDP allocation that owns its TURN session: Close closes the allocation, then
 // the TURN client and its transport.
 type packetConn struct {
@@ -287,24 +293,27 @@ func (c *packetConn) TransportAddrs() (local, remote net.Addr) {
 	return c.transport.LocalAddr(), c.server
 }
 
-// channelFinder is the reverse channel mapper of the pion client relay conn (the merged
-// upstream accessor). The forward (addr to channel) accessor is not public upstream yet, so
-// callers probe channel numbers through this.
+// channelFinder is the channel accessor set of the pion client relay conn. The concrete type
+// lives in the library's internal packages, so the only way to reach these is structurally.
 type channelFinder interface {
-	FindAddrByChannelNumber(chNum uint16) (net.Addr, bool)
+	FindChannelNumberByAddr(addr net.Addr) (uint16, bool)
+	IsChannelActive(chNum uint16) bool
 }
 
-// FindAddrByChannelNumber exposes the pion relay conn's reverse channel mapper: the peer
-// address the TURN client assigned the channel number for on this session. Note that
-// assignment happens at the first write towards the peer while the ChannelBind transaction
-// completes asynchronously, so a freshly reported channel may still be one round-trip away
-// from being accepted by the server.
-func (c *packetConn) FindAddrByChannelNumber(chNum uint16) (net.Addr, bool) {
+// Channel reports the channel the session frames traffic towards peer with, and whether that
+// framing is live. The client assigns a number at the first write towards a peer and completes
+// the ChannelBind a round trip later, sending Send indications until it does, so a number alone
+// does not mean the wire carries ChannelData yet.
+func (c *packetConn) Channel(peer net.Addr) (uint16, bool) {
 	f, ok := c.PacketConn.(channelFinder)
 	if !ok {
-		return nil, false
+		return 0, false
 	}
-	return f.FindAddrByChannelNumber(chNum)
+	num, ok := f.FindChannelNumberByAddr(peer)
+	if !ok || !f.IsChannelActive(num) {
+		return 0, false
+	}
+	return num, true
 }
 
 // conn is an RFC 6062 relayed TCP connection that owns its TURN session: Close closes the data
@@ -320,6 +329,16 @@ func (c *conn) Close() error {
 	c.once.Do(c.closeSession)
 	return err
 }
+
+// TransportAddrs returns the wire addresses of the relayed connection: the RFC 6062 data
+// connection runs to the TURN server, so the remote is the server, not the peer.
+func (c *conn) TransportAddrs() (local, remote net.Addr) {
+	return c.LocalAddr(), c.RemoteAddr()
+}
+
+// Channel reports no framing: RFC 6062 relays peer traffic over a dedicated data connection,
+// there are no channels on a stream allocation.
+func (c *conn) Channel(net.Addr) (uint16, bool) { return 0, false }
 
 // networkFamily narrows a base network ("udp") to the family of the server IP, so the local
 // socket family matches the server: a dual-stack wildcard socket would source packets to an IPv4

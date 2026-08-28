@@ -15,6 +15,7 @@ import (
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	"github.com/l7mp/stunner/v2/internal/turnclient"
+	"github.com/l7mp/stunner/v2/internal/upstream"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
 
@@ -91,7 +92,7 @@ func (r *Relay) Validate() error { return nil }
 // relayed address, and the requested port is the upstream server's business. Otherwise a local
 // relay socket is bound, wrapped so every datagram is routed/admitted via the Router and
 // accounted in telemetry.
-func (r *Relay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
+func (r *Relay) AllocatePacketConn(conf turn.AllocateListenerConfig) (upstream.PacketConn, net.Addr, error) {
 	if c, ok := r.runtime.Router.Route(r.listener, isTURNCluster); ok {
 		turnConf, err := turnclient.NewConfig(c.TURNServer(), c.Protocol())
 		if err != nil {
@@ -104,8 +105,13 @@ func (r *Relay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Packet
 			return nil, nil, fmt.Errorf("failed to dial upstream TURN server for cluster %q: %w",
 				c.Name(), err)
 		}
-		wrapped := netutil.NewPacketConn(pc, c.Name(), telemetry.ClusterType, r.runtime.Telemetry,
-			nil, r.runtime.Logger.NewLogger(fmt.Sprintf("turn-relay-%s", r.listener)))
+		// admission is the upstream server's business, so the conn only accounts
+		wrapped := &turnPacketConn{
+			PacketConn: netutil.NewPacketConn(pc, c.Name(), telemetry.ClusterType,
+				r.runtime.Telemetry, nil,
+				r.runtime.Logger.NewLogger(fmt.Sprintf("turn-relay-%s", r.listener))),
+			up: pc,
+		}
 		return wrapped, pc.LocalAddr(), nil
 	}
 
@@ -118,9 +124,10 @@ func (r *Relay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Packet
 		return nil, nil, err
 	}
 
-	prc := netutil.NewPacketConn(conn, r.listener, telemetry.ClusterType, r.runtime.Telemetry,
+	prc := &plainPacketConn{PacketConn: netutil.NewPacketConn(conn, r.listener,
+		telemetry.ClusterType, r.runtime.Telemetry,
 		func(addr net.Addr) (string, bool) { return routeRemote(r.runtime, r.listener, addr) },
-		r.runtime.Logger.NewLogger(fmt.Sprintf("relay-%s", r.listener)))
+		r.runtime.Logger.NewLogger(fmt.Sprintf("relay-%s", r.listener)))}
 
 	relayAddr, ok := prc.LocalAddr().(*net.UDPAddr)
 	if !ok {
@@ -135,7 +142,7 @@ func (r *Relay) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.Packet
 // server (an upstream TCP allocation, per-allocation credentials); otherwise the peer is
 // routed/admitted once and dialed directly from the allocation's relayed transport address
 // (shared with its listener, hence the reuse socket options).
-func (r *Relay) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
+func (r *Relay) AllocateConn(conf turn.AllocateConnConfig) (upstream.Conn, error) {
 	if c, ok := r.runtime.Router.Route(r.listener, isTURNCluster); ok {
 		turnConf, err := turnclient.NewConfig(c.TURNServer(), c.Protocol())
 		if err != nil {
@@ -149,7 +156,10 @@ func (r *Relay) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
 			return nil, err
 		}
 		// account the relayed connection under the cluster in telemetry
-		return netutil.NewConn(conn, c.Name(), telemetry.ClusterType, r.runtime.Telemetry), nil
+		return &turnConn{
+			Conn: netutil.NewConn(conn, c.Name(), telemetry.ClusterType, r.runtime.Telemetry),
+			up:   conn,
+		}, nil
 	}
 
 	cluster, ok := routeRemote(r.runtime, r.listener, conf.RemoteAddr)
@@ -170,7 +180,8 @@ func (r *Relay) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return netutil.NewConn(conn, cluster, telemetry.ClusterType, r.runtime.Telemetry), nil
+	return &plainConn{Conn: netutil.NewConn(conn, cluster, telemetry.ClusterType,
+		r.runtime.Telemetry)}, nil
 }
 
 // AllocateListener binds the relayed transport address of an RFC 6062 TCP allocation, admitting
@@ -208,6 +219,22 @@ func (r *Relay) AllocateListener(conf turn.AllocateListenerConfig) (net.Listener
 		return prl, &relayAddr, nil
 	}
 	return prl, l.Addr(), nil
+}
+
+// relayAddressGenerator hands a Relay to the pion TURN server. Go has no covariant returns, so
+// the Relay methods, which return transports the dataplane can ask about themselves, do not
+// satisfy RelayAddressGenerator on their own; this narrows them to the bare net.* types the
+// server takes. AllocateListener and Validate already match and are promoted as they are.
+type relayAddressGenerator struct{ *Relay }
+
+var _ turn.RelayAddressGenerator = relayAddressGenerator{}
+
+func (g relayAddressGenerator) AllocatePacketConn(conf turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
+	return g.Relay.AllocatePacketConn(conf)
+}
+
+func (g relayAddressGenerator) AllocateConn(conf turn.AllocateConnConfig) (net.Conn, error) {
+	return g.Relay.AllocateConn(conf)
 }
 
 // routeRemote resolves the cluster admitting a remote peer endpoint (protocol and port derived from

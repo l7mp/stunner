@@ -116,11 +116,21 @@ func TestUpstreamSessionChannel(t *testing.T) {
 	_, err = pc.WriteTo([]byte("hello"), peer)
 	require.NoError(t, err, "relayed write")
 
-	// the channel is assigned at the first write and lands at the channel floor (0x4000):
-	// per-session allocations bind a single peer; the async ChannelBind settles within a
-	// round trip
+	// the channel is assigned at the first write, but Channel stays silent until the
+	// ChannelBind settles a round trip later: until then the client sends the payload as a
+	// Send indication and the wire carries no ChannelData
 	assert.Eventually(t, func() bool {
-		addr, ok := pc.(*packetConn).FindAddrByChannelNumber(0x4000)
-		return ok && addr.String() == peer.String()
-	}, 3*time.Second, 50*time.Millisecond, "peer channel found at the floor")
+		_, ok := pc.Channel(peer)
+		return ok
+	}, 3*time.Second, 50*time.Millisecond, "the binding goes live")
+
+	// per-session allocations bind a single peer, so its channel lands at the floor (0x4000)
+	num, ok := pc.Channel(peer)
+	require.True(t, ok, "channel live")
+	assert.Equal(t, uint16(0x4000), num, "channel at the floor")
+
+	// an address the session does not carry has no framing
+	other := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}
+	_, ok = pc.Channel(other)
+	assert.False(t, ok, "no framing for a peer the session does not carry")
 }

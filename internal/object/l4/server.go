@@ -222,25 +222,13 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 	}
 	f.ev.Peer = f.peer
 
-	// A direct leg leaves from its relay socket; an upstream TURN leg leaves from the
-	// session's transport socket towards the server, and the offload housekeeping learns
-	// its channel through the leg's channel finder.
-	switch {
-	case f.relayPacket != nil:
-		inner := net.PacketConn(f.relayPacket)
-		if u, ok := inner.(unwrapper); ok {
-			inner = u.Unwrap()
-		}
-		if leg, ok := inner.(upstreamLeg); ok {
-			f.finder = leg
-			local, remote := leg.TransportAddrs()
-			f.ev.RelayAddr = local
-			f.ev.ServerAddr = remote
-		} else {
-			f.ev.RelayAddr = f.relayPacket.LocalAddr()
-		}
-	case f.relayStream != nil:
-		f.ev.RelayAddr = f.relayStream.LocalAddr()
+	// The transport reports its own wire addresses: a direct leg leaves from its relay socket
+	// with no fixed remote, an upstream TURN leg from the session's transport socket towards
+	// the server.
+	if f.relayPacket != nil {
+		f.ev.RelayAddr, f.ev.ServerAddr = f.relayPacket.TransportAddrs()
+	} else {
+		f.ev.RelayAddr, f.ev.ServerAddr = f.relayStream.TransportAddrs()
 	}
 
 	if !s.addFlow(f) {

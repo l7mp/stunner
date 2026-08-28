@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/l7mp/stunner/v2/internal/upstream"
 )
 
 // bufferSize is the pump chunk size: one read makes one datagram on a datagram leg, so a
@@ -16,25 +18,14 @@ const bufferSize = 1500
 // errQuotaExceeded rejects a flow the quota gate refused.
 var errQuotaExceeded = errors.New("flow quota exceeded")
 
-// unwrapper reaches the relay conn behind the telemetry wrap.
-type unwrapper interface{ Unwrap() net.PacketConn }
-
-// upstreamLeg is the capability set of an upstream TURN relay leg: the wire addresses of the
-// session and the reverse channel mapper.
-type upstreamLeg interface {
-	TransportAddrs() (local, remote net.Addr)
-	FindAddrByChannelNumber(chNum uint16) (net.Addr, bool)
-}
-
 // flow is one relayed client flow: the client-side conn, the relay leg towards the pinned
 // peer (a packet conn for datagram legs, a conn for stream legs), and the idle machinery.
 type flow struct {
 	s           *Server
 	client      net.Conn
-	relayPacket net.PacketConn
-	relayStream net.Conn
+	relayPacket upstream.PacketConn
+	relayStream upstream.Conn
 	peer        net.Addr
-	finder      upstreamLeg // the upstream TURN leg of a tunnel-mode flow, nil for direct
 	ev          FlowEvent
 	closed      atomic.Bool // teardown flag, checked by the offload housekeeping
 

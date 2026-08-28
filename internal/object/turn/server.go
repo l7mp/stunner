@@ -71,7 +71,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 		for _, c := range conns {
 			conn := turn.PacketConnConfig{
 				PacketConn:            c,
-				RelayAddressGenerator: relay,
+				RelayAddressGenerator: relayAddressGenerator{relay},
 				PermissionHandler:     permissionHandler,
 			}
 			s.Conns = append(s.Conns, conn)
@@ -88,7 +88,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              tcpListener,
-			RelayAddressGenerator: relay,
+			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
 		}
 		lConns = append(lConns, conn)
@@ -111,7 +111,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              tlsListener,
-			RelayAddressGenerator: relay,
+			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
 		}
 		lConns = append(lConns, conn)
@@ -135,7 +135,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 			rt.Telemetry, nil, nil)
 		conn := turn.ListenerConfig{
 			Listener:              dtlsListener,
-			RelayAddressGenerator: relay,
+			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
 		}
 		lConns = append(lConns, conn)
