@@ -89,15 +89,25 @@ type StatInfo struct {
 // StatMap maps stat keys to their last cached samples.
 type StatMap = map[StatKey]StatInfo
 
+// Protocol values of a Connection: the transport as the TURN five-tuple names it, which is what
+// the engines match on.
+const (
+	ProtocolUDP = "UDP"
+	ProtocolTCP = "TCP"
+)
+
 // Connection combines the offload engine identifiers required for uniquely identifying an
-// allocation channel binding. Depending on the engine, some values are unused (e.g., SocketFd
-// has no role for an XDP offload).
+// allocation channel binding. RemoteAddr and LocalAddr are the source and the destination of a
+// packet arriving on this side of the offloaded pair. Depending on the engine, some values are
+// unused (e.g., SocketFd has no role for an XDP offload).
 type Connection struct {
 	RemoteAddr net.Addr
 	LocalAddr  net.Addr
-	Protocol   string
-	SocketFd   uintptr
-	ChannelID  uint32
+	// Protocol is the transport, one of the Protocol constants above. The engines compare it
+	// verbatim, so the spelling is part of the contract.
+	Protocol  string
+	SocketFd  uintptr
+	ChannelID uint32
 }
 
 func (c *Connection) String() string {

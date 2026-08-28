@@ -185,13 +185,14 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 	// through an upstream TURN server is the allocators' internal business.
 	f := &flow{s: s, client: client}
 	f.ev = FlowEvent{
-		SrcAddr:      client.RemoteAddr(),
-		DstAddr:      client.LocalAddr(),
-		Protocol:     strings.ToLower(s.proto.String()),
-		PeerProtocol: strings.ToLower(peerProto.String()),
-		Cluster:      admitting.Name(),
-		Username:     user,
-		Realm:        realm,
+		SrcAddr:         client.RemoteAddr(),
+		DstAddr:         client.LocalAddr(),
+		Protocol:        strings.ToLower(s.proto.String()),
+		PeerProtocol:    strings.ToLower(peerProto.String()),
+		Cluster:         admitting.Name(),
+		ClusterProtocol: admitting.Protocol(),
+		Username:        user,
+		Realm:           realm,
 	}
 	switch peerProto {
 	case stnrv1.ProtocolTCP:

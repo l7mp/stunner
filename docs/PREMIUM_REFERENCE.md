@@ -283,5 +283,6 @@ Effective TURN protocol offload requires some low-level tweaking of the underlyi
 
 - The offload engine relies on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
 - Loading the eBPF program requires elevated admin privileges that might be not available on arbitrary Kubernetes clusters. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
+- Offload applies only to a leg between a TURN client and a TURN server, where plaintext ChannelData arrives on one side and raw traffic leaves on the other. See the [combination table](/docs/cmd/stunnerd.md#listener-and-cluster-combinations).
 - Currently TURN offload only supports UDP TURN channels. Implementing TURN/TCP acceleration and offloading TURN send indications are on the TODO list, reach out to us if you need these features.
 - TURN/XDP offload is disabled for host-local redirects (except the lo interface). Use the TURN/TC engine when host-local redirect is important, like accelerated symmetric ICE mode deployment.

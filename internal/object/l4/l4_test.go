@@ -3,6 +3,7 @@ package l4_test
 import (
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -403,7 +404,9 @@ func TestFlowGoroutineLeak(t *testing.T) {
 }
 
 // TestFlowEvents covers the default event wiring: a flow increments the per-client-IP quota
-// accounting and registers a channel-less offload connection pair; teardown reverses both.
+// accounting, and teardown releases it. A direct flow is never offloaded, whatever the engine:
+// the datapath only accelerates a TURN client/server leg, so a channel-less pair has no
+// meaning there.
 func TestFlowEvents(t *testing.T) {
 	quota := &spyQuota{}
 	eng := newSpyOffload()
@@ -430,23 +433,16 @@ func TestFlowEvents(t *testing.T) {
 	assert.Empty(t, decs, "no decrement while the flow lives")
 
 	upserts, removes := eng.snapshot()
-	require.Len(t, upserts, 1, "offload registered")
-	up := upserts[0]
-	assert.Equal(t, client.LocalAddr().String(), up.client.RemoteAddr.String(), "client source")
-	assert.Equal(t, "udp", up.client.Protocol, "client transport")
-	assert.Zero(t, up.client.ChannelID, "no channel on the client side")
-	assert.Equal(t, peer.String(), up.peer.RemoteAddr.String(), "peer endpoint")
-	assert.Zero(t, up.peer.ChannelID, "no channel on a direct leg")
-	assert.Equal(t, "plain-udp-events", up.listener, "listener attribution")
-	assert.Equal(t, "cluster", up.cluster, "cluster attribution")
-	assert.Empty(t, removes, "no removal while the flow lives")
+	assert.Empty(t, upserts, "a direct flow is not offloadable")
+	assert.Empty(t, removes, "nothing to remove")
 
 	require.NoError(t, s.Close())
 	assert.Eventually(t, func() bool {
 		_, decs := quota.snapshot()
-		_, removes := eng.snapshot()
-		return len(decs) == 1 && len(removes) == 1
-	}, 2*time.Second, 10*time.Millisecond, "teardown reverses quota and offload")
+		return len(decs) == 1
+	}, 2*time.Second, 10*time.Millisecond, "teardown releases the quota")
+	_, removes = eng.snapshot()
+	assert.Empty(t, removes, "nothing was offloaded, so nothing is removed")
 	_, decs = quota.snapshot()
 	assert.Equal(t, incs, decs, "decrement carries the minted identity")
 }
@@ -477,11 +473,12 @@ func TestFlowQuotaRejected(t *testing.T) {
 	assert.Empty(t, decs, "nothing released")
 }
 
-// TestTunnelFlowOffload drives a real tunnel-mode flow: the listener routes to a TURN
-// cluster backed by a local pion server, so the relay leg is a real upstream allocation. No
-// offload registration happens until the pion client binds the upstream channel (at the
-// first client write); then the channel-bound event upserts the wire 5-tuple with the
-// channel on the upstream side only, and teardown removes the same pair.
+// TestTunnelFlowOffload drives a real tunnel-mode flow: the listener routes to a TURN cluster
+// backed by a local pion server, so the relay leg is a real upstream allocation. No offload
+// registration happens until the upstream channel binding goes live; then the upsert names the
+// wire 5-tuple with the channel on the upstream side only, and teardown removes the same pair.
+// The registered pair is the contract of the client-side kernel offload: ingress strips nothing
+// and egress encapsulates into the channel.
 func TestTunnelFlowOffload(t *testing.T) {
 	serverConn, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	require.NoError(t, err, "server socket")
@@ -542,10 +539,24 @@ func TestTunnelFlowOffload(t *testing.T) {
 
 	upserts, _ := eng.snapshot()
 	up := upserts[0]
-	assert.Zero(t, up.client.ChannelID, "no channel on the client side")
-	assert.Equal(t, serverAddr.String(), up.peer.RemoteAddr.String(), "wire remote is the server")
-	assert.NotEqual(t, peer.String(), up.peer.RemoteAddr.String(), "peer rides the channel, not the wire")
-	assert.GreaterOrEqual(t, up.peer.ChannelID, uint32(0x4000), "upstream side rides the channel")
+
+	// the wire takes the engine's channel-bearing position: ChannelData towards the upstream
+	// server over the transport socket, with the peer implicit in the channel
+	assert.Equal(t, serverAddr.String(), up.client.RemoteAddr.String(), "wire remote is the server")
+	assert.NotEqual(t, peer.String(), up.client.RemoteAddr.String(), "peer rides the channel, not the wire")
+	assert.Equal(t, offload.ProtocolUDP, up.client.Protocol, "wire transport")
+	assert.False(t, strings.HasSuffix(up.client.LocalAddr.String(), ":"+strconv.Itoa(port)),
+		"transport socket, not the listener socket")
+	assert.Equal(t, uint32(0x4000), up.client.ChannelID,
+		"the single binding of a per-flow session sits at the channel floor")
+
+	// the raw side faces our client at the listener socket, with no channel
+	assert.Equal(t, client.LocalAddr().String(), up.peer.RemoteAddr.String(), "client source")
+	assert.True(t, strings.HasSuffix(up.peer.LocalAddr.String(), ":"+strconv.Itoa(port)),
+		"listener socket")
+	assert.Equal(t, offload.ProtocolUDP, up.peer.Protocol, "client transport")
+	assert.Zero(t, up.peer.ChannelID, "no channel on the raw side")
+
 	assert.Equal(t, "plain-udp-tunnel", up.listener, "listener attribution")
 	assert.Equal(t, "cluster", up.cluster, "cluster attribution")
 
@@ -555,5 +566,6 @@ func TestTunnelFlowOffload(t *testing.T) {
 		return len(removes) == 1
 	}, 2*time.Second, 10*time.Millisecond, "offload removed on teardown")
 	_, removes := eng.snapshot()
-	assert.Equal(t, up.peer.ChannelID, removes[0].peer.ChannelID, "removal names the same channel")
+	assert.Equal(t, up.client, removes[0].client, "removal names the same wire connection")
+	assert.Equal(t, up.peer, removes[0].peer, "removal names the same client connection")
 }

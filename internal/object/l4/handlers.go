@@ -2,7 +2,6 @@ package l4
 
 import (
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,8 +24,11 @@ type FlowEvent struct {
 	// Peer is the resolved peer endpoint and PeerProtocol its transport ("udp" or "tcp").
 	Peer         net.Addr
 	PeerProtocol string
-	// Cluster is the routed cluster that admitted the peer.
-	Cluster string
+	// Cluster is the routed cluster that admitted the peer, and ClusterProtocol its
+	// protocol: the transport of the relay leg, and what decides whether the leg is
+	// offloadable at all.
+	Cluster         string
+	ClusterProtocol stnrv1.ClusterProtocol
 	// Username and Realm are the flow's quota identity, as minted by the quota gate.
 	Username, Realm string
 	// RelayAddr is the local address the relayed traffic leaves from: the relay socket of
@@ -103,7 +105,9 @@ const (
 	channelPollAttempts = 5
 )
 
-// offloadPair is the connection pair a flow is registered with on the offload engine.
+// offloadPair is the connection pair a flow is registered with, in the order the engine takes
+// them: the side whose inbound packets carry ChannelData first, the raw side second. A pair with
+// no channel on either side degenerates to a plain 5-tuple forwarder.
 type offloadPair struct {
 	client, peer offload.Connection
 }
@@ -124,25 +128,27 @@ func newOffloadHandler(listener string, rt *objruntime.Runtime, log logging.Leve
 	return &offloadHandler{rt: rt, listener: listener, log: log, pairs: make(map[*flow]offloadPair)}
 }
 
-// upsert registers a flow with the offload engine. The connection pair encodes the directions: the
-// client connection is the ingress side (raw traffic arrives from the client at the listener
-// socket), the peer connection the egress side, and channel semantics are per side. The channel
-// upstream channel is assigned at the first client write and bound a round-trip later, so a
+// upsert registers a flow with the offload engine, which only ever accelerates the leg between a
+// TURN client and a TURN server: the datapath decapsulates ChannelData arriving on the
+// channel-bearing side and encapsulates towards it on the way back, with no path that forwards
+// raw traffic on both sides. So only tunnel-mode UDP flows are offloadable. A direct flow, a
+// stream flow and a stdin flow all stay in userspace, and registering one would be worse than
+// useless: the datapath would parse a channel header out of raw client payload and prepend one
+// to the peer's replies, corrupting both directions.
+//
+// The upstream channel is assigned at the first client write and bound a round trip later, so a
 // goroutine retries until the transport reports live framing, giving up when the flow closes or
-// after the last attempt, leaving the flow unoffloaded. Offloading an unbound channel would put
-// ChannelData on the wire that the upstream server drops.
+// after the last attempt, leaving the flow unoffloaded.
 func (h *offloadHandler) upsert(f *flow) {
-	// ingress: raw client traffic from SrcAddr arriving at the listener socket DstAddr
-	client := offload.Connection{RemoteAddr: f.ev.SrcAddr, LocalAddr: f.ev.DstAddr,
-		Protocol: f.ev.Protocol}
-
-	if f.ev.ServerAddr == nil {
-		// egress: raw traffic from the relay socket to the pinned peer
-		peer := offload.Connection{RemoteAddr: f.ev.Peer, LocalAddr: f.ev.RelayAddr,
-			Protocol: f.ev.PeerProtocol}
-		h.register(f, offloadPair{client: client, peer: peer})
+	// turn-udp only: a turn-tcp wire is not a datagram at all, and turn-tls and turn-dtls
+	// encrypt the ChannelData the datapath would have to parse
+	if f.ev.Protocol != "udp" || f.ev.ClusterProtocol != stnrv1.ClusterProtocolTURNUDP {
 		return
 	}
+
+	// raw client traffic from SrcAddr arriving at the listener socket DstAddr
+	raw := offload.Connection{RemoteAddr: f.ev.SrcAddr, LocalAddr: f.ev.DstAddr,
+		Protocol: offload.ProtocolUDP}
 
 	go func() {
 		backoff := channelPollBackoff
@@ -156,11 +162,9 @@ func (h *offloadHandler) upsert(f *flow) {
 			if !ok {
 				continue
 			}
-			// egress: ChannelData-encapsulated traffic from the transport socket to
-			// the upstream server; the peer itself is implicit in the channel
-			peer := offload.Connection{RemoteAddr: f.ev.ServerAddr, LocalAddr: f.ev.RelayAddr,
-				Protocol: strings.ToLower(f.ev.ServerAddr.Network()), ChannelID: uint32(ch)}
-			h.register(f, offloadPair{client: client, peer: peer})
+			wire := offload.Connection{RemoteAddr: f.ev.ServerAddr, LocalAddr: f.ev.RelayAddr,
+				Protocol: offload.ProtocolUDP, ChannelID: uint32(ch)}
+			h.register(f, offloadPair{client: wire, peer: raw})
 			return
 		}
 	}()

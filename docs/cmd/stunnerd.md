@@ -147,6 +147,20 @@ A listener with a plain protocol (`UDP`, `TCP`) serves raw client flows instead 
 
 Peer admission is unchanged: a flow is only served if one of the listener's routed clusters admits the resolved peer address, and when the listener routes to a TURN protocol cluster the flow is relayed through the upstream TURN server (tunnel mode). Flows quiet for `flow_timeout` (default 5m) in both directions are torn down; fresh client traffic re-creates them. Note that plain listeners authenticate nobody, so they are never rendered by the Kubernetes gateway operator (the Gateway API cannot express a peer address either); they are available from static config files and the tunnel CLI only. See the [security notes](../SECURITY.md) before exposing one.
 
+### Listener and cluster combinations
+
+A listener's protocol and the protocol of the cluster it routes to together decide how a session is relayed, and whether the [TURN offload](../PREMIUM_REFERENCE.md#turn-offload) can accelerate it. The offload engines accelerate exactly one shape: a leg between a TURN client and a TURN server, where plaintext ChannelData arrives on one side and raw traffic leaves on the other. A leg that carries raw traffic in both directions, ChannelData in both directions, or encrypted ChannelData, stays in user space.
+
+| Listener protocol | Cluster protocol | Relaying | Offload (Premium)|
+|---|---|---|---|
+| `turn-*` | `udp` | TURN relaying | yes, on a `turn-udp` listener |
+| `turn-*` | `tcp` | RFC 6062 relayed TCP connections to the peer | no |
+| `turn-*` | `turn-*` | TURN relay chaining | no |
+| `udp`, `tcp` | `udp`, `tcp` | direct relaying to the listener's pinned peer | no |
+| `udp` | `turn-udp` | datagram tunneling | yes |
+| `udp`, `tcp` | `turn-tcp`, `turn-tls`, `turn-dtls` | stream tunneling | no |
+| `stdin` | any | stdin/stdout tunneling | no |
+
 ## Tunnel mode
 
 The positional argument count selects `stunnerd`'s mode: no arguments run the dataplane daemon from the config origin (`-c`), a single TURN listener URI runs a standalone TURN server with a default configuration, and three arguments select tunnel mode, which tunnels a local client socket, or the stdin/stdout pair, through a TURN server to a fixed peer. Tunnel mode is the successor of the retired `turncat` utility and keeps its command line shape:
