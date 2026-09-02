@@ -55,8 +55,8 @@ helm install stunner stunner/stunner --create-namespace --namespace=stunner-syst
 To manually install the CRDs:
 
 ```console
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
-kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/refs/heads/main/helm/stunner/crds/stunner-crd.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/main/deploy/manifests/static/stunner-crd.yaml
 ```
 
 ## Customization
