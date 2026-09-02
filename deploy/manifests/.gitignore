@@ -1,0 +1,10 @@
+# Only the manifests referenced from the documentation and the blog posts are
+# tracked here. Everything else is a local scratch manifest: keep it on disk,
+# keep it out of the git tree.
+*
+!.gitignore
+!stunner-expose-kube-dns.yaml
+!stunner-turn.yaml
+!static/
+static/*
+!static/stunner-crd.yaml

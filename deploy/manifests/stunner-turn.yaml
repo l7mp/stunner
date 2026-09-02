@@ -16,13 +16,12 @@ spec:
       - SYS_MODULE
   dataplaneResource: DaemonSet
   enableMetricsEndpoint: true
-  image: "docker.io/l7mp/stunnerd-premium:dev"
-  # for stable version
-  # image: docker.io/l7mp/stunnerd-premium:latest
+  image: docker.io/l7mp/stunnerd-premium:latest
+  # for the development version
+  # image: docker.io/l7mp/stunnerd-premium:dev
   imagePullPolicy: Always
   offloadEngine: Auto
   hostNetwork: true
-  replicas: 1
   resources:
     limits:
       cpu: 2
