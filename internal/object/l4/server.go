@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4/udp"
+	"github.com/pion/transport/v5/udp"
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/netutil"

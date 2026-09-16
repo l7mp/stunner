@@ -11,8 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/l7mp/stunner/v2/internal/telemetry"
-	"github.com/pion/transport/v4"
-	"github.com/pion/transport/v4/stdnet"
+	"github.com/pion/transport/v5"
+	"github.com/pion/transport/v5/stdnet"
 )
 
 // unixPacketConPool implements socketpools for unix with full support for SO_REUSEPORT

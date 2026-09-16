@@ -8,7 +8,7 @@ package runtime
 import (
 	"sync/atomic"
 
-	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v5"
 
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/resolver"

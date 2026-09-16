@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4"
-	"github.com/pion/transport/v4/stdnet"
+	"github.com/pion/transport/v5"
+	"github.com/pion/transport/v5/stdnet"
 	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/v2/internal/object"

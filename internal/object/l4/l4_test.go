@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/transport/v4/stdnet"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/stdnet"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

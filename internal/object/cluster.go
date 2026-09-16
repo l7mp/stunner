@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v5"
 
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/runtime"

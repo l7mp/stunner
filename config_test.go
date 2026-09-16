@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-logr/zapr"
 	"github.com/gorilla/websocket"
-	"github.com/pion/transport/v4/test"
+	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

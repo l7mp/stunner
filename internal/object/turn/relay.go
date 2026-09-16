@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pion/transport/v4/stdnet"
+	"github.com/pion/transport/v5/stdnet"
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/netutil"

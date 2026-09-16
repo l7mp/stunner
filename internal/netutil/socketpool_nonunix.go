@@ -4,7 +4,7 @@ package netutil
 
 import (
 	"github.com/l7mp/stunner/v2/internal/telemetry"
-	"github.com/pion/transport/v4"
+	"github.com/pion/transport/v5"
 )
 
 // NewPacketConnPool creates a new packet connection pool which is fixed to a single connection,

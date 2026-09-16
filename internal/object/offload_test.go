@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v4/stdnet"
+	"github.com/pion/transport/v5/stdnet"
 	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
