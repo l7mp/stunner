@@ -161,6 +161,8 @@ A listener's protocol and the protocol of the cluster it routes to together deci
 | `udp`, `tcp` | `turn-tcp`, `turn-tls`, `turn-dtls` | stream tunneling | no |
 | `stdin` | any | stdin/stdout tunneling | no |
 
+A listener routes either to plain clusters, any number of them, or to a single TURN cluster. Relaying through different transports is not implemented and rejected on reconciliation.
+
 ## Tunnel mode
 
 The positional argument count selects `stunnerd`'s mode: no arguments run the dataplane daemon from the config origin (`-c`), a single TURN listener URI runs a standalone TURN server with a default configuration, and three arguments select tunnel mode, which tunnels a local client socket, or the stdin/stdout pair, through a TURN server to a fixed peer. Tunnel mode is the successor of the retired `turncat` utility and keeps its command line shape:

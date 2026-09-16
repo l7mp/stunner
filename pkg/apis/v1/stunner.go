@@ -58,6 +58,44 @@ func (req *StunnerConfig) Validate() error {
 		}
 	}
 
+	// A listener routes either to plain clusters, any number of them, or to a single TURN
+	// cluster. The two relay through different transports, so mixing them on one listener
+	// leaves the relay a listener property that peer routing cannot answer; a second TURN
+	// cluster would split the listener's allocations across two upstream servers. Both are
+	// rejected here rather than silently resolved in the dataplane. Runs after the cluster
+	// loop, which normalizes the protocols.
+	turnProto := make(map[string]bool, len(req.Clusters))
+	for _, c := range req.Clusters {
+		p, err := NewClusterProtocol(c.Protocol)
+		if err != nil {
+			return err
+		}
+		turnProto[c.Name] = p.IsTURN()
+	}
+	for _, l := range req.Listeners {
+		turn, plain := []string{}, []string{}
+		for _, r := range l.Routes {
+			isTURN, ok := turnProto[r]
+			switch {
+			case !ok: // a route naming no cluster admits nothing, and is not an error here
+			case isTURN:
+				turn = append(turn, r)
+			default:
+				plain = append(plain, r)
+			}
+		}
+		if len(turn) > 1 {
+			return fmt.Errorf("listener %q routes to multiple TURN clusters (%s): "+
+				"a listener may relay through at most one upstream TURN server",
+				l.Name, strings.Join(turn, ", "))
+		}
+		if len(turn) == 1 && len(plain) > 0 {
+			return fmt.Errorf("listener %q routes to both plain (%s) and TURN (%s) clusters: "+
+				"a listener either relays directly or through an upstream TURN server",
+				l.Name, strings.Join(plain, ", "), turn[0])
+		}
+	}
+
 	return nil
 }
 
