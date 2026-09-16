@@ -34,6 +34,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # the Makefile stamps the build with git describe --tags;
+          # the default shallow fetch has no tags and degrades it to a bare hash
+          fetch-depth: 0
 
       - name: Get version
         id: vars

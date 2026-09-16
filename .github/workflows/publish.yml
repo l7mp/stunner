@@ -12,6 +12,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # the Makefile stamps the build with git describe --tags;
+          # the default shallow fetch has no tags and degrades it to a bare hash
+          fetch-depth: 0
 
       - name: Verify README is release-ready
         run: |
@@ -36,6 +40,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # the Makefile stamps the build with git describe --tags;
+          # the default shallow fetch has no tags and degrades it to a bare hash
+          fetch-depth: 0
 
       - name: Docker meta
         id: meta
@@ -83,6 +91,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # the Makefile stamps the build with git describe --tags;
+          # the default shallow fetch has no tags and degrades it to a bare hash
+          fetch-depth: 0
 
       - name: Docker meta
         id: meta
