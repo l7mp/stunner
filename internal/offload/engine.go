@@ -10,6 +10,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/telemetry"
+	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 )
 
@@ -95,6 +96,31 @@ const (
 	ProtocolUDP = "UDP"
 	ProtocolTCP = "TCP"
 )
+
+// Offloadable reports whether the leg between a listener and a cluster of the given protocols is
+// one the engines can accelerate. They implement exactly one shape: plaintext ChannelData on one
+// side of the leg, raw datagrams on the other, decapsulated one way and encapsulated back. Only
+// two protocol pairs have that shape, and they are mirror images: a turn-udp listener relaying to
+// a udp cluster, where the ChannelData arrives from the client; and a udp listener tunnelling to
+// a turn-udp cluster, where it leaves towards the upstream server.
+//
+// Everything else stays in user space. A leg that is raw on both sides has no channel to strip. A
+// leg carrying ChannelData on both sides (TURN relay chaining) would need the datapath to rewrite
+// one channel number into another, which the maps cannot express. turn-tls and turn-dtls encrypt
+// the ChannelData, so there is nothing parseable on the wire. And a stream or stdin leg carries no
+// datagrams to match a 4-tuple against.
+//
+// Both arguments are the same underlying type, so keep them in order: the listener first.
+func Offloadable(listener stnrv1.ListenerProtocol, cluster stnrv1.ClusterProtocol) bool {
+	switch listener {
+	case stnrv1.ListenerProtocolTURNUDP:
+		return cluster == stnrv1.ClusterProtocolUDP
+	case stnrv1.ListenerProtocolUDP:
+		return cluster == stnrv1.ClusterProtocolTURNUDP
+	default:
+		return false
+	}
+}
 
 // Connection combines the offload engine identifiers required for uniquely identifying an
 // allocation channel binding. RemoteAddr and LocalAddr are the source and the destination of a

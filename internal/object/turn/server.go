@@ -150,7 +150,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 	server, err := turn.NewServer(turn.ServerConfig{
 		Realm:             auth.Realm,
 		AuthHandler:       NewAuthHandler(rt, log),
-		EventHandler:      NewEventHandler(listener, rt, log, q),
+		EventHandler:      NewEventHandler(listener, s.proto, rt, log, q),
 		QuotaHandler:      q.QuotaHandler(),
 		PacketConnConfigs: pConns,
 		ListenerConfigs:   lConns,

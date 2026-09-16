@@ -158,6 +158,7 @@ A listener's protocol and the protocol of the cluster it routes to together deci
 | `turn-*` | `turn-*` | TURN relay chaining | no |
 | `udp`, `tcp` | `udp`, `tcp` | direct relaying to the listener's pinned peer | no |
 | `udp` | `turn-udp` | datagram tunneling | yes |
+| `tcp` | `turn-udp` | stream tunneling | no |
 | `udp`, `tcp` | `turn-tcp`, `turn-tls`, `turn-dtls` | stream tunneling | no |
 | `stdin` | any | stdin/stdout tunneling | no |
 

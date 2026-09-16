@@ -72,7 +72,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 		quota:    q,
 		gate:     q.QuotaHandler(),
 		events:   NewEventHandler(listener, rt, log, q),
-		offload:  newOffloadHandler(listener, rt, log),
+		offload:  newOffloadHandler(listener, proto, rt, log),
 		log:      log,
 		flows:    make(map[*flow]struct{}),
 	}

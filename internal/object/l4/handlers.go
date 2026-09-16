@@ -118,31 +118,29 @@ type offloadPair struct {
 type offloadHandler struct {
 	rt       *objruntime.Runtime
 	listener string
+	proto    stnrv1.ListenerProtocol
 	log      logging.LeveledLogger
 
 	mu    sync.Mutex
 	pairs map[*flow]offloadPair
 }
 
-func newOffloadHandler(listener string, rt *objruntime.Runtime, log logging.LeveledLogger) *offloadHandler {
-	return &offloadHandler{rt: rt, listener: listener, log: log, pairs: make(map[*flow]offloadPair)}
+func newOffloadHandler(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime, log logging.LeveledLogger) *offloadHandler {
+	return &offloadHandler{rt: rt, listener: listener, proto: proto, log: log,
+		pairs: make(map[*flow]offloadPair)}
 }
 
-// upsert registers a flow with the offload engine, which only ever accelerates the leg between a
-// TURN client and a TURN server: the datapath decapsulates ChannelData arriving on the
-// channel-bearing side and encapsulates towards it on the way back, with no path that forwards
-// raw traffic on both sides. So only tunnel-mode UDP flows are offloadable. A direct flow, a
-// stream flow and a stdin flow all stay in userspace, and registering one would be worse than
-// useless: the datapath would parse a channel header out of raw client payload and prepend one
-// to the peer's replies, corrupting both directions.
+// upsert registers a flow with the offload engine, for the one leg shape the engines accelerate:
+// offload.Offloadable decides, and on this side only a udp listener tunnelling to a turn-udp
+// cluster qualifies. Registering any other flow would be worse than useless: the datapath would
+// parse a channel header out of raw client payload and prepend one to the peer's replies,
+// corrupting both directions.
 //
 // The upstream channel is assigned at the first client write and bound a round trip later, so a
 // goroutine retries until the transport reports live framing, giving up when the flow closes or
 // after the last attempt, leaving the flow unoffloaded.
 func (h *offloadHandler) upsert(f *flow) {
-	// turn-udp only: a turn-tcp wire is not a datagram at all, and turn-tls and turn-dtls
-	// encrypt the ChannelData the datapath would have to parse
-	if f.ev.Protocol != "udp" || f.ev.ClusterProtocol != stnrv1.ClusterProtocolTURNUDP {
+	if !offload.Offloadable(h.proto, f.ev.ClusterProtocol) {
 		return
 	}
 

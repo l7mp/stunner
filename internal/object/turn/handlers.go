@@ -151,8 +151,20 @@ func (q *Quota) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, re
 	}
 }
 
-// NewEventHandler creates a set of callbacks for tracking the lifecycle of TURN allocations.
-func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLogger, q *Quota) turn.EventHandler {
+// NewEventHandler creates a set of callbacks for tracking the lifecycle of TURN allocations on a
+// listener serving listenerProto.
+func NewEventHandler(name string, listenerProto stnrv1.ListenerProtocol, rt *objruntime.Runtime, log logging.LeveledLogger, q *Quota) turn.EventHandler {
+	// routeChannel resolves the cluster serving a channel to peerIP and its protocol.
+	routeChannel := func(peerIP net.IP) (string, stnrv1.ClusterProtocol) {
+		if cl, ok := rt.Router.RoutePeer(name, stnrv1.ClusterProtocolUDP, peerIP, 0); ok {
+			return cl, stnrv1.ClusterProtocolUDP
+		}
+		if c, ok := rt.Router.Route(name, isTURNCluster); ok {
+			return c.Name(), c.Protocol()
+		}
+		return "", stnrv1.ClusterProtocolUnknown
+	}
+
 	return turn.EventHandler{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
@@ -189,22 +201,17 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
 		},
 		OnChannelCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
-			cluster := ""
 			peerAddr, ok := peer.(*net.UDPAddr)
 			if !ok {
 				return
 			}
-			if cl, ok := rt.Router.RoutePeer(name, stnrv1.ClusterProtocolUDP, peerAddr.IP, 0); ok {
-				cluster = cl
-			}
+			cluster, clusterProto := routeChannel(peerAddr.IP)
 			log.Debugf("channel created: listener=%s, cluster=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				name, cluster, dumpClient(src, dst, proto, username, realm),
 				relayAddr.String(), peer.String(), chanNum)
-			if _, ok := rt.Router.Route(name, isTURNCluster); ok {
-				// the flow relays through an upstream TURN session in userspace: a
-				// kernel offload bypass would black-hole it
-				log.Debugf("skipping offload for channel to peer %s on TURN-cluster listener %s",
-					peer.String(), name)
+			if !offload.Offloadable(listenerProto, clusterProto) {
+				log.Debugf("skipping offload for channel to peer %s: %s listener %s, %s cluster",
+					peer.String(), listenerProto.String(), name, clusterProto.String())
 				return
 			}
 			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
@@ -218,6 +225,13 @@ func NewEventHandler(name string, rt *objruntime.Runtime, log logging.LeveledLog
 			log.Debugf("channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
+			peerAddr, ok := peer.(*net.UDPAddr)
+			if !ok {
+				return
+			}
+			if _, clusterProto := routeChannel(peerAddr.IP); !offload.Offloadable(listenerProto, clusterProto) {
+				return
+			}
 			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
 			peerConn := offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto}
 			if err := rt.OffloadEngine.Remove(client, peerConn); err != nil {
