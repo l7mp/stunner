@@ -8,8 +8,8 @@ import (
 
 // This file declares the interfaces of the runtime services that the Runtime stores and hands
 // out. The concrete implementations live in their own packages (internal/router, internal/quota,
-// ...) and satisfy these interfaces structurally. Keeping the interface here — rather than
-// importing the implementation package into runtime — lets those packages import runtime (and so
+// ...) and satisfy these interfaces structurally. Keeping the interface here, rather than
+// importing the implementation package into runtime, lets those packages import runtime (and so
 // reach every other runtime service, e.g. the license manager) without an import cycle.
 
 // Router finds the cluster that serves a request on a listener. It is deliberately dumb: it looks

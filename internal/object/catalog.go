@@ -16,7 +16,7 @@ type Catalog = reconciler.Catalog
 // NewCatalog builds the default object catalog:
 //
 //	Stunner (root, singleton)
-//	+-- Admin ── Health / Metrics / Offload    (singletons)
+//	+-- Admin -- Health / Metrics / Offload    (singletons)
 //	+-- Auth                                   (singleton)
 //	+-- Listener [N from config]
 //	|   +-- ListenerServer                     (lifecycle-only, owns the TURN server)

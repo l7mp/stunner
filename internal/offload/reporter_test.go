@@ -143,7 +143,7 @@ func TestStatsReporterReport(t *testing.T) {
 
 // TestStatsReporterLoop exercises the timer-driven loop end to end: with a short interval the
 // reporter samples the engine on its own, picks up the stats, and Close shuts it down promptly.
-// This is the pattern the premium eBPF tests use — generate real traffic, then poll the counters
+// This is the pattern the premium eBPF tests use: generate real traffic, then poll the counters
 // via Eventually rather than racing a single synchronous report against the eBPF map update. The
 // interval is an instance field, so same-package tests shorten it without a mutable global.
 func TestStatsReporterLoop(t *testing.T) {

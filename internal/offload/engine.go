@@ -31,7 +31,7 @@ func New(deps Deps) Engine { return engineConstructor(deps) }
 // Engine provides a general interface for offloading techniques (e.g., XDP). The engine instance
 // is a process-wide singleton (rt.OffloadEngine) with the server's lifetime; Start pins the eBPF
 // maps and attaches to interfaces, Close unpins them. An offload-config change is applied by the
-// Offload object as a Close()+Start() (re-pin) — the engine has no lighter in-place path.
+// Offload object as a Close()+Start() (re-pin), since the engine has no lighter in-place path.
 type Engine interface {
 	// Name returns the offload engine type.
 	Name() string

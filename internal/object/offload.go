@@ -12,9 +12,9 @@ import (
 )
 
 // Offload is the reconciliation representative of the process-wide offload engine
-// (rt.OffloadEngine). It owns no engine lifecycle — the engine is created/started at server
-// startup and closed at shutdown — it only pushes config changes (engine mode, interfaces) to the
-// engine in place and surfaces its statistics as status.
+// (rt.OffloadEngine). It owns no engine lifecycle: the engine is created and started at server
+// startup and closed at shutdown. The object only pushes config changes (engine mode,
+// interfaces) to the engine in place and surfaces its statistics as status.
 type Offload struct {
 	rt *runtime.Runtime
 

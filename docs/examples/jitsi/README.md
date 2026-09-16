@@ -109,7 +109,7 @@ We also need the Ingress external IP address we have stored previously: this wil
 sed -i "s/<public-ingress-ip>/$INGRESSIP/g" docs/examples/jitsi/jitsi-server.yaml
 ```
 
-To use the web server, the corresponding Nginx `resolver` parameter must be the Kubernetes’ DNS address.
+To use the web server, the corresponding Nginx `resolver` parameter must be the Kubernetes' DNS address.
 
 ```console
 export KUBEDNS=$(kubectl get svc kube-dns -n kube-system -o jsonpath='{.spec.clusterIP}')

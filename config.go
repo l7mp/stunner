@@ -117,7 +117,7 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 }
 
 // GetConfig returns the configuration of the running STUNner daemon. The root Object assembles
-// the StunnerConfig from its descendants — see internal/object/stunner.go.
+// the StunnerConfig from its descendants, see internal/object/stunner.go.
 func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
 	s.log.Tracef("getConfig")
 	if c, ok := s.rt.GetConfig(runtime.TypeStunner, "").(*stnrv1.StunnerConfig); ok && c != nil {

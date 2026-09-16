@@ -66,7 +66,7 @@ func TestParseURI(t *testing.T) {
 		{name: "dtls via turns+udp default port 443", uri: "turns://1.2.3.4?transport=udp",
 			proto: "TURN-DTLS", address: "1.2.3.4", port: 443, network: "udp"},
 
-		// RFC 7065 opaque form (single colon after scheme) — the new capability
+		// RFC 7065 opaque form (single colon after scheme): the new capability
 		{name: "rfc7065 udp", uri: "turn:1.2.3.4:5555?transport=udp",
 			proto: "TURN-UDP", address: "1.2.3.4", port: 5555, network: "udp", addr: "1.2.3.4:5555"},
 		{name: "rfc7065 tcp", uri: "turn:1.2.3.4:5555?transport=tcp",
