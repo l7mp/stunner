@@ -42,7 +42,9 @@ type Engine interface {
 	Start(mode string, interfaces []string) error
 	// Close detaches and unpins the eBPF maps.
 	Close() error
-	// Upsert establishes a new offloaded connection on the engine or modifies an existing one.
+	// Upsert establishes a new offloaded connection on the engine or rewrites an existing one.
+	// Since eBPF maps are LRU, an offload can lose part of itself; upsert repairs it but
+	// resets the Packets counter.
 	Upsert(client, peer Connection, listenerName, clusterName string) error
 	// Remove removes an offloaded connection. Removing a connection that is not offloaded
 	// is not an error.
@@ -50,7 +52,7 @@ type Engine interface {
 	// Stats returns the last cached offload statistics, keyed by object name-hash and direction.
 	Stats() (StatMap, error)
 	// Packets returns a client-peer pair flow's packet counter and a boolean indicating
-	// whether the flow is offloaded.
+	// whether the flow is offloaded. Counter is monotone between upserts; Upsert resets it.
 	Packets(client, peer Connection) (uint64, bool)
 }
 
