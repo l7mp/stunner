@@ -16,8 +16,8 @@ require (
 	github.com/pion/dtls/v3 v3.1.9
 	github.com/pion/ice/v4 v4.4.3
 	github.com/pion/logging v0.2.5-0.20260405224506-902883ec686b
-	github.com/pion/transport/v5 v5.0.0
-	github.com/pion/turn/v5 v5.1.2
+	github.com/pion/transport/v5 v5.0.1
+	github.com/pion/turn/v5 v5.1.3-0.20260917120801-d17ad27a4f3c
 	github.com/pion/webrtc/v4 v4.2.21-0.20260916154938-65a0eef1af6d
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spf13/cobra v1.10.2
@@ -128,9 +128,3 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
-
-// The TURN client's channel accessors, which the flow offload needs to know when a binding is
-// live on the wire. pion/turn#592 carries them upstream; drop this once it merges. The fork is
-// pion/main plus that one commit, on branch client-find-channel-by-addr. Re-pin it with
-// go mod edit -replace=github.com/pion/turn/v5=github.com/l7mp/turn/v5@client-find-channel-by-addr
-replace github.com/pion/turn/v5 => github.com/l7mp/turn/v5 v5.0.0-20260916145932-d5b107404d26

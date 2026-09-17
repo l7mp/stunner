@@ -100,7 +100,7 @@ func flowIdentity(rt *objruntime.Runtime, srcAddr net.Addr) (username, realm str
 // channelPollBackoff and channelPollAttempts pace the channel learning of tunnel-mode
 // flows: the pion client assigns the channel at the first client write towards the peer and
 // binds it asynchronously.
-const (
+var (
 	channelPollBackoff  = 100 * time.Millisecond
 	channelPollAttempts = 5
 )
