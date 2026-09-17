@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -114,8 +115,10 @@ func runICETest(_ *cobra.Command, args []string) error {
 		case context.DeadlineExceeded:
 			fmt.Printf("\nICE tester timed out after %s\n", iceTesterTimeout)
 			printLogs(logBuffer)
+			err = fmt.Errorf("ICE test timed out after %s", iceTesterTimeout)
 		case context.Canceled:
 			fmt.Printf("\nICE tester stopped due to user interrupt\n")
+			err = errors.New("ICE test interrupted")
 		default:
 			fmt.Printf("\nICE tester error: %s\n", err.Error())
 		}
@@ -126,7 +129,8 @@ func runICETest(_ *cobra.Command, args []string) error {
 	// wait until the printer finishes
 	wg.Wait()
 
-	return nil
+	// A non-nil error makes stunnerctl exit non-zero, so scripts can rely on the exit status.
+	return err
 }
 
 func printEvent(e icetester.Event, logbuf io.ReadWriter) {
