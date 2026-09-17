@@ -110,6 +110,9 @@ const (
 // no channel on either side degenerates to a plain 5-tuple forwarder.
 type offloadPair struct {
 	client, peer offload.Connection
+	// pkts is the engine's packet counter as of the last liveness check, so the reaper can
+	// tell whether the kernel moved anything for this flow since it last looked.
+	pkts uint64
 }
 
 // offloadHandler registers the listener's flows with the kernel offload engine, keeping the
@@ -184,6 +187,27 @@ func (h *offloadHandler) register(f *flow, p offloadPair) {
 		h.log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
 			p.client.String(), h.listener, p.peer.String(), f.ev.Cluster, err.Error())
 	}
+}
+
+// active reports whether the kernel has forwarded anything for this flow since the last call,
+// and whether the engine has an opinion at all. An offloaded flow's pumps never run, so without
+// this the flow's idle timer reaps it mid-traffic; a flow the engine does not know returns
+// (false, false), which means "no kernel-side opinion", not "idle".
+func (h *offloadHandler) active(f *flow) (moved, known bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	p, ok := h.pairs[f]
+	if !ok {
+		return false, false
+	}
+	pkts, known := h.rt.OffloadEngine.Packets(p.client, p.peer)
+	if !known {
+		return false, false
+	}
+	moved = pkts != p.pkts
+	p.pkts = pkts
+	h.pairs[f] = p
+	return moved, true
 }
 
 // remove uninstalls the flow's registered connection pair; a flow that never got offloaded

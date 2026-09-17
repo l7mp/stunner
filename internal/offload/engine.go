@@ -49,6 +49,9 @@ type Engine interface {
 	Remove(client, peer Connection) error
 	// Stats returns the last cached offload statistics, keyed by object name-hash and direction.
 	Stats() (StatMap, error)
+	// Packets returns a client-peer pair flow's packet counter and a boolean indicating
+	// whether the flow is offloaded.
+	Packets(client, peer Connection) (uint64, bool)
 }
 
 // stats flags.

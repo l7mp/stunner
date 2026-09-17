@@ -72,6 +72,9 @@ type spyEngine struct {
 	offload.Engine
 	mu               sync.Mutex
 	upserts, removes []offloadCall
+	// counting turns the engine into one that knows the pair, pkts is what it reports
+	counting bool
+	pkts     uint64
 }
 
 func newSpyEngine() *spyEngine { return &spyEngine{Engine: offload.NewNullEngine()} }
@@ -80,6 +83,7 @@ func (e *spyEngine) Upsert(client, peer offload.Connection, listener, cluster st
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.upserts = append(e.upserts, offloadCall{client, peer, listener, cluster})
+	e.counting = true
 	return nil
 }
 
@@ -88,6 +92,24 @@ func (e *spyEngine) Remove(client, peer offload.Connection) error {
 	defer e.mu.Unlock()
 	e.removes = append(e.removes, offloadCall{client: client, peer: peer})
 	return nil
+}
+
+// Packets reports the counter the test set for the registered pair. A counter that never moves
+// is how an engine says "the kernel forwarded nothing for this flow".
+func (e *spyEngine) Packets(_, _ offload.Connection) (uint64, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !e.counting {
+		return 0, false
+	}
+	return e.pkts, true
+}
+
+// advance simulates the kernel forwarding packets for the offloaded flow.
+func (e *spyEngine) advance(n uint64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pkts += n
 }
 
 func (e *spyEngine) snapshot() (upserts, removes []offloadCall) {
@@ -479,4 +501,66 @@ func TestOffloadEndToEnd(t *testing.T) {
 		_, removes := eng.snapshot()
 		assert.Empty(t, removes, "no offload removal attempted")
 	})
+}
+
+// TestOffloadedFlowLiveness pins the one thing an offloaded flow cannot say for itself. Once the
+// kernel owns a flow, its userspace pumps never run, so flow.touch() is never called and the idle
+// timer reaps a flow that is passing traffic. The reaper has to ask the engine before tearing
+// anything down, and treat a moving packet counter as activity.
+//
+// The flow here is a real tunnel-mode flow through a live upstream TURN server, and the engine is
+// a spy whose counter the test advances by hand: injecting eBPF into a unit test is not possible,
+// so what is tested is the contract between the reaper and the engine, not the datapath.
+func TestOffloadedFlowLiveness(t *testing.T) {
+	defer func(d time.Duration) { l4.FlowTimeout = d }(l4.FlowTimeout)
+	l4.FlowTimeout = 150 * time.Millisecond
+
+	serverAddr := turnUpstream(t)
+	eng := newSpyEngine()
+	peer := udpEcho(t)
+	port := freePort(t, "udp")
+	lconf := plainListenerConf("plain-udp-liveness", "UDP", peer.String(), port)
+	s := newDataplaneEnv(t, lconf, turnClusterConf(serverAddr), eng)
+
+	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	require.NoError(t, err, "client dial")
+	defer func() { _ = client.Close() }()
+
+	buf := make([]byte, 2048)
+	echoed := false
+	for i := 0; i < 20 && !echoed; i++ {
+		_, err = client.Write([]byte("hello"))
+		require.NoError(t, err, "client write")
+		require.NoError(t, client.SetReadDeadline(time.Now().Add(250*time.Millisecond)))
+		if _, err := client.Read(buf); err == nil {
+			echoed = true
+		}
+	}
+	require.True(t, echoed, "echo through the tunnel chain")
+
+	// wait for the registration: only a registered flow has a counter to consult
+	require.Eventually(t, func() bool {
+		upserts, _ := eng.snapshot()
+		return len(upserts) == 1
+	}, 5*time.Second, 50*time.Millisecond, "flow offloaded")
+
+	// one more round trip, so the flow starts this phase freshly touched, then the kernel
+	// keeps forwarding while user space stays silent: exactly the state that used to be
+	// indistinguishable from an idle flow
+	_, err = client.Write([]byte("hello"))
+	require.NoError(t, err, "client write")
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(time.Second)))
+	_, err = client.Read(buf)
+	require.NoError(t, err, "echo")
+
+	for i := 0; i < 12; i++ {
+		eng.advance(10)
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	assert.Equal(t, 1, s.AllocationCount(), "offloaded flow survives while the kernel forwards")
+
+	// the counter stops: with no activity on either side of the kernel boundary the flow goes
+	assert.Eventually(t, func() bool { return s.AllocationCount() == 0 }, 3*time.Second,
+		25*time.Millisecond, "flow reaped once the kernel goes quiet too")
 }

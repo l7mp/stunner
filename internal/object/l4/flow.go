@@ -96,11 +96,18 @@ func (f *flow) pumpPeerToClient() {
 
 func (f *flow) touch() { f.last.Store(time.Now().UnixNano()) }
 
-// checkIdle fires on the coarse per-flow timer: it tears the flow down when it has been quiet
-// for the idle timeout in both directions, otherwise re-arms for the remainder.
+// checkIdle fires on the coarse per-flow timer: it keeps the flow alive ONLY if either:
+// - the flow has sent a user space packet in any direction for the idle timeout OR
+// - the kernel reports the flow as being offloaded AND currently active.
+// otherwise the flow is torn down.
 func (f *flow) checkIdle() {
 	elapsed := time.Duration(time.Now().UnixNano() - f.last.Load())
 	if elapsed >= f.s.idle {
+		if moved, known := f.s.offload.active(f); known && moved {
+			f.touch()
+			f.timer.Reset(f.s.idle)
+			return
+		}
 		f.close("idle timeout")
 		return
 	}

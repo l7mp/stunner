@@ -66,6 +66,7 @@ type fakeEngine struct {
 func (f *fakeEngine) Name() string                              { return "fake" }
 func (f *fakeEngine) Start(_ string, _ []string) error          { return nil }
 func (f *fakeEngine) Close() error                              { return nil }
+func (f *fakeEngine) Packets(_, _ Connection) (uint64, bool)    { return 0, false }
 func (f *fakeEngine) Upsert(_, _ Connection, _, _ string) error { return nil }
 func (f *fakeEngine) Remove(_, _ Connection) error              { return nil }
 func (f *fakeEngine) Stats() (StatMap, error)                   { return f.stats, nil }

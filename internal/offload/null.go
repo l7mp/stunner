@@ -21,5 +21,9 @@ func (o *NullEngine) Upsert(_, _ Connection, _, _ string) error { return nil }
 // Remove removes an offloaded connection.
 func (o *NullEngine) Remove(_, _ Connection) error { return nil }
 
+// Packets reports that the null engine knows no connection: it offloads nothing, so every flow
+// stays visible to its own pumps and needs no kernel-side liveness signal.
+func (o *NullEngine) Packets(_, _ Connection) (uint64, bool) { return 0, false }
+
 // Stats returns the last cached offload statistics.
 func (o *NullEngine) Stats() (StatMap, error) { return map[StatKey]StatInfo{}, nil }
