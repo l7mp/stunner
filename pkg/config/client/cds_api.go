@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -256,7 +257,7 @@ func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppr
 		for {
 			if err := poll(ctx, a, ch, suppressDelete); err != nil && !errors.Is(err, context.Canceled) {
 				_, wsuri := a.Endpoint()
-				a.Errorf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
+				a.Warnf("failed to init CDS watcher (url: %s): %s", wsuri, err.Error())
 			} else {
 				// context got cancelled
 				return
@@ -270,6 +271,14 @@ func watch(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppr
 	return nil
 }
 
+// dialer is the websocket dialer of the watchers. Retries may be systematic, so we override the
+// kernel's SYN retry budget (about two minutes). The established connection is not affected.
+var dialer = &websocket.Dialer{
+	Proxy:            http.ProxyFromEnvironment,
+	HandshakeTimeout: 10 * time.Second,
+	NetDialContext:   (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
+}
+
 // ////////////
 // API workers
 // ////////////
@@ -277,7 +286,7 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv1.StunnerConfig, suppre
 	_, url := a.Endpoint()
 	a.Tracef("poll: trying to open connection to CDS server at %s", url)
 
-	wc, _, err := websocket.DefaultDialer.DialContext(ctx, url, makeHeader(url))
+	wc, _, err := dialer.DialContext(ctx, url, makeHeader(url))
 	if err != nil {
 		return err
 	}

@@ -47,6 +47,13 @@ const (
 	DefaultOwnedByLabelValue       = "stunner"
 )
 
+// Gateway operator defaults shared with the clients that need to find the operator.
+const (
+	// DefaultLeaderElectionID is the name of the Lease the operator replicas compete for, in
+	// the operator's namespace.
+	DefaultLeaderElectionID = "stunner-gateway-operator.l7mp.io"
+)
+
 // CDS defaults
 const (
 	DefaultConfigDiscoveryPort    = 13478

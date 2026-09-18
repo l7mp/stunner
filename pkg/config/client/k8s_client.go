@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/pion/logging"
 	"github.com/spf13/pflag"
@@ -25,6 +27,9 @@ import (
 
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
+
+// cdsProbeTimeout bounds one probe of a CDS server pod during discovery.
+const cdsProbeTimeout = 2 * time.Second
 
 // CDSConfigFlags composes a set of flags for CDS server discovery.
 type CDSConfigFlags struct {
@@ -170,9 +175,14 @@ func NewK8sDiscoverer(k8sFlags *cliopt.ConfigFlags, log logging.LeveledLogger) (
 	return d, nil
 }
 
-// DiscoverK8sCDSServer discovers a CDS Server located in a Kubernetes cluster and returns an
-// address that a CDS client can be opened to for reaching that CDS server. If necessary, opens a
-// port-forward connection to the remote cluster.
+// DiscoverK8sCDSServer discovers the serving CDS server of the gateway operator in a Kubernetes
+// cluster and returns an address that a CDS client can use. If necessary, opens a port-forward
+// connection to a remote cluster. The operator may run multiple replicas that each carry the
+// config discovery label, but only the leader serves config discovery. Policy for looking up the
+// the leader pod:
+//   - find the operator's Lease and parse the leader pod's name from the holder identity,
+//   - when the Lease is unavailable, (no permission, a custom Lease name, or a holder that is
+//     not among the pods), probe replicas and use the first one that answers.
 func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cdsFlags *CDSConfigFlags, log logging.LeveledLogger) (PodInfo, error) {
 	// if CDS server address is specified, return it
 	if cdsFlags.Addr != "" {
@@ -197,7 +207,7 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 	label := fmt.Sprintf("%s=%s", stnrv1.DefaultCDSServiceLabelKey, stnrv1.DefaultCDSServiceLabelValue)
 	d.log.Debugf("querying CDS server pods in namespace %q using label-selector %q", nsLog, label)
 
-	pods, err := d.cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
+	pods, err := d.cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
 		LabelSelector: label,
 	})
 	if err != nil {
@@ -208,11 +218,109 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 		return PodInfo{}, fmt.Errorf("no CDS server found")
 	}
 
-	if len(pods.Items) > 1 {
-		return PodInfo{}, fmt.Errorf("too many CDS servers")
+	if len(pods.Items) == 1 {
+		return d.PortFwd(ctx, &pods.Items[0], cdsFlags.Port)
 	}
 
-	return d.PortFwd(ctx, &pods.Items[0], cdsFlags.Port)
+	// several replicas: the Lease names the leader
+	for _, podNs := range podNamespaces(pods.Items) {
+		lease, err := d.cs.CoordinationV1().Leases(podNs).Get(ctx, stnrv1.DefaultLeaderElectionID,
+			metav1.GetOptions{})
+		if err != nil {
+			d.log.Debugf("cannot read the operator Lease %s/%s: %s", podNs,
+				stnrv1.DefaultLeaderElectionID, err.Error())
+			continue
+		}
+		holder := ""
+		if lease.Spec.HolderIdentity != nil {
+			holder = *lease.Spec.HolderIdentity
+		}
+		if leader := LeaderPod(holder, pods.Items); leader != nil {
+			d.log.Debugf("operator Lease %s/%s names %s/%s as the leader", podNs,
+				stnrv1.DefaultLeaderElectionID, leader.GetNamespace(), leader.GetName())
+			return d.PortFwd(ctx, leader, cdsFlags.Port)
+		}
+		d.log.Debugf("operator Lease %s/%s holder %q is not among the CDS server pods",
+			podNs, stnrv1.DefaultLeaderElectionID, holder)
+	}
+
+	// no usable Lease: probe the replicas, the leader is the one that answers
+	d.log.Debugf("probing %d CDS server pods for the serving replica", len(pods.Items))
+	for i := range pods.Items {
+		probeCtx, cancel := context.WithCancel(ctx)
+		p, err := d.PortFwd(probeCtx, &pods.Items[i], cdsFlags.Port)
+		if err != nil {
+			cancel()
+			d.log.Debugf("cannot port-forward to %s/%s: %s", pods.Items[i].GetNamespace(),
+				pods.Items[i].GetName(), err.Error())
+			continue
+		}
+		if err := probeCDSServer(probeCtx, p.Addr); err != nil {
+			cancel()
+			d.log.Debugf("CDS server pod %s/%s does not serve: %s", p.Namespace, p.Name,
+				err.Error())
+			continue
+		}
+		// keep this port-forwarder: it stops with the caller's context
+		go func() { <-ctx.Done(); cancel() }()
+		return p, nil
+	}
+
+	return PodInfo{}, fmt.Errorf("none of the %d CDS server pods serves config discovery",
+		len(pods.Items))
+}
+
+// LeaderPod selects the pod named by a Lease holder identity. The identity written by the
+// operator's leader election is the leader pod's name followed by an underscore and a random
+// suffix; pod names carry no underscore.
+func LeaderPod(holder string, pods []corev1.Pod) *corev1.Pod {
+	name := holder
+	if i := strings.LastIndex(holder, "_"); i >= 0 {
+		name = holder[:i]
+	}
+	if name == "" {
+		return nil
+	}
+	for i := range pods {
+		if pods[i].GetName() == name {
+			return &pods[i]
+		}
+	}
+	return nil
+}
+
+// podNamespaces lists the distinct namespaces of the pods, in order of first appearance.
+func podNamespaces(pods []corev1.Pod) []string {
+	seen := map[string]bool{}
+	nss := []string{}
+	for i := range pods {
+		if ns := pods[i].GetNamespace(); !seen[ns] {
+			seen[ns] = true
+			nss = append(nss, ns)
+		}
+	}
+	return nss
+}
+
+// probeCDSServer asks the CDS server at addr for its license status with a short deadline. A
+// standby operator does not listen, so the request fails fast.
+func probeCDSServer(ctx context.Context, addr string) error {
+	ctx, cancel := context.WithTimeout(ctx, cdsProbeTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("http://%s/api/v1/license", addr), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP status %s", resp.Status)
+	}
+	return nil
 }
 
 // DiscoverK8sStunnerdPods discovers the stunnerd pods in a Kubernetes cluster, opens a
