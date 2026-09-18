@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
+
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
@@ -46,36 +45,19 @@ func runStatus(_ *cobra.Command, args []string) error {
 	}
 
 	log.Debug("searching for dataplane pods " + extraLog)
-	pods, err := cdsclient.DiscoverK8sStunnerdPods(ctx, k8sConfigFlags, podConfigFlags,
+	pods, err := discovery.DiscoverK8sStunnerdPods(ctx, k8sConfigFlags, podConfigFlags,
 		gwNs, gw, loggerFactory.NewLogger("stunnerd-fwd"))
 	if err != nil {
 		return fmt.Errorf("error searching for stunnerd pods: %w", err)
 	}
 
 	for _, pod := range pods {
-		client := http.Client{
-			Timeout: 5 * time.Second,
-		}
-		url := fmt.Sprintf("http://%s/status", pod.Addr)
-		res, err := client.Get(url)
+		status, err := discovery.GetStunnerdStatus(ctx, pod.Addr)
 		if err != nil {
-			log.Errorf("error querying status for stunnerd pod at URL %q on %s: %s",
-				url, pod.String(), err.Error())
+			log.Errorf("error querying status for stunnerd pod %s: %s", pod.String(), err.Error())
 			continue
 		}
-
-		if res.StatusCode != http.StatusOK {
-			log.Errorf("status query failed on %s with HTTP error code %s",
-				pod.String(), res.Status)
-			continue
-		}
-
-		s := v1.StunnerStatus{}
-		err = json.NewDecoder(res.Body).Decode(&s)
-		if err != nil {
-			log.Errorf("could not decode status response: %s", err.Error())
-			continue
-		}
+		s := *status
 
 		switch output {
 		case "yaml":

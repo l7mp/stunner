@@ -14,9 +14,9 @@ import (
 	"github.com/l7mp/stunner/v2/internal/netutil"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
-	"github.com/l7mp/stunner/v2/internal/turnclient"
-	"github.com/l7mp/stunner/v2/internal/upstream"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	"github.com/l7mp/stunner/v2/pkg/utils/turnclient"
+	"github.com/l7mp/stunner/v2/pkg/upstream"
 )
 
 var errNilConn = errors.New("cannot allocate relay connection")

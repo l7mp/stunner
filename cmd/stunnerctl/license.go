@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
+
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
@@ -23,7 +25,7 @@ func runLicense(_ *cobra.Command, args []string) error {
 	defer cancel()
 
 	log.Debug("searching for CDS server")
-	pod, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+	pod, err := discovery.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 		loggerFactory.NewLogger("cds-fwd"))
 	if err != nil {
 		return fmt.Errorf("error searching for CDS server: %w", err)

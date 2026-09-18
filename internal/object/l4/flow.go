@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/l7mp/stunner/v2/internal/upstream"
+	"github.com/l7mp/stunner/v2/pkg/upstream"
 )
 
 // bufferSize is the pump chunk size: one read makes one datagram on a datagram leg, so a

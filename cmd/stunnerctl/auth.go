@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/spf13/cobra"
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 
-	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
+	"github.com/spf13/cobra"
 )
 
 func runAuth(_ *cobra.Command, args []string) error {
@@ -17,7 +17,7 @@ func runAuth(_ *cobra.Command, args []string) error {
 	defer cancel()
 
 	log.Debug("searching for authentication server")
-	pod, err := cdsclient.DiscoverK8sAuthServer(ctx, k8sConfigFlags, authConfigFlags,
+	pod, err := discovery.DiscoverK8sAuthServer(ctx, k8sConfigFlags, authConfigFlags,
 		loggerFactory.NewLogger("auth-fwd"))
 	if err != nil {
 		return fmt.Errorf("error searching for auth service: %w", err)

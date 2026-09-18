@@ -5,13 +5,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
+
 	"github.com/pion/logging"
 	"github.com/spf13/cobra"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/l7mp/stunner/v2/internal/icetester"
 	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
-	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -25,9 +26,9 @@ var (
 	iceTesterImage, iceTesterOffloadEngine, configRelayAddressNode string
 	watch, all, verbose, forceCleanup, allowNodePort               bool
 	k8sConfigFlags                                                 *cliopt.ConfigFlags
-	cdsConfigFlags                                                 *cdsclient.CDSConfigFlags
-	authConfigFlags                                                *cdsclient.AuthConfigFlags
-	podConfigFlags                                                 *cdsclient.PodConfigFlags
+	cdsConfigFlags                                                 *discovery.CDSConfigFlags
+	authConfigFlags                                                *discovery.AuthConfigFlags
+	podConfigFlags                                                 *discovery.PodConfigFlags
 	iceTesterTimeout                                               time.Duration
 	iceTesterPacketRate                                            int
 
@@ -127,7 +128,7 @@ func init() {
 	k8sConfigFlags.AddFlags(rootCmd.PersistentFlags())
 
 	// CDS server discovery flags: for the "config" and "license" commands
-	cdsConfigFlags = cdsclient.NewCDSConfigFlags()
+	cdsConfigFlags = discovery.NewCDSConfigFlags()
 	cdsConfigFlags.AddFlags(configCmd.Flags())
 	cdsConfigFlags.AddFlags(licenseCmd.Flags())
 
@@ -137,11 +138,11 @@ func init() {
 		"Perform relay address discovery (if available) with respect to the given node.")
 
 	// Pod discovery flags: only for "status" command
-	podConfigFlags = cdsclient.NewPodConfigFlags()
+	podConfigFlags = discovery.NewPodConfigFlags()
 	podConfigFlags.AddFlags(statusCmd.Flags())
 
 	// Auth discovery flags: only for "auth" command
-	authConfigFlags = cdsclient.NewAuthConfigFlags()
+	authConfigFlags = discovery.NewAuthConfigFlags()
 	authConfigFlags.AddFlags(authCmd.Flags())
 	authCmd.Flags().StringVarP(&username, "username", "u", "",
 		"User id for generating an ephemeral credential (Default is empty username)")

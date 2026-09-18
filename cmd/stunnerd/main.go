@@ -8,6 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
+
 	flag "github.com/spf13/pflag"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -70,7 +72,7 @@ func main() {
 	k8sConfigFlags.AddFlags(flag.CommandLine)
 
 	// CDS server discovery flags
-	cdsConfigFlags := cdsclient.NewCDSConfigFlags()
+	cdsConfigFlags := discovery.NewCDSConfigFlags()
 	cdsConfigFlags.AddFlags(flag.CommandLine)
 
 	flag.Usage = func() {
@@ -165,7 +167,7 @@ func main() {
 
 		if configOrigin == "k8s" {
 			log.Info("discovering configuration from Kubernetes")
-			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+			cdsAddr, err := discovery.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 				st.GetLogger().NewLogger("cds-fwd"))
 			if err != nil {
 				log.Errorf("error searching for CDS server: %s", err.Error())
@@ -195,7 +197,7 @@ func main() {
 
 		if configOrigin == "k8s" {
 			log.Info("discovering configuration from Kubernetes")
-			cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+			cdsAddr, err := discovery.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 				st.GetLogger().NewLogger("cds-fwd"))
 			if err != nil {
 				log.Errorf("error searching for CDS server: %s", err.Error())

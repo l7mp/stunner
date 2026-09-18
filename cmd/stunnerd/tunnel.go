@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
@@ -34,7 +36,7 @@ type tunnelOptions struct {
 // runTunnel runs stunnerd in tunnel mode: render an in-memory config with one plain (or stdin)
 // listener relaying every client flow through the given TURN server to the pinned peer, and runs
 // the normal reconcile machinery on it.
-func runTunnel(clientArg, serverArg, peerArg string, opts tunnelOptions, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *cdsclient.CDSConfigFlags) {
+func runTunnel(clientArg, serverArg, peerArg string, opts tunnelOptions, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *discovery.CDSConfigFlags) {
 	loggerFactory := logger.NewLoggerFactory(opts.logLevel)
 	loggerFactory.SetWriter(os.Stderr)
 	log := loggerFactory.NewLogger("tunnel-cli")
@@ -239,13 +241,13 @@ func tunnelServer(arg, defaultNamespace string, fromK8s func(k8sName) (*stnrv1.S
 
 // tunnelConfFromK8s fetches the running dataplane config of the gateway named in a parsed
 // k8s:// URI from the cluster's CDS server and narrows it to the single named listener.
-func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *cdsclient.CDSConfigFlags, loggerFactory logger.LoggerFactory) (*stnrv1.StunnerConfig, error) {
+func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *discovery.CDSConfigFlags, loggerFactory logger.LoggerFactory) (*stnrv1.StunnerConfig, error) {
 	namespace, name, listener := u.Namespace, u.Name, u.Component
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cdsAddr, err := cdsclient.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
+	cdsAddr, err := discovery.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
 		loggerFactory.NewLogger("cds-fwd"))
 	if err != nil {
 		return nil, fmt.Errorf("error searching for CDS server: %w", err)

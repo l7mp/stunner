@@ -1,6 +1,7 @@
-// Package turnclient opens client sessions on an upstream TURN server over any of the TURN
-// transports (TURN-UDP, TURN-TCP, TURN-TLS, TURN-DTLS). It is the TURN-client machinery under
-// the TURN-* protocol relay clusters.
+// Package turnclient opens client sessions on a TURN server over any of the TURN transports
+// (TURN-UDP, TURN-TCP, TURN-TLS, TURN-DTLS). It is the TURN-client machinery under the TURN-*
+// protocol relay clusters, and the client the tests and tools use to drive traffic through a
+// STUNner gateway.
 package turnclient
 
 import (
@@ -14,9 +15,9 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
-	"github.com/l7mp/stunner/v2/internal/upstream"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
+	"github.com/l7mp/stunner/v2/pkg/upstream"
 )
 
 // Config specifies the upstream TURN server to dial.
@@ -119,6 +120,26 @@ func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (upstream.PacketC
 	}
 
 	return &packetConn{PacketConn: relay, client: client, transport: transport, server: server}, nil
+}
+
+// BindingRequest sends a STUN binding request over a fresh session and returns the reflexive
+// address the server saw, closing the session afterwards. It needs no credentials: a STUN
+// server answers it without authentication.
+func (d Dialer) BindingRequest(ctx context.Context) (net.Addr, error) {
+	client, transport, err := dial(d.Config)
+	if err != nil {
+		return nil, err
+	}
+	defer transport.Close() //nolint:errcheck
+	defer client.Close()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	addr, err := client.SendBindingRequest()
+	if err != nil {
+		return nil, fmt.Errorf("binding request failed: %w", err)
+	}
+	return addr, nil
 }
 
 // DialContext makes a TCP (RFC 6062) allocation on the TURN server and opens a relayed connection

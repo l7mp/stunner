@@ -1,4 +1,8 @@
-package client
+// Package discovery finds STUNner's components in a Kubernetes cluster, the config discovery
+// server of the gateway operator, the stunnerd pods of a Gateway and the auth service, and
+// opens port-forwards to them. It is the toolbox behind stunnerctl and the k8s config origin
+// of stunnerd.
+package discovery
 
 import (
 	"bytes"
@@ -523,29 +527,43 @@ func (d *PodConnector) PortFwd(ctx context.Context, pod *corev1.Pod, port int) (
 		return PodInfo{}, fmt.Errorf("failed to create port-forwarder: %w", err)
 	}
 
-	go func() {
-		if err := fw.ForwardPorts(); err != nil {
-			d.log.Errorf("failed to set up port-forwarder: %s", err.Error())
-			os.Exit(1)
-		}
-	}()
+	// ForwardPorts blocks for the life of the forwarder; an error before it is ready is a
+	// failed setup, an error after is a lost forwarder, which the next request will notice
+	errCh := make(chan error, 1)
+	go func() { errCh <- fw.ForwardPorts() }()
 
 	d.log.Debug("waiting for port-forwarder...")
-	<-readyChan
+	select {
+	case <-readyChan:
+	case err := <-errCh:
+		return PodInfo{}, fmt.Errorf("failed to set up port-forwarder to pod %s/%s: %w",
+			p.Namespace, p.Name, err)
+	case <-ctx.Done():
+		close(stopChan)
+		return PodInfo{}, ctx.Err()
+	}
 
 	localPort, err := fw.GetPorts()
 	if err != nil {
+		close(stopChan)
 		return PodInfo{}, fmt.Errorf("error obtaining local forwarder port: %w", err)
 	}
 
 	if len(localPort) != 1 {
+		close(stopChan)
 		return PodInfo{}, fmt.Errorf("error setting up port-forwarder: required port pairs (1) "+
 			"does not match the length of port forwarder port pairs (%d)", len(localPort))
 	}
 
 	go func() {
-		<-ctx.Done()
-		close(stopChan)
+		select {
+		case <-ctx.Done():
+			close(stopChan)
+		case err := <-errCh:
+			if err != nil {
+				d.log.Errorf("port-forwarder to pod %s/%s lost: %s", p.Namespace, p.Name, err.Error())
+			}
+		}
 	}()
 
 	p.Addr = fmt.Sprintf("127.0.0.1:%d", localPort[0].Local)

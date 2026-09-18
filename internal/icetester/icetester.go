@@ -12,6 +12,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
+
 	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4"
@@ -73,8 +75,8 @@ type Config struct {
 	EventChannel chan Event
 
 	K8sConfigFlags  *cliopt.ConfigFlags
-	CDSConfigFlags  *cdsclient.CDSConfigFlags
-	AuthConfigFlags *cdsclient.AuthConfigFlags
+	CDSConfigFlags  *discovery.CDSConfigFlags
+	AuthConfigFlags *discovery.AuthConfigFlags
 
 	Namespace      string
 	TURNTransports []v1.ListenerProtocol
@@ -94,8 +96,8 @@ type iceTester struct {
 	eventCh chan Event
 
 	k8sConfigFlags  *cliopt.ConfigFlags
-	cdsConfigFlags  *cdsclient.CDSConfigFlags
-	authConfigFlags *cdsclient.AuthConfigFlags
+	cdsConfigFlags  *discovery.CDSConfigFlags
+	authConfigFlags *discovery.AuthConfigFlags
 
 	namespace             string
 	transports            []v1.ListenerProtocol
@@ -304,7 +306,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		)
 	}
 
-	whipEndpoint, err := cdsclient.DiscoverK8sPod(ctx, t.k8sConfigFlags, t.namespace, "app=icetester", v1.DefaultICETesterPort,
+	whipEndpoint, err := discovery.DiscoverK8sPod(ctx, t.k8sConfigFlags, t.namespace, "app=icetester", v1.DefaultICETesterPort,
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
@@ -315,7 +317,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	}
 
 	log.Info("searching for CDS server")
-	cdsPod, err := cdsclient.DiscoverK8sCDSServer(ctx, t.k8sConfigFlags, t.cdsConfigFlags,
+	cdsPod, err := discovery.DiscoverK8sCDSServer(ctx, t.k8sConfigFlags, t.cdsConfigFlags,
 		t.logger.NewLogger("cds-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
@@ -326,7 +328,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	}
 
 	log.Info("searching for authentication service")
-	authPod, err := cdsclient.DiscoverK8sAuthServer(ctx, t.k8sConfigFlags, t.authConfigFlags,
+	authPod, err := discovery.DiscoverK8sAuthServer(ctx, t.k8sConfigFlags, t.authConfigFlags,
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,

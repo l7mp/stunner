@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/l7mp/stunner/v2/internal/netutil"
-	"github.com/l7mp/stunner/v2/internal/upstream"
+	"github.com/l7mp/stunner/v2/pkg/upstream"
 )
 
 // The conn types below are the reason nothing above needs unwrapping: each embeds the accounting
