@@ -16,7 +16,7 @@ func TestFeatureCatalog(t *testing.T) {
 		}
 		defined = append(defined, f)
 	}
-	assert.Len(t, defined, 7, "the feature enum grew or shrank")
+	assert.Len(t, defined, 9, "the feature enum grew or shrank")
 
 	for _, f := range defined {
 		assert.Equal(t, f, NewFeature(f.String()),
@@ -28,7 +28,8 @@ func TestFeatureCatalog(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack},
+		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
+		FeaturePQC},
 		Features(SubscriptionTypeMember), "the member tier changed")
 	assert.NotContains(t, Features(SubscriptionTypeMember), FeatureTURNOffload,
 		"offload is enterprise only")

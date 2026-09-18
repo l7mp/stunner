@@ -10,6 +10,7 @@ STUNner's premium features are designed to help medium to large scale enterprise
 1. [Relay address discovery](#relay-address-discovery)
 1. [TCP routes](#tcp-routes)
 1. [Dual-stack TURN](#dual-stack-turn)
+1. [Operator restarts and failover](#operator-restarts-and-failover)
 1. [TURN offload](#turn-offload)
 
 ## User quota
@@ -202,17 +203,28 @@ kubectl get tcproute media-plane-route -o jsonpath='{.status.parents[0].conditio
 
 **Feature:** `DualStack`. **Availability:** member and enterprise tiers.
 
-A TURN server that is reachable over both IPv4 and IPv6 must hand each client a *relayed transport address in the client's own address family*: an IPv6 client that ingresses over the IPv6 VIP needs an IPv6 relay to reach IPv6 peers. Kubernetes preserves the address family end-to-end (a dual-stack Service gets one VIP and one EndpointSlice per family, and kube-proxy never cross-connects families), so the missing piece is for `stunnerd` to know, and advertise, one relay address per family.
+A TURN server that is reachable over both IPv4 and IPv6 must hand each client a relayed transport address in the client's own address family: an IPv6 client that ingresses over the IPv6 VIP needs an IPv6 relay to reach IPv6 peers, and analogously for IPv4. Kubernetes preserves the address family end-to-end (a dual-stack Service gets one VIP and one EndpointSlice per family and Kubernetes never cross-connects families), so the missing piece is STUNner respecting the requested address family.
 
 The `DualStack` feature wires this up:
-
 - the STUNner dataplane pods receive their pod IPs for *both* families and advertise a relay address matching each client's family;
 - the public addresses of a Gateway are advertised per family, so the ICE server list your clients receive contains an entry per family;
-- the LoadBalancer Service exposing a Gateway requests `ipFamilyPolicy: PreferDualStack`, so a dual-stack cluster assigns a per-family VIP. `PreferDualStack`, unlike `RequireDualStack`, degrades gracefully to single-stack on a single-stack cluster rather than failing.
+- the LoadBalancer Service is configured with a per-family VIP.
 
-Dual-stack TURN is available in your tier if the `DualStack` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature STUNner runs single-stack, exactly as before. Note that single-stack means the cluster's own address family, whichever it is: on an IPv6-only cluster STUNner runs single-stack IPv6 without any license requirement, since the pod IP, the Service VIP and the relay address are then all IPv6 to begin with. The `DualStack` feature is only needed to serve *both* families at once.
+Note that the address family is chosen by the *client's* ICE agent when it picks which of the advertised ICE server URLs to contact, and the family of that connection then selects the family of the relay address.
 
-Note that the address family is chosen by the *client's* ICE agent when it picks which of the advertised ICE server URLs to contact, and the family of that connection then selects the family of the relay it gets. Make sure your cluster is actually dual-stack (`--feature-gates=IPv6DualStack`, dual-stack pod and service CIDRs) and that your cloud load-balancer controller forwards the IPv6 VIP over IPv6; this last hop is the only one Kubernetes does not guarantee.
+Dual-stack TURN is available in your tier if the `DualStack` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature STUNner falls back to single-stack mode.
+
+## High-availability operator
+
+**Feature:** `HAOperator`. **Availability:** member and enterprise tiers.
+
+In a production STUNner deployment the gateway operator, which is responsible for providing the dataplane configuration over the config discovery service (CDS), may unavoidably go offline. Sometimes the node the operator is scheduled at is removed, sometimes it is a planned restart, sometimes it may even be a genuine operator bug. 
+
+A solution to this is to run multiple operator pods side by side: enabling leader election (`--leader-elect`) makes sure only one operator instance is active (i.e., updates Kubernetes and emits dataplane configurations) at a time, the rest are the hot standby. Once the leader operator terminates, a new leader is selected that takes over the responsibilities of the former leader. By default, however, this involves the restarting of the running dataplane pods and the disconnection of all active clients.
+
+When using the high-availability mode, operator failovers become seamless: the new replica takes over the control of the running dataplane pods and makes sure there is no stale config emitted along the way. If only a single operator replica is run, the high-availability mode makes sure the restarted operator will not cause a dataplane churn. Note that the finalizer (`--enable-finalizer`) mode is incompatible with leader election: a replica losing the lease must not tear down resources the new leader keeps serving.
+
+High-availability operator mode is available in your tier if the `HAOperator` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature the operator falls back to rolling the dataplane as before.
 
 ## TURN offload
 

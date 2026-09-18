@@ -69,6 +69,8 @@ const (
 	FeatureSTUNServer
 	FeatureTCPRoute
 	FeatureDualStack
+	FeatureHAOperator
+	FeaturePQC
 )
 
 // NewFeature parses a string into an enum.
@@ -88,6 +90,10 @@ func NewFeature(f string) Feature {
 		return FeatureTCPRoute
 	case "dualstack":
 		return FeatureDualStack
+	case "haoperator":
+		return FeatureHAOperator
+	case "pqc":
+		return FeaturePQC
 	case "none":
 		fallthrough
 	default:
@@ -114,6 +120,10 @@ func (f feature) String() string {
 		return "TCPRoute"
 	case FeatureDualStack:
 		return "DualStack"
+	case FeatureHAOperator:
+		return "HAOperator"
+	case FeaturePQC:
+		return "PQC"
 	default:
 		return "unknown"
 	}
@@ -122,7 +132,8 @@ func (f feature) String() string {
 // AllFeatures returns all defined valid features.
 func AllFeatures() []Feature {
 	return []Feature{FeatureTURNOffload, FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack}
+		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
+		FeaturePQC}
 }
 
 // AllFeaturesString returns all valid features in a string slice.
@@ -135,7 +146,8 @@ func Features(t SubscriptionType) []Feature {
 	switch t {
 	case SubscriptionTypeMember:
 		return []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-			FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack}
+			FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
+			FeaturePQC}
 	case SubscriptionTypeEnterprise:
 		return AllFeatures()
 	default:
