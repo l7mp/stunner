@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -400,10 +401,21 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 		}
 	}
 
-	// open port-forwarders in parallel
+	// a pod that is not running (pending, terminating, or failed) has no stunnerd to talk to
+	pods.Items = slices.DeleteFunc(pods.Items, func(p corev1.Pod) bool {
+		if p.Status.Phase == corev1.PodRunning && p.DeletionTimestamp == nil {
+			return false
+		}
+		d.log.Debugf("skipping stunnerd pod %s/%s in phase %s", p.GetNamespace(), p.GetName(),
+			p.Status.Phase)
+		return true
+	})
+
+	// open port-forwarders in parallel; a pod whose forwarder fails is left out rather than
+	// reported with an empty address
 	var wg sync.WaitGroup
 	var lock sync.Mutex
-	ps = make([]PodInfo, len(pods.Items))
+	ps = make([]PodInfo, 0, len(pods.Items))
 	wg.Add(len(pods.Items))
 	for i := range pods.Items {
 		go func(j int) {
@@ -419,13 +431,13 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 
 			lock.Lock()
 			defer lock.Unlock()
-			ps[j] = p
+			ps = append(ps, p)
 		}(i)
 	}
 
 	wg.Wait()
 
-	d.log.Debugf("successfully opened %d port-forward connections", len(pods.Items))
+	d.log.Debugf("successfully opened %d of %d port-forward connections", len(ps), len(pods.Items))
 
 	return ps, nil
 }
