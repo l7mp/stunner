@@ -1,6 +1,9 @@
 ###########
 # BUILD
-FROM golang:1.27-alpine AS builder
+# The builder runs on the build platform and cross-compiles for the target: Go needs no
+# emulation for that, an emulated compiler is an order of magnitude slower.
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
+ARG TARGETOS TARGETARCH
 
 WORKDIR /app
 
@@ -17,14 +20,7 @@ COPY .git ./.git/
 COPY Makefile ./
 RUN apk add --no-cache git make
 
-RUN apkArch="$(apk --print-arch)"; \
-      case "$apkArch" in \
-        aarch64) export GOARCH='arm64' ;; \
-        *) export GOARCH='amd64' ;; \
-      esac; \
-    export CGO_ENABLED=0; \
-    export GOOS=linux; \
-    make build-bin
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH make build-bin
 
 ###########
 # STUNNERD
