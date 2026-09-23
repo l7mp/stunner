@@ -11,17 +11,27 @@ import (
 	"sync/atomic"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v5"
 
+	"github.com/l7mp/stunner/v2/internal/object/l4"
+	objectturn "github.com/l7mp/stunner/v2/internal/object/turn"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
-	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
-// Listener implements a STUNner listener. The TURN server it drives lives in the listener's
-// ListenerServer child; the listener itself holds only the reconciled config, published as an
-// atomic snapshot for the TURN request path.
+// Server is the packet server a listener runs: the TURN server for the TURN-* protocols, the
+// L4 flow engine for the plain protocols. A Server is created running by its constructor and
+// lives exactly as long as one Start/Close cycle of its listener, which owns it and reports its
+// active session count.
+type Server interface {
+	// Close shuts the server down, tearing down its transport listeners and sessions.
+	Close() error
+	// AllocationCount returns the number of active sessions: TURN allocations on a TURN
+	// server, live flows on the L4 engine.
+	AllocationCount() int
+}
+
+// Listener implements a STUNner listener. It holds the reconciled config, published as an atomic
+// snapshot for the packet path, and owns the Server that Start brings up from it.
 type Listener struct {
 	name, realm            string
 	proto                  stnrv1.ListenerProtocol
@@ -36,27 +46,22 @@ type Listener struct {
 	peerAddr               string
 	routes                 []string
 
-	// conf is the atomic snapshot read by the TURN handlers on the request path.
+	// conf is the atomic snapshot read by the server on the request path.
 	conf atomic.Pointer[stnrv1.ListenerConfig]
 
-	rt           *runtime.Runtime
-	telemetry    *telemetry.Telemetry
-	udpThreadNum int
-	net          transport.Net
-	logger       logger.LoggerFactory
-	log          logging.LeveledLogger
+	// server is the running packet server, nil while the listener is down.
+	server Server
+
+	rt  *runtime.Runtime
+	log logging.LeveledLogger
 }
 
 // NewListener creates a Listener object.
 func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	if conf == nil {
 		return &Listener{
-			rt:           rt,
-			telemetry:    rt.Telemetry,
-			udpThreadNum: rt.UdpThreadNum,
-			net:          rt.Net,
-			logger:       rt.Logger,
-			log:          rt.Logger.NewLogger("listener"),
+			rt:  rt,
+			log: rt.Logger.NewLogger("listener"),
 		}, nil
 	}
 	req := conf.(*stnrv1.ListenerConfig)
@@ -65,13 +70,9 @@ func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error
 	}
 	name := req.Name
 	l := &Listener{
-		name:         name,
-		rt:           rt,
-		telemetry:    rt.Telemetry,
-		udpThreadNum: rt.UdpThreadNum,
-		net:          rt.Net,
-		logger:       rt.Logger,
-		log:          rt.Logger.NewLogger(fmt.Sprintf("listener-%s", name)),
+		name: name,
+		rt:   rt,
+		log:  rt.Logger.NewLogger(fmt.Sprintf("listener-%s", name)),
 	}
 	if err := l.Reconcile(req); err != nil {
 		return nil, err
@@ -245,13 +246,41 @@ func (l *Listener) GetConfig() stnrv1.Config {
 	return &cp
 }
 
+// Start brings up the Server matching the listener protocol. Servers read the listener config
+// back through the runtime, so the listener must already be registered.
 func (l *Listener) Start() error {
+	l.log.Infof("listener %s (re)starting", l.String())
+	var (
+		s   Server
+		err error
+	)
+	switch l.proto {
+	case stnrv1.ProtocolTURNUDP, stnrv1.ProtocolTURNTCP, stnrv1.ProtocolTURNTLS,
+		stnrv1.ProtocolTURNDTLS:
+		s, err = objectturn.NewServer(l.name, l.proto, l.rt)
+	case stnrv1.ProtocolUDP, stnrv1.ProtocolTCP, stnrv1.ProtocolSTDIN:
+		s, err = l4.NewServer(l.name, l.proto, l.rt)
+	default:
+		return fmt.Errorf("listener %s: unsupported protocol %q", l.name, l.proto.String())
+	}
+	if err != nil {
+		return fmt.Errorf("failed to start %s server for listener %s: %w",
+			l.proto.String(), l.name, err)
+	}
+	l.server = s
+	l.log.Infof("listener %s: listener running", l.name)
 	return nil
 }
 
+// Close tears down the server and drops cached routing state.
 func (l *Listener) Close(_ bool) error {
 	l.rt.Router.InvalidateCache()
-	return nil
+	if l.server == nil {
+		return nil
+	}
+	err := l.server.Close()
+	l.server = nil
+	return err
 }
 
 func (l *Listener) Status() stnrv1.Status {
@@ -265,19 +294,12 @@ func (l *Listener) Status() stnrv1.Status {
 	return status
 }
 
-// AllocationCount returns the number of active allocations on the listener's TURN server.
+// AllocationCount returns the number of active sessions on the listener's server.
 func (l *Listener) AllocationCount() int {
-	o, ok := l.rt.Registry.Get(runtime.TypeListenerServer, l.name)
-	if !ok {
+	if l.server == nil {
 		return 0
 	}
-	s, ok := o.(interface {
-		AllocationCount() int
-	})
-	if !ok {
-		return 0
-	}
-	return s.AllocationCount()
+	return l.server.AllocationCount()
 }
 
 // lookupAuthConfig is the runtime-backed cross-reference used at reconcile time to track auth

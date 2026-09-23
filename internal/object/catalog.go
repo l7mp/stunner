@@ -3,8 +3,6 @@
 package object
 
 import (
-	"fmt"
-
 	"github.com/l7mp/stunner/v2/internal/reconciler"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
@@ -18,12 +16,10 @@ type Catalog = reconciler.Catalog
 //	Stunner (root, singleton)
 //	+-- Admin -- Health / Metrics / Offload    (singletons)
 //	+-- Auth                                   (singleton)
-//	+-- Listener [N from config]
-//	|   +-- ListenerServer                     (lifecycle-only, owns the TURN server)
+//	+-- Listener [N from config]               (owns its Server)
 //	+-- Cluster [N from config]
-//	    +-- Relay [one per cluster protocol]   (lifecycle-only, owns the udp/tcp relay)
 func NewCatalog() *Catalog {
-	specs := make([]KindSpec, 0, 10)
+	specs := make([]KindSpec, 0, 8)
 
 	register := func(spec KindSpec) {
 		specs = append(specs, spec)
@@ -122,8 +118,7 @@ func NewCatalog() *Catalog {
 	})
 
 	register(KindSpec{
-		Type:     runtime.TypeListener,
-		Children: []runtime.ObjectType{runtime.TypeListenerServer},
+		Type: runtime.TypeListener,
 		New: func(_ runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
 			return NewListener(conf, rt)
 		},
@@ -135,22 +130,6 @@ func NewCatalog() *Catalog {
 			}
 			return out, nil
 		},
-	})
-
-	register(KindSpec{
-		Type: runtime.TypeListenerServer,
-		New: func(parent runtime.Runnable, _ stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
-			listener, ok := parent.(*Listener)
-			if !ok {
-				return nil, fmt.Errorf("catalog: listener-server parent is not a listener: %T", parent)
-			}
-			return NewListenerServer(listener, rt), nil
-		},
-		ExtractConfigs: func(parentName string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
-			return []stnrv1.Config{&runtime.NodeConfig{Name: parentName}}, nil
-		},
-		Singleton:     true,
-		SingletonName: func(parentName string) string { return parentName },
 	})
 
 	register(KindSpec{

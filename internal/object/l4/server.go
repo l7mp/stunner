@@ -51,13 +51,9 @@ type Server struct {
 	closed bool
 }
 
-// NewServer starts the flow engine for a plain listener context.
-func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
+// NewServer starts the flow engine for a plain listener context on the given plain protocol.
+func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime) (*Server, error) {
 	conf := rt.GetConfig(objruntime.TypeListener, listener).(*stnrv1.ListenerConfig)
-	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
-	if err != nil {
-		return nil, fmt.Errorf("invalid listener protocol for %q: %w", listener, err)
-	}
 	log := rt.Logger.NewLogger(fmt.Sprintf("listener-%s", listener))
 
 	// The quota machinery is shared with the TURN engine: the same gate admits sessions

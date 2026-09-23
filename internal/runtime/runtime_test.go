@@ -91,15 +91,17 @@ func TestLookupSkipsLifecycleOnly(t *testing.T) {
 	}
 	require.NoError(t, rt.Registry.Add(auth, nil))
 
-	listenerServer := &fakeRunnable{name: "listener-a", typ: runtime.TypeListenerServer}
-	require.NoError(t, rt.Registry.Add(listenerServer, nil))
+	// A lifecycle-only node carries neither config nor status.
+	lifecycleOnly := runtime.ObjectType("lifecycle-only")
+	node := &fakeRunnable{name: "node-a", typ: lifecycleOnly}
+	require.NoError(t, rt.Registry.Add(node, nil))
 
 	gotAuth, ok := rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
 	require.True(t, ok)
 	require.Equal(t, "example.org", gotAuth.Realm)
 
-	require.Nil(t, rt.GetConfig(runtime.TypeListenerServer, "listener-a"))
-	require.Empty(t, rt.GetConfigs(runtime.TypeListenerServer))
-	require.Nil(t, rt.GetStatus(runtime.TypeListenerServer, "listener-a"))
-	require.Empty(t, rt.GetStatuses(runtime.TypeListenerServer))
+	require.Nil(t, rt.GetConfig(lifecycleOnly, "node-a"))
+	require.Empty(t, rt.GetConfigs(lifecycleOnly))
+	require.Nil(t, rt.GetStatus(lifecycleOnly, "node-a"))
+	require.Empty(t, rt.GetStatuses(lifecycleOnly))
 }

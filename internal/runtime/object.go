@@ -19,15 +19,14 @@ type ObjectType string
 
 // Type names for the various object kinds.
 const (
-	TypeStunner        ObjectType = "stunner"
-	TypeAdmin          ObjectType = "admin"
-	TypeAuth           ObjectType = "auth"
-	TypeHealth         ObjectType = "health"
-	TypeMetrics        ObjectType = "metrics"
-	TypeOffload        ObjectType = "offload"
-	TypeListener       ObjectType = "listener"
-	TypeListenerServer ObjectType = "listener-server"
-	TypeCluster        ObjectType = "cluster"
+	TypeStunner  ObjectType = "stunner"
+	TypeAdmin    ObjectType = "admin"
+	TypeAuth     ObjectType = "auth"
+	TypeHealth   ObjectType = "health"
+	TypeMetrics  ObjectType = "metrics"
+	TypeOffload  ObjectType = "offload"
+	TypeListener ObjectType = "listener"
+	TypeCluster  ObjectType = "cluster"
 )
 
 // Action is the reconciliation action an Object reports from Inspect.
@@ -43,8 +42,8 @@ const (
 	ActionRestart
 )
 
-// Runnable is the minimal node contract in the object tree: identity plus lifecycle.
-// Lifecycle-only nodes (listener servers, cluster relays) implement just this.
+// Runnable is the minimal node contract in the object tree: identity plus lifecycle. The
+// reconciler drives every node through it; config-driven objects add Reconcilable on top.
 type Runnable interface {
 	Name() string
 	Type() ObjectType

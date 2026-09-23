@@ -18,34 +18,26 @@ import (
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
 
-// Server wraps a pion/turn server bound to a listener context.
+// Server wraps a pion/turn server bound to a listener context. The server is created running:
+// NewServer binds the transport sockets and starts pion, Close tears everything down.
 type Server struct {
 	*turn.Server
-	runtime  *objruntime.Runtime
 	listener string
-	name     string
 	proto    stnrv1.ListenerProtocol
-	Conns    []any
 	log      logging.LeveledLogger
 }
 
-// NewServer starts the TURN server for a listener context.
-func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
+// NewServer starts the TURN server for a listener context on the given TURN-* protocol.
+func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime) (*Server, error) {
 	conf := rt.GetConfig(objruntime.TypeListener, listener).(*stnrv1.ListenerConfig)
-	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
-	if err != nil {
-		panic(fmt.Sprintf("turn: invalid listener protocol for %q: %s", listener, err.Error()))
-	}
 	log := rt.Logger.NewLogger(fmt.Sprintf("listener-%s", listener))
 
 	s := &Server{
-		runtime:  rt,
 		listener: listener,
-		name:     listener,
 		proto:    proto,
 		log:      log,
 	}
-	s.log.Debugf("TURN server %s (re)starting", s.name)
+	s.log.Debugf("TURN server %s (re)starting", listener)
 
 	var pConns []turn.PacketConnConfig
 	var lConns []turn.ListenerConfig
@@ -61,7 +53,7 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 
 	switch s.proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := netutil.NewPacketConnPool(s.name, rt.Net, rt.UdpThreadNum, rt.Telemetry)
+		socketPool := netutil.NewPacketConnPool(listener, rt.Net, rt.UdpThreadNum, rt.Telemetry)
 		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
 			addr, socketPool.Size())
 		conns, err := socketPool.ListenPacket("udp", addr)
@@ -69,13 +61,11 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 			return nil, err
 		}
 		for _, c := range conns {
-			conn := turn.PacketConnConfig{
+			pConns = append(pConns, turn.PacketConnConfig{
 				PacketConn:            c,
 				RelayAddressGenerator: relayAddressGenerator{relay},
 				PermissionHandler:     permissionHandler,
-			}
-			s.Conns = append(s.Conns, conn)
-			pConns = append(pConns, conn)
+			})
 		}
 
 	case stnrv1.ListenerProtocolTURNTCP:
@@ -84,15 +74,13 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
-		tcpListener = netutil.NewListener(tcpListener, s.name, telemetry.ListenerType,
+		tcpListener = netutil.NewListener(tcpListener, listener, telemetry.ListenerType,
 			rt.Telemetry, nil, nil)
-		conn := turn.ListenerConfig{
+		lConns = append(lConns, turn.ListenerConfig{
 			Listener:              tcpListener,
 			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
-		}
-		lConns = append(lConns, conn)
-		s.Conns = append(s.Conns, conn)
+		})
 
 	case stnrv1.ListenerProtocolTURNTLS:
 		s.log.Debugf("setting up TLS/TCP listener at %s", addr)
@@ -107,15 +95,13 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
-		tlsListener = netutil.NewListener(tlsListener, s.name, telemetry.ListenerType,
+		tlsListener = netutil.NewListener(tlsListener, listener, telemetry.ListenerType,
 			rt.Telemetry, nil, nil)
-		conn := turn.ListenerConfig{
+		lConns = append(lConns, turn.ListenerConfig{
 			Listener:              tlsListener,
 			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
-		}
-		lConns = append(lConns, conn)
-		s.Conns = append(s.Conns, conn)
+		})
 
 	case stnrv1.ListenerProtocolTURNDTLS:
 		s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
@@ -131,15 +117,13 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
-		dtlsListener = netutil.NewListener(dtlsListener, s.name, telemetry.ListenerType,
+		dtlsListener = netutil.NewListener(dtlsListener, listener, telemetry.ListenerType,
 			rt.Telemetry, nil, nil)
-		conn := turn.ListenerConfig{
+		lConns = append(lConns, turn.ListenerConfig{
 			Listener:              dtlsListener,
 			RelayAddressGenerator: relayAddressGenerator{relay},
 			PermissionHandler:     permissionHandler,
-		}
-		lConns = append(lConns, conn)
-		s.Conns = append(s.Conns, conn)
+		})
 
 	default:
 		return nil, fmt.Errorf("internal error: unknown listener protocol %q", s.proto.String())
@@ -164,36 +148,17 @@ func NewServer(listener string, rt *objruntime.Runtime) (*Server, error) {
 	return s, nil
 }
 
-// Start is a no-op because the TURN server is fully initialized by NewServer.
-func (s *Server) Start() error { return nil }
-
-// Close shuts down the TURN server and its underlying transport listeners.
+// Close shuts down the TURN server and its underlying transport listeners; pion closes every
+// socket it was given.
 func (s *Server) Close() error {
-	conf := s.runtime.GetConfig(objruntime.TypeListener, s.listener).(*stnrv1.ListenerConfig)
-	s.log.Tracef("closing %s listener at %s", s.proto.String(), conf.Addr)
-	if s.Server != nil {
-		if err := s.Server.Close(); err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
-			return err
-		}
+	s.log.Tracef("closing %s listener %s", s.proto.String(), s.listener)
+	if s.Server == nil {
+		return nil
 	}
+	err := s.Server.Close()
 	s.Server = nil
-
-	for _, c := range s.Conns {
-		switch s.proto {
-		case stnrv1.ListenerProtocolTURNUDP:
-			conn, ok := c.(turn.PacketConnConfig)
-			if !ok {
-				continue
-			}
-			_ = conn.PacketConn.Close()
-		case stnrv1.ListenerProtocolTURNTCP, stnrv1.ListenerProtocolTURNTLS, stnrv1.ListenerProtocolTURNDTLS:
-			conn, ok := c.(turn.ListenerConfig)
-			if !ok {
-				continue
-			}
-			_ = conn.Listener.Close()
-		}
+	if err != nil && !util.IsClosedErr(err) && !strings.Contains(err.Error(), "already closed") {
+		return err
 	}
-	s.Conns = []any{}
 	return nil
 }

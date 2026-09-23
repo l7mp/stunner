@@ -95,7 +95,10 @@ func newTestServer(t *testing.T, lconf *stnrv1.ListenerConfig, cconf *stnrv1.Clu
 
 func startServer(t *testing.T, rt *objruntime.Runtime, name string) *l4.Server {
 	t.Helper()
-	s, err := l4.NewServer(name, rt)
+	conf := rt.GetConfig(objruntime.TypeListener, name).(*stnrv1.ListenerConfig)
+	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
+	require.NoError(t, err, "listener protocol")
+	s, err := l4.NewServer(name, proto, rt)
 	require.NoError(t, err, "flow engine")
 	t.Cleanup(func() { _ = s.Close() })
 	return s
