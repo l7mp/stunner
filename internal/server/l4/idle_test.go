@@ -18,8 +18,7 @@ import (
 // stubLeg is the minimal upstream leg a flow needs to tear itself down.
 type stubLeg struct{ net.Conn }
 
-func (stubLeg) TransportAddrs() (net.Addr, net.Addr) { return nil, nil }
-func (stubLeg) Channel(net.Addr) (uint16, bool)      { return 0, false }
+func (stubLeg) Class() string { return "cl" }
 
 // countingEngine answers Packets with whatever the case wants, which is the only thing the idle
 // check asks of an engine.
@@ -76,13 +75,13 @@ func TestCheckIdleConsultsTheEngine(t *testing.T) {
 			s := &Server{
 				idle:    time.Minute,
 				log:     log,
-				flows:   map[*flow]struct{}{},
-				offload: newOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log),
+				flows:   map[*Flow]struct{}{},
+				offload: NewOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log),
 				events:  EventHandler{OnFlowDeleted: func(FlowEvent) {}},
 			}
 
 			client, leg := net.Pipe()
-			f := &flow{s: s, client: client, relayStream: stubLeg{leg},
+			f := &Flow{s: s, client: client, RelayStream: stubLeg{leg},
 				timer: time.NewTimer(time.Hour)}
 			s.flows[f] = struct{}{}
 			// the flow has been quiet in user space for longer than the idle timeout, which
@@ -111,13 +110,13 @@ func TestCheckIdleRearmsOnUserspaceActivity(t *testing.T) {
 	s := &Server{
 		idle:    time.Minute,
 		log:     log,
-		flows:   map[*flow]struct{}{},
-		offload: newOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log),
+		flows:   map[*Flow]struct{}{},
+		offload: NewOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log),
 		events:  EventHandler{OnFlowDeleted: func(FlowEvent) {}},
 	}
 
 	client, leg := net.Pipe()
-	f := &flow{s: s, client: client, relayStream: stubLeg{leg}, timer: time.NewTimer(time.Hour)}
+	f := &Flow{s: s, client: client, RelayStream: stubLeg{leg}, timer: time.NewTimer(time.Hour)}
 	s.flows[f] = struct{}{}
 	s.offload.pairs[f] = offloadPair{}
 	f.touch()
@@ -140,6 +139,7 @@ type stubRelay struct {
 
 func (s stubRelay) TransportAddrs() (net.Addr, net.Addr) { return s.local, s.server }
 func (s stubRelay) Channel(net.Addr) (uint16, bool)      { return s.chanID, s.framed }
+func (s stubRelay) Class(net.Addr) (string, bool)        { return "cl", true }
 
 // TestOffloadPairShape pins what the flow engine hands the offload engine, which the matrix does
 // not look at: the pair is flipped, because the engine decapsulates ChannelData arriving on its
@@ -155,18 +155,18 @@ func TestOffloadPairShape(t *testing.T) {
 	eng := newRecordingEngine()
 	rt := &objruntime.Runtime{Config: objruntime.Config{OffloadEngine: eng}}
 	log := logging.NewDefaultLoggerFactory().NewLogger("test")
-	h := newOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log)
+	h := NewOffloadHandler("li", stnrv1.ListenerProtocolUDP, rt, log)
 
-	f := &flow{
-		peer:        peerAddr,
-		relayPacket: stubRelay{server: serverAddr, local: wireAddr, chanID: 0x4000, framed: true},
-		ev: FlowEvent{
+	f := &Flow{
+		Peer:        peerAddr,
+		RelayPacket: stubRelay{server: serverAddr, local: wireAddr, chanID: 0x4000, framed: true},
+		Event: FlowEvent{
 			SrcAddr: clientAddr, DstAddr: listenerAddr, Peer: peerAddr,
 			RelayAddr: wireAddr, ServerAddr: serverAddr,
 			Cluster: "cl", ClusterProtocol: stnrv1.ClusterProtocolTURNUDP,
 		},
 	}
-	h.upsert(f)
+	h.Upsert(f)
 
 	require.Eventually(t, func() bool { return len(eng.registrations()) == 1 },
 		2*time.Second, 20*time.Millisecond, "flow registered")

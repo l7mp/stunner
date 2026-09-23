@@ -20,9 +20,11 @@ import (
 	"github.com/pion/transport/v5/udp"
 	"github.com/pion/turn/v5"
 
-	"github.com/l7mp/stunner/v2/internal/netutil"
-	objectturn "github.com/l7mp/stunner/v2/internal/object/turn"
+	"github.com/l7mp/stunner/v2/internal/netconn/account"
+	"github.com/l7mp/stunner/v2/internal/netconn/classify"
+	"github.com/l7mp/stunner/v2/internal/relay"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
+	turnsrv "github.com/l7mp/stunner/v2/internal/server/turn"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	"github.com/l7mp/stunner/v2/internal/util"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
@@ -38,16 +40,16 @@ type Server struct {
 	proto    stnrv1.ListenerProtocol
 	idle     time.Duration
 	runtime  *objruntime.Runtime
-	relay    *objectturn.Relay
-	quota    *objectturn.Quota
+	relay    *relay.Relay
+	quota    *turnsrv.Quota
 	gate     turn.QuotaHandler
 	events   EventHandler
-	offload  *offloadHandler
+	offload  *OffloadHandler
 	ln       net.Listener
 	log      logging.LeveledLogger
 
 	mu     sync.Mutex
-	flows  map[*flow]struct{}
+	flows  map[*Flow]struct{}
 	closed bool
 }
 
@@ -58,19 +60,19 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 
 	// The quota machinery is shared with the TURN engine: the same gate admits sessions
 	// and the same allocation handler administers the counters from the lifecycle events.
-	q := objectturn.NewQuotaHandler(rt)
+	q := turnsrv.NewQuotaHandler(rt)
 	s := &Server{
 		listener: listener,
 		proto:    proto,
 		idle:     FlowTimeout,
 		runtime:  rt,
-		relay:    objectturn.NewRelay(listener, rt),
+		relay:    relay.New(listener, rt),
 		quota:    q,
 		gate:     q.QuotaHandler(),
 		events:   NewEventHandler(listener, rt, log, q),
-		offload:  newOffloadHandler(listener, proto, rt, log),
+		offload:  NewOffloadHandler(listener, proto, rt, log),
 		log:      log,
-		flows:    make(map[*flow]struct{}),
+		flows:    make(map[*Flow]struct{}),
 	}
 	log.Debugf("flow engine %s (re)starting", listener)
 
@@ -100,7 +102,10 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 	default:
 		return nil, fmt.Errorf("unsupported plain listener protocol %q", proto.String())
 	}
-	s.ln = netutil.NewListener(ln, listener, telemetry.ListenerType, rt.Telemetry, nil, log)
+	// The listener socket carries clients, not peers: every client is in the listener's own
+	// class, and the socket is accounted under the listener.
+	s.ln = account.Listener(rt.Telemetry, classify.NewListener(ln, classify.Const(listener), nil),
+		telemetry.ListenerType)
 
 	go s.acceptLoop()
 	log.Infof("listener %s: %s flow engine running, peer %s", listener, proto.String(),
@@ -133,7 +138,7 @@ func (s *Server) serve(client net.Conn) {
 // the listener's clusters (failing early when nothing admits it), creates the relay leg, and
 // registers the flow. The peer is read from the live config, so a reconciled peer address
 // applies to new flows while existing flows stay pinned to the peer they were created with.
-func (s *Server) newFlow(client net.Conn) (*flow, error) {
+func (s *Server) newFlow(client net.Conn) (*Flow, error) {
 	conf, ok := s.runtime.GetConfig(objruntime.TypeListener, s.listener).(*stnrv1.ListenerConfig)
 	if !ok || conf == nil {
 		return nil, net.ErrClosed
@@ -162,7 +167,7 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 		return c.Admits(ip, port)
 	})
 	if !ok {
-		return nil, netutil.ErrPortProhibited
+		return nil, classify.ErrProhibited
 	}
 
 	// Quota gate: mint the flow's quota identity and fail before anything is dialed. The
@@ -174,13 +179,13 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 	}
 	quotaRelease := func() {
 		s.quota.AllocationHandler(client.RemoteAddr(), client.LocalAddr(),
-			strings.ToLower(s.proto.String()), user, realm, objectturn.AllocationDeleted)
+			strings.ToLower(s.proto.String()), user, realm, turnsrv.AllocationDeleted)
 	}
 
 	// The peer's own transport picks the relay leg; whether the leg relays directly or
 	// through an upstream TURN server is the allocators' internal business.
-	f := &flow{s: s, client: client}
-	f.ev = FlowEvent{
+	f := &Flow{s: s, client: client}
+	f.Event = FlowEvent{
 		SrcAddr:         client.RemoteAddr(),
 		DstAddr:         client.LocalAddr(),
 		Protocol:        strings.ToLower(s.proto.String()),
@@ -193,39 +198,39 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 	switch peerProto {
 	case stnrv1.ProtocolTCP:
 		peer := &net.TCPAddr{IP: ip, Port: port}
-		f.peer = peer
-		network := "tcp4"
-		if ip.To4() == nil {
-			network = "tcp6"
-		}
-		conn, err := s.relay.AllocateConn(turn.AllocateConnConfig{Network: network, RemoteAddr: peer})
+		f.Peer = peer
+		conn, err := s.relay.Conn(nil, peer)
 		if err != nil {
 			quotaRelease()
 			return nil, err
 		}
-		f.relayStream = conn
+		f.RelayStream = conn
 	default:
-		f.peer = &net.UDPAddr{IP: ip, Port: port}
+		f.Peer = &net.UDPAddr{IP: ip, Port: port}
 		network := "udp4"
 		if ip.To4() == nil {
 			network = "udp6"
 		}
-		pc, _, err := s.relay.AllocatePacketConn(turn.AllocateListenerConfig{Network: network})
+		pc, _, err := s.relay.PacketConn(network, 0)
 		if err != nil {
 			quotaRelease()
 			return nil, err
 		}
-		f.relayPacket = pc
+		f.RelayPacket = pc
 	}
-	f.ev.Peer = f.peer
+	f.Event.Peer = f.Peer
 
-	// The transport reports its own wire addresses: a direct leg leaves from its relay socket
-	// with no fixed remote, an upstream TURN leg from the session's transport socket towards
-	// the server.
-	if f.relayPacket != nil {
-		f.ev.RelayAddr, f.ev.ServerAddr = f.relayPacket.TransportAddrs()
+	// A datagram leg reports its own wire addresses: a direct leg leaves from its relay
+	// socket with no fixed remote, an upstream TURN leg from the session's transport socket
+	// towards the server. A stream leg runs to its remote, which is the upstream TURN server
+	// on a TURN cluster and the peer itself otherwise.
+	if f.RelayPacket != nil {
+		f.Event.RelayAddr, f.Event.ServerAddr = f.RelayPacket.TransportAddrs()
 	} else {
-		f.ev.RelayAddr, f.ev.ServerAddr = f.relayStream.TransportAddrs()
+		f.Event.RelayAddr = f.RelayStream.LocalAddr()
+		if f.Event.ClusterProtocol.IsTURN() {
+			f.Event.ServerAddr = f.RelayStream.RemoteAddr()
+		}
 	}
 
 	if !s.addFlow(f) {
@@ -235,12 +240,12 @@ func (s *Server) newFlow(client net.Conn) (*flow, error) {
 	}
 	f.touch()
 	f.timer = time.AfterFunc(s.idle, f.checkIdle)
-	s.events.OnFlowCreated(f.ev)
-	s.offload.upsert(f)
+	s.events.OnFlowCreated(f.Event)
+	s.offload.Upsert(f)
 	return f, nil
 }
 
-func (s *Server) addFlow(f *flow) bool {
+func (s *Server) addFlow(f *Flow) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -250,7 +255,7 @@ func (s *Server) addFlow(f *flow) bool {
 	return true
 }
 
-func (s *Server) removeFlow(f *flow) {
+func (s *Server) removeFlow(f *Flow) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.flows, f)
@@ -268,7 +273,7 @@ func (s *Server) AllocationCount() int {
 func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
-	flows := make([]*flow, 0, len(s.flows))
+	flows := make([]*Flow, 0, len(s.flows))
 	for f := range s.flows {
 		flows = append(flows, f)
 	}

@@ -2553,7 +2553,7 @@ var testConfigsV1Alpha1 = []TestConfigV1Alpha1{
 	},
 	{
 		testName:       "longterm endpoint with multiple routes ok",
-		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"secret":"my-secret"}},"listeners":[{"name":"udp","protocol":"turn-udp","public_address":"1.2.3.4","public_port":3478,"address":"127.0.0.1","port":3478,"routes":["allow-any"]}],"clusters":[{"name":"allow-any","endpoints":["0.0.0.0/0"]}]}`),
+		config:         []byte(`{"version":"v1alpha1","admin":{"loglevel":"all:ERROR"},"auth":{"type":"longterm","credentials":{"secret":"my-secret"}},"listeners":[{"name":"udp","protocol":"turn-udp","public_address":"1.2.3.4","public_port":3478,"address":"1.2.3.4","port":3478,"routes":["allow-any"]}],"clusters":[{"name":"allow-any","endpoints":["0.0.0.0/0"]}]}`),
 		echoServerAddr: "1.2.3.5:5678",
 		result:         true,
 	},

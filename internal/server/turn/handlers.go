@@ -8,6 +8,7 @@ import (
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/offload"
+	"github.com/l7mp/stunner/v2/internal/relay"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
@@ -159,7 +160,7 @@ func NewEventHandler(name string, listenerProto stnrv1.ListenerProtocol, rt *obj
 		if cl, ok := rt.Router.RoutePeer(name, stnrv1.ClusterProtocolUDP, peerIP, 0); ok {
 			return cl, stnrv1.ClusterProtocolUDP
 		}
-		if c, ok := rt.Router.Route(name, isTURNCluster); ok {
+		if c, ok := relay.TURNCluster(rt, name); ok {
 			return c.Name(), c.Protocol()
 		}
 		return "", stnrv1.ClusterProtocolUnknown

@@ -7,9 +7,9 @@ import (
 
 	"github.com/pion/logging"
 
-	objectturn "github.com/l7mp/stunner/v2/internal/object/turn"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
+	turnsrv "github.com/l7mp/stunner/v2/internal/server/turn"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
 
@@ -52,24 +52,23 @@ type EventHandler struct {
 	OnFlowError func(srcAddr net.Addr, protocol, message string)
 }
 
-// NewEventHandler returns the default flow event wiring for a listener context: logging,
-// quota accounting through the shared Quota machinery of the TURN engine, and
-// kernel-offload bookkeeping.
-func NewEventHandler(listener string, rt *objruntime.Runtime, log logging.LeveledLogger, q *objectturn.Quota) EventHandler {
+// NewEventHandler returns the default flow event wiring for a listener context: logging and
+// quota accounting through the shared Quota machinery of the TURN engine.
+func NewEventHandler(listener string, rt *objruntime.Runtime, log logging.LeveledLogger, q *turnsrv.Quota) EventHandler {
 	return EventHandler{
 		OnFlowCreated: func(ev FlowEvent) {
 			log.Debugf("flow created: client=%s-%s:%s, peer=%s:%s, cluster=%s",
 				ev.SrcAddr.String(), ev.DstAddr.String(), ev.Protocol,
 				ev.Peer.String(), ev.PeerProtocol, ev.Cluster)
 			q.AllocationHandler(ev.SrcAddr, ev.DstAddr, ev.Protocol, ev.Username,
-				ev.Realm, objectturn.AllocationCreated)
+				ev.Realm, turnsrv.AllocationCreated)
 		},
 		OnFlowDeleted: func(ev FlowEvent) {
 			log.Debugf("flow deleted: client=%s-%s:%s, peer=%s:%s",
 				ev.SrcAddr.String(), ev.DstAddr.String(), ev.Protocol,
 				ev.Peer.String(), ev.PeerProtocol)
 			q.AllocationHandler(ev.SrcAddr, ev.DstAddr, ev.Protocol, ev.Username,
-				ev.Realm, objectturn.AllocationDeleted)
+				ev.Realm, turnsrv.AllocationDeleted)
 		},
 		OnFlowError: func(srcAddr net.Addr, protocol, message string) {
 			log.Debugf("flow error: client=%s:%s, error=%s", srcAddr.String(), protocol,
@@ -97,12 +96,12 @@ func flowIdentity(rt *objruntime.Runtime, srcAddr net.Addr) (username, realm str
 	}
 }
 
-// channelPollBackoff and channelPollAttempts pace the channel learning of tunnel-mode
+// ChannelPollBackoff and ChannelPollAttempts pace the channel learning of tunnel-mode
 // flows: the pion client assigns the channel at the first client write towards the peer and
 // binds it asynchronously.
 var (
-	channelPollBackoff  = 100 * time.Millisecond
-	channelPollAttempts = 5
+	ChannelPollBackoff  = 100 * time.Millisecond
+	ChannelPollAttempts = 5
 )
 
 // offloadPair is the connection pair a flow is registered with, in the order the engine takes
@@ -115,25 +114,25 @@ type offloadPair struct {
 	pkts uint64
 }
 
-// offloadHandler registers the listener's flows with the kernel offload engine, keeping the
+// OffloadHandler registers the listener's flows with the kernel offload engine, keeping the
 // per-flow housekeeping (the tunnel-mode channel learning and the registered connection
 // pairs) here so the flow events stay pure data.
-type offloadHandler struct {
+type OffloadHandler struct {
 	rt       *objruntime.Runtime
 	listener string
 	proto    stnrv1.ListenerProtocol
 	log      logging.LeveledLogger
 
 	mu    sync.Mutex
-	pairs map[*flow]offloadPair
+	pairs map[*Flow]offloadPair
 }
 
-func newOffloadHandler(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime, log logging.LeveledLogger) *offloadHandler {
-	return &offloadHandler{rt: rt, listener: listener, proto: proto, log: log,
-		pairs: make(map[*flow]offloadPair)}
+func NewOffloadHandler(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime, log logging.LeveledLogger) *OffloadHandler {
+	return &OffloadHandler{rt: rt, listener: listener, proto: proto, log: log,
+		pairs: make(map[*Flow]offloadPair)}
 }
 
-// upsert registers a flow with the offload engine, for the one leg shape the engines accelerate:
+// Upsert registers a flow with the offload engine, for the one leg shape the engines accelerate:
 // offload.Offloadable decides, and on this side only a udp listener tunnelling to a turn-udp
 // cluster qualifies. Registering any other flow would be worse than useless: the datapath would
 // parse a channel header out of raw client payload and prepend one to the peer's replies,
@@ -142,28 +141,28 @@ func newOffloadHandler(listener string, proto stnrv1.ListenerProtocol, rt *objru
 // The upstream channel is assigned at the first client write and bound a round trip later, so a
 // goroutine retries until the transport reports live framing, giving up when the flow closes or
 // after the last attempt, leaving the flow unoffloaded.
-func (h *offloadHandler) upsert(f *flow) {
-	if !offload.Offloadable(h.proto, f.ev.ClusterProtocol) {
+func (h *OffloadHandler) Upsert(f *Flow) {
+	if !offload.Offloadable(h.proto, f.Event.ClusterProtocol) {
 		return
 	}
 
 	// raw client traffic from SrcAddr arriving at the listener socket DstAddr
-	raw := offload.Connection{RemoteAddr: f.ev.SrcAddr, LocalAddr: f.ev.DstAddr,
+	raw := offload.Connection{RemoteAddr: f.Event.SrcAddr, LocalAddr: f.Event.DstAddr,
 		Protocol: offload.ProtocolUDP}
 
 	go func() {
-		backoff := channelPollBackoff
-		for attempt := 0; attempt < channelPollAttempts; attempt++ {
+		backoff := ChannelPollBackoff
+		for attempt := 0; attempt < ChannelPollAttempts; attempt++ {
 			time.Sleep(backoff)
 			backoff *= 2
 			if f.closed.Load() {
 				return
 			}
-			ch, ok := f.relayPacket.Channel(f.ev.Peer)
+			ch, ok := f.RelayPacket.Channel(f.Event.Peer)
 			if !ok {
 				continue
 			}
-			wire := offload.Connection{RemoteAddr: f.ev.ServerAddr, LocalAddr: f.ev.RelayAddr,
+			wire := offload.Connection{RemoteAddr: f.Event.ServerAddr, LocalAddr: f.Event.RelayAddr,
 				Protocol: offload.ProtocolUDP, ChannelID: uint32(ch)}
 			h.register(f, offloadPair{client: wire, peer: raw})
 			return
@@ -174,7 +173,7 @@ func (h *offloadHandler) upsert(f *flow) {
 // register books the flow's connection pair and installs it on the engine. The closed
 // re-check under the lock closes the race with a concurrent remove: a flow torn down while
 // its channel was being learned must not leave a stale offload behind.
-func (h *offloadHandler) register(f *flow, p offloadPair) {
+func (h *OffloadHandler) register(f *Flow, p offloadPair) {
 	h.mu.Lock()
 	if f.closed.Load() {
 		h.mu.Unlock()
@@ -183,17 +182,17 @@ func (h *offloadHandler) register(f *flow, p offloadPair) {
 	h.pairs[f] = p
 	h.mu.Unlock()
 
-	if err := h.rt.OffloadEngine.Upsert(p.client, p.peer, h.listener, f.ev.Cluster); err != nil {
+	if err := h.rt.OffloadEngine.Upsert(p.client, p.peer, h.listener, f.Event.Cluster); err != nil {
 		h.log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
-			p.client.String(), h.listener, p.peer.String(), f.ev.Cluster, err.Error())
+			p.client.String(), h.listener, p.peer.String(), f.Event.Cluster, err.Error())
 	}
 }
 
-// active reports whether the kernel has forwarded anything for this flow since the last call,
+// Active reports whether the kernel has forwarded anything for this flow since the last call,
 // and whether the engine has an opinion at all. An offloaded flow's pumps never run, so without
 // this the flow's idle timer reaps it mid-traffic; a flow the engine does not know returns
 // (false, false), which means "no kernel-side opinion", not "idle".
-func (h *offloadHandler) active(f *flow) (moved, known bool) {
+func (h *OffloadHandler) Active(f *Flow) (moved, known bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	p, ok := h.pairs[f]
@@ -210,9 +209,9 @@ func (h *offloadHandler) active(f *flow) (moved, known bool) {
 	return moved, true
 }
 
-// remove uninstalls the flow's registered connection pair; a flow that never got offloaded
+// Remove uninstalls the flow's registered connection pair; a flow that never got offloaded
 // (a tunnel-mode flow whose channel never bound) has no pair booked and needs nothing.
-func (h *offloadHandler) remove(f *flow) {
+func (h *OffloadHandler) Remove(f *Flow) {
 	h.mu.Lock()
 	p, ok := h.pairs[f]
 	delete(h.pairs, f)

@@ -17,7 +17,6 @@ import (
 
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
-	"github.com/l7mp/stunner/v2/pkg/upstream"
 )
 
 // Config specifies the upstream TURN server to dial.
@@ -91,7 +90,7 @@ type Dialer struct {
 // permission for each new peer written to), and LocalAddr is the server-relayed transport
 // address. The network and local address of the allocation are the server's business, so both
 // parameters are ignored; they exist to mirror net.ListenConfig.ListenPacket.
-func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (upstream.PacketConn, error) {
+func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (*PacketConn, error) {
 	client, transport, err := dial(d.Config)
 	if err != nil {
 		return nil, err
@@ -119,7 +118,7 @@ func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (upstream.PacketC
 		server, _ = net.ResolveTCPAddr("tcp", d.ServerAddr)
 	}
 
-	return &packetConn{PacketConn: relay, client: client, transport: transport, server: server}, nil
+	return &PacketConn{PacketConn: relay, client: client, transport: transport, server: server}, nil
 }
 
 // BindingRequest sends a STUN binding request over a fresh session and returns the reflexive
@@ -145,7 +144,7 @@ func (d Dialer) BindingRequest(ctx context.Context) (net.Addr, error) {
 // DialContext makes a TCP (RFC 6062) allocation on the TURN server and opens a relayed connection
 // to the peer at address (host:port). Only "tcp" is a valid network, and only over TURN-TCP and
 // TURN-TLS: RFC 6062 requires the control connection to be TCP or TLS.
-func (d Dialer) DialContext(ctx context.Context, network, address string) (upstream.Conn, error) {
+func (d Dialer) DialContext(ctx context.Context, network, address string) (*Conn, error) {
 	if network != "tcp" {
 		return nil, fmt.Errorf("TURN relayed connections are TCP only, got network %q", network)
 	}
@@ -203,7 +202,7 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (upstr
 		return nil, fmt.Errorf("upstream relayed connection to peer %s failed: %w", address, err)
 	}
 
-	return &conn{Conn: dataConn, closeSession: closeSession}, nil
+	return &Conn{Conn: dataConn, closeSession: closeSession}, nil
 }
 
 // dial connects the transport to the TURN server, builds the TURN client, and starts its read
@@ -283,14 +282,10 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 	return client, turnConn, nil
 }
 
-var (
-	_ upstream.PacketConn = &packetConn{}
-	_ upstream.Conn       = &conn{}
-)
-
-// packetConn is a UDP allocation that owns its TURN session: Close closes the allocation, then
-// the TURN client and its transport.
-type packetConn struct {
+// PacketConn is a UDP allocation that owns its TURN session: Close closes the allocation, then
+// the TURN client and its transport. TransportAddrs and Channel describe the session's wire, so
+// the dataplane can stack its relay leg on the session as it is.
+type PacketConn struct {
 	net.PacketConn // the upstream allocation
 	client         *turn.Client
 	transport      net.PacketConn
@@ -298,7 +293,7 @@ type packetConn struct {
 	once           sync.Once
 }
 
-func (c *packetConn) Close() error {
+func (c *PacketConn) Close() error {
 	err := c.PacketConn.Close()
 	c.once.Do(func() {
 		c.client.Close()
@@ -310,7 +305,7 @@ func (c *packetConn) Close() error {
 // TransportAddrs returns the wire addresses of the TURN session: the transport socket's local
 // address and the server's address. This is the 5-tuple a kernel offload must match on; the
 // allocation's own LocalAddr is the server-side relayed address, useless for local offload.
-func (c *packetConn) TransportAddrs() (local, remote net.Addr) {
+func (c *PacketConn) TransportAddrs() (local, remote net.Addr) {
 	return c.transport.LocalAddr(), c.server
 }
 
@@ -325,7 +320,7 @@ type channelFinder interface {
 // framing is live. The client assigns a number at the first write towards a peer and completes
 // the ChannelBind a round trip later, sending Send indications until it does, so a number alone
 // does not mean the wire carries ChannelData yet.
-func (c *packetConn) Channel(peer net.Addr) (uint16, bool) {
+func (c *PacketConn) Channel(peer net.Addr) (uint16, bool) {
 	f, ok := c.PacketConn.(channelFinder)
 	if !ok {
 		return 0, false
@@ -337,15 +332,15 @@ func (c *packetConn) Channel(peer net.Addr) (uint16, bool) {
 	return num, true
 }
 
-// conn is an RFC 6062 relayed TCP connection that owns its TURN session: Close closes the data
+// Conn is an RFC 6062 relayed TCP connection that owns its TURN session: Close closes the data
 // connection, then the allocation, the TURN client, and its transport.
-type conn struct {
+type Conn struct {
 	net.Conn
 	closeSession func()
 	once         sync.Once
 }
 
-func (c *conn) Close() error {
+func (c *Conn) Close() error {
 	err := c.Conn.Close()
 	c.once.Do(c.closeSession)
 	return err
@@ -353,13 +348,13 @@ func (c *conn) Close() error {
 
 // TransportAddrs returns the wire addresses of the relayed connection: the RFC 6062 data
 // connection runs to the TURN server, so the remote is the server, not the peer.
-func (c *conn) TransportAddrs() (local, remote net.Addr) {
+func (c *Conn) TransportAddrs() (local, remote net.Addr) {
 	return c.LocalAddr(), c.RemoteAddr()
 }
 
 // Channel reports no framing: RFC 6062 relays peer traffic over a dedicated data connection,
 // there are no channels on a stream allocation.
-func (c *conn) Channel(net.Addr) (uint16, bool) { return 0, false }
+func (c *Conn) Channel(net.Addr) (uint16, bool) { return 0, false }
 
 // networkFamily narrows a base network ("udp") to the family of the server IP, so the local
 // socket family matches the server: a dual-stack wildcard socket would source packets to an IPv4

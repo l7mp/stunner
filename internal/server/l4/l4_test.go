@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/object"
-	"github.com/l7mp/stunner/v2/internal/object/l4"
 	quotapkg "github.com/l7mp/stunner/v2/internal/quota"
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/router"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
+	"github.com/l7mp/stunner/v2/internal/server/l4"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	"github.com/l7mp/stunner/v2/pkg/logger"
@@ -274,7 +274,7 @@ func TestFlowAdmission(t *testing.T) {
 // TestFlowPreflightProtocolAgnostic pins the admission pre-flight semantics: it follows the
 // TURN permission-handler rule, so a cluster of any protocol admitting the peer IP passes the
 // pre-flight, and the protocol-aware verdict falls on the relay leg (here: the per-datagram
-// admission wrapper of the direct UDP leg refuses the write, tearing the flow down).
+// classified direct UDP leg refuses the write, tearing the flow down).
 func TestFlowPreflightProtocolAgnostic(t *testing.T) {
 	peer := udpEcho(t)
 	port := freePort(t, "udp")

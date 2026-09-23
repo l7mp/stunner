@@ -12,23 +12,10 @@ import (
 
 	"github.com/pion/logging"
 
-	"github.com/l7mp/stunner/v2/internal/object/l4"
-	objectturn "github.com/l7mp/stunner/v2/internal/object/turn"
 	"github.com/l7mp/stunner/v2/internal/runtime"
+	"github.com/l7mp/stunner/v2/internal/server"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
-
-// Server is the packet server a listener runs: the TURN server for the TURN-* protocols, the
-// L4 flow engine for the plain protocols. A Server is created running by its constructor and
-// lives exactly as long as one Start/Close cycle of its listener, which owns it and reports its
-// active session count.
-type Server interface {
-	// Close shuts the server down, tearing down its transport listeners and sessions.
-	Close() error
-	// AllocationCount returns the number of active sessions: TURN allocations on a TURN
-	// server, live flows on the L4 engine.
-	AllocationCount() int
-}
 
 // Listener implements a STUNner listener. It holds the reconciled config, published as an atomic
 // snapshot for the packet path, and owns the Server that Start brings up from it.
@@ -50,7 +37,7 @@ type Listener struct {
 	conf atomic.Pointer[stnrv1.ListenerConfig]
 
 	// server is the running packet server, nil while the listener is down.
-	server Server
+	server server.Server
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
@@ -250,22 +237,9 @@ func (l *Listener) GetConfig() stnrv1.Config {
 // back through the runtime, so the listener must already be registered.
 func (l *Listener) Start() error {
 	l.log.Infof("listener %s (re)starting", l.String())
-	var (
-		s   Server
-		err error
-	)
-	switch l.proto {
-	case stnrv1.ProtocolTURNUDP, stnrv1.ProtocolTURNTCP, stnrv1.ProtocolTURNTLS,
-		stnrv1.ProtocolTURNDTLS:
-		s, err = objectturn.NewServer(l.name, l.proto, l.rt)
-	case stnrv1.ProtocolUDP, stnrv1.ProtocolTCP, stnrv1.ProtocolSTDIN:
-		s, err = l4.NewServer(l.name, l.proto, l.rt)
-	default:
-		return fmt.Errorf("listener %s: unsupported protocol %q", l.name, l.proto.String())
-	}
+	s, err := server.New(l.name, l.proto, l.rt)
 	if err != nil {
-		return fmt.Errorf("failed to start %s server for listener %s: %w",
-			l.proto.String(), l.name, err)
+		return fmt.Errorf("failed to start server for listener %s: %w", l.name, err)
 	}
 	l.server = s
 	l.log.Infof("listener %s: listener running", l.name)

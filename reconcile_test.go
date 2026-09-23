@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/object"
-	objectturn "github.com/l7mp/stunner/v2/internal/object/turn"
 	"github.com/l7mp/stunner/v2/internal/resolver"
+	objectturn "github.com/l7mp/stunner/v2/internal/server/turn"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 	"github.com/l7mp/stunner/v2/pkg/logger"

@@ -1,3 +1,6 @@
+// Package turn implements the Server of the TURN-* listeners over pion/turn: it binds the
+// listener sockets, wires the authentication, permission, quota and event handlers into pion,
+// and hands pion the listener's relay through the RelayAddressGenerator adapter.
 package turn
 
 import (
@@ -11,7 +14,11 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
-	"github.com/l7mp/stunner/v2/internal/netutil"
+	"github.com/l7mp/stunner/v2/internal/netconn/account"
+	"github.com/l7mp/stunner/v2/internal/netconn/classify"
+	"github.com/l7mp/stunner/v2/internal/netconn/socketpool"
+	"github.com/l7mp/stunner/v2/internal/netconn/wire"
+	"github.com/l7mp/stunner/v2/internal/relay"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	"github.com/l7mp/stunner/v2/internal/util"
@@ -39,11 +46,8 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 	}
 	s.log.Debugf("TURN server %s (re)starting", listener)
 
-	var pConns []turn.PacketConnConfig
-	var lConns []turn.ListenerConfig
-
 	permissionHandler := NewPermissionHandler(listener, rt, log)
-	relay := NewRelay(listener, rt)
+	generator := relayAddressGenerator{relay.New(listener, rt)}
 	// Empty host is the unspecified address: on dual-stack hosts (Linux default
 	// with net.ipv6.bindv6only=0) ":port" binds a single socket reachable via
 	// both IPv4 and IPv6, while on single-family hosts it binds the available
@@ -51,19 +55,23 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 	// clusters.
 	addr := net.JoinHostPort("", strconv.Itoa(conf.Port))
 
+	// Listener sockets carry clients, not peers: every client is in the listener's own class,
+	// and the sockets are accounted under the listener.
+	var pConns []turn.PacketConnConfig
+	var lConns []turn.ListenerConfig
+	var ln net.Listener
 	switch s.proto {
 	case stnrv1.ListenerProtocolTURNUDP:
-		socketPool := netutil.NewPacketConnPool(listener, rt.Net, rt.UdpThreadNum, rt.Telemetry)
-		s.log.Infof("setting up UDP listener socket pool at %s with %d readloop threads",
-			addr, socketPool.Size())
-		conns, err := socketPool.ListenPacket("udp", addr)
+		socks, err := socketpool.ListenPacket(rt.Net, "udp", addr, rt.UdpThreadNum)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range conns {
+		s.log.Infof("setting up UDP listener socket pool at %s with %d sockets", addr, len(socks))
+		for _, sock := range socks {
+			c := classify.NewPacketConn(wire.Direct(sock), classify.Const(listener))
 			pConns = append(pConns, turn.PacketConnConfig{
-				PacketConn:            c,
-				RelayAddressGenerator: relayAddressGenerator{relay},
+				PacketConn:            account.PacketConn(rt.Telemetry, c, listener, telemetry.ListenerType),
+				RelayAddressGenerator: generator,
 				PermissionHandler:     permissionHandler,
 			})
 		}
@@ -74,13 +82,7 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TCP listener at %s: %s", addr, err)
 		}
-		tcpListener = netutil.NewListener(tcpListener, listener, telemetry.ListenerType,
-			rt.Telemetry, nil, nil)
-		lConns = append(lConns, turn.ListenerConfig{
-			Listener:              tcpListener,
-			RelayAddressGenerator: relayAddressGenerator{relay},
-			PermissionHandler:     permissionHandler,
-		})
+		ln = tcpListener
 
 	case stnrv1.ListenerProtocolTURNTLS:
 		s.log.Debugf("setting up TLS/TCP listener at %s", addr)
@@ -95,13 +97,7 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}
-		tlsListener = netutil.NewListener(tlsListener, listener, telemetry.ListenerType,
-			rt.Telemetry, nil, nil)
-		lConns = append(lConns, turn.ListenerConfig{
-			Listener:              tlsListener,
-			RelayAddressGenerator: relayAddressGenerator{relay},
-			PermissionHandler:     permissionHandler,
-		})
+		ln = tlsListener
 
 	case stnrv1.ListenerProtocolTURNDTLS:
 		s.log.Debugf("setting up DTLS/UDP listener at %s", addr)
@@ -117,16 +113,18 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DTLS listener at %s: %s", addr, err)
 		}
-		dtlsListener = netutil.NewListener(dtlsListener, listener, telemetry.ListenerType,
-			rt.Telemetry, nil, nil)
-		lConns = append(lConns, turn.ListenerConfig{
-			Listener:              dtlsListener,
-			RelayAddressGenerator: relayAddressGenerator{relay},
-			PermissionHandler:     permissionHandler,
-		})
+		ln = dtlsListener
 
 	default:
 		return nil, fmt.Errorf("internal error: unknown listener protocol %q", s.proto.String())
+	}
+	if ln != nil {
+		c := classify.NewListener(ln, classify.Const(listener), nil)
+		lConns = append(lConns, turn.ListenerConfig{
+			Listener:              account.Listener(rt.Telemetry, c, telemetry.ListenerType),
+			RelayAddressGenerator: generator,
+			PermissionHandler:     permissionHandler,
+		})
 	}
 
 	q := NewQuotaHandler(rt)

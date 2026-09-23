@@ -108,7 +108,7 @@ func TestUpstreamSessionChannel(t *testing.T) {
 	require.NoError(t, err, "upstream session")
 	defer pc.Close() //nolint:errcheck
 
-	local, remote := pc.(*packetConn).TransportAddrs()
+	local, remote := pc.TransportAddrs()
 	require.NotNil(t, local, "transport local address")
 	assert.Equal(t, serverConn.LocalAddr().String(), remote.String(), "server address")
 

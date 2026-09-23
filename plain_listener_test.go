@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/l7mp/stunner/v2/internal/object/l4"
+	"github.com/l7mp/stunner/v2/internal/server/l4"
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )

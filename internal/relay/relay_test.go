@@ -1,4 +1,4 @@
-package turn
+package relay
 
 import (
 	"net"
