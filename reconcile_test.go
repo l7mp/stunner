@@ -2278,6 +2278,103 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.False(t, p(src, net.ParseIP("2001:dead::1")), "route to IPv6 2001:dead::1 fails")
 		},
 	},
+	{
+		name: "reconcile-test: TLS listener PQC mode",
+		config: stnrv1.StunnerConfig{
+			ApiVersion: stnrv1.ApiVersion,
+			Admin: stnrv1.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv1.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv1.ListenerConfig{{
+				Name:     "default-listener",
+				Protocol: "turn-tls",
+				Addr:     "127.0.0.1",
+				Port:     3478,
+				Key:      "ZHVtbXkK", // base64: dummy
+				Cert:     "ZHVtbXkK", // base64: dummy
+				PQCMode:  "Preferred",
+				Routes:   []string{"allow-any"},
+			}},
+			Clusters: []stnrv1.ClusterConfig{{
+				Name:      "allow-any",
+				Endpoints: []string{"0.0.0.0/0"},
+			}},
+		},
+		tester: func(t *testing.T, s *Stunner, err error) {
+			// the protocol changed: restarted, and the mode is parsed and normalized
+			assert.Error(t, err, "restarted")
+			e, ok := err.(stnrv1.ErrRestarted)
+			assert.True(t, ok, "restarted status")
+			assert.Contains(t, e.Objects, "listener: default-listener", "restarted object")
+
+			l := s.GetListener("default-listener")
+			require.NotNil(t, l, "listener found")
+			assert.Equal(t, "preferred", listenerConf(t, l).PQCMode, "pqc mode normalized")
+			assert.Contains(t, l.Status().String(), "pqc=preferred", "pqc mode in status")
+
+			tlsConf := func(mode string, routes ...string) *stnrv1.StunnerConfig {
+				return &stnrv1.StunnerConfig{
+					ApiVersion: stnrv1.ApiVersion,
+					Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
+					Auth: stnrv1.AuthConfig{Credentials: map[string]string{
+						"username": "user", "password": "pass"}},
+					Listeners: []stnrv1.ListenerConfig{{
+						Name: "default-listener", Protocol: "turn-tls", Addr: "127.0.0.1",
+						Port: 3478, Key: "ZHVtbXkK", Cert: "ZHVtbXkK", PQCMode: mode,
+						Routes: routes,
+					}},
+					Clusters: []stnrv1.ClusterConfig{{Name: "allow-any", Endpoints: []string{"0.0.0.0/0"}}},
+				}
+			}
+
+			// a mode change restarts the listener, and only the listener
+			err = s.Reconcile(tlsConf("enforced", "allow-any"))
+			e, ok = err.(stnrv1.ErrRestarted)
+			require.True(t, ok, "mode change: restarted status")
+			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "mode change: restarted object")
+			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "mode change applied")
+
+			// the same mode with a route change reconciles in place
+			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any", "dummy")), "route change: no restart")
+			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "route change: mode kept")
+			assert.Len(t, listenerConf(t, l).Routes, 2, "route change applied")
+
+			// back to the default mode: a restart, and the default is the empty string
+			err = s.Reconcile(tlsConf("Default", "allow-any", "dummy"))
+			e, ok = err.(stnrv1.ErrRestarted)
+			require.True(t, ok, "default mode: restarted status")
+			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "default mode: restarted object")
+			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode normalized to empty")
+			assert.NotContains(t, l.Status().String(), "pqc=", "default mode absent from status")
+
+			// an omitted mode and a spelled-out default are the running mode: no restart
+			assert.NoError(t, s.Reconcile(tlsConf("", "allow-any", "dummy")), "omitted mode: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("default", "allow-any", "dummy")), "spelled-out default: no restart")
+
+			// the mode is TLS-only and must parse
+			udp := tlsConf("preferred", "allow-any", "dummy")
+			udp.Listeners[0].Protocol, udp.Listeners[0].Cert, udp.Listeners[0].Key = "turn-udp", "", ""
+			assert.ErrorContains(t, s.Reconcile(udp), "only TURN-TLS listeners", "pqc mode on a turn-udp listener")
+			assert.ErrorContains(t, s.Reconcile(tlsConf("quantum", "allow-any", "dummy")), "unknown PQC mode", "unknown mode")
+			dtls := tlsConf("enforced", "allow-any", "dummy")
+			dtls.Listeners[0].Protocol = "turn-dtls"
+			assert.ErrorContains(t, s.Reconcile(dtls), "only TURN-TLS listeners", "pqc mode on a turn-dtls listener")
+			assert.Empty(t, listenerConf(t, l).PQCMode, "rejected configs leave the listener alone")
+
+			// the default mode is admissible on any protocol
+			udp.Listeners[0].PQCMode = "default"
+			_, ok = s.Reconcile(udp).(stnrv1.ErrRestarted)
+			assert.True(t, ok, "default mode on a turn-udp listener: restarted for the protocol change only")
+			assert.Equal(t, stnrv1.ListenerProtocolTURNUDP.String(), listenerConf(t, l).Protocol, "protocol change applied")
+			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode on a turn-udp listener")
+		},
+	},
 }
 
 // start with default config and then reconcile with the given config

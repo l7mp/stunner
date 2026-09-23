@@ -40,6 +40,9 @@ type ListenerConfig struct {
 	Cert string `json:"cert,omitempty"`
 	// Key is the base64-encoded TLS key.
 	Key string `json:"key,omitempty"`
+	// PQCMode is the post-quantum encryption policy of a TURN-TLS listener: "default",
+	// "preferred" or "enforced".
+	PQCMode string `json:"pqc_mode,omitempty"`
 	// PeerAddr is the peer to which a plain UDP/TCP or STDIN listener relays every client
 	// flow, as "<udp|tcp>://host:port". Ignored for TURN listeners.
 	PeerAddr string `json:"peer_addr,omitempty"`
@@ -95,6 +98,20 @@ func (req *ListenerConfig) Validate() error {
 		if req.Key == "" {
 			return fmt.Errorf("empty TLS key for %s listener", proto.String())
 		}
+	}
+
+	// The PQC mode is a TLS-only policy: DTLS has no post-quantum key exchange to speak of.
+	pqcMode, err := NewPQCMode(req.PQCMode)
+	if err != nil {
+		return err
+	}
+	if pqcMode != PQCModeDefault && proto != ListenerProtocolTURNTLS {
+		return fmt.Errorf("PQC mode %q set for %s listener: only TURN-TLS listeners take a PQC mode",
+			pqcMode.String(), proto.String())
+	}
+	req.PQCMode = ""
+	if pqcMode != PQCModeDefault {
+		req.PQCMode = pqcMode.String()
 	}
 
 	// Plain listeners relay every client flow to a single static peer: raw flows carry no
@@ -219,6 +236,9 @@ func (req *ListenerConfig) String() string {
 		k = "<SECRET>"
 	}
 	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
+	if req.PQCMode != "" {
+		status = append(status, fmt.Sprintf("pqc=%s", req.PQCMode))
+	}
 	status = append(status, fmt.Sprintf("routes=[%s]", strings.Join(req.Routes, ",")))
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))

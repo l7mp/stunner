@@ -30,6 +30,7 @@ type Listener struct {
 	rawAddr                string
 	addrs                  []string
 	cert, key              []byte
+	pqcMode                stnrv1.PQCMode
 	peerAddr               string
 	routes                 []string
 
@@ -92,12 +93,14 @@ func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (
 	// A restart is only avoidable when Routes, PublicIP/PublicPort and/or PeerAddr are the
 	// only changes. A peer address change reconciles in place: existing flows stay pinned to
 	// the peer they were created with, new flows go to the new peer.
+	pqcMode, _ := stnrv1.NewPQCMode(req.PQCMode)
 	restart := !(l.name == req.Name && //nolint:staticcheck
 		l.proto == proto &&
 		l.rawAddr == req.Addr &&
 		l.port == req.Port &&
 		bytes.Equal(l.cert, cert) &&
-		bytes.Equal(l.key, key))
+		bytes.Equal(l.key, key) &&
+		l.pqcMode == pqcMode)
 
 	curRealm := l.realm
 	if a := l.lookupAuthConfig(); a != nil {
@@ -160,6 +163,7 @@ func (l *Listener) Reconcile(conf stnrv1.Config) error {
 		l.cert = cert
 		l.key = key
 	}
+	l.pqcMode, _ = stnrv1.NewPQCMode(req.PQCMode)
 	l.realm = stnrv1.DefaultRealm
 	if a := l.lookupAuthConfig(); a != nil {
 		l.realm = a.Realm
@@ -208,6 +212,9 @@ func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
 	}
 	c.Cert = string(l.cert)
 	c.Key = string(l.key)
+	if l.pqcMode != stnrv1.PQCModeDefault {
+		c.PQCMode = l.pqcMode.String()
+	}
 	return c
 }
 

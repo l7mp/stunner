@@ -34,6 +34,16 @@ type Server struct {
 	log      logging.LeveledLogger
 }
 
+// newTLSConfig builds the TLS configuration of a TURN-TLS listener from its config and
+// certificate. The open-source build serves the default TLS settings whatever PQC mode the
+// listener asks for; a build with the PQC feature replaces the constructor and honours the mode.
+var newTLSConfig = func(_ *objruntime.Runtime, conf *stnrv1.ListenerConfig, cert tls.Certificate, log logging.LeveledLogger) *tls.Config {
+	return &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		Certificates: []tls.Certificate{cert},
+	}
+}
+
 // NewServer starts the TURN server for a listener context on the given TURN-* protocol.
 func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Runtime) (*Server, error) {
 	conf := rt.GetConfig(objruntime.TypeListener, listener).(*stnrv1.ListenerConfig)
@@ -90,10 +100,7 @@ func NewServer(listener string, proto stnrv1.ListenerProtocol, rt *objruntime.Ru
 		if err != nil {
 			return nil, fmt.Errorf("cannot load cert/key pair for creating TLS listener at %s: %s", addr, err)
 		}
-		tlsListener, err := tls.Listen("tcp", addr, &tls.Config{
-			MinVersion:   tls.VersionTLS12,
-			Certificates: []tls.Certificate{cer},
-		})
+		tlsListener, err := tls.Listen("tcp", addr, newTLSConfig(rt, conf, cer, s.log))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TLS listener at %s: %s", addr, err)
 		}

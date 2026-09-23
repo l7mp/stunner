@@ -52,6 +52,54 @@ func (a AuthType) String() string {
 	}
 }
 
+// PQCMode selects the post-quantum key exchange policy of a TURN-TLS listener. Honouring it is a
+// premium feature: a build without it serves the default TLS settings whatever the mode says.
+type PQCMode int
+
+const (
+	// PQCModeDefault serves Go's default TLS settings.
+	PQCModeDefault PQCMode = iota
+	// PQCModePreferred prefers a post-quantum hybrid key exchange, falling back to classical
+	// TLS 1.2 or 1.3 for clients that do not offer one.
+	PQCModePreferred
+	// PQCModeEnforced serves TLS 1.3 with a post-quantum hybrid key exchange only.
+	PQCModeEnforced
+)
+
+const (
+	pqcModeDefaultStr   = "default"
+	pqcModePreferredStr = "preferred"
+	pqcModeEnforcedStr  = "enforced"
+)
+
+// NewPQCMode parses a PQC mode; the empty string is the default mode.
+func NewPQCMode(raw string) (PQCMode, error) {
+	switch strings.ToLower(raw) {
+	case "", pqcModeDefaultStr:
+		return PQCModeDefault, nil
+	case pqcModePreferredStr:
+		return PQCModePreferred, nil
+	case pqcModeEnforcedStr:
+		return PQCModeEnforced, nil
+	default:
+		return PQCModeDefault, fmt.Errorf("unknown PQC mode: %q", raw)
+	}
+}
+
+// String returns the name of the PQC mode.
+func (m PQCMode) String() string {
+	switch m {
+	case PQCModeDefault:
+		return pqcModeDefaultStr
+	case PQCModePreferred:
+		return pqcModePreferredStr
+	case PQCModeEnforced:
+		return pqcModeEnforcedStr
+	default:
+		return "<unknown>"
+	}
+}
+
 // Protocol specifies a network protocol. A single enum lists every protocol STUNner understands;
 // which subset is valid in a given context (listener, cluster, ...) is enforced at the use site, not
 // by this type. Parse a protocol name with NewProtocol; check context validity with the
