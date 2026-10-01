@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestConfigStore_Upsert(t *testing.T) {
@@ -168,7 +168,7 @@ func TestConfigStore_Patcher(t *testing.T) {
 	store.Upsert("ns1", "cfg1", originalConfig)
 
 	// Create a patcher function
-	patcher := func(conf *stnrv1.StunnerConfig) *stnrv1.StunnerConfig {
+	patcher := func(conf *stnrv2.StunnerConfig) *stnrv2.StunnerConfig {
 		conf.Auth.Realm = "patched-" + conf.Auth.Realm
 		return conf
 	}
@@ -420,17 +420,17 @@ func collectConfigs(ch chan *Config, count int, timeout time.Duration) []*Config
 	return configs
 }
 
-func testConfig(realm string) *stnrv1.StunnerConfig {
-	c := &stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin:      stnrv1.AdminConfig{Name: "dummy/dummy"},
-		Auth: stnrv1.AuthConfig{
+func testConfig(realm string) *stnrv2.StunnerConfig {
+	c := &stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin:      stnrv2.AdminConfig{Name: "dummy/dummy"},
+		Auth: stnrv2.AuthConfig{
 			Type:        "static",
 			Realm:       realm,
 			Credentials: map[string]string{"username": "dummy-username", "password": "dummy-password"},
 		},
-		Listeners: []stnrv1.ListenerConfig{},
-		Clusters:  []stnrv1.ClusterConfig{},
+		Listeners: []stnrv2.ListenerConfig{},
+		Clusters:  []stnrv2.ClusterConfig{},
 	}
 	_ = c.Validate() // make sure deepeq works
 	return c

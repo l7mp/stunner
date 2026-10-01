@@ -7,7 +7,7 @@ import (
 
 	"github.com/l7mp/stunner/v2/pkg/config/server/api"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 type ConfigList = api.V1ConfigList
@@ -26,7 +26,7 @@ func (s *Server) ListV1Configs(ctx context.Context, request api.ListV1ConfigsReq
 	s.log.V(1).Info("handling ListV1Configs API call")
 
 	configs := s.configs.Snapshot() // deepcopies
-	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
+	response := ConfigList{Version: stnrv2.ApiVersion, Items: []stnrv2.StunnerConfig{}}
 	for _, c := range configs {
 		response.Items = append(response.Items, *c.Config)
 	}
@@ -41,7 +41,7 @@ func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1C
 	s.log.V(1).Info("handling ListV1ConfigsNamespace API call", "namespace", request.Namespace)
 
 	configs := s.configs.Snapshot() // deepcopies
-	response := ConfigList{Version: "v1", Items: []stnrv1.StunnerConfig{}}
+	response := ConfigList{Version: stnrv2.ApiVersion, Items: []stnrv2.StunnerConfig{}}
 	for _, c := range configs {
 		if c.Namespace == request.Namespace {
 			response.Items = append(response.Items, *c.Config)

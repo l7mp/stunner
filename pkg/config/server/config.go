@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // ClientFilter lets a client to filter push notifications.
@@ -20,7 +20,7 @@ func NamespacedName(id string) (string, string, bool) {
 
 type Config struct {
 	Namespace, Name string
-	Config          *stnrv1.StunnerConfig
+	Config          *stnrv2.StunnerConfig
 }
 
 func (c *Config) String() string {

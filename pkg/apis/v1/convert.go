@@ -95,11 +95,12 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 }
 
 // ConvertCluster converts a v1 cluster, given the v1 listeners of its config. The cluster gets the
-// addresses of the listeners routing to it as relay addresses, the first one per family in
-// listener order, and the routing policy of the first of them: FILTER behind a TURN listener,
-// ROUND_ROBIN behind any other (a cluster behind both kinds keeps the first, and the other server
-// skips it). A TURN-* cluster becomes a UDP cluster tunnelled through the cluster's TURN server,
-// and admits every peer, so its endpoints convert to the catch-all prefixes.
+// addresses of the listeners routing to it as relay addresses, the first IP per family in listener
+// order and any non-IP address (an environment variable or a placeholder) as it is, and the
+// routing policy of the first of them: FILTER behind a TURN listener, ROUND_ROBIN behind any other
+// (a cluster behind both kinds keeps the first, and the other server skips it). A TURN-* cluster
+// becomes a UDP cluster tunnelled through the cluster's TURN server, and admits every peer, so its
+// endpoints convert to the catch-all prefixes.
 func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.ClusterConfig, error) {
 	proto, _ := NewClusterProtocol(cl.Protocol)
 
@@ -136,7 +137,9 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 	}
 
 	// the relay addresses: the first IP of each family among the addresses of the listeners
-	// routing to the cluster; an unspecified address advertises nothing
+	// routing to the cluster, and every other address once, as it is (an environment variable
+	// such as $STUNNER_ADDR, resolved where the config is loaded, or the operator's node address
+	// placeholder); an unspecified address advertises nothing
 	v4, v6 := false, false
 	for _, l := range listeners {
 		if !slices.Contains(l.Routes, cl.Name) {
@@ -155,6 +158,8 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 		for _, a := range addrs {
 			ip := net.ParseIP(a)
 			switch {
+			case ip == nil && !slices.Contains(cluster.Addrs, a):
+				cluster.Addrs = append(cluster.Addrs, a)
 			case ip == nil || ip.IsUnspecified():
 			case ip.To4() != nil && !v4:
 				cluster.Addrs, v4 = append(cluster.Addrs, a), true

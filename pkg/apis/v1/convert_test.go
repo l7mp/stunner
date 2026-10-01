@@ -161,6 +161,15 @@ func TestConvertCluster(t *testing.T) {
 	assert.Equal(t, []string{"10.2.0.1:5000"}, c.Endpoints)
 	assert.Equal(t, []string{"10.0.0.9", "fd00::1"}, c.Addrs, "the first address per family")
 
+	// an address that is no IP is kept as it is, once: it is resolved where the config is loaded
+	c, err = ConvertCluster(ClusterConfig{Name: "env"}, []ListenerConfig{
+		{Name: "a", Protocol: "TURN-UDP", Addr: "$STUNNER_ADDR", Routes: []string{"env"}},
+		{Name: "b", Protocol: "TURN-TCP", Addr: "$STUNNER_ADDR", Addrs: []string{"$STUNNER_ADDRS"},
+			Routes: []string{"env"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"$STUNNER_ADDR", "$STUNNER_ADDRS"}, c.Addrs)
+
 	c, err = ConvertCluster(ClusterConfig{Name: "orphan"}, listeners)
 	require.NoError(t, err)
 	assert.Empty(t, c.RoutingPolicy, "no listener routes to it: the v2 default applies")

@@ -8,11 +8,13 @@ import (
 	"net"
 	"net/http"
 
+	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
+
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
 	"github.com/l7mp/stunner/v2/pkg/config/server/api"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 var (
@@ -22,7 +24,7 @@ var (
 )
 
 // ConfigNodePatcher is a callback to patch config updates per node name.
-type ConfigNodePatcher func(conf *stnrv1.StunnerConfig, node string) *stnrv1.StunnerConfig
+type ConfigNodePatcher func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig
 
 // Server is a generic config discovery server implementation.
 type Server struct {
@@ -39,7 +41,7 @@ type Server struct {
 // New creates a new config discovery server instance for the specified address.
 func New(addr string, patch ConfigNodePatcher, logger logr.Logger) *Server {
 	if addr == "" {
-		addr = stnrv1.DefaultConfigDiscoveryAddress
+		addr = stnrv2.DefaultConfigDiscoveryAddress
 	}
 
 	return &Server{
@@ -123,7 +125,7 @@ func (s *Server) PushNodeConfig(node string) {
 	s.configs.Push(node)
 }
 
-func (s *Server) UpsertConfig(id string, c *stnrv1.StunnerConfig) {
+func (s *Server) UpsertConfig(id string, c *stnrv2.StunnerConfig) {
 	s.log.V(4).Info("upserting config", "config-id", id, "config", c.String())
 	if namespace, name, ok := NamespacedName(id); ok {
 		s.configs.Upsert(namespace, name, c)
@@ -144,22 +146,8 @@ func (s *Server) DeleteConfig(id string) {
 		return
 	}
 
-	// the zero config clients recognize as a deletion: the operator speaks v1, so does this
-	// server; clients convert it like any other config
-	config := &stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin:      stnrv1.AdminConfig{Name: id},
-		Auth: stnrv1.AuthConfig{
-			Type:  "static",
-			Realm: stnrv1.DefaultRealm,
-			Credentials: map[string]string{
-				"username": "dummy-username",
-				"password": "dummy-password",
-			},
-		},
-		Listeners: []stnrv1.ListenerConfig{},
-		Clusters:  []stnrv1.ClusterConfig{},
-	}
+	// the zero config clients recognize as a deletion
+	config := cdsclient.ZeroConfig(id)
 	if SuppressConfigDeletion {
 		s.log.Info("suppressing config update for deleted config", "config-id", id)
 		config = nil

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Number if config updates that can be on-hold.
@@ -16,7 +16,7 @@ const SubscribeChannelBufferSize = 256
 type FilterFunc func(config *Config) bool
 
 // PatchFunc is a callback to patch config updates for a client.
-type PatchFunc func(conf *stnrv1.StunnerConfig) *stnrv1.StunnerConfig
+type PatchFunc func(conf *stnrv2.StunnerConfig) *stnrv2.StunnerConfig
 
 type Subscription[T comparable] struct {
 	topic   string
@@ -55,7 +55,7 @@ func (cs *ConfigStore[_]) Snapshot() []*Config {
 }
 
 // Upsert sets or updates a config and notifies subscribers.
-func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv1.StunnerConfig) {
+func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv2.StunnerConfig) {
 	// Suppress Upsert if there is no change
 	if c, ok := cs.Get(namespace, name); ok {
 		if c.Config.DeepEqual(stnrConfig) {
@@ -91,7 +91,7 @@ func (cs *ConfigStore[T]) Upsert(namespace, name string, stnrConfig *stnrv1.Stun
 
 // Delete removes the config from the store and optionally sends the supplied config (usually a
 // zero-config) to affected clients.
-func (cs *ConfigStore[T]) Delete(namespace, name string, stnrConfig *stnrv1.StunnerConfig) {
+func (cs *ConfigStore[T]) Delete(namespace, name string, stnrConfig *stnrv2.StunnerConfig) {
 	// Update the config
 	cs.mu.Lock()
 	if configs, exists := cs.configs[namespace]; exists {

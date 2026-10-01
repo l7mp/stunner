@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/config/server/api"
 )
 
@@ -38,7 +38,7 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 				filter = func(expectedNode string) bool {
 					return *param.Params.Node == expectedNode
 				}
-				patcher = func(conf *stnrv1.StunnerConfig) *stnrv1.StunnerConfig {
+				patcher = func(conf *stnrv2.StunnerConfig) *stnrv2.StunnerConfig {
 					return s.patcher(conf, *param.Params.Node)
 				}
 			}
@@ -142,7 +142,7 @@ func (s *Server) handleConn(reqCtx context.Context, wsConn *websocket.Conn, oper
 	}
 }
 
-func (s *Server) writeConfig(conn *Conn, c *stnrv1.StunnerConfig) {
+func (s *Server) writeConfig(conn *Conn, c *stnrv2.StunnerConfig) {
 	json, err := json.Marshal(c)
 	if err != nil {
 		s.log.Error(err, "Cannot JSON serialize config", "config", c.String())

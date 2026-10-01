@@ -163,17 +163,17 @@ components:
           items:
             $ref: '#/components/schemas/v1.Config'
     v1.LicenseStatus:
-      description: 'LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
-      x-go-type: "stunnerv1.LicenseStatus"
+      description: 'LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v2'
+      x-go-type: "stunnerv2.LicenseStatus"
       x-go-type-import:
-        name: stunnerv1
-        path: "github.com/l7mp/stunner/v2/pkg/apis/v1"
+        name: stunnerv2
+        path: "github.com/l7mp/stunner/v2/pkg/apis/v2"
     v1.Config:
-      description: 'Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1'
-      x-go-type: "stunnerv1.StunnerConfig"
+      description: 'Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v2'
+      x-go-type: "stunnerv2.StunnerConfig"
       x-go-type-import:
-        name: stunnerv1
-        path: "github.com/l7mp/stunner/v2/pkg/apis/v1"
+        name: stunnerv2
+        path: "github.com/l7mp/stunner/v2/pkg/apis/v2"
     v1.Error:
       description: API error.
       type: object

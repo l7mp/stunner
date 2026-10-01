@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/yaml"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 	cdsserver "github.com/l7mp/stunner/v2/pkg/config/server"
@@ -447,11 +446,13 @@ func TestStunnerConfigPatcher(t *testing.T) {
 	testCDSAddr := "localhost:63479"
 	log.Debugf("create server on %s", testCDSAddr)
 	// rewrite node address if requested
-	patcher := func(conf *stnrv1.StunnerConfig, node string) *stnrv1.StunnerConfig {
+	patcher := func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig {
 		if node != "" {
-			for i := range conf.Listeners {
-				if conf.Listeners[i].Addr == "STUNNER_NODE_ADDR" {
-					conf.Listeners[i].Addr = node
+			for i := range conf.Clusters {
+				for j, a := range conf.Clusters[i].Addrs {
+					if a == "STUNNER_NODE_ADDR" {
+						conf.Clusters[i].Addrs[j] = node
+					}
 				}
 			}
 		}
@@ -492,24 +493,24 @@ func TestStunnerConfigPatcher(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name   string
-		prep   func(c *stnrv1.StunnerConfig, t *testing.T)
+		prep   func(c *stnrv2.StunnerConfig, t *testing.T)
 		tester func(c *stnrv2.StunnerConfig) bool
 	}{{
 		name: "default",
-		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) {},
+		prep: func(c *stnrv2.StunnerConfig, _ *testing.T) {},
 		tester: func(c *stnrv2.StunnerConfig) bool {
 			return len(c.Clusters) == 1 && len(c.Clusters[0].Addrs) == 0
 		},
 	}, {
 		name: "default w/ IP",
-		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) { c.Listeners[0].Addr = "127.0.0.1" },
+		prep: func(c *stnrv2.StunnerConfig, _ *testing.T) { c.Clusters[0].Addrs = []string{"127.0.0.1"} },
 		tester: func(c *stnrv2.StunnerConfig) bool {
 			return len(c.Clusters) == 1 && len(c.Clusters[0].Addrs) == 1 &&
 				isHostLocal(c.Clusters[0].Addrs[0])
 		},
 	}, {
 		name: "node rewrite",
-		prep: func(c *stnrv1.StunnerConfig, _ *testing.T) { c.Listeners[0].Addr = "STUNNER_NODE_ADDR" },
+		prep: func(c *stnrv2.StunnerConfig, _ *testing.T) { c.Clusters[0].Addrs = []string{"STUNNER_NODE_ADDR"} },
 		tester: func(c *stnrv2.StunnerConfig) bool {
 			return len(c.Clusters) == 1 && len(c.Clusters[0].Addrs) == 1 &&
 				c.Clusters[0].Addrs[0] == "127.1.2.3"
@@ -519,26 +520,31 @@ func TestStunnerConfigPatcher(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
 
-			// the CDS server serves v1 configs, the client converts them to v2
-			config := &stnrv1.StunnerConfig{
-				ApiVersion: stnrv1.ApiVersion,
-				Admin: stnrv1.AdminConfig{
+			config := &stnrv2.StunnerConfig{
+				ApiVersion: stnrv2.ApiVersion,
+				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv1.AuthConfig{
+				Auth: stnrv2.AuthConfig{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
 				},
-				Listeners: []stnrv1.ListenerConfig{{
-					Name:   "default-listener",
-					Addr:   "0.0.0.0",
-					Routes: []string{"allow-any"},
+				Listeners: []stnrv2.ListenerConfig{{
+					Name:     "default-listener",
+					Protocol: "UDP",
+					Servers:  []string{"default-server"},
 				}},
-				Clusters: []stnrv1.ClusterConfig{{
+				Servers: []stnrv2.ServerConfig{{
+					Name:     "default-server",
+					Type:     "turn",
+					Clusters: []string{"allow-any"},
+				}},
+				Clusters: []stnrv2.ClusterConfig{{
 					Name:      "allow-any",
 					Endpoints: []string{"0.0.0.0/0"},
+					Protocol:  "UDP",
 				}},
 			}
 			testCase.prep(config, t)

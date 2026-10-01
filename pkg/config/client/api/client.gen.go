@@ -12,12 +12,12 @@ import (
 	"net/url"
 	"strings"
 
-	stunnerv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stunnerv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/oapi-codegen/runtime"
 )
 
-// V1Config Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
-type V1Config = stunnerv1.StunnerConfig
+// V1Config Config provides a STUNner config. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v2
+type V1Config = stunnerv2.StunnerConfig
 
 // V1ConfigList ConfigList is a list of Configs.
 type V1ConfigList struct {
@@ -37,8 +37,8 @@ type V1Error struct {
 	Message string `json:"message"`
 }
 
-// V1LicenseStatus LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v1
-type V1LicenseStatus = stunnerv1.LicenseStatus
+// V1LicenseStatus LicenseStatus provides the license status. Schema is defined in https://github.com/l7mp/stunner/tree/main/pkg/apis/v2
+type V1LicenseStatus = stunnerv2.LicenseStatus
 
 // ListV1ConfigsParams defines parameters for ListV1Configs.
 type ListV1ConfigsParams struct {
