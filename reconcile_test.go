@@ -1,10 +1,10 @@
 package stunner
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"sync"
 
 	// "strconv"
@@ -18,8 +18,9 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/resolver"
+	"github.com/l7mp/stunner/v2/internal/runtime"
 	objectturn "github.com/l7mp/stunner/v2/internal/server/turn"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -36,32 +37,39 @@ const (
 // *****************
 type StunnerReconcileTestConfig struct {
 	name   string
-	config stnrv1.StunnerConfig
+	config stnrv2.StunnerConfig
 	tester func(t *testing.T, s *Stunner, err error)
 }
 
 var testReconcileDefault = []StunnerReconcileTestConfig{
 	{
 		name: "reconcile-test: default admin",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -69,13 +77,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
 			// make sure we get the right loglevel, we may override this for debugging the tests
-			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
+			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
@@ -83,13 +91,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
-				stnrv1.DefaultRealm, "pass"), "auth handler ok")
+				stnrv2.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -97,135 +105,144 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
-			// listener  uses the open cluster for routing
-
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			// the server uses the open cluster
 		},
 	},
 	{
-		name: "reconcile-test: empty credentials errs: user",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		name: "reconcile-test: empty credentials are accepted: user",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			assert.ErrorContains(t, err, "empty username or password")
+			assert.NoError(t, err, "missing credentials are no config error: the TURN server refuses every client")
 		},
 	},
 	{
-		name: "reconcile-test: empty credentials errs: passwd",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		name: "reconcile-test: empty credentials are accepted: passwd",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			assert.ErrorContains(t, err, "empty username or password")
+			assert.NoError(t, err, "missing credentials are no config error: the TURN server refuses every client")
 		},
 	},
 	{
 		name: "reconcile-test: auth-type=none is OK",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "none",
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "empty username or password is OK with auth type none")
-			assert.Equal(t, stnrv1.AuthTypeNone, mustAuthType(t, s.GetAuth()))
-			authConfig, ok := s.GetAuth().GetConfig().(*stnrv1.AuthConfig)
+			assert.Equal(t, stnrv2.AuthTypeNone, mustAuthType(t, s.GetAuth()))
+			authConfig, ok := s.GetAuth().GetConfig().(*stnrv2.AuthConfig)
 			assert.True(t, ok)
 			assert.Empty(t, authConfig.Credentials)
 		},
 	},
 	{
 		name: "reconcile-test: empty listener is fine",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters: []stnrv1.ClusterConfig{{
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -235,24 +252,31 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	},
 	{
 		name: "reconcile-test: empty listener name errs",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{""},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -261,23 +285,29 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	},
 	{
 		name: "reconcile-test: empty cluster is fine",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "no restart needed")
@@ -285,24 +315,32 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	},
 	{
 		name: "reconcile-test: empty cluster name errs",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -313,26 +351,33 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	/// admin
 	{
 		name: "reconcile-test: reconcile name",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				Name:     "new-name",
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -343,11 +388,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), "new-name", "stunner name")
-			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
+			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
@@ -355,13 +400,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
-				stnrv1.DefaultRealm, "pass"), "auth handler ok")
+				stnrv2.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -369,58 +414,50 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile loglevel",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: "anything",
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -434,7 +471,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
@@ -442,13 +479,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
-				stnrv1.DefaultRealm, "pass"), "auth handler ok")
+				stnrv2.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -456,65 +493,57 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile metrics_endpoint",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel:        "anything",
 				MetricsEndpoint: "http://0.0.0.0:8080/metrics",
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// metrics endpoint changed: the metrics server restart is reported
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Contains(t, e.Objects, "metrics: default-metrics", "restarted object")
 
@@ -522,14 +551,14 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
-			// assert.Equal(t, admin.LogLevel, stnrv1.DefaultLogLevel, "stunner loglevel")
-			adminConf := admin.GetConfig().(*stnrv1.AdminConfig)
+			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
+			adminConf := admin.GetConfig().(*stnrv2.AdminConfig)
 			assert.Equal(t, adminConf.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
 
 			assert.NotNil(t, s.GetAuth(), "authManager keys")
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
@@ -537,13 +566,13 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
-				stnrv1.DefaultRealm, "pass"), "auth handler ok")
+				stnrv2.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -551,59 +580,51 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	/// auth
 	{
 		name: "reconcile-test: reconcile staticauth name",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "newuser",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -611,7 +632,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "newuser", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "pass", "password ok")
@@ -619,17 +640,17 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "newuser",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "newuser", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("newuser",
-				stnrv1.DefaultRealm, "pass"), "auth handler ok")
+				stnrv2.DefaultRealm, "pass"), "auth handler ok")
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -638,58 +659,50 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile static auth passwd",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "newpass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -697,7 +710,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
 			assert.Equal(t, authCreds(t, auth)["password"], "newpass", "password ok")
@@ -705,17 +718,17 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: "user",
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 			assert.Equal(t, "user", userID, "authHandler userID ok")
 			assert.Equal(t, key, a12n.GenerateAuthKey("user",
-				stnrv1.DefaultRealm, "newpass"), "auth handler ok")
+				stnrv2.DefaultRealm, "newpass"), "auth handler ok")
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -724,58 +737,50 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile ephemeral auth",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "newsecret",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -783,7 +788,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "no restart needed")
 
 			auth := s.GetAuth()
-			assert.Equal(t, stnrv1.AuthTypeEphemeral, mustAuthType(t, auth), "auth type ok")
+			assert.Equal(t, stnrv2.AuthTypeEphemeral, mustAuthType(t, auth), "auth type ok")
 			assert.Equal(t, authCreds(t, auth)["secret"], "newsecret")
 
 			duration, _ := time.ParseDuration("10h")
@@ -794,12 +799,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			handler := newAuthHandler(s)
 			userID, key, ok := callAuthHandler(t, handler, &turn.RequestAttributes{
 				Username: username,
-				Realm:    stnrv1.DefaultRealm,
+				Realm:    stnrv2.DefaultRealm,
 				SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
 			})
 			assert.True(t, ok, "authHandler key ok")
 
-			key2 := a12n.GenerateAuthKey(username, stnrv1.DefaultRealm, passwd)
+			key2 := a12n.GenerateAuthKey(username, stnrv2.DefaultRealm, passwd)
 			assert.Equal(t, key, key2, "authHandler key matches")
 
 			// userID must be the parsed user-id portion ("dummy_user")
@@ -807,7 +812,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
@@ -816,67 +821,58 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener  uses the open cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	/// listener
 	{
 		name: "reconcile-test: reconcile existing listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
-				Protocol: "turn-tcp",
+				Protocol: "TCP",
+				Servers:  []string{"default-server"},
 				Addr:     "127.0.0.2",
 				Port:     12345,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// requires a restart!
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
@@ -887,65 +883,57 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTCP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, 12345, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "server cluster count ok")
 			// sorted!!!
-			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
-			assert.Equal(t, mustAdminName(t, admin), stnrv1.DefaultStunnerName, "stunner name")
+			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener uses the old cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: rename listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "renamed-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "renamed-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"renamed-listener"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "renamed-listener",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -956,41 +944,42 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("renamed-listener")
 			assert.NotNil(t, l, "renamed listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, "allow-any", listenerConf(t, l).Routes[0], "listener route name ok")
-
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, "allow-any", serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "server cluster name ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile new listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "newlistener",
-				Protocol: "turn-tcp",
+				Protocol: "TCP",
+				Servers:  []string{"newlistener"},
 				Addr:     "127.0.0.2",
 				Port:     1,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "newlistener",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1006,93 +995,97 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTCP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "server cluster count ok")
 			// sorted!
-			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			// listener uses the old cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
-		name: "reconcile-test: empty TLS credentials errs",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		name: "reconcile-test: empty TLS credentials pass validation",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "newlistener",
-				Protocol: "turn-tls",
+				Protocol: "TLS",
+				Servers:  []string{"newlistener"},
 				Addr:     "127.0.0.2",
 				Port:     1,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "newlistener",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			assert.ErrorContains(t, err, "empty TLS", "missing username")
+			// validation is syntactic: the listener fails when it starts, not here
+			assert.NoError(t, err, "reconcile")
+			assert.NotNil(t, s.GetListener("newlistener"), "listener created")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile additional listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}, {
 				Name:     "newlistener",
-				Protocol: "turn-tcp",
+				Protocol: "TCP",
+				Servers:  []string{"newlistener"},
 				Addr:     "127.0.0.2",
 				Port:     1,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}, {
+				Name:     "newlistener",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1104,97 +1097,80 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
-			// listener uses the old cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			// the server uses the old cluster
 
 			l = s.GetListener("newlistener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTCP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "server cluster count ok")
 			// sorted!
-			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
-
-			p = newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
-
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile existing listener with TLS cert and add a new one",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
-				Protocol: "TURN-DTLS",
+				Protocol: "DTLS",
+				Servers:  []string{"default-server"},
 				Cert:     dummyCert64,
 				Key:      dummyKey64,
-				Routes:   []string{"allow-any"},
 			}, {
 				Name:     "newlistener",
-				Protocol: "turn-tcp",
+				Protocol: "TCP",
+				Servers:  []string{"newlistener"},
 				Addr:     "127.0.0.2",
 				Port:     1,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}, {
+				Name:     "newlistener",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// default-listener restarts
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
@@ -1204,99 +1180,82 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNDTLS.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolDTLS.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Cert), []byte("dummy-cert")), 0, "listener cert ok")
-			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Key), []byte("dummy-key")), 0, "listener key ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Cert, dummyCert64, "listener cert ok")
+			assert.Equal(t, listenerConf(t, l).Key, dummyKey64, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
-			// listener uses the old cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			// the server uses the old cluster
 
 			l = s.GetListener("newlistener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTCP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "server cluster count ok")
 			// sorted!
-			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
-
-			p = newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
-
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile existing listener with TLS cert and add a new one",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
-				Protocol: "TURN-TLS",
+				Protocol: "TLS",
+				Servers:  []string{"default-server"},
 				Cert:     dummyCert64,
 				Key:      dummyKey64,
-				Routes:   []string{"allow-any"},
 			}, {
 				Name:     "newlistener",
-				Protocol: "turn-tcp",
+				Protocol: "TCP",
+				Servers:  []string{"newlistener"},
 				Addr:     "127.0.0.2",
 				Port:     1,
-				Routes:   []string{"none", "dummy"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}, {
+				Name:     "newlistener",
+				Type:     "turn",
+				Clusters: []string{"none", "dummy"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// default-listener restarts
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "listener: default-listener")
@@ -1306,87 +1265,66 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTLS.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTLS.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Cert), []byte("dummy-cert")), 0, "listener cert ok")
-			assert.Equal(t, bytes.Compare([]byte(listenerConf(t, l).Key), []byte("dummy-key")), 0, "listener key ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Equal(t, listenerConf(t, l).Cert, dummyCert64, "listener cert ok")
+			assert.Equal(t, listenerConf(t, l).Key, dummyKey64, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
-			// listener uses the old cluster for routing
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			// the server uses the old cluster
 
 			l = s.GetListener("newlistener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNTCP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTCP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.2", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, 1, "listener port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "listener route count ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "server cluster count ok")
 			// sorted!
-			assert.Equal(t, listenerConf(t, l).Routes[0], "dummy", "listener route name ok")
-			assert.Equal(t, listenerConf(t, l).Routes[1], "none", "listener route name ok")
-
-			p = newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
-
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile existing listener with new public IP and port",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
-				Protocol:   "TURN-UDP",
+				Protocol:   "UDP",
+				Servers:    []string{"default-server"},
 				PublicAddr: "127.0.0.2",
 				PublicPort: 33478,
-				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1398,40 +1336,41 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
-			assert.Equal(t, listenerConf(t, l).Protocol, stnrv1.ListenerProtocolTURNUDP.String(), "listener proto ok")
+			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolUDP.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Port, stnrv1.DefaultPort, "listener port ok")
+			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Equal(t, listenerConf(t, l).PublicAddr, "127.0.0.2", "listener public address ok")
 			assert.Equal(t, listenerConf(t, l).PublicPort, 33478, "listener public port ok")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, listenerConf(t, l).Routes[0], "allow-any", "listener route name ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile deleted listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters: []stnrv1.ClusterConfig{{
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1451,78 +1390,76 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	/// cluster
 	{
 		name: "reconcile-test: reconcile existing cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			_, n, _ := net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: rename cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"renamed-cluster"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"renamed-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "renamed-cluster",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1533,49 +1470,50 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("renamed-cluster")
 			assert.NotNil(t, c, "renamed cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
-			assert.Len(t, listenerConf(t, l).Routes, 1, "listener route count ok")
-			assert.Equal(t, "renamed-cluster", listenerConf(t, l).Routes[0], "listener route name ok")
-
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
+			assert.Equal(t, "renamed-cluster", serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "server cluster name ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile new cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.Nil(t, c, "cluster found")
@@ -1583,56 +1521,46 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			_, n, _ := net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-
-			// listener still uses the old cluster for routing
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile cluster with port range",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1:<1-2>", "2.2.2.2/8:<3-4>"},
+				Endpoints: []string{"1.1.1.1:1-2", "2.2.2.2/8:3-4"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 1, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.Nil(t, c, "cluster found")
@@ -1640,302 +1568,228 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:<1-2>", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.0.0.0/8:<3-4>", "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-
-			// listener still uses the old cluster for routing
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:1-2", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8:3-4", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile additional cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Protocol:  "UDP",
 			}, {
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			_, n, _ = net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
-
-			// listener still uses the old open cluster for routing
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile additional cluster and reroute",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"newcluster"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"newcluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Protocol:  "UDP",
 			}, {
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// only routes have changed, we shouldn't need a restart
+			// only clusters have changed, we shouldn't need a restart
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			_, n, _ = net.ParseCIDR("2.2.2.2/8")
-			assert.Equal(t, clusterEndpoints(t, c)[1], n.String(), "cluster endpoint ok")
-
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile port-range",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"newcluster"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"newcluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1:<1-2>", "2.2.2.2/8:<3-4>"},
+				Endpoints: []string{"1.1.1.1:1-2", "2.2.2.2/8:3-4"},
+				Protocol:  "UDP",
 			}, {
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
-			// only routes have changed, we shouldn't need a restart
+			// only clusters have changed, we shouldn't need a restart
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 2, "clusterManager keys")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
 			c := s.GetCluster("allow-any")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("0.0.0.0/0")
-			assert.Equal(t, clusterEndpoints(t, c)[0], n.String(), "cluster endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster mode ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:<1-2>", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.0.0.0/8:<3-4>", "cluster endpoint ok")
-
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 ok")
-			assert.True(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
-
-			assert.True(t, c.Admits(net.ParseIP("1.1.1.1"), 0), "route to 1.1.1.1 ok")
-			assert.False(t, c.Admits(net.ParseIP("1.1.1.2"), 0), "route to 1.1.1.2 fails")
-			assert.True(t, c.Admits(net.ParseIP("2.2.2.2"), 0), "route to 2.2.2.2 ok")
-			assert.True(t, c.Admits(net.ParseIP("2.128.3.3"), 0), "route to 2.128.3.3 ok")
-			assert.False(t, c.Admits(net.ParseIP("3.0.0.0"), 0), "route to 3.0.0.0 fails")
-
-			assert.True(t, c.Admits(net.ParseIP("1.1.1.1"), 1), "match 1.1.1.1:1 ok")
-			assert.True(t, c.Admits(net.ParseIP("1.1.1.1"), 2), "match 1.1.1.1:2 ok")
-			assert.False(t, c.Admits(net.ParseIP("1.1.1.1"), 3), "match 1.1.1.1:3 fails")
-
-			assert.False(t, c.Admits(net.ParseIP("1.1.1.2"), 1), "match 1.1.1.2 fails")
-
-			assert.True(t, c.Admits(net.ParseIP("2.2.2.2"), 3), "match 2.2.2.2:3 ok")
-			assert.True(t, c.Admits(net.ParseIP("2.2.2.2"), 4), "match 2.2.2.2:4 ok")
-			assert.False(t, c.Admits(net.ParseIP("2.2.2.2"), 5), "match 2.2.2.2:4 fails")
-
-			assert.True(t, c.Admits(net.ParseIP("2.128.3.3"), 3), "match 2.128.3.3:3 ok")
-			assert.True(t, c.Admits(net.ParseIP("2.128.3.3"), 4), "match 2.128.3.3:4 ok")
-			assert.False(t, c.Admits(net.ParseIP("2.128.3.3"), 5), "match 2.128.3.3:5 ok")
-
-			assert.False(t, c.Admits(net.ParseIP("3.0.0.0"), 1), "match 3.0.0.0 fails")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:1-2", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8:3-4", "cluster endpoint ok")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile deleted cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-any"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Len(t, s.GetClusters(), 0, "clusterManager keys")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			assert.NotNil(t, p, "permission handler exists")
-
-			// missing cluster, deny all IPs
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.1")), "route to 1.1.1.1 ok")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("1.1.1.2")), "route to 1.1.1.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.2.2.2")), "route to 2.2.2.2 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("2.128.3.3")), "route to 2.128.3.3 fails")
-			assert.False(t, p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234},
-				net.ParseIP("3.0.0.0")), "route to 3.0.0.0 fails")
+			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 0, "cluster keys")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile user quota",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				UserQuota: 12,
 				LogLevel:  stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
@@ -1945,28 +1799,29 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			c := a.GetConfig()
 			assert.NotNil(t, c, "admin-getconfig")
-			ca, ok := c.(*stnrv1.AdminConfig)
+			ca, ok := c.(*stnrv2.AdminConfig)
 			assert.True(t, ok, "adminconfig cast")
 			assert.Equal(t, 12, ca.UserQuota, "quota")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile offload mode",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				OffloadEngine: "XDP",
 				LogLevel:      stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "none",
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.Error(t, err, "restarted") // changing the offload mode requires a restart
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "offload: default-offload")
@@ -1976,27 +1831,28 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			c := a.GetConfig()
 			assert.NotNil(t, c, "admin-getconfig")
-			ca, ok := c.(*stnrv1.AdminConfig)
+			ca, ok := c.(*stnrv2.AdminConfig)
 			assert.True(t, ok, "adminconfig cast")
 			assert.Equal(t, "XDP", ca.OffloadEngine, "offload")
 		},
 	},
 	{
 		name: "reconcile-test: reconcile offload interfaces (sorted)",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			// badly sorted
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				OffloadEngine:     "TC",
 				OffloadInterfaces: []string{"c", "a", "b"}, // badly sorted
 				LogLevel:          stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "none",
 			},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.Error(t, err, "restarted") // changing the offload interfaces requires a restart
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Len(t, e.Objects, 1, "restarted object")
 			assert.Contains(t, e.Objects, "offload: default-offload")
@@ -2006,100 +1862,91 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			c := a.GetConfig()
 			assert.NotNil(t, c, "admin-getconfig")
-			ca, ok := c.(*stnrv1.AdminConfig)
+			ca, ok := c.(*stnrv2.AdminConfig)
 			assert.True(t, ok, "adminconfig cast")
 			assert.Equal(t, "TC", ca.OffloadEngine, "offload")
 			assert.Equal(t, []string{"a", "b", "c"}, ca.OffloadInterfaces, "offload intfs")
 		},
 	},
 	{
-		name: "reconcile-test: TCP cluster routed by a TURN-TCP listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		name: "reconcile-test: TCP and UDP clusters on a TURN server behind a TCP listener",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "tcp",
-				Protocol: stnrv1.ListenerProtocolTURNTCP.String(),
+				Protocol: "TCP",
+				Servers:  []string{"tcp"},
 				Addr:     "127.0.0.1",
 				Port:     3478,
-				Routes:   []string{"tcp-cluster", "udp-cluster"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{
-				{
-					Name:      "tcp-cluster",
-					Type:      stnrv1.ClusterTypeStatic.String(),
-					Protocol:  stnrv1.ClusterProtocolTCP.String(),
-					Endpoints: []string{"1.1.1.1", "2.2.2.0/24"},
-				},
-				{
-					Name:      "udp-cluster",
-					Type:      stnrv1.ClusterTypeStatic.String(),
-					Protocol:  stnrv1.ClusterProtocolUDP.String(),
-					Endpoints: []string{"3.3.3.3"},
-				},
-			},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "tcp",
+				Type:     "turn",
+				Clusters: []string{"tcp-cluster", "udp-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "tcp-cluster",
+				Type:      stnrv2.ClusterTypeStatic.String(),
+				Endpoints: []string{"1.1.1.1", "2.2.2.0/24"},
+				Protocol:  stnrv2.ProtocolTCP.String(),
+			}, {
+				Name:      "udp-cluster",
+				Type:      stnrv2.ClusterTypeStatic.String(),
+				Endpoints: []string{"3.3.3.3"},
+				Protocol:  stnrv2.ProtocolUDP.String(),
+			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "reconcile")
 
-			// The cluster exposes the TCP protocol through its public config.
+			// The clusters expose their protocols through their public configs.
 			tcpCluster := s.GetCluster("tcp-cluster")
 			require.NotNil(t, tcpCluster, "tcp cluster present")
-			tcpConf, ok := tcpCluster.GetConfig().(*stnrv1.ClusterConfig)
+			tcpConf, ok := tcpCluster.GetConfig().(*stnrv2.ClusterConfig)
 			require.True(t, ok, "cluster config cast")
-			assert.Equal(t, stnrv1.ClusterProtocolTCP.String(), tcpConf.Protocol, "tcp cluster protocol")
-			assert.Equal(t, stnrv1.ClusterTypeStatic.String(), tcpConf.Type, "tcp cluster type")
-
-			// The cluster admits its endpoints (static IP and CIDR) and rejects others.
-			router := s.rt.Router
-			assert.True(t, tcpCluster.Admits(net.ParseIP("1.1.1.1"), 0), "admit static endpoint")
-			assert.True(t, tcpCluster.Admits(net.ParseIP("2.2.2.7"), 0), "admit CIDR endpoint")
-			assert.False(t, tcpCluster.Admits(net.ParseIP("9.9.9.9"), 0), "reject non-endpoint")
-
-			// Route resolution is protocol-scoped: TCP peer -> TCP cluster, UDP peer -> UDP cluster,
-			// and a TCP-cluster endpoint is not reachable over UDP (and vice versa).
-			cl, ok := router.RoutePeer("tcp", stnrv1.ClusterProtocolTCP, net.ParseIP("1.1.1.1"), 0)
-			assert.True(t, ok, "TCP route resolves")
-			assert.Equal(t, "tcp-cluster", cl, "TCP route -> tcp cluster")
-
-			cl, ok = router.RoutePeer("tcp", stnrv1.ClusterProtocolUDP, net.ParseIP("3.3.3.3"), 0)
-			assert.True(t, ok, "UDP route resolves")
-			assert.Equal(t, "udp-cluster", cl, "UDP route -> udp cluster")
-
-			_, ok = router.RoutePeer("tcp", stnrv1.ClusterProtocolTCP, net.ParseIP("3.3.3.3"), 0)
-			assert.False(t, ok, "udp-cluster endpoint not reachable over TCP")
-			_, ok = router.RoutePeer("tcp", stnrv1.ClusterProtocolUDP, net.ParseIP("1.1.1.1"), 0)
-			assert.False(t, ok, "tcp-cluster endpoint not reachable over UDP")
+			assert.Equal(t, stnrv2.ProtocolTCP.String(), tcpConf.Protocol, "tcp cluster protocol")
+			udpCluster := s.GetCluster("udp-cluster")
+			require.NotNil(t, udpCluster, "udp cluster present")
+			udpConf, ok := udpCluster.GetConfig().(*stnrv2.ClusterConfig)
+			require.True(t, ok, "cluster config cast")
+			assert.Equal(t, stnrv2.ProtocolUDP.String(), udpConf.Protocol, "udp cluster protocol")
 		},
 	},
 	// IPv6: listener address.
 	{
 		name: "reconcile-test: IPv6 listener address",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "2001:db8::1",
-				Protocol: "TURN-UDP",
-				Routes:   []string{"allow-any"},
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// changing the listener address requires a restart
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Contains(t, e.Objects, "listener: default-listener", "restarted object")
 			l := s.GetListener("default-listener")
@@ -2110,23 +1957,29 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	// IPv6: listener public address on an IPv4 listener (mixed families across addr/public-addr).
 	{
 		name: "reconcile-test: IPv6 listener public address",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
-				Protocol:   "TURN-UDP",
+				Protocol:   "UDP",
+				Servers:    []string{"default-server"},
 				PublicAddr: "2001:db8::2",
 				PublicPort: 33478,
-				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2141,29 +1994,35 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	// IPv6: fully IPv6 listener with an IPv4 public address (the reverse mix).
 	{
 		name: "reconcile-test: IPv6 listener address with IPv4 public address",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "2001:db8::1",
-				Protocol:   "TURN-UDP",
+				Protocol:   "UDP",
+				Servers:    []string{"default-server"},
 				PublicAddr: "1.2.3.4",
 				PublicPort: 33478,
-				Routes:     []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// changing the listener address requires a restart
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Contains(t, e.Objects, "listener: default-listener", "restarted object")
 			l := s.GetListener("default-listener")
@@ -2175,54 +2034,62 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	// IPv6: fully-specified address in cluster endpoints (round-trips without a prefix length).
 	{
 		name: "reconcile-test: IPv6 cluster endpoint (fully-specified address)",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-some"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-some"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
 				Endpoints: []string{"2001:db8::1"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "reconcile")
 			c := s.GetCluster("allow-some")
 			require.NotNil(t, c, "cluster found")
-			assert.Equal(t, stnrv1.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
+			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			require.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
 			assert.Equal(t, "2001:db8::1", clusterEndpoints(t, c)[0], "cluster IPv6 endpoint ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			src := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234}
-			assert.True(t, p(src, net.ParseIP("2001:db8::1")), "route to 2001:db8::1 ok")
-			assert.False(t, p(src, net.ParseIP("2001:db8::2")), "route to 2001:db8::2 fails")
 		},
 	},
 	// IPv6: prefix in cluster endpoints.
 	{
 		name: "reconcile-test: IPv6 cluster endpoint (prefix)",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-some"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-some"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
 				Endpoints: []string{"2001:db8::/32"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2230,34 +2097,33 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			c := s.GetCluster("allow-some")
 			require.NotNil(t, c, "cluster found")
 			require.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			_, n, _ := net.ParseCIDR("2001:db8::/32")
-			assert.Equal(t, n.String(), clusterEndpoints(t, c)[0], "cluster IPv6 prefix ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			src := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234}
-			assert.True(t, p(src, net.ParseIP("2001:db8::5")), "route to 2001:db8::5 ok")
-			assert.True(t, p(src, net.ParseIP("2001:db8:ffff::1")), "route within prefix ok")
-			assert.False(t, p(src, net.ParseIP("2001:dead::1")), "route outside prefix fails")
+			assert.Equal(t, "2001:db8::/32", clusterEndpoints(t, c)[0], "cluster IPv6 prefix ok")
 		},
 	},
 	// IPv6: mixed IPv4/IPv6 endpoints in a single cluster; routing must match each family.
 	{
 		name: "reconcile-test: mixed IPv4/IPv6 cluster endpoints",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv1.AuthConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
-				Name:   "default-listener",
-				Addr:   "127.0.0.1",
-				Routes: []string{"allow-some"},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "default-listener",
+				Addr:     "127.0.0.1",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-some"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
 				Endpoints: []string{"1.1.1.1", "2001:db8::/32"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2266,50 +2132,47 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			require.NotNil(t, c, "cluster found")
 			require.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, "1.1.1.1", clusterEndpoints(t, c)[0], "cluster IPv4 endpoint ok")
-			_, n, _ := net.ParseCIDR("2001:db8::/32")
-			assert.Equal(t, n.String(), clusterEndpoints(t, c)[1], "cluster IPv6 prefix ok")
-
-			l := s.GetListener("default-listener")
-			p := newPermissionHandler(s, l)
-			src := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1234}
-			assert.True(t, p(src, net.ParseIP("1.1.1.1")), "route to IPv4 1.1.1.1 ok")
-			assert.False(t, p(src, net.ParseIP("2.2.2.2")), "route to IPv4 2.2.2.2 fails")
-			assert.True(t, p(src, net.ParseIP("2001:db8::5")), "route to IPv6 2001:db8::5 ok")
-			assert.False(t, p(src, net.ParseIP("2001:dead::1")), "route to IPv6 2001:dead::1 fails")
+			assert.Equal(t, "2001:db8::/32", clusterEndpoints(t, c)[1], "cluster IPv6 prefix ok")
 		},
 	},
 	{
 		name: "reconcile-test: TLS listener PQC mode",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
-				Protocol: "turn-tls",
+				Protocol: "TLS",
+				Servers:  []string{"default-server"},
 				Addr:     "127.0.0.1",
 				Port:     3478,
-				Key:      "ZHVtbXkK", // base64: dummy
-				Cert:     "ZHVtbXkK", // base64: dummy
+				Key:      "ZHVtbXkK",
+				Cert:     "ZHVtbXkK",
 				PQCMode:  "Preferred",
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			// the protocol changed: restarted, and the mode is parsed and normalized
 			assert.Error(t, err, "restarted")
-			e, ok := err.(stnrv1.ErrRestarted)
+			e, ok := err.(stnrv2.ErrRestarted)
 			assert.True(t, ok, "restarted status")
 			assert.Contains(t, e.Objects, "listener: default-listener", "restarted object")
 
@@ -2318,36 +2181,50 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, "preferred", listenerConf(t, l).PQCMode, "pqc mode normalized")
 			assert.Contains(t, l.Status().String(), "pqc=preferred", "pqc mode in status")
 
-			tlsConf := func(mode string, routes ...string) *stnrv1.StunnerConfig {
-				return &stnrv1.StunnerConfig{
-					ApiVersion: stnrv1.ApiVersion,
-					Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel},
-					Auth: stnrv1.AuthConfig{Credentials: map[string]string{
+			tlsConf := func(mode string, clusters ...string) *stnrv2.StunnerConfig {
+				return &stnrv2.StunnerConfig{
+					ApiVersion: stnrv2.ApiVersion,
+					Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+					Auth: stnrv2.AuthConfig{Credentials: map[string]string{
 						"username": "user", "password": "pass"}},
-					Listeners: []stnrv1.ListenerConfig{{
-						Name: "default-listener", Protocol: "turn-tls", Addr: "127.0.0.1",
-						Port: 3478, Key: "ZHVtbXkK", Cert: "ZHVtbXkK", PQCMode: mode,
-						Routes: routes,
+					Listeners: []stnrv2.ListenerConfig{{
+						Name:     "default-listener",
+						Protocol: "TLS",
+						Servers:  []string{"default-server"},
+						Addr:     "127.0.0.1",
+						Port:     3478,
+						Key:      "ZHVtbXkK",
+						Cert:     "ZHVtbXkK",
+						PQCMode:  mode,
 					}},
-					Clusters: []stnrv1.ClusterConfig{{Name: "allow-any", Endpoints: []string{"0.0.0.0/0"}}},
+					Servers: []stnrv2.ServerConfig{{
+						Name:     "default-server",
+						Type:     "turn",
+						Clusters: clusters,
+					}},
+					Clusters: []stnrv2.ClusterConfig{{
+						Name:      "allow-any",
+						Endpoints: []string{"0.0.0.0/0"},
+						Protocol:  "UDP",
+					}},
 				}
 			}
 
 			// a mode change restarts the listener, and only the listener
 			err = s.Reconcile(tlsConf("enforced", "allow-any"))
-			e, ok = err.(stnrv1.ErrRestarted)
+			e, ok = err.(stnrv2.ErrRestarted)
 			require.True(t, ok, "mode change: restarted status")
 			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "mode change: restarted object")
 			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "mode change applied")
 
-			// the same mode with a route change reconciles in place
-			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any", "dummy")), "route change: no restart")
-			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "route change: mode kept")
-			assert.Len(t, listenerConf(t, l).Routes, 2, "route change applied")
+			// the same mode with a cluster change reconciles in place
+			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any", "dummy")), "cluster change: no restart")
+			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "cluster change: mode kept")
+			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "cluster change applied")
 
 			// back to the default mode: a restart, and the default is the empty string
 			err = s.Reconcile(tlsConf("Default", "allow-any", "dummy"))
-			e, ok = err.(stnrv1.ErrRestarted)
+			e, ok = err.(stnrv2.ErrRestarted)
 			require.True(t, ok, "default mode: restarted status")
 			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "default mode: restarted object")
 			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode normalized to empty")
@@ -2357,28 +2234,23 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, s.Reconcile(tlsConf("", "allow-any", "dummy")), "omitted mode: no restart")
 			assert.NoError(t, s.Reconcile(tlsConf("default", "allow-any", "dummy")), "spelled-out default: no restart")
 
-			// the mode is TLS-only and must parse
-			udp := tlsConf("preferred", "allow-any", "dummy")
-			udp.Listeners[0].Protocol, udp.Listeners[0].Cert, udp.Listeners[0].Key = "turn-udp", "", ""
-			assert.ErrorContains(t, s.Reconcile(udp), "only TURN-TLS listeners", "pqc mode on a turn-udp listener")
+			// the mode must parse
 			assert.ErrorContains(t, s.Reconcile(tlsConf("quantum", "allow-any", "dummy")), "unknown PQC mode", "unknown mode")
-			dtls := tlsConf("enforced", "allow-any", "dummy")
-			dtls.Listeners[0].Protocol = "turn-dtls"
-			assert.ErrorContains(t, s.Reconcile(dtls), "only TURN-TLS listeners", "pqc mode on a turn-dtls listener")
-			assert.Empty(t, listenerConf(t, l).PQCMode, "rejected configs leave the listener alone")
+			assert.Empty(t, listenerConf(t, l).PQCMode, "a rejected config leaves the listener alone")
 
-			// the default mode is admissible on any protocol
-			udp.Listeners[0].PQCMode = "default"
-			_, ok = s.Reconcile(udp).(stnrv1.ErrRestarted)
-			assert.True(t, ok, "default mode on a turn-udp listener: restarted for the protocol change only")
-			assert.Equal(t, stnrv1.ListenerProtocolTURNUDP.String(), listenerConf(t, l).Protocol, "protocol change applied")
-			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode on a turn-udp listener")
+			// a listener of another protocol takes a mode and ignores it
+			udp := tlsConf("preferred", "allow-any", "dummy")
+			udp.Listeners[0].Protocol, udp.Listeners[0].Cert, udp.Listeners[0].Key = "UDP", "", ""
+			_, ok = s.Reconcile(udp).(stnrv2.ErrRestarted)
+			assert.True(t, ok, "a mode on a UDP listener: restarted for the protocol change")
+			assert.Equal(t, stnrv2.ProtocolUDP.String(), listenerConf(t, l).Protocol, "protocol change applied")
 		},
 	},
 }
 
 // start with default config and then reconcile with the given config
 func TestStunnerReconcile(t *testing.T) {
+
 	lim := test.TimeOut(time.Second * 60)
 	defer lim.Stop()
 
@@ -2396,6 +2268,10 @@ func TestStunnerReconcile(t *testing.T) {
 			conf, err := NewDefaultConfig("turn://user:pass@127.0.0.1:3478")
 			assert.NoError(t, err, err)
 			conf.Admin.LogLevel = stunnerTestLoglevel
+			// the test configs bind their listeners to the loopback and advertise no relay
+			// address
+			conf.Listeners[0].Addr = "127.0.0.1"
+			conf.Clusters[0].Addrs = nil
 
 			log.Debug("creating a stunnerd")
 			s := NewStunner(Options{
@@ -2419,7 +2295,9 @@ func TestStunnerReconcile(t *testing.T) {
 			require.True(t, conf.Listeners[0].DeepEqual(
 				&runningConf.Listeners[0]), "default stunner listener config ok")
 
-			require.NotEmpty(t, conf.Clusters, "default conf cluster config")
+			require.NotEmpty(t, runningConf.Servers, "running conf server config")
+			require.True(t, conf.Servers[0].DeepEqual(
+				&runningConf.Servers[0]), "default stunner server config ok")
 			require.NotEmpty(t, runningConf.Clusters, "running conf cluster config")
 			require.True(t, conf.Clusters[0].DeepEqual(
 				&runningConf.Clusters[0]), "default stunner cluster config ok")
@@ -2435,8 +2313,8 @@ func TestStunnerReconcile(t *testing.T) {
 }
 
 // TestConcurrentReadsDuringReconcile asserts that lockless reads of the atomic snapshots
-// (Auth.conf, Listener.conf, Cluster.state) and the runtime.Router LRU caches stay race-free and
-// panic-free while reconciliation concurrently swaps configs and bounces listeners.
+// (Auth.conf, Listener.conf, Server.conf) and the cluster endpoints stay race-free and
+// panic-free while reconciliation concurrently swaps configs and bounces servers and listeners.
 func TestConcurrentReadsDuringReconcile(t *testing.T) {
 	s := NewStunner(Options{
 		DryRun:           true,
@@ -2475,11 +2353,10 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 					})
 				}
 
-				for _, l := range s.GetListeners() {
-					p := newPermissionHandler(s, l)
-					if p != nil {
-						_ = p(&net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000}, net.ParseIP("1.1.1.1"))
-					}
+				// the cluster endpoints the TURN permission handlers read, while
+				// reconciliation swaps them
+				if r := s.GetCluster("allow-any"); r != nil {
+					_, _, _ = r.Route(netip.MustParseAddrPort("10.0.0.1:1"))
 				}
 			}
 		}()
@@ -2505,10 +2382,12 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 
 type StunnerTestReconcileE2EConfig struct {
 	testName                                          string
-	config                                            stnrv1.StunnerConfig
+	config                                            stnrv2.StunnerConfig
 	echoServerAddr                                    string
 	errContains                                       string
 	bindSuccess, allocateSuccess, echoResult, restart bool
+	// restarted, when set, lists exactly the objects the reconcile restarts.
+	restarted []string
 }
 
 func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcileE2EConfig, rollback bool) {
@@ -2529,6 +2408,8 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	log.Debug("creating default stunner config")
 	conf, err := NewDefaultConfig("turn://user:pass@1.2.3.4:3478?transport=udp")
 	assert.NoError(t, err, err)
+	// the test configs bind their listeners to the pod address
+	conf.Listeners[0].Addr = "1.2.3.4"
 
 	conf.Admin.LogLevel = stunnerTestLoglevel
 	conf.Admin.MetricsEndpoint = ""
@@ -2564,12 +2445,14 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 				assert.ErrorContains(t, err, c.errContains, "starting server")
 			} else if c.restart {
 				assert.ErrorContains(t, err, "restart", "starting server")
+				if c.restarted != nil {
+					var restarted stnrv2.ErrRestarted
+					require.True(t, errors.As(err, &restarted), "restarted status")
+					assert.ElementsMatch(t, c.restarted, restarted.Objects, "restarted objects")
+				}
 			} else {
 				assert.NoError(t, err, "no restart")
 			}
-
-			// // make sure new clusters use the mockDns
-			// s.resolver.SetResolver(mockDns)
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -2577,7 +2460,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
 				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
-				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory, ""}
+				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory, "", nil}
 			stunnerEchoTest(testConfig)
 
 			time.Sleep(100 * time.Millisecond)
@@ -2592,23 +2475,29 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	{
 		testName: "empty server with no auth", // STUN-server mode
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "none",
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"default-server"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
 			}},
-			Clusters: []stnrv1.ClusterConfig{},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "default-server",
+				Type:     "turn",
+				Clusters: []string{},
+			}},
+			Clusters: []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: false,
@@ -2616,21 +2505,22 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "initial E2E reconcile test: empty server",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: false,
@@ -2638,29 +2528,32 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "adding a listener at the wrong port",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3480,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
@@ -2668,34 +2561,37 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "adding a cluster to a listener at the wrong port",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3480,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
@@ -2703,42 +2599,47 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "adding a listener at the right port",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3480,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -2746,85 +2647,96 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "changing the port in the wrong listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         true,
+		restarted:       []string{"listener: udp"},
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
 	},
 	{
 		testName: "changing static credentials to a wrong passwd",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "dummy",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: false,
@@ -2832,42 +2744,47 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "changing auth to ephemeral credentials errs",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "dummy",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: false,
@@ -2875,43 +2792,48 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "reverting good static credentials ok",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -2919,135 +2841,154 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "realm reset induces a server restart",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Realm: "dummy",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		echoServerAddr: "1.2.3.5:6678",
+		restart:        true,
+		// the listeners restart with their servers, only the servers are reported
+		restarted:       []string{"server: udp-ok", "server: udp"},
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
 	},
 	{
 		testName: "reverting the realm induces another server restart",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		echoServerAddr: "1.2.3.5:6678",
+		restart:        true,
+		// the listeners restart with their servers, only the servers are reported
+		restarted:       []string{"server: udp-ok", "server: udp"},
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
 	},
 	{
 		testName: "adding a cluster to the wrong IP",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}, {
 				Name:      "dummy-cluster",
 				Endpoints: []string{},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3055,42 +2996,47 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "removing working cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "dummy-cluster",
 				Endpoints: []string{},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3098,47 +3044,52 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "reintroducing good cluster to the wrong IP",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}, {
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3479,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}, {
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}, {
 				Name:      "dummy-cluster",
 				Endpoints: []string{},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3146,38 +3097,42 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "removing wrong listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}, {
 				Name:      "dummy-cluster",
 				Endpoints: []string{},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3185,40 +3140,42 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "correct the wrong cluster and remove the good one",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.10",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.10"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}, {
-				Name: "dummy-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+				Name:      "dummy-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3226,35 +3183,37 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "removing wrong cluster and reverting the working one",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3262,34 +3221,37 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "removing dangling cluster ref",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3297,34 +3259,37 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "adding port range to cluster ok",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5:<5678-5678>",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5:6678"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3332,34 +3297,37 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "extensing port range still ok",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Endpoints: []string{
-					"1.2.3.5:<1-10000>",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Endpoints: []string{"1.2.3.5:1-10000"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
@@ -3367,123 +3335,170 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "converting cluster to strict dns",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"echo-server-cluster",
-					"dummy-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "echo-server-cluster",
-				Type: "STRICT_DNS",
-				Endpoints: []string{
-					"echo-server.l7mp.io",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "echo-server-cluster",
+				Type:      "STRICT_DNS",
+				Endpoints: []string{"echo-server.l7mp.io"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
-		restart:         true,
+		echoServerAddr:  "1.2.3.5:6678",
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
 	},
 	{
 		testName: "rewiring to an open cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"open-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
-				Name: "open-cluster",
-				Endpoints: []string{
-					"0.0.0.0/0",
-				},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"open-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:      "open-cluster",
+				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
 		echoResult:      true,
 	},
 	{
+		// a cluster with no endpoints still makes relay sockets but admits no peer
 		testName: "closing open cluster",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes: []string{
-					"open-cluster",
-				},
 			}},
-			Clusters: []stnrv1.ClusterConfig{},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"open-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:     "open-cluster",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
+			}},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		allocateSuccess: true,
 		bindSuccess:     true,
 		echoResult:      false,
 	},
 	{
-		testName: "closing listener",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		// with no cluster the server has no transport to make a relay socket with
+		testName: "closing cluster",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:     "udp-ok",
+				Protocol: "UDP",
+				Servers:  []string{"udp-ok"},
+				Addr:     "1.2.3.4",
+				Port:     3478,
+			}},
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp-ok",
+				Type:     "turn",
+				Clusters: []string{"open-cluster"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
+		restart:         false,
+		allocateSuccess: false,
+		bindSuccess:     true,
+		echoResult:      false,
+	},
+	{
+		testName: "closing listener",
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
+				LogLevel: stunnerTestLoglevel,
+			},
+			Auth: stnrv2.AuthConfig{
+				Credentials: map[string]string{
+					"username": "user",
+					"password": "pass",
+				},
+			},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
+		},
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
 		bindSuccess:     false,
 		allocateSuccess: true,
@@ -3491,47 +3506,51 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 	},
 	{
 		testName: "changing the offload mode induces a restart",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				OffloadEngine: "XDP",
 				LogLevel:      stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         true,
+		restarted:       []string{"offload: default-offload"},
 		bindSuccess:     false,
 		allocateSuccess: false,
 		echoResult:      false,
 	},
 	{
 		testName: "changing offload interfaces induces a restart",
-		config: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		config: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				OffloadEngine:     "XDP",
 				OffloadInterfaces: []string{"eth0"},
 				LogLevel:          stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{},
-			Clusters:  []stnrv1.ClusterConfig{},
+			Listeners: []stnrv2.ListenerConfig{},
+			Servers:   []stnrv2.ServerConfig{},
+			Clusters:  []stnrv2.ClusterConfig{},
 		},
-		echoServerAddr:  "1.2.3.5:5678",
+		echoServerAddr:  "1.2.3.5:6678",
 		restart:         true,
+		restarted:       []string{"offload: default-offload"},
 		bindSuccess:     false,
 		allocateSuccess: false,
 		echoResult:      false,
@@ -3552,34 +3571,37 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 	"reconcile protocol": {
 		{
 			testName: "base config",
-			config: stnrv1.StunnerConfig{
-				ApiVersion: stnrv1.ApiVersion,
-				Admin: stnrv1.AdminConfig{
+			config: stnrv2.StunnerConfig{
+				ApiVersion: stnrv2.ApiVersion,
+				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv1.AuthConfig{
+				Auth: stnrv2.AuthConfig{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
 				},
-				Listeners: []stnrv1.ListenerConfig{{
+				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
-					Protocol: "turn-udp",
+					Protocol: "UDP",
+					Servers:  []string{"default-server"},
 					Addr:     "1.2.3.4",
 					Port:     3478,
-					Routes: []string{
-						"echo-server-cluster",
-					},
 				}},
-				Clusters: []stnrv1.ClusterConfig{{
-					Name: "echo-server-cluster",
-					Endpoints: []string{
-						"1.2.3.5",
-					},
+				Servers: []stnrv2.ServerConfig{{
+					Name:     "default-server",
+					Type:     "turn",
+					Clusters: []string{"echo-server-cluster"},
+				}},
+				Clusters: []stnrv2.ClusterConfig{{
+					Name:      "echo-server-cluster",
+					Endpoints: []string{"1.2.3.5"},
+					Protocol:  "UDP",
+					Addrs:     []string{"1.2.3.4"},
 				}},
 			},
-			echoServerAddr:  "1.2.3.5:5678",
+			echoServerAddr:  "1.2.3.5:6678",
 			restart:         false,
 			bindSuccess:     true,
 			allocateSuccess: true,
@@ -3589,36 +3611,39 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 			// this will trigger an error at a later stage of reconciliation that the
 			// validation phase cannot catch and cause a rollback
 			testName: "reconcile listener with an invalid TLS cert/key",
-			config: stnrv1.StunnerConfig{
-				ApiVersion: stnrv1.ApiVersion,
-				Admin: stnrv1.AdminConfig{
+			config: stnrv2.StunnerConfig{
+				ApiVersion: stnrv2.ApiVersion,
+				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv1.AuthConfig{
+				Auth: stnrv2.AuthConfig{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
 				},
-				Listeners: []stnrv1.ListenerConfig{{
+				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
-					Protocol: "turn-tls",
+					Protocol: "TLS",
+					Servers:  []string{"default-server"},
 					Addr:     "1.2.3.4",
 					Port:     3478,
-					Key:      "ZHVtbXkK", // base64: dummy
-					Cert:     "ZHVtbXkK", // base64: dummy
-					Routes: []string{
-						"echo-server-cluster",
-					},
+					Key:      "ZHVtbXkK",
+					Cert:     "ZHVtbXkK",
 				}},
-				Clusters: []stnrv1.ClusterConfig{{
-					Name: "echo-server-cluster",
-					Endpoints: []string{
-						"1.2.3.5",
-					},
+				Servers: []stnrv2.ServerConfig{{
+					Name:     "default-server",
+					Type:     "turn",
+					Clusters: []string{"echo-server-cluster"},
+				}},
+				Clusters: []stnrv2.ClusterConfig{{
+					Name:      "echo-server-cluster",
+					Endpoints: []string{"1.2.3.5"},
+					Protocol:  "UDP",
+					Addrs:     []string{"1.2.3.4"},
 				}},
 			},
-			echoServerAddr:  "1.2.3.5:5678",
+			echoServerAddr:  "1.2.3.5:6678",
 			errContains:     "cannot load cert/key pair",
 			restart:         true,
 			bindSuccess:     true,
@@ -3642,14 +3667,6 @@ func newAuthHandler(s *Stunner) a12n.AuthHandler {
 	return objectturn.NewAuthHandler(s.rt, s.log)
 }
 
-func newPermissionHandler(s *Stunner, l *object.Listener) a12n.PermissionHandler {
-	if l == nil {
-		return nil
-	}
-
-	return objectturn.NewPermissionHandler(l.Name(), s.rt, s.log)
-}
-
 func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
 	t.Helper()
 	if !assert.NotNil(t, h, "auth handler exists") {
@@ -3658,95 +3675,110 @@ func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttribute
 	return h(ra)
 }
 
-func mustAuthType(t *testing.T, auth *object.Auth) stnrv1.AuthType {
+func mustAuthType(t *testing.T, auth *object.Auth) stnrv2.AuthType {
 	t.Helper()
-	conf, ok := auth.GetConfig().(*stnrv1.AuthConfig)
+	conf, ok := auth.GetConfig().(*stnrv2.AuthConfig)
 	require.True(t, ok)
-	typ, err := stnrv1.NewAuthType(conf.Type)
+	typ, err := stnrv2.NewAuthType(conf.Type)
 	require.NoError(t, err)
 	return typ
 }
 
-func mustClusterType(t *testing.T, cluster *object.Cluster) stnrv1.ClusterType {
+func mustClusterType(t *testing.T, r *object.Cluster) stnrv2.ClusterType {
 	t.Helper()
-	conf, ok := cluster.GetConfig().(*stnrv1.ClusterConfig)
+	require.NotNil(t, r, "cluster found")
+	conf, ok := r.GetConfig().(*stnrv2.ClusterConfig)
 	require.True(t, ok)
-	typ, err := stnrv1.NewClusterType(conf.Type)
+	typ, err := stnrv2.NewClusterType(conf.Type)
 	require.NoError(t, err)
 	return typ
 }
 
-// clusterEndpoints returns a cluster's reconciled endpoints (or strict-DNS domains) via its
-// public config, used by tests as a proxy now that the cluster keeps no exported endpoint field.
-func clusterEndpoints(t *testing.T, c *object.Cluster) []string {
+// clusterEndpoints returns a cluster's reconciled endpoints via its public config.
+func clusterEndpoints(t *testing.T, r *object.Cluster) []string {
 	t.Helper()
-	conf, ok := c.GetConfig().(*stnrv1.ClusterConfig)
+	require.NotNil(t, r, "cluster found")
+	conf, ok := r.GetConfig().(*stnrv2.ClusterConfig)
 	require.True(t, ok)
 	return conf.Endpoints
 }
 
-// listenerConf returns a listener's reconciled config via its public snapshot, used by tests as a
-// proxy now that the listener keeps no exported fields.
-func listenerConf(t *testing.T, l *object.Listener) *stnrv1.ListenerConfig {
+// listenerConf returns a listener's reconciled config via its public snapshot.
+func listenerConf(t *testing.T, l *object.Listener) *stnrv2.ListenerConfig {
 	t.Helper()
-	conf, ok := l.GetConfig().(*stnrv1.ListenerConfig)
+	require.NotNil(t, l, "listener found")
+	conf, ok := l.GetConfig().(*stnrv2.ListenerConfig)
 	require.True(t, ok)
 	return conf
 }
 
-// authCreds returns an auth object's reconciled credentials via its public config, used by tests
-// as a proxy now that the auth object keeps no exported credential fields.
+// serverConf returns a server's reconciled config via its public snapshot.
+func serverConf(t *testing.T, srv *object.Server) *stnrv2.ServerConfig {
+	t.Helper()
+	require.NotNil(t, srv, "server found")
+	conf, ok := srv.GetConfig().(*stnrv2.ServerConfig)
+	require.True(t, ok)
+	return conf
+}
+
+// authCreds returns an auth object's reconciled credentials via its public config.
 func authCreds(t *testing.T, a *object.Auth) map[string]string {
 	t.Helper()
-	conf, ok := a.GetConfig().(*stnrv1.AuthConfig)
+	conf, ok := a.GetConfig().(*stnrv2.AuthConfig)
 	require.True(t, ok)
 	return conf.Credentials
 }
 
 func mustAdminName(t *testing.T, admin *object.Admin) string {
 	t.Helper()
-	conf, ok := admin.GetConfig().(*stnrv1.AdminConfig)
+	conf, ok := admin.GetConfig().(*stnrv2.AdminConfig)
 	require.True(t, ok)
 	return conf.Name
 }
 
-func makeRaceConfig(realm string) stnrv1.StunnerConfig {
-	return stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin: stnrv1.AdminConfig{
+func makeRaceConfig(realm string) stnrv2.StunnerConfig {
+	return stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin: stnrv2.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Auth: stnrv1.AuthConfig{
-			Type:  stnrv1.AuthTypeStatic.String(),
+		Auth: stnrv2.AuthConfig{
+			Type:  stnrv2.AuthTypeStatic.String(),
 			Realm: realm,
 			Credentials: map[string]string{
 				"username": "user",
 				"password": "pass",
 			},
 		},
-		Listeners: []stnrv1.ListenerConfig{{
+		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
-			Protocol: stnrv1.ListenerProtocolTURNUDP.String(),
+			Protocol: "UDP",
+			Servers:  []string{"default-server"},
 			Addr:     "127.0.0.1",
 			Port:     3478,
-			Routes:   []string{"allow-any"},
 		}},
-		Clusters: []stnrv1.ClusterConfig{{
+		Servers: []stnrv2.ServerConfig{{
+			Name:     "default-server",
+			Type:     "turn",
+			Clusters: []string{"allow-any"},
+		}},
+		Clusters: []stnrv2.ClusterConfig{{
 			Name:      "allow-any",
-			Type:      stnrv1.ClusterTypeStatic.String(),
-			Protocol:  stnrv1.ClusterProtocolUDP.String(),
+			Type:      stnrv2.ClusterTypeStatic.String(),
 			Endpoints: []string{"0.0.0.0/0"},
+			Protocol:  stnrv2.ProtocolUDP.String(),
+			Addrs:     []string{"127.0.0.1"},
 		}},
 	}
 }
 
-func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv1.StunnerConfig) {
+func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv2.StunnerConfig) {
 	t.Helper()
 	err := s.Reconcile(c)
 	if err == nil {
 		return
 	}
 
-	var restarted stnrv1.ErrRestarted
+	var restarted stnrv2.ErrRestarted
 	require.True(t, errors.As(err, &restarted), "unexpected reconcile error: %v", err)
 }

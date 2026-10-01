@@ -14,7 +14,7 @@ import (
 	"github.com/pion/turn/v5"
 	"github.com/stretchr/testify/assert"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -39,7 +39,7 @@ func longTermCredentials(username string, sharedSecret string) (string, error) {
 
 type StunnerTestAuthWithVnet struct {
 	testName   string
-	conf       stnrv1.StunnerConfig
+	conf       stnrv2.StunnerConfig
 	auth       func() (string, string)
 	clientAddr string
 }
@@ -48,28 +48,35 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	{
 		testName:   "static",
 		clientAddr: "1.1.1.1",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) { return "user1", "passwd1" },
@@ -77,54 +84,68 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	{
 		testName:   "default auth type: static",
 		clientAddr: "1.1.1.1",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) { return "user1", "passwd1" },
 	},
 	{
 		testName: "ephemeral - plain timestamp in username",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -134,27 +155,34 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "ephemeral - timestamp:userid in username",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -166,27 +194,34 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "ephemeral - userid:timestamp in username",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -198,27 +233,34 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 	},
 	{
 		testName: "ephemeral - userid:timestamp:ramdom-crap in username",
-		conf: stnrv1.StunnerConfig{
-			ApiVersion: stnrv1.ApiVersion,
-			Admin: stnrv1.AdminConfig{
+		conf: stnrv2.StunnerConfig{
+			ApiVersion: stnrv2.ApiVersion,
+			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv1.AuthConfig{
+			Auth: stnrv2.AuthConfig{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
 			},
-			Listeners: []stnrv1.ListenerConfig{{
+			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
-				Protocol: "turn-udp",
+				Protocol: "UDP",
+				Servers:  []string{"udp"},
 				Addr:     "1.2.3.4",
 				Port:     3478,
-				Routes:   []string{"allow-any"},
 			}},
-			Clusters: []stnrv1.ClusterConfig{{
+			Servers: []stnrv2.ServerConfig{{
+				Name:     "udp",
+				Type:     "turn",
+				Clusters: []string{"allow-any"},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
 				Endpoints: []string{"0.0.0.0/0"},
+				Protocol:  "UDP",
+				Addrs:     []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -268,7 +310,7 @@ func TestStunnerAuthServerVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				"1.2.3.5:5678", true, true, true, loggerFactory, ""}
+				"1.2.3.5:6678", true, true, true, loggerFactory, "", nil}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")

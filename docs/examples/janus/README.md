@@ -107,7 +107,7 @@ Janus Web tells the connected clients where to look for the Janus Gateway server
     var iceServers = [{urls: "turn:1.2.3.4:3478?transport=udp", username: "user-1", credential: "pass-1"}]
 ```
 
-This will make sure that Janus Web tells the clients to use STUNner as the STUN/TURN server. If unsure about the STUNner settings to use, you can always use the handy [`stunnerctl` CLI tool](/cmd/stunnerctl/README.md) to dump the running STUNner configuration.
+This will make sure that Janus Web tells the clients to use STUNner as the STUN/TURN server. If unsure about the STUNner settings to use, you can always use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration.
 
 ``` console
 stunnerctl -n stunner config udp-gateway

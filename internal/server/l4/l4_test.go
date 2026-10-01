@@ -12,14 +12,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/listener"
 	"github.com/l7mp/stunner/v2/internal/object"
 	quotapkg "github.com/l7mp/stunner/v2/internal/quota"
 	"github.com/l7mp/stunner/v2/internal/resolver"
-	"github.com/l7mp/stunner/v2/internal/router"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server/l4"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -52,68 +53,98 @@ func (q *spyQuota) snapshot() (incs, decs []string) {
 	return append([]string{}, q.incs...), append([]string{}, q.decs...)
 }
 
-// newTestRuntime builds a runtime with one plain listener and one cluster registered.
-func newTestRuntime(t *testing.T, lconf *stnrv1.ListenerConfig, cconf *stnrv1.ClusterConfig,
-	quota objruntime.QuotaHandler) *objruntime.Runtime {
-	t.Helper()
+// setup describes a test L4 server: its listener protocol, the protocol and the endpoints of the
+// cluster it names (no protocol: the cluster does not exist), and an optional quota handler.
+type setup struct {
+	listener  string
+	proto     string
+	endpoints []string
+	quota     objruntime.QuotaHandler
+}
 
+type testServer struct {
+	*object.Server
+	cluster *object.Cluster
+	port    int
+}
+
+// newTestServer starts an L4 server behind one listener on loopback.
+func newTestServer(t *testing.T, c setup) *testServer {
+	t.Helper()
 	log := logger.NewLoggerFactory("all:ERROR")
 	tm, err := telemetry.New(telemetry.Callbacks{}, true, log.NewLogger("telemetry"))
-	require.NoError(t, err, "telemetry")
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = tm.Close() })
-	n, err := stdnet.NewNet()
-	require.NoError(t, err, "stdnet")
-	rt := objruntime.New(objruntime.Config{
-		Logger:       log,
-		DryRun:       true,
-		Resolver:     resolver.NewMockResolver(map[string][]string{}, log),
-		Telemetry:    tm,
-		QuotaHandler: quota,
-		Net:          n,
-	})
-	rt.Router = router.NewRouter(rt)
+	nw, err := stdnet.NewNet()
+	require.NoError(t, err)
+	rt := objruntime.New(objruntime.Config{Logger: log, Telemetry: tm, Net: nw,
+		QuotaHandler: c.quota, Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
 	if rt.QuotaHandler == nil {
 		rt.QuotaHandler = quotapkg.New(rt)
 	}
 
-	cluster, err := object.NewCluster(cconf, rt)
-	require.NoError(t, err, "cluster")
-	require.NoError(t, rt.Registry.Add(cluster, nil), "register cluster")
+	// the server and its cluster, found by name through the registry
+	start := func(o objruntime.Object) {
+		require.NoError(t, rt.Registry.Add(o, nil))
+		require.NoError(t, o.Start())
+		t.Cleanup(func() { _ = o.Close(true) })
+	}
+	ts := &testServer{}
+	if c.proto != "" {
+		cl, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "peers", Endpoints: c.endpoints,
+			Protocol: c.proto, RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}, rt)
+		require.NoError(t, err)
+		start(cl)
+		ts.cluster = cl.(*object.Cluster)
+	}
+	srv, err := object.NewServer(&stnrv2.ServerConfig{Name: "l4", Type: "l4",
+		Clusters: []string{"peers"}}, rt)
+	require.NoError(t, err)
+	start(srv)
+	s := srv.(*object.Server)
 
-	listener, err := object.NewListener(lconf, rt)
-	require.NoError(t, err, "listener")
-	require.NoError(t, rt.Registry.Add(listener, nil), "register listener")
-
-	return rt
+	port := freePort(t, c.listener)
+	conf := &stnrv2.ListenerConfig{Name: "plain", Protocol: c.listener, Addr: "127.0.0.1",
+		Port: port, Servers: []string{"l4"}}
+	require.NoError(t, conf.Validate())
+	l, err := listener.New(conf, rt, func(conn api.Conn) {
+		if _, _, err := s.Serve(conn); err != nil {
+			_ = conn.Close()
+		}
+	})
+	require.NoError(t, err)
+	require.NoError(t, l.Start())
+	t.Cleanup(func() { _ = l.Close() })
+	ts.Server, ts.port = s, port
+	return ts
 }
 
-// newTestServer starts the flow engine over a fresh test runtime.
-func newTestServer(t *testing.T, lconf *stnrv1.ListenerConfig, cconf *stnrv1.ClusterConfig) *l4.Server {
+// setEndpoints reconciles the cluster with new endpoints.
+func (s *testServer) setEndpoints(t *testing.T, endpoints []string) {
 	t.Helper()
-	return startServer(t, newTestRuntime(t, lconf, cconf, nil), lconf.Name)
+	require.NoError(t, s.cluster.Reconcile(&stnrv2.ClusterConfig{Name: "peers",
+		Endpoints: endpoints, Protocol: s.cluster.Protocol().String(),
+		RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}))
 }
 
-func startServer(t *testing.T, rt *objruntime.Runtime, name string) *l4.Server {
+func (s *testServer) dial(t *testing.T, network string) net.Conn {
 	t.Helper()
-	conf := rt.GetConfig(objruntime.TypeListener, name).(*stnrv1.ListenerConfig)
-	proto, err := stnrv1.NewListenerProtocol(conf.Protocol)
-	require.NoError(t, err, "listener protocol")
-	s, err := l4.NewServer(name, proto, rt)
-	require.NoError(t, err, "flow engine")
-	t.Cleanup(func() { _ = s.Close() })
-	return s
+	c, err := net.Dial(network, net.JoinHostPort("127.0.0.1", strconv.Itoa(s.port))) //nolint:noctx
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = c.Close() })
+	return c
 }
 
-// freePort reserves a kernel-allocated port of the given network and releases it for reuse.
-func freePort(t *testing.T, network string) int {
+// freePort reserves a kernel-allocated port of the given listener protocol and releases it.
+func freePort(t *testing.T, proto string) int {
 	t.Helper()
-	if network == "udp" {
-		c, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if proto == "UDP" {
+		c, err := net.ListenPacket("udp", "127.0.0.1:0") //nolint:noctx
 		require.NoError(t, err)
 		defer func() { _ = c.Close() }()
 		return c.LocalAddr().(*net.UDPAddr).Port
 	}
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx
 	require.NoError(t, err)
 	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port
@@ -122,7 +153,7 @@ func freePort(t *testing.T, network string) int {
 // udpEcho starts a UDP echo peer and returns its address.
 func udpEcho(t *testing.T) *net.UDPAddr {
 	t.Helper()
-	c, err := net.ListenPacket("udp", "127.0.0.1:0")
+	c, err := net.ListenPacket("udp", "127.0.0.1:0") //nolint:noctx
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = c.Close() })
 	go func() {
@@ -138,80 +169,15 @@ func udpEcho(t *testing.T) *net.UDPAddr {
 	return c.LocalAddr().(*net.UDPAddr)
 }
 
-func udpListenerConf(name, peer string, port int) *stnrv1.ListenerConfig {
-	return &stnrv1.ListenerConfig{Name: name, Protocol: "UDP", Addr: "127.0.0.1",
-		Port: port, PeerAddr: peer, Routes: []string{"cluster"}}
-}
-
-func udpClusterConf(endpoints ...string) *stnrv1.ClusterConfig {
-	return &stnrv1.ClusterConfig{Name: "cluster", Type: "STATIC", Protocol: "udp",
-		Endpoints: endpoints}
-}
-
-// TestFlowUDPRelay covers the datagram round trip of a plain UDP listener: client datagrams
-// reach the pinned peer and the peer's responses come back on the same flow.
-func TestFlowUDPRelay(t *testing.T) {
-	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	s := newTestServer(t, udpListenerConf("plain-udp", peer.String(), port),
-		udpClusterConf("127.0.0.1"))
-
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
-	buf := make([]byte, 2048)
-	n, err := client.Read(buf)
-	require.NoError(t, err, "echo")
-	assert.Equal(t, "hello", string(buf[:n]), "echo payload")
-	assert.Equal(t, 1, s.AllocationCount(), "flow count")
-
-	require.NoError(t, s.Close())
-	assert.Eventually(t, func() bool { return s.AllocationCount() == 0 }, time.Second,
-		10*time.Millisecond, "flows torn down on close")
-}
-
-// TestFlowTCPClientRelay covers the stream-to-datagram adaptation: a TCP client flow is framed
-// into datagrams towards a UDP peer, chunk per read.
-func TestFlowTCPClientRelay(t *testing.T) {
-	peer := udpEcho(t)
-	port := freePort(t, "tcp")
-	lconf := &stnrv1.ListenerConfig{Name: "plain-tcp", Protocol: "TCP", Addr: "127.0.0.1",
-		Port: port, PeerAddr: peer.String(), Routes: []string{"cluster"}}
-	s := newTestServer(t, lconf, udpClusterConf("127.0.0.1"))
-
-	client, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
-	buf := make([]byte, 2048)
-	n, err := client.Read(buf)
-	require.NoError(t, err, "echo")
-	assert.Equal(t, "hello", string(buf[:n]), "echo payload")
-	assert.Equal(t, 1, s.AllocationCount(), "flow count")
-
-	// a client FIN tears the flow down
-	require.NoError(t, client.Close())
-	assert.Eventually(t, func() bool { return s.AllocationCount() == 0 }, time.Second,
-		10*time.Millisecond, "flow torn down on client close")
-}
-
-// TestFlowTCPPeerRelay covers the stream relay leg: a listener routing to a TCP cluster dials
-// the peer over TCP.
-func TestFlowTCPPeerRelay(t *testing.T) {
-	pl, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "peer listener")
-	t.Cleanup(func() { _ = pl.Close() })
+// tcpEcho starts a TCP echo peer and returns its address.
+func tcpEcho(t *testing.T) *net.TCPAddr {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
 	go func() {
 		for {
-			c, err := pl.Accept()
+			c, err := l.Accept()
 			if err != nil {
 				return
 			}
@@ -227,145 +193,156 @@ func TestFlowTCPPeerRelay(t *testing.T) {
 			}()
 		}
 	}()
+	return l.Addr().(*net.TCPAddr)
+}
 
-	port := freePort(t, "udp")
-	lconf := udpListenerConf("plain-udp-tcp-peer", "tcp://"+pl.Addr().String(), port)
-	cconf := &stnrv1.ClusterConfig{Name: "cluster", Type: "STATIC", Protocol: "tcp",
-		Endpoints: []string{"127.0.0.1"}}
-	s := newTestServer(t, lconf, cconf)
-
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
+// echo writes msg and expects it back.
+func echo(t *testing.T, c net.Conn, msg string) {
+	t.Helper()
+	_, err := c.Write([]byte(msg))
+	require.NoError(t, err)
+	require.NoError(t, c.SetReadDeadline(time.Now().Add(2*time.Second)))
 	buf := make([]byte, 2048)
-	n, err := client.Read(buf)
+	n, err := c.Read(buf)
 	require.NoError(t, err, "echo")
-	assert.Equal(t, "hello", string(buf[:n]), "echo payload")
-	assert.Equal(t, 1, s.AllocationCount(), "flow count")
+	assert.Equal(t, msg, string(buf[:n]))
 }
 
-// TestFlowAdmission verifies that a peer no routed cluster admits fails the flow early:
-// nothing is relayed and no flow is registered.
-func TestFlowAdmission(t *testing.T) {
-	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	s := newTestServer(t, udpListenerConf("plain-udp-unadmitted", peer.String(), port),
-		udpClusterConf("9.9.9.9"))
-
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
-	buf := make([]byte, 2048)
-	_, err = client.Read(buf)
-	assert.Error(t, err, "no echo from an unadmitted peer")
-	assert.Equal(t, 0, s.AllocationCount(), "no flow registered")
+// noEcho writes msg and expects nothing back.
+func noEcho(t *testing.T, c net.Conn, msg string) {
+	t.Helper()
+	_, err := c.Write([]byte(msg))
+	require.NoError(t, err)
+	require.NoError(t, c.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
+	_, err = c.Read(make([]byte, 2048))
+	assert.Error(t, err, "no echo")
 }
 
-// TestFlowPreflightProtocolAgnostic pins the admission pre-flight semantics: it follows the
-// TURN permission-handler rule, so a cluster of any protocol admitting the peer IP passes the
-// pre-flight, and the protocol-aware verdict falls on the relay leg (here: the per-datagram
-// classified direct UDP leg refuses the write, tearing the flow down).
-func TestFlowPreflightProtocolAgnostic(t *testing.T) {
+// TestFlowUDPRelay covers the datagram round trip: client datagrams reach the endpoint and its
+// responses come back on the same flow.
+func TestFlowUDPRelay(t *testing.T) {
 	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	// UDP peer, but the only routed cluster is a TCP protocol cluster
-	lconf := udpListenerConf("plain-udp-proto-mismatch", peer.String(), port)
-	cconf := &stnrv1.ClusterConfig{Name: "cluster", Type: "STATIC", Protocol: "tcp",
-		Endpoints: []string{"127.0.0.1"}}
-	s := newTestServer(t, lconf, cconf)
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer.String()}})
 
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
+	client := s.dial(t, "udp")
+	echo(t, client, "hello")
+	echo(t, client, "again")
+	assert.Equal(t, 1, s.Sessions(), "one flow per client")
 
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
+	require.NoError(t, s.Close(false))
+	assert.Eventually(t, func() bool { return s.Sessions() == 0 }, time.Second,
+		10*time.Millisecond, "flows torn down on close")
+}
 
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
-	buf := make([]byte, 2048)
-	_, err = client.Read(buf)
-	assert.Error(t, err, "no echo: the leg refuses the unadmitted transport")
-	assert.Eventually(t, func() bool { return s.AllocationCount() == 0 }, time.Second,
-		10*time.Millisecond, "flow torn down on the refused write")
+// TestFlowTCPClientRelay covers the stream-to-datagram adaptation: a TCP client flow reaches a
+// UDP endpoint through a UDP cluster, chunk per read.
+func TestFlowTCPClientRelay(t *testing.T) {
+	peer := udpEcho(t)
+	s := newTestServer(t, setup{listener: "TCP", proto: "UDP",
+		endpoints: []string{peer.String()}})
+
+	client := s.dial(t, "tcp")
+	echo(t, client, "hello")
+	assert.Equal(t, 1, s.Sessions())
+
+	// a client FIN tears the flow down
+	require.NoError(t, client.Close())
+	assert.Eventually(t, func() bool { return s.Sessions() == 0 }, time.Second,
+		10*time.Millisecond, "flow torn down on client close")
+}
+
+// TestFlowTCPPeerRelay covers a stream leg for a datagram client.
+func TestFlowTCPPeerRelay(t *testing.T) {
+	peer := tcpEcho(t)
+	s := newTestServer(t, setup{listener: "UDP", proto: "TCP",
+		endpoints: []string{peer.String()}})
+
+	echo(t, s.dial(t, "udp"), "hello")
+	assert.Equal(t, 1, s.Sessions())
+}
+
+// TestFlowNoTarget verifies that without a dialable endpoint no flow is created: a cluster of
+// prefixes is a TURN filter, not a set of L4 targets.
+func TestFlowNoTarget(t *testing.T) {
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{"127.0.0.0/8"}})
+	noEcho(t, s.dial(t, "udp"), "hello")
+	assert.Equal(t, 0, s.Sessions(), "no flow registered")
+}
+
+// TestFlowNoCluster verifies that a flow fails when the cluster the server names does not exist.
+func TestFlowNoCluster(t *testing.T) {
+	peer := udpEcho(t)
+	s := newTestServer(t, setup{listener: "UDP", endpoints: []string{peer.String()}})
+	noEcho(t, s.dial(t, "udp"), "hello")
+	assert.Equal(t, 0, s.Sessions(), "no flow registered")
+}
+
+// TestFlowLoadBalancing verifies round robin over the dialable endpoints, and that a cluster
+// change leaves live flows on their leg.
+func TestFlowLoadBalancing(t *testing.T) {
+	peer1, peer2 := udpEcho(t), udpEcho(t)
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer1.String(), peer2.String()}})
+
+	c1, c2 := s.dial(t, "udp"), s.dial(t, "udp")
+	echo(t, c1, "one")
+	echo(t, c2, "two")
+	assert.Equal(t, 2, s.Sessions())
+
+	// both peers got a flow: the echo peers answer from their own address, and the flows are
+	// pinned to theirs, so both echoes arriving means both endpoints were used
+	s.setEndpoints(t, []string{"127.0.0.0/8"})
+	echo(t, c1, "still one")
+	echo(t, c2, "still two")
+	noEcho(t, s.dial(t, "udp"), "new flows find no target")
 }
 
 // TestFlowIdleExpiry verifies the activity-driven idle teardown and that fresh traffic from the
 // same client re-creates the flow.
 func TestFlowIdleExpiry(t *testing.T) {
-	// the flow timeout is a system constant; shorten it for the test
 	defer func(d time.Duration) { l4.FlowTimeout = d }(l4.FlowTimeout)
 	l4.FlowTimeout = 100 * time.Millisecond
 
 	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	s := newTestServer(t, udpListenerConf("plain-udp-idle", peer.String(), port),
-		udpClusterConf("127.0.0.1"))
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer.String()}})
+	client := s.dial(t, "udp")
 
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	buf := make([]byte, 2048)
-	echo := func() {
-		_, err := client.Write([]byte("hello"))
-		require.NoError(t, err, "client write")
-		require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
-		_, err = client.Read(buf)
-		require.NoError(t, err, "echo")
-	}
-
-	echo()
-	assert.Equal(t, 1, s.AllocationCount(), "flow created")
+	echo(t, client, "hello")
+	assert.Equal(t, 1, s.Sessions(), "flow created")
 
 	// keep the flow busy over several timer periods: activity re-arms the idle timer
 	for i := 0; i < 5; i++ {
 		time.Sleep(50 * time.Millisecond)
-		echo()
+		echo(t, client, "hello")
 	}
-	assert.Equal(t, 1, s.AllocationCount(), "active flow survives the idle timer")
+	assert.Equal(t, 1, s.Sessions(), "active flow survives the idle timer")
 
 	// quiet flow expires
-	assert.Eventually(t, func() bool { return s.AllocationCount() == 0 }, time.Second,
+	assert.Eventually(t, func() bool { return s.Sessions() == 0 }, time.Second,
 		10*time.Millisecond, "idle flow torn down")
 
 	// fresh traffic re-creates the flow
-	echo()
-	assert.Equal(t, 1, s.AllocationCount(), "flow re-created on traffic")
+	echo(t, client, "hello")
+	assert.Equal(t, 1, s.Sessions(), "flow re-created on traffic")
 }
 
-// TestFlowGoroutineLeak verifies that flow and engine teardown release the pump goroutines.
-// The routine check runs as the outermost cleanup, after the harness teardown.
+// TestFlowGoroutineLeak verifies that flow and server teardown release the pump goroutines.
 func TestFlowGoroutineLeak(t *testing.T) {
 	t.Cleanup(test.CheckRoutines(t))
 
 	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	s := newTestServer(t, udpListenerConf("plain-udp-leak", peer.String(), port),
-		udpClusterConf("127.0.0.1"))
-
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer.String()}})
 	for i := 0; i < 5; i++ {
-		client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-		require.NoError(t, err, "client dial")
-		_, err = client.Write([]byte("hello"))
-		require.NoError(t, err, "client write")
-		require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
-		buf := make([]byte, 2048)
-		_, err = client.Read(buf)
-		require.NoError(t, err, "echo")
-		require.NoError(t, client.Close())
+		c, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(s.port))) //nolint:noctx
+		require.NoError(t, err)
+		echo(t, c, "hello")
+		require.NoError(t, c.Close())
 	}
-
-	require.NoError(t, s.Close())
+	require.NoError(t, s.Close(true))
 }
 
 // TestFlowEvents covers the default event wiring: a flow increments the per-client-IP quota
@@ -373,28 +350,16 @@ func TestFlowGoroutineLeak(t *testing.T) {
 func TestFlowEvents(t *testing.T) {
 	quota := &spyQuota{}
 	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	lconf := udpListenerConf("plain-udp-events", peer.String(), port)
-	rt := newTestRuntime(t, lconf, udpClusterConf("127.0.0.1"), quota)
-	s := startServer(t, rt, lconf.Name)
-
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(2*time.Second)))
-	buf := make([]byte, 2048)
-	_, err = client.Read(buf)
-	require.NoError(t, err, "echo")
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer.String()}, quota: quota})
+	echo(t, s.dial(t, "udp"), "hello")
 
 	incs, decs := quota.snapshot()
 	require.Len(t, incs, 1, "quota incremented")
-	assert.Equal(t, "127.0.0.1@"+stnrv1.DefaultRealm, incs[0], "client IP is the principal")
+	assert.Equal(t, "127.0.0.1@"+stnrv2.DefaultRealm, incs[0], "client IP is the principal")
 	assert.Empty(t, decs, "no decrement while the flow lives")
 
-	require.NoError(t, s.Close())
+	require.NoError(t, s.Close(false))
 	assert.Eventually(t, func() bool {
 		_, decs := quota.snapshot()
 		return len(decs) == 1
@@ -407,22 +372,10 @@ func TestFlowEvents(t *testing.T) {
 func TestFlowQuotaRejected(t *testing.T) {
 	quota := &spyQuota{deny: true}
 	peer := udpEcho(t)
-	port := freePort(t, "udp")
-	lconf := udpListenerConf("plain-udp-quota", peer.String(), port)
-	rt := newTestRuntime(t, lconf, udpClusterConf("127.0.0.1"), quota)
-	s := startServer(t, rt, lconf.Name)
-
-	client, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	require.NoError(t, err, "client dial")
-	defer func() { _ = client.Close() }()
-
-	_, err = client.Write([]byte("hello"))
-	require.NoError(t, err, "client write")
-	require.NoError(t, client.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
-	buf := make([]byte, 2048)
-	_, err = client.Read(buf)
-	assert.Error(t, err, "no echo for a quota-rejected client")
-	assert.Equal(t, 0, s.AllocationCount(), "no flow registered")
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
+		endpoints: []string{peer.String()}, quota: quota})
+	noEcho(t, s.dial(t, "udp"), "hello")
+	assert.Equal(t, 0, s.Sessions(), "no flow registered")
 
 	incs, decs := quota.snapshot()
 	assert.Empty(t, incs, "nothing counted")

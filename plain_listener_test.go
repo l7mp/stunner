@@ -2,52 +2,59 @@ package stunner
 
 import (
 	"net"
-	"strconv"
 	"testing"
 	"time"
 
+	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/server/l4"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
-// plainListenerConfig builds a single-listener stunnerd config with a plain listener relaying
-// to the given peer through one cluster.
-func plainListenerConfig(proto string, port int, peer string, endpoints []string) *stnrv1.StunnerConfig {
+// plainListenerConfig builds a single-listener stunnerd config with a listener of the given
+// protocol at host:port feeding an l4 server that relays each client flow to an endpoint of its
+// UDP cluster.
+func plainListenerConfig(proto, host string, port int, endpoints ...string) *stnrv2.StunnerConfig {
 	noHealthCheck := ""
-	return &stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin: stnrv1.AdminConfig{
+	return &stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin: stnrv2.AdminConfig{
 			LogLevel:            stunnerTestLoglevel,
 			HealthCheckEndpoint: &noHealthCheck,
 		},
-		Auth: stnrv1.AuthConfig{
+		Auth: stnrv2.AuthConfig{
 			Type:        "static",
 			Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 		},
-		Listeners: []stnrv1.ListenerConfig{{
+		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "plain",
 			Protocol: proto,
-			Addr:     "127.0.0.1",
+			Servers:  []string{"plain"},
+			Addr:     host,
 			Port:     port,
-			PeerAddr: peer,
-			Routes:   []string{"cluster"},
 		}},
-		Clusters: []stnrv1.ClusterConfig{{
-			Name:      "cluster",
-			Endpoints: endpoints,
+		Servers: []stnrv2.ServerConfig{{
+			Name:     "plain",
+			Type:     "l4",
+			Clusters: []string{"peer"},
+		}},
+		Clusters: []stnrv2.ClusterConfig{{
+			Name:          "peer",
+			Endpoints:     endpoints,
+			RoutingPolicy: "ROUND_ROBIN",
+			Protocol:      "UDP",
 		}},
 	}
 }
 
-// startUDPEcho starts a UDP echo server on the given loopback port.
-func startUDPEcho(t *testing.T, port int) net.PacketConn {
+// startUDPEcho starts a UDP echo server at addr of nw.
+func startUDPEcho(t *testing.T, nw transport.Net, addr string) net.PacketConn {
 	t.Helper()
-	c, err := net.ListenPacket("udp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	c, err := nw.ListenPacket("udp4", addr)
 	require.NoError(t, err, "echo server socket")
 	t.Cleanup(func() { _ = c.Close() })
 	go func() {
@@ -63,8 +70,8 @@ func startUDPEcho(t *testing.T, port int) net.PacketConn {
 	return c
 }
 
-// TestStunnerPlainListener exercises the plain-listener flow engine end to end through the full
-// reconcile machinery: engine dispatch, admission, chunking, idle expiry.
+// TestStunnerPlainListener exercises the l4 flow engine end to end through the full reconcile
+// machinery: server dispatch, endpoint selection, chunking, idle expiry.
 func TestStunnerPlainListener(t *testing.T) {
 	lim := test.TimeOut(time.Second * 120)
 	defer lim.Stop()
@@ -76,14 +83,16 @@ func TestStunnerPlainListener(t *testing.T) {
 	log := loggerFactory.NewLogger("test")
 
 	t.Run("udp-round-trip", func(t *testing.T) {
+		tn := vnetTestNet(t)
+		defer tn.close()
 		log.Debug("-------------- Running test: plain UDP round trip --------------")
-		startUDPEcho(t, 25680)
-		s := NewStunner(Options{Name: "plain-udp", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+		startUDPEcho(t, tn.pod, net.JoinHostPort(tn.peerHost, "25680"))
+		s := NewStunner(Options{Name: "plain-udp", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 		defer closeStunner(s)
-		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", 23478,
-			"127.0.0.1:25680", []string{"127.0.0.1"})), "server started")
+		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", tn.host, 23478,
+			net.JoinHostPort(tn.peerHost, "25680"))), "server started")
 
-		client, err := net.Dial("udp", "127.0.0.1:23478")
+		client, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 		require.NoError(t, err, "client dial")
 		defer client.Close() //nolint:errcheck
 
@@ -95,18 +104,19 @@ func TestStunnerPlainListener(t *testing.T) {
 		require.NoError(t, err, "echo")
 		assert.Equal(t, "Hello", string(buf[:n]), "echo payload")
 
-		l := s.GetListener("plain")
-		require.NotNil(t, l, "listener")
-		assert.Equal(t, 1, l.AllocationCount(), "flow counted as allocation")
+		srv := s.GetServer("plain")
+		require.NotNil(t, srv, "server")
+		assert.Equal(t, 1, srv.Sessions(), "flow counted as allocation")
 	})
 
 	t.Run("tcp-client-chunking", func(t *testing.T) {
+		tn := osTestNet(t)
 		log.Debug("-------------- Running test: plain TCP client chunking --------------")
-		startUDPEcho(t, 25680)
+		startUDPEcho(t, tn.pod, net.JoinHostPort(tn.peerHost, "25680"))
 		s := NewStunner(Options{Name: "plain-tcp", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 		defer closeStunner(s)
-		require.NoError(t, s.Reconcile(plainListenerConfig("TCP", 23478,
-			"127.0.0.1:25680", []string{"127.0.0.1"})), "server started")
+		require.NoError(t, s.Reconcile(plainListenerConfig("TCP", tn.host, 23478,
+			net.JoinHostPort(tn.peerHost, "25680"))), "server started")
 
 		client, err := net.Dial("tcp", "127.0.0.1:23478")
 		require.NoError(t, err, "client dial")
@@ -124,25 +134,28 @@ func TestStunnerPlainListener(t *testing.T) {
 			assert.Equal(t, msg, string(buf[:n]), "echo payload")
 		}
 
-		l := s.GetListener("plain")
-		require.NotNil(t, l, "listener")
-		assert.Equal(t, 1, l.AllocationCount(), "flow counted as allocation")
+		srv := s.GetServer("plain")
+		require.NotNil(t, srv, "server")
+		assert.Equal(t, 1, srv.Sessions(), "flow counted as allocation")
 
 		// a client FIN tears the flow down
 		require.NoError(t, client.Close())
-		assert.Eventually(t, func() bool { return l.AllocationCount() == 0 },
+		assert.Eventually(t, func() bool { return srv.Sessions() == 0 },
 			5*time.Second, 10*time.Millisecond, "flow torn down on client close")
 	})
 
-	t.Run("unadmitted-peer", func(t *testing.T) {
-		log.Debug("-------------- Running test: plain listener unadmitted peer --------------")
-		startUDPEcho(t, 25680)
-		s := NewStunner(Options{Name: "plain-unadmitted", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+	t.Run("no-dialable-endpoint", func(t *testing.T) {
+		tn := vnetTestNet(t)
+		defer tn.close()
+		log.Debug("-------------- Running test: l4 server with no dialable endpoint --------------")
+		startUDPEcho(t, tn.pod, net.JoinHostPort(tn.peerHost, "25680"))
+		s := NewStunner(Options{Name: "plain-undialable", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 		defer closeStunner(s)
-		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", 23478,
-			"127.0.0.1:25680", []string{"9.9.9.9"})), "server started")
+		// an endpoint without a port admits the peer but names no target to dial
+		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", tn.host, 23478,
+			tn.peerHost)), "server started")
 
-		client, err := net.Dial("udp", "127.0.0.1:23478")
+		client, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 		require.NoError(t, err, "client dial")
 		defer client.Close() //nolint:errcheck
 
@@ -151,18 +164,20 @@ func TestStunnerPlainListener(t *testing.T) {
 		require.NoError(t, err, "client write")
 		require.NoError(t, client.SetReadDeadline(time.Now().Add(300*time.Millisecond)))
 		_, err = client.Read(buf)
-		assert.Error(t, err, "no echo from an unadmitted peer")
+		assert.Error(t, err, "no echo without a dialable endpoint")
 
-		l := s.GetListener("plain")
-		require.NotNil(t, l, "listener")
-		assert.Equal(t, 0, l.AllocationCount(), "no flow registered")
+		srv := s.GetServer("plain")
+		require.NotNil(t, srv, "server")
+		assert.Equal(t, 0, srv.Sessions(), "no flow registered")
 	})
 
 	t.Run("peer-change-reconciles-in-place", func(t *testing.T) {
+		tn := vnetTestNet(t)
+		defer tn.close()
 		log.Debug("-------------- Running test: plain listener peer change --------------")
-		startUDPEcho(t, 25680)
+		startUDPEcho(t, tn.pod, net.JoinHostPort(tn.peerHost, "25680"))
 		// the second peer tags its replies so the serving peer is observable
-		tagged, err := net.ListenPacket("udp4", "127.0.0.1:25681")
+		tagged, err := tn.pod.ListenPacket("udp4", net.JoinHostPort(tn.peerHost, "25681"))
 		require.NoError(t, err, "tagged echo server socket")
 		defer tagged.Close() //nolint:errcheck
 		go func() {
@@ -176,10 +191,10 @@ func TestStunnerPlainListener(t *testing.T) {
 			}
 		}()
 
-		s := NewStunner(Options{Name: "plain-peer-change", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+		s := NewStunner(Options{Name: "plain-peer-change", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 		defer closeStunner(s)
-		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", 23478,
-			"127.0.0.1:25680", []string{"127.0.0.1"})), "server started")
+		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", tn.host, 23478,
+			net.JoinHostPort(tn.peerHost, "25680"))), "server started")
 
 		buf := make([]byte, 1600)
 		echo := func(c net.Conn, want string) {
@@ -192,41 +207,43 @@ func TestStunnerPlainListener(t *testing.T) {
 			assert.Equal(t, want, string(buf[:n]), "echo payload")
 		}
 
-		client1, err := net.Dial("udp", "127.0.0.1:23478")
+		client1, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 		require.NoError(t, err, "client 1 dial")
 		defer client1.Close() //nolint:errcheck
 		echo(client1, "Hello")
 
-		// a peer change reconciles in place: the existing flow stays pinned to the old
+		// a cluster change reconciles in place: the existing flow stays pinned to the old
 		// peer, a new flow goes to the new one
-		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", 23478,
-			"127.0.0.1:25681", []string{"127.0.0.1"})), "peer change reconciled")
+		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", tn.host, 23478,
+			net.JoinHostPort(tn.peerHost, "25681"))), "peer change reconciled")
 
 		echo(client1, "Hello")
 
-		client2, err := net.Dial("udp", "127.0.0.1:23478")
+		client2, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 		require.NoError(t, err, "client 2 dial")
 		defer client2.Close() //nolint:errcheck
 		echo(client2, "B:Hello")
 
-		l := s.GetListener("plain")
-		require.NotNil(t, l, "listener")
-		assert.Equal(t, 2, l.AllocationCount(), "both flows live")
+		srv := s.GetServer("plain")
+		require.NotNil(t, srv, "server")
+		assert.Equal(t, 2, srv.Sessions(), "both flows live")
 	})
 
 	t.Run("idle-expiry", func(t *testing.T) {
+		tn := vnetTestNet(t)
+		defer tn.close()
 		log.Debug("-------------- Running test: plain listener idle expiry --------------")
 		// the flow timeout is a system constant; shorten it for the test
 		defer func(d time.Duration) { l4.FlowTimeout = d }(l4.FlowTimeout)
 		l4.FlowTimeout = 100 * time.Millisecond
 
-		startUDPEcho(t, 25680)
-		s := NewStunner(Options{Name: "plain-idle", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+		startUDPEcho(t, tn.pod, net.JoinHostPort(tn.peerHost, "25680"))
+		s := NewStunner(Options{Name: "plain-idle", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 		defer closeStunner(s)
-		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", 23478,
-			"127.0.0.1:25680", []string{"127.0.0.1"})), "server started")
+		require.NoError(t, s.Reconcile(plainListenerConfig("UDP", tn.host, 23478,
+			net.JoinHostPort(tn.peerHost, "25680"))), "server started")
 
-		client, err := net.Dial("udp", "127.0.0.1:23478")
+		client, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 		require.NoError(t, err, "client dial")
 		defer client.Close() //nolint:errcheck
 
@@ -239,19 +256,19 @@ func TestStunnerPlainListener(t *testing.T) {
 			require.NoError(t, err, "echo")
 		}
 
-		l := s.GetListener("plain")
-		require.NotNil(t, l, "listener")
+		srv := s.GetServer("plain")
+		require.NotNil(t, srv, "server")
 
 		echo()
-		assert.Equal(t, 1, l.AllocationCount(), "flow created")
+		assert.Equal(t, 1, srv.Sessions(), "flow created")
 
 		// quiet flow expires
-		assert.Eventually(t, func() bool { return l.AllocationCount() == 0 },
+		assert.Eventually(t, func() bool { return srv.Sessions() == 0 },
 			5*time.Second, 10*time.Millisecond, "idle flow torn down")
 
 		// fresh traffic from the same client re-creates the flow
 		echo()
-		assert.Equal(t, 1, l.AllocationCount(), "flow re-created on traffic")
+		assert.Equal(t, 1, srv.Sessions(), "flow re-created on traffic")
 	})
 }
 
@@ -259,34 +276,33 @@ func TestStunnerPlainListener(t *testing.T) {
 // turncat's test matrix (client transport x upstream TURN transport x static/ephemeral
 // upstream auth, with UDP peers) plus the tcp-tcp tunnel that turncat never had: a TCP
 // client relayed to a TCP peer over an RFC 6062 upstream allocation. Each case runs a raw
-// client against a plain listener whose only route is a TURN-* protocol cluster pointing at
-// an upstream stunnerd; a successful raw echo plus exactly one upstream allocation proves
-// the traversal.
+// client against an l4 server whose only cluster holds the peer and tunnels through an upstream
+// stunnerd; a successful raw echo plus exactly one upstream allocation proves the traversal.
 func TestStunnerPlainTunnelChain(t *testing.T) {
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
-	staticAuth := stnrv1.AuthConfig{Type: "static",
+	staticAuth := stnrv2.AuthConfig{Type: "static",
 		Credentials: map[string]string{"username": "user2", "password": "passwd2"}}
-	ephemeralAuth := stnrv1.AuthConfig{Type: "ephemeral",
+	ephemeralAuth := stnrv2.AuthConfig{Type: "ephemeral",
 		Credentials: map[string]string{"secret": "my-secret"}}
 
 	testCases := []struct {
 		name          string
 		clientProto   string // downstream listener protocol
 		upstreamProto string // transport towards the upstream TURN server
-		auth          stnrv1.AuthConfig
+		auth          stnrv2.AuthConfig
 		tcpPeer       bool
 	}{
-		{"udp-client:turn-udp:static", "UDP", "turn-udp", staticAuth, false},
-		{"udp-client:turn-tcp:static", "UDP", "turn-tcp", staticAuth, false},
-		{"tcp-client:turn-udp:static", "TCP", "turn-udp", staticAuth, false},
-		{"tcp-client:turn-tcp:static", "TCP", "turn-tcp", staticAuth, false},
-		{"udp-client:turn-udp:ephemeral", "UDP", "turn-udp", ephemeralAuth, false},
-		{"udp-client:turn-tcp:ephemeral", "UDP", "turn-tcp", ephemeralAuth, false},
-		{"tcp-client:turn-udp:ephemeral", "TCP", "turn-udp", ephemeralAuth, false},
-		{"tcp-client:turn-tcp:ephemeral", "TCP", "turn-tcp", ephemeralAuth, false},
-		{"tcp-client:turn-tcp:static:tcp-peer", "TCP", "turn-tcp", staticAuth, true},
+		{"udp-client:turn-udp:static", "UDP", "UDP", staticAuth, false},
+		{"udp-client:turn-tcp:static", "UDP", "TCP", staticAuth, false},
+		{"tcp-client:turn-udp:static", "TCP", "UDP", staticAuth, false},
+		{"tcp-client:turn-tcp:static", "TCP", "TCP", staticAuth, false},
+		{"udp-client:turn-udp:ephemeral", "UDP", "UDP", ephemeralAuth, false},
+		{"udp-client:turn-tcp:ephemeral", "UDP", "TCP", ephemeralAuth, false},
+		{"tcp-client:turn-udp:ephemeral", "TCP", "UDP", ephemeralAuth, false},
+		{"tcp-client:turn-tcp:ephemeral", "TCP", "TCP", ephemeralAuth, false},
+		{"tcp-client:turn-tcp:static:tcp-peer", "TCP", "TCP", staticAuth, true},
 	}
 
 	for _, tc := range testCases {
@@ -300,12 +316,20 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			report := test.CheckRoutines(t)
 			defer report()
 
+			// a chain with no TCP anywhere runs on the default vnet
+			tn := osTestNet(t)
+			if tc.clientProto == "UDP" && tc.upstreamProto == "UDP" && !tc.tcpPeer {
+				tn = vnetTestNet(t)
+			}
+			defer tn.close()
+
 			// the peer: a UDP echo server, or a TCP one for the tcp-tcp tunnel
-			peerAddr := "udp://127.0.0.1:25680"
-			upstreamCluster := stnrv1.ClusterConfig{Name: "allow-any", Endpoints: []string{"0.0.0.0/0"}}
+			peerAddr, peerProto := net.JoinHostPort(tn.peerHost, "25680"), "UDP"
+			upstreamCluster := stnrv2.ClusterConfig{Name: "allow-any", Protocol: "UDP",
+				Endpoints: []string{"0.0.0.0/0"}}
 			if tc.tcpPeer {
-				peerAddr = "tcp://127.0.0.1:25681"
-				upstreamCluster = stnrv1.ClusterConfig{Name: "tcp-echo", Protocol: "tcp",
+				peerAddr, peerProto = "127.0.0.1:25681", "TCP"
+				upstreamCluster = stnrv2.ClusterConfig{Name: "tcp-echo", Protocol: "TCP",
 					Endpoints: []string{"127.0.0.1"}}
 				echoLn, err := net.Listen("tcp", "127.0.0.1:25681")
 				require.NoError(t, err, "tcp echo listener")
@@ -332,49 +356,61 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 					}
 				}()
 			} else {
-				echo := startUDPEcho(t, 25680)
+				echo := startUDPEcho(t, tn.pod, peerAddr)
 				defer echo.Close() //nolint:errcheck
 			}
 
 			// each side gets its own copy of the auth config: reconciliation normalizes in place
-			upstreamAuth, serverAuth := stnrv1.AuthConfig{}, stnrv1.AuthConfig{}
+			upstreamAuth, serverAuth := stnrv2.AuthConfig{}, stnrv2.AuthConfig{}
 			tc.auth.DeepCopyInto(&upstreamAuth)
 			tc.auth.DeepCopyInto(&serverAuth)
 
+			tunnelProto, err := stnrv2.NewProtocol("TURN-" + tc.upstreamProto)
+			require.NoError(t, err, "tunnel protocol")
+			tunnelURL := (&stnrv2.URI{Protocol: tunnelProto, Host: tn.host, Port: 23479}).String()
+
 			noHealthCheck := ""
-			upstream := NewStunner(Options{Name: "upstream", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+			upstream := NewStunner(Options{Name: "upstream", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 			defer closeStunner(upstream)
-			require.NoError(t, upstream.Reconcile(&stnrv1.StunnerConfig{
-				ApiVersion: stnrv1.ApiVersion,
-				Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
+			require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
+				ApiVersion: stnrv2.ApiVersion,
+				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
 				Auth:       upstreamAuth,
-				Listeners: []stnrv1.ListenerConfig{{
-					Name: "upstream", Protocol: tc.upstreamProto, Addr: "127.0.0.1", Port: 23479,
-					Routes: []string{upstreamCluster.Name},
+				Listeners: []stnrv2.ListenerConfig{{
+					Name: "upstream", Protocol: tc.upstreamProto, Servers: []string{"upstream"},
+					Addr: tn.host, Port: 23479,
 				}},
-				Clusters: []stnrv1.ClusterConfig{upstreamCluster},
+				Servers: []stnrv2.ServerConfig{{
+					Name: "upstream", Type: "turn", Clusters: []string{upstreamCluster.Name},
+				}},
+				Clusters: []stnrv2.ClusterConfig{upstreamCluster},
 			}), "upstream server started")
 
-			downstream := NewStunner(Options{Name: "downstream", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
+			downstream := NewStunner(Options{Name: "downstream", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 			defer closeStunner(downstream)
-			require.NoError(t, downstream.Reconcile(&stnrv1.StunnerConfig{
-				ApiVersion: stnrv1.ApiVersion,
-				Admin:      stnrv1.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
-				Auth:       stnrv1.AuthConfig{Type: "none"},
-				Listeners: []stnrv1.ListenerConfig{{
-					Name: "downstream", Protocol: tc.clientProto, Addr: "127.0.0.1", Port: 23478,
-					PeerAddr: peerAddr, Routes: []string{"turn-relay"},
+			require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
+				ApiVersion: stnrv2.ApiVersion,
+				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
+				Auth:       stnrv2.AuthConfig{Type: "none"},
+				Listeners: []stnrv2.ListenerConfig{{
+					Name: "downstream", Protocol: tc.clientProto, Servers: []string{"downstream"},
+					Addr: tn.host, Port: 23478,
 				}},
-				Clusters: []stnrv1.ClusterConfig{{
-					Name: "turn-relay", Protocol: tc.upstreamProto,
-					TURNServer: &stnrv1.TURNServer{Address: "127.0.0.1", Port: 23479,
-						Auth: &serverAuth},
+				Servers: []stnrv2.ServerConfig{{
+					Name: "downstream", Type: "l4", Clusters: []string{"peer"},
+				}},
+				Clusters: []stnrv2.ClusterConfig{{
+					Name:          "peer",
+					Endpoints:     []string{peerAddr},
+					RoutingPolicy: "ROUND_ROBIN",
+					Protocol:      peerProto,
+					Tunnel:        &stnrv2.TunnelConfig{URL: tunnelURL, Auth: &serverAuth},
 				}},
 			}), "downstream server started")
 
 			buf := make([]byte, 1600)
 			if tc.clientProto == "UDP" {
-				client, err := net.Dial("udp", "127.0.0.1:23478")
+				client, err := tn.client.Dial("udp", net.JoinHostPort(tn.host, "23478"))
 				require.NoError(t, err, "client dial")
 				defer client.Close() //nolint:errcheck
 
@@ -421,12 +457,12 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			}
 
 			// the flow rides an upstream allocation and counts as a downstream flow
-			ul := upstream.GetListener("upstream")
-			require.NotNil(t, ul, "upstream listener")
-			assert.Equal(t, 1, ul.AllocationCount(), "upstream allocation count")
-			dl := downstream.GetListener("downstream")
-			require.NotNil(t, dl, "downstream listener")
-			assert.Equal(t, 1, dl.AllocationCount(), "downstream flow count")
+			us := upstream.GetServer("upstream")
+			require.NotNil(t, us, "upstream server")
+			assert.Equal(t, 1, us.Sessions(), "upstream allocation count")
+			ds := downstream.GetServer("downstream")
+			require.NotNil(t, ds, "downstream server")
+			assert.Equal(t, 1, ds.Sessions(), "downstream flow count")
 		})
 	}
 }

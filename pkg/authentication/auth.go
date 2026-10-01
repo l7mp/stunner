@@ -12,7 +12,7 @@ import (
 
 	"github.com/pion/turn/v5"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // UsernameSeparator is the separator character used in time-windowed TURN authentication as
@@ -96,24 +96,24 @@ func GenerateAuthKey(username, realm, password string) []byte {
 // lifetime. A nil config and an explicit "none" both yield empty credentials, an anonymous
 // session. This is the client-side counterpart of the AuthHandler: everywhere STUNner dials an
 // upstream TURN server (a TURN-* relay cluster), the credentials come from here.
-func GenerateCredentials(auth *stnrv1.AuthConfig) (string, string, error) {
+func GenerateCredentials(auth *stnrv2.AuthConfig) (string, string, error) {
 	if auth == nil {
 		return "", "", nil
 	}
 
-	atype, err := stnrv1.NewAuthType(auth.Type)
+	atype, err := stnrv2.NewAuthType(auth.Type)
 	if err != nil {
 		return "", "", err
 	}
 
 	switch atype {
-	case stnrv1.AuthTypeNone:
+	case stnrv2.AuthTypeNone:
 		return "", "", nil
 
-	case stnrv1.AuthTypeStatic:
+	case stnrv2.AuthTypeStatic:
 		return auth.Credentials["username"], auth.Credentials["password"], nil
 
-	case stnrv1.AuthTypeEphemeral:
+	case stnrv2.AuthTypeEphemeral:
 		secret, found := auth.Credentials["secret"]
 		if !found {
 			return "", "", fmt.Errorf("no secret found in %s auth config", atype.String())

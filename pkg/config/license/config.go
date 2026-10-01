@@ -6,7 +6,7 @@ import (
 
 	"github.com/pion/logging"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 var constructor = NewStub
@@ -35,10 +35,10 @@ func NewNilSubscriptionType() *nilSubscriptionType { return &nilSubscriptionType
 // Manager is a genetic API for negotiating licensing status.
 type ConfigManager interface {
 	// GetConfig returns the current config, i.e., the ecrpyted key/passphrase pair.
-	GetConfig() *stnrv1.LicenseConfig
+	GetConfig() *stnrv2.LicenseConfig
 	// Reconcile updates the the licensing status, i.e., the licensed feature-set and the
 	// subscription type, based in an ecrpyted key/passphrase pair.
-	Reconcile(config *stnrv1.LicenseConfig)
+	Reconcile(config *stnrv2.LicenseConfig)
 	// Validate checks whether a client is entitled to use a feature.
 	Validate(feature Feature) bool
 	// SubscriptionType returns the current subscription type (e.g., free, member, enterprise).
@@ -54,7 +54,7 @@ func New(log logging.LeveledLogger) ConfigManager {
 
 // baseManager implements the basic functionality so that all license manager implementations can embed it
 type baseManager struct {
-	config *stnrv1.LicenseConfig
+	config *stnrv2.LicenseConfig
 	log    logging.LeveledLogger
 }
 
@@ -63,8 +63,8 @@ func newBaseManager(log logging.LeveledLogger) baseManager {
 	return m
 }
 
-func (m *baseManager) GetConfig() *stnrv1.LicenseConfig       { return m.config }
-func (m *baseManager) Reconcile(config *stnrv1.LicenseConfig) { m.config = config }
+func (m *baseManager) GetConfig() *stnrv2.LicenseConfig       { return m.config }
+func (m *baseManager) Reconcile(config *stnrv2.LicenseConfig) { m.config = config }
 func (m *baseManager) Validate(_ Feature) bool                { return false }
 func (m *baseManager) SubscriptionType() SubscriptionType     { return NewNilSubscriptionType() }
 func (m *baseManager) Status() string                         { return "{tier:free}" }

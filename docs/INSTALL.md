@@ -79,18 +79,6 @@ resources:
 
 This means that every `stunnerd` pod will request 0.5 CPU cores and 128 mebibytes of memory. Note that the pods will start only if Kubernetes can successfully allocate the given amount of resources. In order to avoid stressing the Kubernetes scheduler, it is advised to keep the limits at the bare minimum and scale out by [increasing the number of running `stunnerd` pods](SCALING.md) if needed.
 
-### UDP multithreading
-
-STUNner can run multiple UDP listeners over multiple parallel readloops for loadbalancing. Namely, each `stunnerd` pod can create a configurable number of UDP server sockets using `SO_REUSEPORT` and then spawn a separate goroutine to run a parallel readloop per each. The kernel will load-balance allocations across the sockets/readloops per the IP 5-tuple, so the same allocation will always stay at the same CPU. This allows UDP listeners to scale to multiple CPUs, improving performance. Note that this is required only for UDP: TCP, TLS and DTLS listeners spawn a per-client readloop anyway. Also note that `SO_REUSEPORT` is not portable, so currently we enable this only for UNIX architectures.
-
-The feature is exposed via the command line flag `--udp-thread-num=<THREAD_NUMBER>` in `stunnerd`. In the Helm chart, it can be enabled or disabled with the `--set stunner.deployment.container.stunnerd.udpMultithreading.enabled=true` flag. By default, UDP multithreading is enabled with 16 separate readloops per each UDP listener.
-
-```yaml
-udpMultithreading:
-  enabled: true
-  readLoopsPerUDPListener: 16
-```
-
 ### Graceful shutdown
 
 STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunner` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile.

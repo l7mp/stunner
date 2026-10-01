@@ -7,23 +7,23 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestAuthObjectSemantics(t *testing.T) {
 	runObjectSemanticsCase(t, objectSemanticsCase{
 		name: "auth",
-		setup: func(t *testing.T) (runtime.Object, stnrv1.Config, *stnrv1.StunnerConfig) {
+		setup: func(t *testing.T) (runtime.Object, stnrv2.Config, *stnrv2.StunnerConfig) {
 			env := newTestEnv()
 			obj, err := object.NewAuth(nil, env.rt)
 			require.NoError(t, err)
-			return obj, staticAuthConfig(), &stnrv1.StunnerConfig{}
+			return obj, staticAuthConfig(), &stnrv2.StunnerConfig{}
 		},
 		expectations: []inspectExpectation{
 			{
 				name: "realm-change-reconcile",
-				conf: &stnrv1.AuthConfig{
-					Type:  stnrv1.AuthTypeStatic.String(),
+				conf: &stnrv2.AuthConfig{
+					Type:  stnrv2.AuthTypeStatic.String(),
 					Realm: "example.org",
 					Credentials: map[string]string{
 						"username": "user",

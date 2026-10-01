@@ -1,76 +1,55 @@
 package object
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
-	"sort"
-	"strings"
+	"net/netip"
+	"reflect"
+	"slices"
 	"sync/atomic"
 
 	"github.com/pion/logging"
-	"github.com/pion/transport/v5"
 
-	"github.com/l7mp/stunner/v2/internal/resolver"
+	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/dialer"
+	"github.com/l7mp/stunner/v2/internal/router"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/util"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// Cluster represents a set of upstream peers to which STUNner can relay traffic. Static clusters
-// hold IP/CIDR endpoints; strict-DNS clusters resolve domain names in the background. The cluster
-// holds the reconciled state as an atomic snapshot for the packet path and owns the strict-DNS
-// domain registration lifecycle.
+// Cluster is a cluster config, the router over its endpoints and the dialer that reaches them.
 type Cluster struct {
-	name     string
-	resolver resolver.DnsResolver
-	net      transport.Net
+	name string
 
-	// state is the atomic snapshot of reconciled cluster data, published by Reconcile and read
-	// back (via GetConfig) by the Router and config consumers without locking.
-	state atomic.Pointer[clusterState]
-
-	// registered holds the strict-DNS domains registered with the resolver by Start, so Close
-	// unregisters exactly those. Touched only on the reconcile path.
-	registered []string
+	conf       atomic.Pointer[stnrv2.ClusterConfig]
+	router     atomic.Pointer[api.Router]
+	dialer     atomic.Pointer[api.Dialer]
+	registered []string // the domains registered with the resolver
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
 }
 
-// clusterState is the immutable snapshot of reconciled cluster data: the single source of truth
-// for a cluster's type, protocol, endpoint set, and (for TURN-* protocol clusters) the upstream
-// TURN server.
-type clusterState struct {
-	clusterType stnrv1.ClusterType
-	protocol    stnrv1.ClusterProtocol
-	endpoints   []*util.Endpoint
-	domains     []string
-	turnServer  *stnrv1.TURNServer
-}
+var (
+	_ api.Router = &Cluster{}
+	_ api.Dialer = &Cluster{}
+)
 
-// NewCluster creates a Cluster object.
-func NewCluster(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
-	if conf == nil {
-		return &Cluster{
-			resolver: rt.Resolver,
-			net:      rt.Net,
-			rt:       rt,
-			log:      rt.Logger.NewLogger("cluster"),
-		}, nil
-	}
-	req, ok := conf.(*stnrv1.ClusterConfig)
+// NewCluster creates a cluster object.
+func NewCluster(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
+	req, ok := conf.(*stnrv2.ClusterConfig)
 	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+		return nil, stnrv2.ErrInvalidConf
 	}
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 	c := &Cluster{
-		name:     req.Name,
-		resolver: rt.Resolver,
-		net:      rt.Net,
-		rt:       rt,
-		log:      rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
+		name: req.Name,
+		rt:   rt,
+		log:  rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
 	}
 	if err := c.Reconcile(req); err != nil {
 		return nil, err
@@ -81,225 +60,144 @@ func NewCluster(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 func (c *Cluster) Name() string             { return c.name }
 func (c *Cluster) Type() runtime.ObjectType { return runtime.TypeCluster }
 
-func (c *Cluster) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
-	req, ok := new.(*stnrv1.ClusterConfig)
+// Inspect restarts on a dialer change; the router and the addresses reconcile in place.
+func (c *Cluster) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
+	req, ok := new.(*stnrv2.ClusterConfig)
 	if !ok {
-		return runtime.ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
-	cur := old.(*stnrv1.ClusterConfig)
+	if err := req.Validate(); err != nil {
+		return runtime.ActionNone, err
+	}
+	cur := old.(*stnrv2.ClusterConfig)
 	if cur.DeepEqual(req) {
 		return runtime.ActionNone, nil
 	}
-
-	strictDNS := stnrv1.ClusterTypeStrictDNS.String()
-	curStrictDNS := strings.EqualFold(cur.Type, strictDNS)
-	reqStrictDNS := strings.EqualFold(req.Type, strictDNS)
-	becomesStrictDNS := !curStrictDNS && reqStrictDNS
-	leavesStrictDNS := curStrictDNS && !reqStrictDNS
-	strictDNSEndpointsChanged := curStrictDNS && reqStrictDNS &&
-		!sameStringSet(cur.Endpoints, req.Endpoints)
-
-	if becomesStrictDNS || strictDNSEndpointsChanged || leavesStrictDNS {
+	if cur.Protocol != req.Protocol || !reflect.DeepEqual(cur.Tunnel, req.Tunnel) {
 		return runtime.ActionRestart, nil
 	}
-
-	// TURN-related changes (protocol flips to/from/between TURN-*, upstream server address or
-	// credential changes) reconcile rather than restart: live upstream TURN sessions belong to
-	// the allocations, not to the cluster object, and new allocations dial from the published
-	// snapshot.
 	return runtime.ActionReconcile, nil
 }
 
-func (c *Cluster) Reconcile(conf stnrv1.Config) error {
-	req, ok := conf.(*stnrv1.ClusterConfig)
+// Reconcile rebuilds the router, and moves the resolver registrations of a running cluster to
+// the new domains.
+func (c *Cluster) Reconcile(conf stnrv2.Config) error {
+	req, ok := conf.(*stnrv2.ClusterConfig)
 	if !ok {
-		return stnrv1.ErrInvalidConf
+		return stnrv2.ErrInvalidConf
 	}
 	if err := req.Validate(); err != nil {
 		return err
 	}
-	c.log.Tracef("reconcile: %s", req.String())
+	cp := &stnrv2.ClusterConfig{}
+	req.DeepCopyInto(cp)
 
-	c.name = req.Name
-	// Validate vouched for the type and the protocol
-	clusterType, _ := stnrv1.NewClusterType(req.Type)
-	protocol, _ := stnrv1.NewClusterProtocol(req.Protocol)
-
-	var endpoints []*util.Endpoint
-	var domains []string
-	switch clusterType {
-	case stnrv1.ClusterTypeStatic:
-		for _, e := range req.Endpoints {
-			ep, err := util.ParseEndpoint(e)
-			if err != nil {
-				c.log.Warnf("cluster %q: could not parse endpoint %q (ignoring): %s",
-					c.name, e, err.Error())
-				continue
-			}
-			endpoints = append(endpoints, ep)
-		}
-	case stnrv1.ClusterTypeStrictDNS:
-		if c.resolver == nil {
-			return fmt.Errorf("sTRICT_DNS cluster %q initialized with no DNS resolver", c.name)
-		}
-		domains = append([]string(nil), req.Endpoints...)
+	r, err := router.New(cp, c.rt, c.log)
+	if err != nil {
+		return err
 	}
-
-	// Publish the snapshot for the packet path.
-	c.state.Store(&clusterState{
-		clusterType: clusterType,
-		protocol:    protocol,
-		endpoints:   endpoints,
-		domains:     domains,
-		turnServer:  req.TURNServer,
-	})
-
-	c.rt.Router.InvalidateCache()
-	return nil
-}
-
-func (c *Cluster) GetConfig() stnrv1.Config {
-	conf := stnrv1.ClusterConfig{Name: c.name}
-	state := c.state.Load()
-	if state == nil {
-		return &conf
-	}
-	conf.Protocol = state.protocol.String()
-	conf.Type = state.clusterType.String()
-	conf.TURNServer = state.turnServer
-	switch state.clusterType {
-	case stnrv1.ClusterTypeStatic:
-		conf.Endpoints = make([]string, len(state.endpoints))
-		for i, e := range state.endpoints {
-			conf.Endpoints[i] = e.String()
-		}
-	case stnrv1.ClusterTypeStrictDNS:
-		conf.Endpoints = make([]string, len(state.domains))
-		copy(conf.Endpoints, state.domains)
-		sort.Strings(conf.Endpoints)
-	}
-	return &conf
-}
-
-// Start registers the cluster's strict-DNS domains with the resolver.
-func (c *Cluster) Start() error {
-	domains := c.strictDNSDomains()
-	for _, d := range domains {
-		if err := c.resolver.Register(d); err != nil {
+	if c.dialer.Load() != nil {
+		if err := c.register(domains(cp)); err != nil {
 			return err
 		}
 	}
-	c.registered = domains
+	c.conf.Store(cp)
+	c.router.Store(&r)
 	return nil
 }
 
-// Close unregisters the strict-DNS domains registered by Start and drops cached routing state.
-func (c *Cluster) Close(_ bool) error {
+// register registers ds with the resolver and unregisters the domains registered before.
+func (c *Cluster) register(ds []string) error {
+	for _, d := range ds {
+		if err := c.rt.Resolver.Register(d); err != nil {
+			return err
+		}
+	}
 	for _, d := range c.registered {
-		c.resolver.Unregister(d)
+		c.rt.Resolver.Unregister(d)
 	}
-	c.registered = nil
-	c.rt.Router.InvalidateCache()
+	c.registered = ds
 	return nil
 }
 
-func (c *Cluster) Status() stnrv1.Status {
-	status := &stnrv1.ClusterStatus{
-		ClusterConfig: c.GetConfig().(*stnrv1.ClusterConfig),
+func (c *Cluster) GetConfig() stnrv2.Config {
+	cp := &stnrv2.ClusterConfig{Name: c.name}
+	if conf := c.conf.Load(); conf != nil {
+		conf.DeepCopyInto(cp)
 	}
-	if offloadStatus, ok := c.rt.GetStatus(runtime.TypeOffload, "").(*stnrv1.OffloadStatus); ok {
+	return cp
+}
+
+// Start runs the dialer and registers the domains with the resolver.
+func (c *Cluster) Start() error {
+	d, err := dialer.New(c.conf.Load(), c.rt)
+	if err != nil {
+		return err
+	}
+	if err := d.Start(); err != nil {
+		return err
+	}
+	c.dialer.Store(&d)
+	return c.register(domains(c.conf.Load()))
+}
+
+// Close unregisters the domains and stops the dialer. Dialed conns stay up.
+func (c *Cluster) Close(shutdown bool) error {
+	_ = c.register(nil)
+	if old := c.dialer.Swap(nil); old != nil {
+		return (*old).Close(shutdown)
+	}
+	return nil
+}
+
+func (c *Cluster) Status() stnrv2.Status {
+	status := &stnrv2.ClusterStatus{ClusterConfig: c.GetConfig().(*stnrv2.ClusterConfig)}
+	if offloadStatus, ok := c.rt.GetStatus(runtime.TypeOffload, "").(*stnrv2.OffloadStatus); ok {
 		status.Stats = offloadStatus.Clusters[c.name]
 	}
 	return status
 }
 
-// Protocol returns the cluster's protocol from the reconciled snapshot.
-func (c *Cluster) Protocol() stnrv1.ClusterProtocol {
-	if state := c.state.Load(); state != nil {
-		return state.protocol
-	}
-	return stnrv1.ClusterProtocolUnknown
+func (c *Cluster) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
+	return (*c.router.Load()).Route(dst)
 }
 
-// TURNServer returns the upstream TURN server of a TURN-* protocol cluster, nil otherwise.
-func (c *Cluster) TURNServer() *stnrv1.TURNServer {
-	if state := c.state.Load(); state != nil {
-		return state.turnServer
-	}
-	return nil
+func (c *Cluster) Protocol() stnrv2.Protocol {
+	p, _ := stnrv2.NewClusterProtocol(c.conf.Load().Protocol)
+	return p
 }
 
-// Admits reports whether the cluster admits (peer, port), on the cluster's own terms: a TURN-*
-// cluster admits every peer, since admission is then the upstream TURN server's job; a static
-// cluster admits the peers its endpoints name; a strict-DNS cluster admits the addresses its
-// domains resolve to (ports are not checked, domains carry none). port==0 ignores the port.
-func (c *Cluster) Admits(peer net.IP, port int) bool {
-	state := c.state.Load()
-	if state == nil {
-		return false
-	}
+var errNotRunning = errors.New("cluster is not running")
 
-	if state.protocol.IsTURN() {
-		return true
+func (c *Cluster) Dial(ctx context.Context, local net.Addr, addr string) (api.Conn, error) {
+	if d := c.dialer.Load(); d != nil {
+		return (*d).Dial(ctx, local, addr)
 	}
-
-	switch state.clusterType {
-	case stnrv1.ClusterTypeStatic:
-		for _, e := range state.endpoints {
-			if e.Match(peer, port) {
-				return true
-			}
-		}
-	case stnrv1.ClusterTypeStrictDNS:
-		if c.resolver == nil {
-			return false
-		}
-		for _, d := range state.domains {
-			hosts, err := c.resolver.Lookup(d)
-			if err != nil {
-				continue
-			}
-			for _, h := range hosts {
-				if h.Equal(peer) {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
 }
 
-// strictDNSDomains returns the cluster's strict-DNS domains from the current snapshot, or nil
-// for non-strict-DNS clusters. Used by Start/Close to (un)register domains with the resolver.
-func (c *Cluster) strictDNSDomains() []string {
-	state := c.state.Load()
-	if state == nil || state.clusterType != stnrv1.ClusterTypeStrictDNS {
-		return nil
+func (c *Cluster) ListenPacket(network string, port int) (net.PacketConn, net.Addr, error) {
+	if d := c.dialer.Load(); d != nil {
+		return (*d).ListenPacket(network, port)
 	}
-	return append([]string(nil), state.domains...)
+	return nil, nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
 }
 
-func sameStringSet(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+func (c *Cluster) Listen(network string, port int) (net.Listener, net.Addr, error) {
+	if d := c.dialer.Load(); d != nil {
+		return (*d).Listen(network, port)
 	}
+	return nil, nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
+}
 
-	aa := append([]string(nil), a...)
-	bb := append([]string(nil), b...)
-	for i := range aa {
-		aa[i] = strings.ToLower(aa[i])
-	}
-	for i := range bb {
-		bb[i] = strings.ToLower(bb[i])
-	}
-	sort.Strings(aa)
-	sort.Strings(bb)
-
-	for i := range aa {
-		if aa[i] != bb[i] {
-			return false
+// domains returns the domain endpoints of a config, whatever its type.
+func domains(conf *stnrv2.ClusterConfig) []string {
+	ret := []string{}
+	for _, ep := range conf.Endpoints {
+		if e, err := stnrv2.ParseEndpoint(ep); err == nil && e.Domain != "" {
+			ret = append(ret, e.Domain)
 		}
 	}
-
-	return true
+	slices.Sort(ret)
+	return slices.Compact(ret)
 }

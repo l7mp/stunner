@@ -98,7 +98,7 @@ STUNner will search for the customer key in the Kubernetes Secret named `stunner
 
 ## Checking license status
 
-The simplest way to check your license status is via the handy [`stunnerctl`](/cmd/stunnerctl/README.md) command line tool:
+The simplest way to check your license status is via the handy [`stunnerctl`](/docs/cmd/stunnerctl.md) command line tool:
 
 ```console
 stunnerctl license
@@ -110,7 +110,7 @@ License status:
 
 This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license.
 
-It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/cmd/stunnerctl/README.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
+It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/docs/cmd/stunnerctl.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
 
 ```console
 stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.Name}: {.admin.licensing_info}'

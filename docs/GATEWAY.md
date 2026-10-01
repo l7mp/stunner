@@ -314,14 +314,14 @@ Backend reference configuration is as follows:
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
 | `namespace` | `string` | Namespace of the backend Service or StaticService. | No |
-| `port` | `int` | Port to use to reach the backend. If empty, make all ports available on the backend. Default: empty.| No |
-| `endPort` | `int` | If port is also specified, then access to the backend is restricted to the port range [port, endPort] inclusive. If port and endPort are empty, make all ports available on the backend. If port is given but endPort is not, admit the singleton port range [port,port]. Default: empty.| No |
+| `port` | `int` | Port of the backend. Not enforced: STUNner admits every port on the backend, see [Access control](SECURITY.md#access-control) for restricting ports. Default: empty.| No |
+| `endPort` | `int` | End of the port range of the backend, if port is also specified. Not enforced, like `port`. Default: empty.| No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
 ## TCPRoute
 
-TCPRoute is the TCP counterpart of the UDPRoute: same spec, same backend kinds, same port-range semantics, but the relay leg towards the backend is a TCP connection instead of a UDP flow. Use it when the backend service speaks TCP.
+TCPRoute is the TCP counterpart of the UDPRoute: same spec, same backend kinds, but the relay leg towards the backend is a TCP connection instead of a UDP flow. Use it when the backend service speaks TCP.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -391,7 +391,7 @@ The StaticService `spec.prefixes` must be a list of proper IPv4 or IPv6 prefixes
 
 ## Dataplane
 
-The Dataplane resource is used as a template for provisioning [`stunnerd`](/cmd/stunnerd/README.md) dataplane pods that implement TURN media ingestion. This is useful to choose the `stunnerd` image origin and version, set custom command line arguments and environment variables, configure resource requests/limits, etc.
+The Dataplane resource is used as a template for provisioning [`stunnerd`](/docs/cmd/stunnerd.md) dataplane pods that implement TURN media ingestion. This is useful to choose the `stunnerd` image origin and version, set custom command line arguments and environment variables, configure resource requests/limits, etc.
 
 Below is the `default` Dataplane installed by STUNner.
 
@@ -405,7 +405,6 @@ spec:
   - stunnerd
   args:
   - -w
-  - --udp-thread-num=16
   image: l7mp/stunnerd:latest
   resources:
     limits:
@@ -422,7 +421,7 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | Field                           | Type       | Description                                                                                                                                                                                                            | Required |
 |:--------------------------------|:----------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
 | `image`                         | `string`   | The container image.                                                                                                                                                                                                   | Yes      |
-| `imagePullPolicy`               | `string`   | Policy for if/when to pull the [`stunnerd`](/cmd/stunnerd/README.md), either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if the `latest` tag is specified on the image, `IfNotPresent` otherwise.          | No       |
+| `imagePullPolicy`               | `string`   | Policy for if/when to pull the [`stunnerd`](/docs/cmd/stunnerd.md), either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if the `latest` tag is specified on the image, `IfNotPresent` otherwise.          | No       |
 | `imagePullSecrets`              | `list`     | List of Secret references to use for pulling the `stunnerd` image. Each ref is a secret name, namespace is the same as that of the Gateway on behalf of which the dataplane is deployed.                               | No       |
 | `labels`                        | `map`      | Custom labels added to `stunnerd` pods. Mandatory labels override whatever is set here. Changing pod labels triggers full dataplane restart for the affected Gateways.                                                 | No       |
 | `annotations`                   | `map`      | Custom annotations added to `stunnerd` pods. Mandatory annotations override whatever is set here, which in turn override manually added annotations. Changes trigger full dataplane restart for the affected Gateways. | No       |
@@ -430,15 +429,15 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | `args`                          | `list`     | Command line arguments for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container).                                                                                                                 | No       |
 | `envFrom`                       | `list`     | List of sources to populate environment variables for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container). Default: empty.                                                                      | No       |
 | `env`                           | `list`     | List of environment variables for the [dataplane container](https://pkg.go.dev/k8s.io/api/core/v1#Container). Default: empty.                                                                                          | No       |
-| `replicas`                      | `int`      | Number of dataplane pods per Gateway to provision. Not enforced if the [dataplane](/cmd/stunnerd/README.md) Deployment replica count is overwritten manually or by an autoscaler. Default: 1.                          | No       |
-| `resources`                     | `object`   | Compute resources per [dataplane](/cmd/stunnerd/README.md) pod. Default: none.                                                                                                                                         | No       |
-| `affinity`                      | `object`   | Scheduling constraints for the [dataplane](/cmd/stunnerd/README.md) pods. Default: none.                                                                                                                               | No       |
-| `tolerations`                   | `object`   | Tolerations for the [dataplane](/cmd/stunnerd/README.md) pods. Default: none.                                                                                                                                          | No       |
-| `securityContext`               | `object`   | Pod-level security attributes for the [dataplane](/cmd/stunnerd/README.md) pods. Default: none.                                                                                                                        | No       |
-| `containerSecurityContext`      | `object`   | Container-level security attributes for the [dataplane](/cmd/stunnerd/README.md) pods. Default: none.                                                                                                                  | No       |
-| `topologySpreadConstraints`     | `object`   | Description of how the [dataplane](/cmd/stunnerd/README.md) pods for a Gateway ought to spread across topology domains. Default: none.                                                                                 | No       |
+| `replicas`                      | `int`      | Number of dataplane pods per Gateway to provision. Not enforced if the [dataplane](/docs/cmd/stunnerd.md) Deployment replica count is overwritten manually or by an autoscaler. Default: 1.                          | No       |
+| `resources`                     | `object`   | Compute resources per [dataplane](/docs/cmd/stunnerd.md) pod. Default: none.                                                                                                                                         | No       |
+| `affinity`                      | `object`   | Scheduling constraints for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                               | No       |
+| `tolerations`                   | `object`   | Tolerations for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                                          | No       |
+| `securityContext`               | `object`   | Pod-level security attributes for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                        | No       |
+| `containerSecurityContext`      | `object`   | Container-level security attributes for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                  | No       |
+| `topologySpreadConstraints`     | `object`   | Description of how the [dataplane](/docs/cmd/stunnerd.md) pods for a Gateway ought to spread across topology domains. Default: none.                                                                                 | No       |
 | `terminationGracePeriodSeconds` | `duration` | Optional duration in seconds for `stunnerd` to terminate gracefully. Default: 30 seconds.                                                                                                                              | No       |
-| `hostNetwork`                   | `bool`     | Deploy the [dataplane](/cmd/stunnerd/README.md) into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                  | No       |
+| `hostNetwork`                   | `bool`     | Deploy the [dataplane](/docs/cmd/stunnerd.md) into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                  | No       |
 | `disableHealthCheck`            | `bool`     | Disable health-checking. If true, enable HTTP health-checks on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: true.                                | No       |
 | `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                                                            | No       |
 | `dataplaneResource`             | `string`   | Kubernetes resource type to be used for deploying the dataplane, either a Deployment (default) or DaemonSet (**not supported in the free tier**).                                                                      | No       |

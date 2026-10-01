@@ -13,9 +13,11 @@ import (
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
+	"github.com/pion/transport/v5"
+	"github.com/pion/transport/v5/stdnet"
 	"github.com/pion/turn/v5"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
@@ -23,7 +25,7 @@ import (
 type Config struct {
 	// Protocol is the transport to reach the TURN server over: TURN-UDP, TURN-TCP, TURN-TLS
 	// or TURN-DTLS.
-	Protocol stnrv1.Protocol
+	Protocol stnrv2.Protocol
 	// ServerAddr is the TURN server address in host:port form. The host may be an IP address
 	// of either family or a DNS name.
 	ServerAddr string
@@ -38,39 +40,74 @@ type Config struct {
 	Insecure bool
 	// LoggerFactory is an optional external logger.
 	LoggerFactory logging.LoggerFactory
+	// Net is the network to reach the TURN server over, nil for the OS network.
+	Net transport.Net
 }
 
-// NewConfig builds a dialer config for the upstream TURN server named in a cluster config, reached
-// over the given transport. Credentials are generated fresh on every call, so with "ephemeral"
-// auth each dial (that is, each allocation) authenticates with its own time-windowed credential.
-// Callers add their own LoggerFactory.
+// network returns the network of the config, the OS network when unset.
+func (c Config) network() (transport.Net, error) {
+	if c.Net != nil {
+		return c.Net, nil
+	}
+	return stdnet.NewNet()
+}
+
+// dialTLS opens a TLS connection to the TURN server over nw.
+func (c Config) dialTLS(nw transport.Net) (net.Conn, error) {
+	raw, err := nw.Dial("tcp", c.ServerAddr)
+	if err != nil {
+		return nil, err
+	}
+	conn := tls.Client(raw, &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		ServerName:         c.ServerName,
+		InsecureSkipVerify: c.Insecure, //nolint:gosec
+	})
+	if err := conn.Handshake(); err != nil {
+		_ = raw.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// NewConfig builds the client config for the upstream TURN server of a cluster's tunnel: the tunnel
+// URL names the server and the transport to reach it over. Credentials are generated fresh on
+// every call, so with "ephemeral" auth each dial (that is, each allocation) authenticates with its
+// own time-windowed credential. Callers add their own LoggerFactory.
 //
 // Realm is a seed only: the server states its realm in the 401 challenge and the client overwrites
 // the configured value with it before computing the message integrity.
-func NewConfig(s *stnrv1.TURNServer, proto stnrv1.Protocol) (Config, error) {
-	user, pass, err := a12n.GenerateCredentials(s.Auth)
+func NewConfig(t *stnrv2.TunnelConfig) (Config, error) {
+	u, err := stnrv2.ParseURI(t.URL)
+	if err != nil {
+		return Config{}, err
+	}
+	if !u.Protocol.IsTURN() {
+		return Config{}, fmt.Errorf("not a TURN URL: %q", t.URL)
+	}
+	user, pass, err := a12n.GenerateCredentials(t.Auth)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to generate credentials for TURN server %q: %w",
-			s.HostPort(), err)
+			u.HostPort(), err)
 	}
 
-	// the SNI override wins; otherwise the address doubles as the server name (no SNI for
-	// an IP literal: the TLS stack ignores ServerName in that case)
-	serverName := s.Address
-	if s.SNI != "" {
-		serverName = s.SNI
+	// the SNI override wins; otherwise the host doubles as the server name (no SNI for an IP
+	// literal: the TLS stack ignores ServerName in that case)
+	serverName := u.Host
+	if t.SNI != "" {
+		serverName = t.SNI
 	}
 
 	c := Config{
-		Protocol:   proto,
-		ServerAddr: s.HostPort(),
+		Protocol:   u.Protocol,
+		ServerAddr: u.HostPort(),
 		Username:   user,
 		Password:   pass,
 		ServerName: serverName,
-		Insecure:   s.Insecure,
+		Insecure:   t.Insecure,
 	}
-	if s.Auth != nil {
-		c.Realm = s.Auth.Realm
+	if t.Auth != nil {
+		c.Realm = t.Auth.Realm
 	}
 	return c, nil
 }
@@ -91,20 +128,20 @@ type Dialer struct {
 // address. The network and local address of the allocation are the server's business, so both
 // parameters are ignored; they exist to mirror net.ListenConfig.ListenPacket.
 func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (*PacketConn, error) {
-	client, transport, err := dial(d.Config)
+	client, tconn, err := dial(d.Config)
 	if err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
 		client.Close()
-		transport.Close() //nolint:errcheck
+		tconn.Close() //nolint:errcheck
 		return nil, err
 	}
 
 	relay, err := client.Allocate()
 	if err != nil {
 		client.Close()
-		transport.Close() //nolint:errcheck
+		tconn.Close() //nolint:errcheck
 		return nil, fmt.Errorf("upstream allocation failed: %w", err)
 	}
 
@@ -112,24 +149,24 @@ func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (*PacketConn, err
 	// resolution succeeded inside dial, so it cannot fail here
 	var server net.Addr
 	switch d.Protocol {
-	case stnrv1.ProtocolTURNUDP, stnrv1.ProtocolTURNDTLS:
+	case stnrv2.ProtocolTURNUDP, stnrv2.ProtocolTURNDTLS:
 		server, _ = net.ResolveUDPAddr("udp", d.ServerAddr)
 	default:
 		server, _ = net.ResolveTCPAddr("tcp", d.ServerAddr)
 	}
 
-	return &PacketConn{PacketConn: relay, client: client, transport: transport, server: server}, nil
+	return &PacketConn{PacketConn: relay, client: client, transport: tconn, server: server}, nil
 }
 
 // BindingRequest sends a STUN binding request over a fresh session and returns the reflexive
 // address the server saw, closing the session afterwards. It needs no credentials: a STUN
 // server answers it without authentication.
 func (d Dialer) BindingRequest(ctx context.Context) (net.Addr, error) {
-	client, transport, err := dial(d.Config)
+	client, tconn, err := dial(d.Config)
 	if err != nil {
 		return nil, err
 	}
-	defer transport.Close() //nolint:errcheck
+	defer tconn.Close() //nolint:errcheck
 	defer client.Close()
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -149,19 +186,19 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (*Conn
 		return nil, fmt.Errorf("TURN relayed connections are TCP only, got network %q", network)
 	}
 	switch d.Protocol {
-	case stnrv1.ProtocolTURNTCP, stnrv1.ProtocolTURNTLS:
+	case stnrv2.ProtocolTURNTCP, stnrv2.ProtocolTURNTLS:
 	default:
 		return nil, fmt.Errorf("TCP relaying requires a TURN-TCP or TURN-TLS transport, got %q",
 			d.Protocol.String())
 	}
 
-	client, transport, err := dial(d.Config)
+	client, tconn, err := dial(d.Config)
 	if err != nil {
 		return nil, err
 	}
 	closeSession := func() {
 		client.Close()
-		transport.Close() //nolint:errcheck
+		tconn.Close() //nolint:errcheck
 	}
 	if err := ctx.Err(); err != nil {
 		closeSession()
@@ -177,22 +214,21 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (*Conn
 	closeSession = func() {
 		_ = alloc.Close()
 		client.Close()
-		transport.Close() //nolint:errcheck
+		tconn.Close() //nolint:errcheck
 	}
 
 	var dataConn net.Conn
 	switch d.Protocol {
-	case stnrv1.ProtocolTURNTCP:
+	case stnrv2.ProtocolTURNTCP:
 		dataConn, err = alloc.Dial("tcp", address)
-	case stnrv1.ProtocolTURNTLS:
+	case stnrv2.ProtocolTURNTLS:
 		// the RFC 6062 data connection follows the control transport: dial it over TLS
 		// ourselves and hand it to the allocation.
+		var nw transport.Net
 		var serverConn net.Conn
-		serverConn, err = tls.Dial("tcp", d.ServerAddr, &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			ServerName:         d.ServerName,
-			InsecureSkipVerify: d.Insecure, //nolint:gosec
-		})
+		if nw, err = d.network(); err == nil {
+			serverConn, err = d.dialTLS(nw)
+		}
 		if err == nil {
 			dataConn, err = alloc.DialWithConn(serverConn, "tcp", address)
 		}
@@ -210,47 +246,52 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (*Conn
 // client first and the conn after. The network family is chosen from the resolved server
 // address, so both IPv4 and IPv6 (and DNS-named) servers work.
 func dial(c Config) (*turn.Client, net.PacketConn, error) {
+	nw, err := c.network()
+	if err != nil {
+		return nil, nil, err
+	}
 	var turnConn net.PacketConn
 
 	switch c.Protocol {
-	case stnrv1.ProtocolTURNUDP:
+	case stnrv2.ProtocolTURNUDP:
 		udpAddr, err := net.ResolveUDPAddr("udp", c.ServerAddr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve TURN server address %q: %w",
 				c.ServerAddr, err)
 		}
-		t, err := net.ListenPacket(networkFamily("udp", udpAddr.IP), ":0")
+		t, err := nw.ListenPacket(networkFamily("udp", udpAddr.IP), ":0")
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to allocate TURN listening packet socket: %w", err)
 		}
 		turnConn = t
-	case stnrv1.ProtocolTURNTCP:
-		conn, err := net.Dial("tcp", c.ServerAddr)
+	case stnrv2.ProtocolTURNTCP:
+		conn, err := nw.Dial("tcp", c.ServerAddr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to allocate TURN socket: %w", err)
 		}
 		turnConn = turn.NewSTUNConn(conn)
-	case stnrv1.ProtocolTURNTLS:
-		conn, err := tls.Dial("tcp", c.ServerAddr, &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			ServerName:         c.ServerName,
-			InsecureSkipVerify: c.Insecure, //nolint:gosec
-		})
+	case stnrv2.ProtocolTURNTLS:
+		conn, err := c.dialTLS(nw)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to allocate TURN/TLS socket: %w", err)
 		}
 		turnConn = turn.NewSTUNConn(conn)
-	case stnrv1.ProtocolTURNDTLS:
+	case stnrv2.ProtocolTURNDTLS:
 		udpAddr, err := net.ResolveUDPAddr("udp", c.ServerAddr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve TURN server address %q: %w",
 				c.ServerAddr, err)
 		}
-		conn, err := dtls.DialWithOptions(networkFamily("udp", udpAddr.IP), udpAddr,
+		sock, err := nw.ListenPacket(networkFamily("udp", udpAddr.IP), ":0")
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to allocate TURN/DTLS socket: %w", err)
+		}
+		conn, err := dtls.ClientWithOptions(sock, udpAddr,
 			dtls.WithInsecureSkipVerify(c.Insecure),
 			dtls.WithServerName(c.ServerName),
 		)
 		if err != nil {
+			_ = sock.Close()
 			return nil, nil, fmt.Errorf("failed to allocate TURN/DTLS socket: %w", err)
 		}
 		turnConn = turn.NewSTUNConn(conn)
@@ -261,6 +302,7 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 	client, err := turn.NewClient(&turn.ClientConfig{
 		STUNServerAddr: c.ServerAddr,
 		TURNServerAddr: c.ServerAddr,
+		Net:            nw,
 		Conn:           turnConn,
 		Username:       c.Username,
 		Password:       c.Password,

@@ -36,9 +36,6 @@ func (m *MockResolver) Close() {
 	m.log.Debugf("closing mock DNS resolver")
 }
 
-// SetOnChange mocks the DNS-change callback installer.
-func (m *MockResolver) SetOnChange(func()) {}
-
 // Register mocks the DNS resolver's Register method
 func (m *MockResolver) Register(domain string) error {
 	m.log.Tracef("register (mock): %q", domain)

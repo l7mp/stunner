@@ -181,6 +181,44 @@ func (t *Telemetry) init() error {
 	return nil
 }
 
+// Counters counts the traffic of one listener or cluster. It builds the metric attributes of both
+// directions once, so the per-packet path neither allocates nor hashes the name.
+type Counters struct {
+	t                  *Telemetry
+	packets, bytes     metric.Int64Counter
+	incoming, outgoing metric.AddOption
+}
+
+// Counters returns the traffic counters of a listener (ListenerType) or a cluster (ClusterType).
+func (t *Telemetry) Counters(n string, c ConnType) *Counters {
+	ret := &Counters{t: t,
+		incoming: metric.WithAttributeSet(attribute.NewSet(attribute.String("name", n),
+			attribute.String("direction", Incoming.String()))),
+		outgoing: metric.WithAttributeSet(attribute.NewSet(attribute.String("name", n),
+			attribute.String("direction", Outgoing.String()))),
+	}
+	switch c {
+	case ListenerType:
+		ret.packets, ret.bytes = t.ListenerPacketsCounter, t.ListenerBytesCounter
+	case ClusterType:
+		ret.packets, ret.bytes = t.ClusterPacketsCounter, t.ClusterBytesCounter
+	}
+	return ret
+}
+
+// Add counts a packet of n bytes in direction d.
+func (c *Counters) Add(d Direction, n int) {
+	if c.packets == nil {
+		return
+	}
+	attrs := c.incoming
+	if d == Outgoing {
+		attrs = c.outgoing
+	}
+	c.packets.Add(c.t.ctx, 1, attrs)
+	c.bytes.Add(c.t.ctx, int64(n), attrs)
+}
+
 func (t *Telemetry) IncrementPackets(n string, c ConnType, d Direction, count uint64) {
 	attrs := metric.WithAttributes(
 		attribute.String("name", n),

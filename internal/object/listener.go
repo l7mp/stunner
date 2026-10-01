@@ -1,66 +1,44 @@
 package object
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
-	"net"
-	"sort"
-	"strconv"
-	"strings"
 	"sync/atomic"
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/listener"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/server"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// Listener implements a STUNner listener. It holds the reconciled config, published as an atomic
-// snapshot for the packet path, and owns the Server that Start brings up from it.
+// Listener is a listener config and the listener it runs, feeding the chain of servers the config
+// names.
 type Listener struct {
-	name, realm            string
-	proto                  stnrv1.ListenerProtocol
-	addr                   net.IP
-	port, minPort, maxPort int
-	publicAddr             string
-	publicPort             int
-	publicAddrs            []string
-	rawAddr                string
-	addrs                  []string
-	cert, key              []byte
-	pqcMode                stnrv1.PQCMode
-	peerAddr               string
-	routes                 []string
+	name string
 
-	// conf is the atomic snapshot read by the server on the request path.
-	conf atomic.Pointer[stnrv1.ListenerConfig]
+	conf atomic.Pointer[stnrv2.ListenerConfig]
 
-	// server is the running packet server, nil while the listener is down.
-	server server.Server
+	listener api.Listener
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
 }
 
-// NewListener creates a Listener object.
-func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
-	if conf == nil {
-		return &Listener{
-			rt:  rt,
-			log: rt.Logger.NewLogger("listener"),
-		}, nil
+// NewListener creates a listener object.
+func NewListener(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
+	req, ok := conf.(*stnrv2.ListenerConfig)
+	if !ok {
+		return nil, stnrv2.ErrInvalidConf
 	}
-	req := conf.(*stnrv1.ListenerConfig)
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	name := req.Name
 	l := &Listener{
-		name: name,
+		name: req.Name,
 		rt:   rt,
-		log:  rt.Logger.NewLogger(fmt.Sprintf("listener-%s", name)),
+		log:  rt.Logger.NewLogger(fmt.Sprintf("listener-%s", req.Name)),
 	}
 	if err := l.Reconcile(req); err != nil {
 		return nil, err
@@ -71,221 +49,122 @@ func NewListener(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error
 func (l *Listener) Name() string             { return l.name }
 func (l *Listener) Type() runtime.ObjectType { return runtime.TypeListener }
 
-func (l *Listener) Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (runtime.Action, error) {
-	req := new.(*stnrv1.ListenerConfig)
+// Inspect restarts on a socket change; servers and public addresses reconcile in place.
+func (l *Listener) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
+	req, ok := new.(*stnrv2.ListenerConfig)
+	if !ok {
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
+	}
 	if err := req.Validate(); err != nil {
 		return runtime.ActionNone, err
 	}
-
-	cur := old.(*stnrv1.ListenerConfig)
-	changed := !cur.DeepEqual(req)
-
-	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
-	cert, err := base64.StdEncoding.DecodeString(req.Cert)
-	if err != nil {
-		return runtime.ActionNone, fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
-	}
-	key, err := base64.StdEncoding.DecodeString(req.Key)
-	if err != nil {
-		return runtime.ActionNone, fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
-	}
-
-	// A restart is only avoidable when Routes, PublicIP/PublicPort and/or PeerAddr are the
-	// only changes. A peer address change reconciles in place: existing flows stay pinned to
-	// the peer they were created with, new flows go to the new peer.
-	pqcMode, _ := stnrv1.NewPQCMode(req.PQCMode)
-	restart := !(l.name == req.Name && //nolint:staticcheck
-		l.proto == proto &&
-		l.rawAddr == req.Addr &&
-		l.port == req.Port &&
-		bytes.Equal(l.cert, cert) &&
-		bytes.Equal(l.key, key) &&
-		l.pqcMode == pqcMode)
-
-	curRealm := l.realm
-	if a := l.lookupAuthConfig(); a != nil {
-		curRealm = a.Realm
-	}
-	desiredRealm := full.Auth.Realm
-	if curRealm != desiredRealm {
-		l.log.Tracef("listener %s restarts due to changing auth realm", l.name)
-		changed = true
-		restart = true
-	}
-	if !changed {
+	cur := old.(*stnrv2.ListenerConfig)
+	if cur.DeepEqual(req) {
 		return runtime.ActionNone, nil
 	}
-	if restart {
+	if cur.Protocol != req.Protocol || cur.Addr != req.Addr || cur.Port != req.Port ||
+		cur.Cert != req.Cert || cur.Key != req.Key || cur.PQCMode != req.PQCMode {
 		return runtime.ActionRestart, nil
 	}
 	return runtime.ActionReconcile, nil
 }
 
-func (l *Listener) Reconcile(conf stnrv1.Config) error {
-	req := conf.(*stnrv1.ListenerConfig)
-	l.log.Tracef("reconcile: %s", req.String())
+func (l *Listener) Reconcile(conf stnrv2.Config) error {
+	req, ok := conf.(*stnrv2.ListenerConfig)
+	if !ok {
+		return stnrv2.ErrInvalidConf
+	}
 	if err := req.Validate(); err != nil {
 		return err
-	}
-	if l.name == "" {
-		l.name = req.Name
 	}
 	if l.name != req.Name {
 		return fmt.Errorf("cannot rename listener %q to %q", l.name, req.Name)
 	}
-
-	proto, _ := stnrv1.NewListenerProtocol(req.Protocol)
-	var ipAddr net.IP
-	if proto != stnrv1.ProtocolSTDIN {
-		// STDIN listeners have no listener socket and carry no address
-		ipAddr = net.ParseIP(req.Addr)
-		if ipAddr == nil && req.Addr == "localhost" {
-			ipAddr = net.ParseIP("127.0.0.1")
-		}
-		if ipAddr == nil {
-			return fmt.Errorf("invalid listener address: %s", req.Addr)
-		}
-	}
-
-	l.proto = proto
-	l.addr = ipAddr
-	l.rawAddr = req.Addr
-	l.port = req.Port
-	if proto == stnrv1.ListenerProtocolTURNTLS || proto == stnrv1.ListenerProtocolTURNDTLS {
-		cert, err := base64.StdEncoding.DecodeString(req.Cert)
-		if err != nil {
-			return fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
-		}
-		key, err := base64.StdEncoding.DecodeString(req.Key)
-		if err != nil {
-			return fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
-		}
-		l.cert = cert
-		l.key = key
-	}
-	l.pqcMode, _ = stnrv1.NewPQCMode(req.PQCMode)
-	l.realm = stnrv1.DefaultRealm
-	if a := l.lookupAuthConfig(); a != nil {
-		l.realm = a.Realm
-	}
-	l.publicAddr = req.PublicAddr
-	l.publicPort = req.PublicPort
-	l.peerAddr = req.PeerAddr
-
-	l.publicAddrs = make([]string, len(req.PublicAddrs))
-	copy(l.publicAddrs, req.PublicAddrs)
-
-	l.addrs = make([]string, len(req.Addrs))
-	copy(l.addrs, req.Addrs)
-
-	l.routes = make([]string, len(req.Routes))
-	copy(l.routes, req.Routes)
-
-	// Publish the snapshot for the TURN request path.
-	l.conf.Store(l.buildConfig())
-
-	l.rt.Router.InvalidateCache()
+	cp := &stnrv2.ListenerConfig{}
+	req.DeepCopyInto(cp)
+	l.conf.Store(cp)
 	return nil
 }
 
-// buildConfig renders the listener's live config from its fields. Only called from Reconcile;
-// readers go through the snapshot.
-func (l *Listener) buildConfig() *stnrv1.ListenerConfig {
-	routes := make([]string, len(l.routes))
-	copy(routes, l.routes)
-	sort.Strings(routes)
-	publicAddrs := make([]string, len(l.publicAddrs))
-	copy(publicAddrs, l.publicAddrs)
-	addrs := make([]string, len(l.addrs))
-	copy(addrs, l.addrs)
-	c := &stnrv1.ListenerConfig{
-		Name:        l.name,
-		Protocol:    l.proto.String(),
-		Addr:        l.rawAddr,
-		Addrs:       addrs,
-		Port:        l.port,
-		PublicAddr:  l.publicAddr,
-		PublicPort:  l.publicPort,
-		PublicAddrs: publicAddrs,
-		PeerAddr:    l.peerAddr,
-		Routes:      routes,
+func (l *Listener) GetConfig() stnrv2.Config {
+	cp := &stnrv2.ListenerConfig{Name: l.name}
+	if c := l.conf.Load(); c != nil {
+		c.DeepCopyInto(cp)
 	}
-	c.Cert = string(l.cert)
-	c.Key = string(l.key)
-	if l.pqcMode != stnrv1.PQCModeDefault {
-		c.PQCMode = l.pqcMode.String()
-	}
-	return c
+	return cp
 }
 
-// String returns a short stable representation, safe as a map key.
-func (l *Listener) String() string {
-	return fmt.Sprintf("%s: [%s://%s<%d:%d>]", l.name, strings.ToLower(l.proto.String()),
-		net.JoinHostPort(l.addr.String(), strconv.Itoa(l.port)), l.minPort, l.maxPort)
-}
-
-// GetConfig returns a copy of the live listener config. Safe for concurrent use.
-func (l *Listener) GetConfig() stnrv1.Config {
-	snap := l.conf.Load()
-	if snap == nil {
-		return &stnrv1.ListenerConfig{Name: l.name}
-	}
-	cp := *snap
-	cp.Routes = make([]string, len(snap.Routes))
-	copy(cp.Routes, snap.Routes)
-	cp.PublicAddrs = make([]string, len(snap.PublicAddrs))
-	copy(cp.PublicAddrs, snap.PublicAddrs)
-	cp.Addrs = make([]string, len(snap.Addrs))
-	copy(cp.Addrs, snap.Addrs)
-	return &cp
-}
-
-// Start brings up the Server matching the listener protocol. Servers read the listener config
-// back through the runtime, so the listener must already be registered.
+// Start binds the listener.
 func (l *Listener) Start() error {
-	l.log.Infof("listener %s (re)starting", l.String())
-	s, err := server.New(l.name, l.proto, l.rt)
+	conf := l.conf.Load()
+	// the listener takes its TLS cert and key in PEM
+	decoded := &stnrv2.ListenerConfig{}
+	conf.DeepCopyInto(decoded)
+	cert, err := base64.StdEncoding.DecodeString(conf.Cert)
 	if err != nil {
-		return fmt.Errorf("failed to start server for listener %s: %w", l.name, err)
+		return fmt.Errorf("invalid TLS certificate: base64-decode error: %w", err)
 	}
-	l.server = s
-	l.log.Infof("listener %s: listener running", l.name)
+	key, err := base64.StdEncoding.DecodeString(conf.Key)
+	if err != nil {
+		return fmt.Errorf("invalid TLS key: base64-decode error: %w", err)
+	}
+	decoded.Cert, decoded.Key = string(cert), string(key)
+
+	ln, err := listener.New(decoded, l.rt, l.serve)
+	if err != nil {
+		return err
+	}
+	if err := ln.Start(); err != nil {
+		return fmt.Errorf("failed to start listener %s: %w", l.name, err)
+	}
+	l.listener = ln
 	return nil
 }
 
-// Close tears down the server and drops cached routing state.
+// Close closes the listener. The conns it emitted stay up.
 func (l *Listener) Close(_ bool) error {
-	l.rt.Router.InvalidateCache()
-	if l.server == nil {
+	if l.listener == nil {
 		return nil
 	}
-	err := l.server.Close()
-	l.server = nil
+	err := l.listener.Close()
+	l.listener = nil
 	return err
 }
 
-func (l *Listener) Status() stnrv1.Status {
-	conf := l.GetConfig().(*stnrv1.ListenerConfig)
-	status := &stnrv1.ListenerStatus{
-		ListenerConfig: conf,
+// serve hands a conn down the server chain, closing it unless a server consumes it.
+func (l *Listener) serve(c api.Conn) {
+	servers := l.conf.Load().Servers
+	for _, name := range servers {
+		srv, ok := l.rt.Server(name)
+		if !ok {
+			l.log.Debugf("listener %s: no server %q for client %s", l.name, name,
+				c.RemoteAddr().String())
+			_ = c.Close()
+			return
+		}
+		next, verdict, err := srv.Serve(c)
+		if err != nil {
+			l.log.Debugf("listener %s: server %q refused client %s: %s", l.name, name,
+				c.RemoteAddr().String(), err.Error())
+			_ = c.Close()
+			return
+		}
+		if verdict == api.Consumed {
+			return
+		}
+		c = next
 	}
-	if offloadStatus, ok := l.rt.GetStatus(runtime.TypeOffload, "").(*stnrv1.OffloadStatus); ok {
-		status.Stats = offloadStatus.Listeners[conf.Name]
+	if len(servers) > 0 {
+		l.log.Warnf("listener %s: the last server %q passed client %s on: closing it", l.name,
+			servers[len(servers)-1], c.RemoteAddr().String())
+	}
+	_ = c.Close()
+}
+
+func (l *Listener) Status() stnrv2.Status {
+	status := &stnrv2.ListenerStatus{ListenerConfig: l.GetConfig().(*stnrv2.ListenerConfig)}
+	if offloadStatus, ok := l.rt.GetStatus(runtime.TypeOffload, "").(*stnrv2.OffloadStatus); ok {
+		status.Stats = offloadStatus.Listeners[l.name]
 	}
 	return status
-}
-
-// AllocationCount returns the number of active sessions on the listener's server.
-func (l *Listener) AllocationCount() int {
-	if l.server == nil {
-		return 0
-	}
-	return l.server.AllocationCount()
-}
-
-// lookupAuthConfig is the runtime-backed cross-reference used at reconcile time to track auth
-// realm changes.
-func (l *Listener) lookupAuthConfig() *stnrv1.AuthConfig {
-	a, _ := l.rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
-	return a
 }

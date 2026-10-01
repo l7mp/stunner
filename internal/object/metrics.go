@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Metrics is the Object that owns the Prometheus metrics HTTP server. Carving it out of Admin
@@ -37,15 +37,15 @@ type MetricsConfig struct {
 }
 
 func (c *MetricsConfig) Validate() error    { return nil }
-func (c *MetricsConfig) ConfigName() string { return stnrv1.DefaultMetricsName }
-func (c *MetricsConfig) DeepEqual(other stnrv1.Config) bool {
+func (c *MetricsConfig) ConfigName() string { return stnrv2.DefaultMetricsName }
+func (c *MetricsConfig) DeepEqual(other stnrv2.Config) bool {
 	o, ok := other.(*MetricsConfig)
 	if !ok {
 		return false
 	}
 	return c.Endpoint == o.Endpoint
 }
-func (c *MetricsConfig) DeepCopyInto(dst stnrv1.Config) {
+func (c *MetricsConfig) DeepCopyInto(dst stnrv2.Config) {
 	d, ok := dst.(*MetricsConfig)
 	if !ok {
 		return
@@ -57,7 +57,7 @@ func (c *MetricsConfig) String() string {
 }
 
 // NewMetrics creates a Metrics object.
-func NewMetrics(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+func NewMetrics(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	m := &Metrics{
 		dryRun: rt.DryRun,
 		log:    rt.Logger.NewLogger("metrics"),
@@ -67,7 +67,7 @@ func NewMetrics(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 	}
 	req, ok := conf.(*MetricsConfig)
 	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+		return nil, stnrv2.ErrInvalidConf
 	}
 	if err := m.Reconcile(req); err != nil {
 		return nil, err
@@ -75,11 +75,11 @@ func NewMetrics(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 	return m, nil
 }
 
-func (m *Metrics) Name() string             { return stnrv1.DefaultMetricsName }
+func (m *Metrics) Name() string             { return stnrv2.DefaultMetricsName }
 func (m *Metrics) Type() runtime.ObjectType { return runtime.TypeMetrics }
 
 // GetConfig returns a copy of the live metrics config. Safe for concurrent use.
-func (m *Metrics) GetConfig() stnrv1.Config {
+func (m *Metrics) GetConfig() stnrv2.Config {
 	if snap := m.conf.Load(); snap != nil {
 		cp := *snap
 		return &cp
@@ -87,12 +87,12 @@ func (m *Metrics) GetConfig() stnrv1.Config {
 	return &MetricsConfig{}
 }
 
-func (m *Metrics) Status() stnrv1.Status { return m.GetConfig() }
+func (m *Metrics) Status() stnrv2.Status { return m.GetConfig() }
 
-func (m *Metrics) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+func (m *Metrics) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*MetricsConfig)
 	if !ok {
-		return runtime.ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
 	cur := old.(*MetricsConfig)
 	if reflect.DeepEqual(req, cur) {
@@ -101,10 +101,10 @@ func (m *Metrics) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runt
 	return runtime.ActionRestart, nil
 }
 
-func (m *Metrics) Reconcile(conf stnrv1.Config) error {
+func (m *Metrics) Reconcile(conf stnrv2.Config) error {
 	req, ok := conf.(*MetricsConfig)
 	if !ok {
-		return stnrv1.ErrInvalidConf
+		return stnrv2.ErrInvalidConf
 	}
 	m.endpoint = req.Endpoint
 	m.conf.Store(&MetricsConfig{Endpoint: req.Endpoint})
@@ -118,7 +118,7 @@ func (m *Metrics) Start() error {
 	if m.endpoint == "" {
 		return nil
 	}
-	addr, path := getAddrFromURL(m.endpoint, stnrv1.DefaultMetricsPort)
+	addr, path := getAddrFromURL(m.endpoint, stnrv2.DefaultMetricsPort)
 	if m.servAddr != "" && m.servAddr == addr {
 		return nil
 	}

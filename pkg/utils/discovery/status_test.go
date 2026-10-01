@@ -11,16 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestGetStunnerdStatus(t *testing.T) {
-	want := stnrv1.StunnerStatus{
-		Admin:  &stnrv1.AdminStatus{Name: "ns/gw", OffloadStatus: "TC[all]"},
+	want := stnrv2.StunnerStatus{
+		Admin:  &stnrv2.AdminStatus{Name: "ns/gw", OffloadStatus: "TC[all]"},
 		Status: "Ready",
-		Listeners: []*stnrv1.ListenerStatus{{
-			ListenerConfig: &stnrv1.ListenerConfig{Name: "ns/gw/udp"},
-			Stats:          stnrv1.OffloadDirStat{Rx: stnrv1.OffloadStatInfo{Pkts: 3}},
+		Listeners: []*stnrv2.ListenerStatus{{
+			ListenerConfig: &stnrv2.ListenerConfig{Name: "ns/gw/udp"},
+			Stats:          stnrv2.OffloadDirStat{Rx: stnrv2.OffloadStatInfo{Pkts: 3}},
 		}},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -108,7 +108,7 @@ NAME                                    AGE
 udproute.stunner.l7mp.io/iperf-server   139m
 ```
 
-You can also use the handy [`stunnerctl` CLI tool](/cmd/stunnerctl/README.md) to dump the running STUNner configuration for the UDP gateway. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory. 
+You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration for the UDP gateway. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory. 
 
 ``` console
 bin/stunnerctl -n stunner config udp-gateway

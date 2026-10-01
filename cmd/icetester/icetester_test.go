@@ -4,7 +4,9 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/l7mp/stunner/v2/pkg/logger"
@@ -44,8 +46,13 @@ var testerTestCases = []struct {
 			assert.NotNil(t, d)
 
 			log.Debug("dialing")
-			clientConn, err := d.DialContext(ctx, defaultICETesterAddr)
-			assert.NoError(t, err)
+			// the listener starts in the background: retry until it is up
+			var clientConn net.Conn
+			require.Eventually(t, func() bool {
+				c, err := d.DialContext(ctx, defaultICETesterAddr)
+				clientConn = c
+				return err == nil
+			}, 5*time.Second, 50*time.Millisecond, "dial")
 
 			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")

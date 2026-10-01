@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/l7mp/stunner/v2"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -31,6 +31,8 @@ type tunnelOptions struct {
 	insecure  bool
 	logLevel  string
 	logFormat string
+	license   *stnrv2.LicenseConfig
+	offload   string
 }
 
 // runTunnel runs stunnerd in tunnel mode: render an in-memory config with one plain (or stdin)
@@ -46,7 +48,7 @@ func runTunnel(clientArg, serverArg, peerArg string, opts tunnelOptions, k8sConf
 		defaultNamespace = *k8sConfigFlags.Namespace
 	}
 	conf, err := tunnelConfig(clientArg, serverArg, peerArg, defaultNamespace, opts,
-		func(u k8sName) (*stnrv1.StunnerConfig, error) {
+		func(u k8sName) (*stnrv2.StunnerConfig, error) {
 			return tunnelConfFromK8s(u, k8sConfigFlags, cdsConfigFlags, loggerFactory)
 		},
 		func(u k8sName) (string, error) {
@@ -98,53 +100,51 @@ func runTunnel(clientArg, serverArg, peerArg string, opts tunnelOptions, k8sConf
 }
 
 // tunnelConfig renders the tunnel-mode stunnerd config from the three positional arguments:
-// one plain (or stdin) listener pinned to the peer, routing to a single TURN-* protocol
-// cluster naming the server. Both k8s:// meta-URI families share one parser; the parsed
+// one plain (or stdin) listener feeding an L4 server, whose single cluster holds the peer and
+// reaches it over the peer URI's transport through a tunnel to the TURN server. Both k8s:// meta-URI families share one parser; the parsed
 // names are resolved against the cluster by the fromK8s (gateway listener) and peerFromK8s
 // (Service port) callbacks.
 func tunnelConfig(clientArg, serverArg, peerArg, defaultNamespace string, opts tunnelOptions,
-	fromK8s func(k8sName) (*stnrv1.StunnerConfig, error),
-	peerFromK8s func(k8sName) (string, error)) (*stnrv1.StunnerConfig, error) {
+	fromK8s func(k8sName) (*stnrv2.StunnerConfig, error),
+	peerFromK8s func(k8sName) (string, error)) (*stnrv2.StunnerConfig, error) {
 
-	srv, proto, err := tunnelServer(serverArg, defaultNamespace, fromK8s)
+	tunnel, proto, err := tunnelServer(serverArg, defaultNamespace, fromK8s)
 	if err != nil {
 		return nil, err
 	}
-	srv.Insecure = opts.insecure
+	tunnel.Insecure = opts.insecure
 	if opts.sni != "" {
-		if proto != stnrv1.ProtocolTURNTLS && proto != stnrv1.ProtocolTURNDTLS {
+		if proto != stnrv2.ProtocolTURNTLS && proto != stnrv2.ProtocolTURNDTLS {
 			return nil, fmt.Errorf("--sni is valid only for the TLS/DTLS transports, "+
 				"server transport is %q", proto.String())
 		}
-		srv.SNI = opts.sni
+		tunnel.SNI = opts.sni
 	}
 
-	listener := stnrv1.ListenerConfig{
-		Name:   "tunnel-listener",
-		Routes: []string{"tunnel-cluster"},
+	listener := stnrv2.ListenerConfig{
+		Name:    "tunnel-listener",
+		Servers: []string{"tunnel-server"},
 	}
 	if clientArg == "-" {
-		listener.Protocol = stnrv1.ProtocolSTDIN.String()
+		listener.Protocol = stnrv2.ProtocolSTDIN.String()
 	} else {
-		u, err := stunner.ParseURI(clientArg)
+		u, err := stnrv2.ParseURI(clientArg)
 		if err != nil {
 			return nil, fmt.Errorf("invalid client address %q: %w", clientArg, err)
 		}
-		p, err := stnrv1.NewProtocol(u.Protocol)
-		if err != nil || (p != stnrv1.ProtocolUDP && p != stnrv1.ProtocolTCP) {
+		if p := u.Protocol; p != stnrv2.ProtocolUDP && p != stnrv2.ProtocolTCP {
 			return nil, fmt.Errorf("invalid client address %q: expecting udp:// or "+
 				"tcp:// (or \"-\" for stdin)", clientArg)
 		}
-		listener.Protocol = p.String()
-		listener.Addr = u.Address
+		listener.Protocol = u.Protocol.String()
+		listener.Addr = u.Host
 		listener.Port = u.Port
 	}
 
 	// A k8s:// peer names a Service port: resolve it into a peer address once at startup
-	// (the Service port spec also names the peer transport). Otherwise the peer URI maps
-	// straight onto the listener's peer address: the scheme names the peer transport and
-	// the host may be a DNS name resolvable only where the tunnel runs (syntax is checked
-	// by the config validation, resolution happens per flow in the engine).
+	// (the Service port spec also names the peer transport). Otherwise the peer URI's scheme
+	// names the transport the cluster reaches the peer over, and its host and port make the
+	// cluster's only endpoint: the host may be a DNS name resolvable only where the tunnel runs.
 	if u, ok, err := parseK8sURI(peerArg, defaultNamespace); ok {
 		if err != nil {
 			return nil, err
@@ -155,28 +155,50 @@ func tunnelConfig(clientArg, serverArg, peerArg, defaultNamespace string, opts t
 		}
 		peerArg = resolved
 	}
-	if lower := strings.ToLower(peerArg); !strings.HasPrefix(lower, "udp://") &&
-		!strings.HasPrefix(lower, "tcp://") {
+	scheme, hostport, _ := strings.Cut(peerArg, "://")
+	peerProto, err := stnrv2.NewClusterProtocol(scheme)
+	if err != nil {
 		return nil, fmt.Errorf("invalid peer address %q: expecting "+
 			"<udp|tcp>://<host>:<port>", peerArg)
 	}
-	listener.PeerAddr = peerArg
+	peer, err := stnrv2.ParseEndpoint(hostport)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer address %q: %w", peerArg, err)
+	}
+	if _, dialable := peer.HostPort(); !dialable {
+		return nil, fmt.Errorf("invalid peer address %q: expecting a single host and port",
+			peerArg)
+	}
+	clusterType := stnrv2.ClusterTypeStatic
+	if peer.Domain != "" {
+		clusterType = stnrv2.ClusterTypeStrictDNS
+	}
 
 	noHealthCheck := ""
-	c := &stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin: stnrv1.AdminConfig{
+	c := &stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin: stnrv2.AdminConfig{
 			Name:                "tunnel",
 			HealthCheckEndpoint: &noHealthCheck,
+			OffloadEngine:       opts.offload,
+			LicenseConfig:       opts.license,
 		},
 		// the plain listener authenticates nobody; the upstream credentials live on the
-		// TURN server block of the cluster
-		Auth:      stnrv1.AuthConfig{Type: "none"},
-		Listeners: []stnrv1.ListenerConfig{listener},
-		Clusters: []stnrv1.ClusterConfig{{
-			Name:       "tunnel-cluster",
-			Protocol:   proto.String(),
-			TURNServer: srv,
+		// tunnel of the cluster
+		Auth:      stnrv2.AuthConfig{Type: "none"},
+		Listeners: []stnrv2.ListenerConfig{listener},
+		Servers: []stnrv2.ServerConfig{{
+			Name:     "tunnel-server",
+			Type:     stnrv2.ServerTypeL4.String(),
+			Clusters: []string{"tunnel-cluster"},
+		}},
+		Clusters: []stnrv2.ClusterConfig{{
+			Name:          "tunnel-cluster",
+			Type:          clusterType.String(),
+			Endpoints:     []string{hostport},
+			RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String(),
+			Protocol:      peerProto.String(),
+			Tunnel:        tunnel,
 		}},
 	}
 	if err := c.Validate(); err != nil {
@@ -185,63 +207,63 @@ func tunnelConfig(clientArg, serverArg, peerArg, defaultNamespace string, opts t
 	return c, nil
 }
 
-// tunnelServer resolves the TURN server argument into an upstream server description and the
-// transport to reach it over: directly from a turn:// URI, or from the running dataplane config
-// of the named gateway listener for the k8s:// meta-URI.
-func tunnelServer(arg, defaultNamespace string, fromK8s func(k8sName) (*stnrv1.StunnerConfig, error)) (*stnrv1.TURNServer, stnrv1.Protocol, error) {
+// tunnelServer resolves the TURN server argument into the tunnel to reach the peer through, and the
+// transport of the tunnel: directly from a turn:// URI, or from the running dataplane config of the
+// named gateway listener for the k8s:// meta-URI.
+func tunnelServer(arg, defaultNamespace string, fromK8s func(k8sName) (*stnrv2.StunnerConfig, error)) (*stnrv2.TunnelConfig, stnrv2.Protocol, error) {
 	if u, ok, err := parseK8sURI(arg, defaultNamespace); ok {
 		if err != nil {
-			return nil, stnrv1.ProtocolUnknown, err
+			return nil, stnrv2.ProtocolUnknown, err
 		}
 		conf, err := fromK8s(u)
 		if err != nil {
-			return nil, stnrv1.ProtocolUnknown, err
+			return nil, stnrv2.ProtocolUnknown, err
 		}
 		l := conf.Listeners[0]
 		if l.PublicAddr == "" || l.PublicPort == 0 {
-			return nil, stnrv1.ProtocolUnknown,
+			return nil, stnrv2.ProtocolUnknown,
 				fmt.Errorf("no public address/port for listener %q", l.Name)
 		}
-		proto, err := stnrv1.NewListenerProtocol(l.Protocol)
-		if err != nil || !proto.IsTURN() {
-			return nil, stnrv1.ProtocolUnknown,
-				fmt.Errorf("listener %q is not a TURN listener", l.Name)
+		if s, err := conf.GetServerConfig(l.FirstServer()); err != nil ||
+			s.Type != stnrv2.ServerTypeTURN.String() {
+			return nil, stnrv2.ProtocolUnknown,
+				fmt.Errorf("listener %q does not feed a TURN server", l.Name)
 		}
-		auth := stnrv1.AuthConfig{}
+		uri, err := stnrv2.NewURIFromListener(&l)
+		if err != nil {
+			return nil, stnrv2.ProtocolUnknown, err
+		}
+		auth := stnrv2.AuthConfig{}
 		conf.Auth.DeepCopyInto(&auth)
-		return &stnrv1.TURNServer{
-			Address: l.PublicAddr,
-			Port:    l.PublicPort,
-			Auth:    &auth,
-		}, proto, nil
+		return &stnrv2.TunnelConfig{URL: uri.String(), Auth: &auth}, uri.Protocol, nil
 	}
 
-	u, err := stunner.ParseURI(arg)
+	u, err := stnrv2.ParseURI(arg)
 	if err != nil {
-		return nil, stnrv1.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: %w", arg, err)
+		return nil, stnrv2.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: %w", arg, err)
 	}
-	proto, err := stnrv1.NewProtocol(u.Protocol)
-	if err != nil || !proto.IsTURN() {
-		return nil, stnrv1.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: "+
+	if !u.Protocol.IsTURN() {
+		return nil, stnrv2.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: "+
 			"not a TURN transport", arg)
 	}
 
-	srv := &stnrv1.TURNServer{Address: u.Address, Port: u.Port}
+	// the URL renders without the credentials
+	tunnel := &stnrv2.TunnelConfig{URL: u.String()}
 	switch {
 	case u.Username != "" && u.Password != "":
-		srv.Auth = &stnrv1.AuthConfig{Type: "static", Credentials: map[string]string{
+		tunnel.Auth = &stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{
 			"username": u.Username, "password": u.Password}}
 	case u.Username != "":
 		// a bare secret mints per-allocation time-windowed credentials
-		srv.Auth = &stnrv1.AuthConfig{Type: "ephemeral", Credentials: map[string]string{
+		tunnel.Auth = &stnrv2.AuthConfig{Type: "ephemeral", Credentials: map[string]string{
 			"secret": u.Username}}
 	}
-	return srv, proto, nil
+	return tunnel, u.Protocol, nil
 }
 
 // tunnelConfFromK8s fetches the running dataplane config of the gateway named in a parsed
 // k8s:// URI from the cluster's CDS server and narrows it to the single named listener.
-func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *discovery.CDSConfigFlags, loggerFactory logger.LoggerFactory) (*stnrv1.StunnerConfig, error) {
+func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *discovery.CDSConfigFlags, loggerFactory logger.LoggerFactory) (*stnrv2.StunnerConfig, error) {
 	namespace, name, listener := u.Namespace, u.Name, u.Component
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -270,7 +292,7 @@ func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigF
 	conf := confs[0]
 
 	// narrow to the named listener; TURN listener names are "<namespace>/<gateway>/<listener>"
-	ls := []stnrv1.ListenerConfig{}
+	ls := []stnrv2.ListenerConfig{}
 	for _, l := range conf.Listeners {
 		s := strings.Split(l.Name, "/")
 		if len(s) != 3 {

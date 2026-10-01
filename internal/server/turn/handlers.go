@@ -3,34 +3,39 @@ package turn
 import (
 	"fmt"
 	"net"
+	"net/netip"
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/offload"
-	"github.com/l7mp/stunner/v2/internal/relay"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	"github.com/l7mp/stunner/v2/internal/server"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
 // NewAuthHandler returns an authentication handler callback for a TURN server.
 func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.AuthHandler {
-	log.Trace("NewAuthHandler")
-
 	// We must return a nil auth-handler to switch pure STUN on.
-	a, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv1.AuthConfig)
+	a, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv2.AuthConfig)
 	if !ok || a == nil {
 		log.Warn("auth handler: no auth config in runtime")
 		return nil
 	}
-	typeVal, err := stnrv1.NewAuthType(a.Type)
+	typeVal, err := stnrv2.NewAuthType(a.Type)
 	if err != nil {
 		log.Errorf("auth handler: invalid auth type %q", a.Type)
 		return nil
 	}
-	if typeVal == stnrv1.AuthTypeNone {
+	if typeVal == stnrv2.AuthTypeNone {
 		return nil
+	}
+	if (typeVal == stnrv2.AuthTypeStatic && (a.Credentials["username"] == "" || a.Credentials["password"] == "")) ||
+		(typeVal == stnrv2.AuthTypeEphemeral && a.Credentials["secret"] == "") {
+		log.Warnf("auth handler: %s auth without credentials: every client is refused",
+			typeVal.String())
 	}
 
 	return func(ra *turn.RequestAttributes) (string, []byte, bool) {
@@ -38,22 +43,26 @@ func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.Auth
 		realm := ra.Realm
 		srcAddr := ra.SrcAddr
 
-		auth, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv1.AuthConfig)
+		auth, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv2.AuthConfig)
 		if !ok || auth == nil {
 			log.Infof("auth request: failed: auth config is unavailable")
 			return "", nil, false
 		}
-		authType, err := stnrv1.NewAuthType(auth.Type)
+		authType, err := stnrv2.NewAuthType(auth.Type)
 		if err != nil {
 			log.Errorf("auth request: invalid auth type %q", auth.Type)
 			return "", nil, false
 		}
 
 		switch authType {
-		case stnrv1.AuthTypeStatic:
+		case stnrv2.AuthTypeStatic:
 			configuredUser := auth.Credentials["username"]
 			configuredPass := auth.Credentials["password"]
 			log.Tracef("static auth request: username=%q realm=%q srcAddr=%v", username, realm, srcAddr)
+			if configuredUser == "" || configuredPass == "" {
+				log.Infof("static auth request: failed: no credentials configured")
+				return "", nil, false
+			}
 			key := a12n.GenerateAuthKey(configuredUser, auth.Realm, configuredPass)
 			if username == configuredUser {
 				log.Debug("static auth request: valid username")
@@ -62,9 +71,13 @@ func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.Auth
 			log.Infof("static auth request: failed: invalid username")
 			return "", nil, false
 
-		case stnrv1.AuthTypeEphemeral:
+		case stnrv2.AuthTypeEphemeral:
 			secret := auth.Credentials["secret"]
 			log.Tracef("ephemeral auth request: username=%q realm=%q srcAddr=%v", username, realm, srcAddr)
+			if secret == "" {
+				log.Infof("ephemeral auth request: failed: no secret configured")
+				return "", nil, false
+			}
 			userID, err := a12n.CheckTimeWindowedUsername(username)
 			if err != nil {
 				log.Infof("ephemeral auth request: failed: %s", err)
@@ -86,32 +99,6 @@ func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.Auth
 	}
 }
 
-// NewPermissionHandler returns a callback to handle client permission requests to access peers.
-func NewPermissionHandler(name string, rt *objruntime.Runtime, log logging.LeveledLogger) a12n.PermissionHandler {
-	log.Trace("NewPermissionHandler")
-
-	return func(src net.Addr, peer net.IP) bool {
-		peerIP := peer.String()
-		log.Tracef("permission handler for listener %q: client %q, peer %q", name,
-			src.String(), peerIP)
-
-		// Grant if *any* routed cluster admits the peer. Each cluster admits on its own
-		// terms: a direct cluster admits the peers its endpoints name, a TURN-* cluster
-		// admits every peer, since admission is then the upstream TURN server's job.
-		if c, ok := rt.Router.Route(name, func(c objruntime.Cluster) bool {
-			return c.Admits(peer, 0)
-		}); ok {
-			log.Debugf("permission granted on listener %q for client %q to peer %s via cluster %q",
-				name, src.String(), peerIP, c.Name())
-			return true
-		}
-
-		log.Infof("permission denied on listener %q for client %q to peer %s: no route to endpoint",
-			name, src.String(), peerIP)
-		return false
-	}
-}
-
 // AllocationEventType is a helper type to administer allocations.
 type AllocationEventType int
 
@@ -120,25 +107,21 @@ const (
 	AllocationDeleted
 )
 
-// Quota is the per-user session quota machinery shared by the packet engines: QuotaHandler
-// gates new sessions (TURN allocations, L4 flows) and AllocationHandler administers the
-// counters from the lifecycle events.
+// Quota is the per-user session quota shared by the TURN and L4 servers.
 type Quota struct {
 	runtime *objruntime.Runtime
 }
 
-// NewQuotaHandler creates a quota handler for a listener context.
+// NewQuotaHandler creates a quota handler.
 func NewQuotaHandler(rt *objruntime.Runtime) *Quota {
 	return &Quota{runtime: rt}
 }
 
-// QuotaHandler returns a callback that enforces per-user session quotas. The check and the
-// quota reservation are one atomic step (CheckAndIncrement), so concurrent sessions cannot
-// race past the cap; AllocationHandler releases the reservation on session teardown.
+// QuotaHandler returns a callback that checks and reserves a session's quota in one step.
 func (q *Quota) QuotaHandler() turn.QuotaHandler {
 	return func(username, realm string, _ net.Addr) bool {
 		quota := 0
-		if admin, ok := q.runtime.GetConfig(objruntime.TypeAdmin, "").(*stnrv1.AdminConfig); ok && admin != nil {
+		if admin, ok := q.runtime.GetConfig(objruntime.TypeAdmin, "").(*stnrv2.AdminConfig); ok && admin != nil {
 			quota = admin.UserQuota
 		}
 		return q.runtime.QuotaHandler.CheckAndIncrement(username, realm, quota)
@@ -152,91 +135,129 @@ func (q *Quota) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, re
 	}
 }
 
-// NewEventHandler creates a set of callbacks for tracking the lifecycle of TURN allocations on a
-// listener serving listenerProto.
-func NewEventHandler(name string, listenerProto stnrv1.ListenerProtocol, rt *objruntime.Runtime, log logging.LeveledLogger, q *Quota) turn.EventHandler {
-	// routeChannel resolves the cluster serving a channel to peerIP and its protocol.
-	routeChannel := func(peerIP net.IP) (string, stnrv1.ClusterProtocol) {
-		if cl, ok := rt.Router.RoutePeer(name, stnrv1.ClusterProtocolUDP, peerIP, 0); ok {
-			return cl, stnrv1.ClusterProtocolUDP
-		}
-		if c, ok := relay.TURNCluster(rt, name); ok {
-			return c.Name(), c.Protocol()
-		}
-		return "", stnrv1.ClusterProtocolUnknown
+// permissionHandler grants a permission when a cluster of the server routes the peer IP.
+func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
+	ip, ok := netip.AddrFromSlice(peer)
+	if !ok {
+		return false
 	}
+	dst := netip.AddrPortFrom(ip.Unmap(), 0)
+	conf := s.rt.ServerConfig(s.name)
+	if conf == nil {
+		return false
+	}
+	for _, name := range conf.Clusters {
+		r, found := s.rt.Router(name)
+		if !found {
+			continue
+		}
+		_, ok, err := r.Route(dst)
+		if err != nil {
+			s.log.Warnf("server %q: skipping cluster %q: %s", s.name, name, err.Error())
+			continue
+		}
+		if ok {
+			s.log.Debugf("permission granted on server %q for client %q to peer %s via cluster %q",
+				s.name, src.String(), peer.String(), name)
+			return true
+		}
+	}
+	s.log.Infof("permission denied on server %q for client %q to peer %s: no cluster routes it",
+		s.name, src.String(), peer.String())
+	return false
+}
 
+// offloadPair is an offloaded channel as registered with the offload engine.
+type offloadPair struct {
+	client, peer offload.Connection
+}
+
+// eventHandler returns the allocation lifecycle callbacks.
+func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 	return turn.EventHandler{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
 			if verdict {
 				status = "ACCEPTED"
 			}
-			log.Debugf("authentication request: client=%s, method=%s, verdict=%s",
+			s.log.Debugf("authentication request: client=%s, method=%s, verdict=%s",
 				dumpClient(src, dst, proto, username, realm), method, status)
 		},
 		OnAllocationCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, reqPort int) {
-			log.Debugf("allocation created: client=%s, relay-address=%s, requested-port=%d",
+			s.log.Debugf("allocation created: client=%s, relay-address=%s, requested-port=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), reqPort)
-			q.AllocationHandler(src, dst, proto, username, realm, AllocationCreated)
+			if e, ok := ct.Get(server.Key(src, dst)); ok {
+				e.Disarm()
+			}
+			s.quota.AllocationHandler(src, dst, proto, username, realm, AllocationCreated)
 		},
 		OnAllocationDeleted: func(src, dst net.Addr, proto, username, realm string) {
-			log.Debugf("allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
-			q.AllocationHandler(src, dst, proto, username, realm, AllocationDeleted)
+			s.log.Debugf("allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
+			s.quota.AllocationHandler(src, dst, proto, username, realm, AllocationDeleted)
+			ct.Remove(server.Key(src, dst))
 		},
 		OnAllocationError: func(src, dst net.Addr, proto, message string) {
-			log.Debugf("allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
+			s.log.Debugf("allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
 		},
 		OnPermissionCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
-			cluster := ""
-			if c, ok := rt.Router.Route(name, func(c objruntime.Cluster) bool {
-				return c.Admits(peer, 0)
-			}); ok {
-				cluster = c.Name()
-			}
-			log.Debugf("permission created: client=%s, relay-addr=%s, peer=%s, cluster=%s",
-				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String(), cluster)
+			s.log.Debugf("permission created: client=%s, relay-addr=%s, peer=%s",
+				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
 		},
 		OnPermissionDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, peer net.IP) {
-			log.Debugf("permission deleted: client=%s, relay-addr=%s, peer=%s",
+			s.log.Debugf("permission deleted: client=%s, relay-addr=%s, peer=%s",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), peer.String())
 		},
 		OnChannelCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
-			peerAddr, ok := peer.(*net.UDPAddr)
-			if !ok {
+			s.log.Debugf("channel created: server=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+				s.name, dumpClient(src, dst, proto, username, realm), relayAddr.String(),
+				peer.String(), chanNum)
+
+			// Only a plain UDP client conn relaying through a local UDP socket is offloadable.
+			// pion reports every client 5-tuple as UDP (DTLS, TCP and TLS included), so the
+			// transport is read from the conn's tag.
+			e, found := ct.Get(server.Key(src, dst))
+			if !found || e.Client.Tag().Proto != stnrv2.ProtocolUDP {
 				return
 			}
-			cluster, clusterProto := routeChannel(peerAddr.IP)
-			log.Debugf("channel created: listener=%s, cluster=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
-				name, cluster, dumpClient(src, dst, proto, username, realm),
-				relayAddr.String(), peer.String(), chanNum)
-			if !offload.Offloadable(listenerProto, clusterProto) {
-				log.Debugf("skipping offload for channel to peer %s: %s listener %s, %s cluster",
-					peer.String(), listenerProto.String(), name, clusterProto.String())
+			c := e.Client
+			// the cluster that made the relay socket must be direct
+			rc, found := s.relayDialer()
+			if !found {
 				return
 			}
-			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
-			peerConn := offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto}
-			if err := rt.OffloadEngine.Upsert(client, peerConn, name, cluster); err != nil {
-				log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
-					client.String(), name, peerConn.String(), cluster, err.Error())
+			if conf := s.rt.ClusterConfig(rc.Name()); conf == nil || conf.Tunnel != nil {
+				return
 			}
+			if _, isUDP := peer.(*net.UDPAddr); !isUDP {
+				return
+			}
+			pair := offloadPair{
+				client: offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto,
+					ChannelID: uint32(chanNum)},
+				peer: offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto},
+			}
+			if err := s.rt.OffloadEngine.Upsert(pair.client, pair.peer, c.Tag().Name, rc.Name()); err != nil {
+				s.log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
+					pair.client.String(), c.Tag().Name, pair.peer.String(), rc.Name(), err.Error())
+				return
+			}
+			s.offloads.Store(pair.client.String(), pair)
 		},
 		OnChannelDeleted: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
-			log.Debugf("channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
+			s.log.Debugf("channel deleted: client=%s, relay-addr=%s, peer=%s, channel-num=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
-			peerAddr, ok := peer.(*net.UDPAddr)
-			if !ok {
+			// remove exactly what was registered: the client conn may be gone by now
+			key := (&offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto,
+				ChannelID: uint32(chanNum)}).String()
+			v, registered := s.offloads.LoadAndDelete(key)
+			if !registered {
 				return
 			}
-			if _, clusterProto := routeChannel(peerAddr.IP); !offload.Offloadable(listenerProto, clusterProto) {
-				return
-			}
-			client := offload.Connection{RemoteAddr: src, LocalAddr: dst, Protocol: proto, ChannelID: uint32(chanNum)}
-			peerConn := offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto}
-			if err := rt.OffloadEngine.Remove(client, peerConn); err != nil {
-				log.Errorf("could not remove offload %s->%s: %s", client.String(), peerConn.String(), err.Error())
+			pair := v.(offloadPair)
+			if err := s.rt.OffloadEngine.Remove(pair.client, pair.peer); err != nil {
+				s.log.Errorf("could not remove offload %s->%s: %s", pair.client.String(),
+					pair.peer.String(), err.Error())
 			}
 		},
 	}
@@ -246,4 +267,15 @@ func NewEventHandler(name string, listenerProto stnrv1.ListenerProtocol, rt *obj
 func dumpClient(srcAddr, dstAddr net.Addr, protocol, username, realm string) string {
 	return fmt.Sprintf("%s-%s:%s, username=%s, realm=%s", srcAddr.String(), dstAddr.String(),
 		protocol, username, realm)
+}
+
+// relayDialer returns the dialer that makes the relay sockets of the server's allocations: the
+// first one reaching UDP peers, the one AllocatePacketConn uses.
+func (s *Server) relayDialer() (api.Dialer, bool) {
+	for _, d := range s.dialers() {
+		if d.Protocol() == stnrv2.ProtocolUDP {
+			return d, true
+		}
+	}
+	return nil, false
 }

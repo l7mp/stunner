@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/pion/logging"
 )
 
@@ -42,7 +42,7 @@ func (w *ConfigFileClient) String() string {
 }
 
 // Load grabs a new configuration from a config file.
-func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
+func (w *ConfigFileClient) Load() (*stnrv2.StunnerConfig, error) {
 	b, err := os.ReadFile(w.configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %q: %s", w.configFile, err.Error())
@@ -66,7 +66,7 @@ func (w *ConfigFileClient) Load() (*stnrv1.StunnerConfig, error) {
 
 // Watch watches a configuration file for changes. If no file exists at the given path, it will
 // periodically retry until the file appears.
-func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
+func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
 	if w.configFile == "" {
 		return errors.New("uninitialized config file path")
 	}
@@ -92,7 +92,7 @@ func (w *ConfigFileClient) Watch(ctx context.Context, ch chan<- *stnrv1.StunnerC
 
 // Poll watches the config file and emits new configs on the specified channel. Returns an error if
 // further action is needed (tryWatchConfig is to be started) or nil on normal exit.
-func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
+func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
 	w.log.Tracef("configWatcher")
 
 	// create a new watcher
@@ -118,7 +118,7 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv1.StunnerCo
 	ch <- c.DeepCopy()
 
 	// save deepcopy so that we can filter repeated events
-	prev := stnrv1.StunnerConfig{}
+	prev := stnrv2.StunnerConfig{}
 	c.DeepCopyInto(&prev)
 
 	for {

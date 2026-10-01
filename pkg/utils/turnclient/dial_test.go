@@ -11,17 +11,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestNewConfig(t *testing.T) {
 	t.Run("static auth", func(t *testing.T) {
-		s := &stnrv1.TURNServer{Address: "1.2.3.4", Port: 3478,
-			Auth: &stnrv1.AuthConfig{Type: "static", Realm: "example.org",
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
+			Auth: &stnrv2.AuthConfig{Type: "static", Realm: "example.org",
 				Credentials: map[string]string{"username": "user", "password": "pass"}}}
-		c, err := NewConfig(s, stnrv1.ProtocolTURNUDP)
+		c, err := NewConfig(s)
 		require.NoError(t, err)
-		assert.Equal(t, stnrv1.ProtocolTURNUDP, c.Protocol)
+		assert.Equal(t, stnrv2.ProtocolTURNUDP, c.Protocol)
 		assert.Equal(t, "1.2.3.4:3478", c.ServerAddr)
 		assert.Equal(t, "user", c.Username)
 		assert.Equal(t, "pass", c.Password)
@@ -30,9 +30,10 @@ func TestNewConfig(t *testing.T) {
 	})
 
 	t.Run("no auth block dials anonymously", func(t *testing.T) {
-		s := &stnrv1.TURNServer{Address: "1.2.3.4", Port: 3478}
-		c, err := NewConfig(s, stnrv1.ProtocolTURNTCP)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478?transport=tcp"}
+		c, err := NewConfig(s)
 		require.NoError(t, err)
+		assert.Equal(t, stnrv2.ProtocolTURNTCP, c.Protocol)
 		assert.Empty(t, c.Username)
 		assert.Empty(t, c.Password)
 		assert.Empty(t, c.Realm)
@@ -42,20 +43,21 @@ func TestNewConfig(t *testing.T) {
 		// a nil auth block and an explicit "none" must behave identically on the wire:
 		// no credentials either way (the realm seed is inert without credentials, no
 		// message integrity is ever computed from it)
-		s := &stnrv1.TURNServer{Address: "1.2.3.4", Port: 3478,
-			Auth: &stnrv1.AuthConfig{Type: "none"}}
-		c, err := NewConfig(s, stnrv1.ProtocolTURNUDP)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
+			Auth: &stnrv2.AuthConfig{Type: "none"}}
+		c, err := NewConfig(s)
 		require.NoError(t, err)
 		assert.Empty(t, c.Username)
 		assert.Empty(t, c.Password)
 	})
 
 	t.Run("ephemeral auth generates per-call credentials", func(t *testing.T) {
-		s := &stnrv1.TURNServer{Address: "2001:db8::1", Port: 3478,
-			Auth: &stnrv1.AuthConfig{Type: "ephemeral", Lifetime: "10m",
+		s := &stnrv2.TunnelConfig{URL: "turns:[2001:db8::1]:3478?transport=tcp",
+			Auth: &stnrv2.AuthConfig{Type: "ephemeral", Lifetime: "10m",
 				Credentials: map[string]string{"secret": "my-secret"}}}
-		c, err := NewConfig(s, stnrv1.ProtocolTURNTLS)
+		c, err := NewConfig(s)
 		require.NoError(t, err)
+		assert.Equal(t, stnrv2.ProtocolTURNTLS, c.Protocol)
 		assert.Equal(t, "[2001:db8::1]:3478", c.ServerAddr, "IPv6 host is bracketed")
 		_, err = strconv.ParseInt(c.Username, 10, 64)
 		assert.NoError(t, err, "time-windowed username")
@@ -63,17 +65,22 @@ func TestNewConfig(t *testing.T) {
 	})
 
 	t.Run("SNI overrides the server name", func(t *testing.T) {
-		s := &stnrv1.TURNServer{Address: "1.2.3.4", Port: 5349, SNI: "turn.example.com"}
-		c, err := NewConfig(s, stnrv1.ProtocolTURNTLS)
+		s := &stnrv2.TunnelConfig{URL: "turns:1.2.3.4:5349?transport=tcp", SNI: "turn.example.com"}
+		c, err := NewConfig(s)
 		require.NoError(t, err)
 		assert.Equal(t, "turn.example.com", c.ServerName, "SNI wins")
 		assert.Equal(t, "1.2.3.4:5349", c.ServerAddr, "dial address unchanged")
 	})
 
 	t.Run("broken auth config fails the dial early", func(t *testing.T) {
-		s := &stnrv1.TURNServer{Address: "1.2.3.4", Port: 3478,
-			Auth: &stnrv1.AuthConfig{Type: "ephemeral"}}
-		_, err := NewConfig(s, stnrv1.ProtocolTURNUDP)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
+			Auth: &stnrv2.AuthConfig{Type: "ephemeral"}}
+		_, err := NewConfig(s)
+		assert.Error(t, err)
+	})
+
+	t.Run("a non-TURN URL fails", func(t *testing.T) {
+		_, err := NewConfig(&stnrv2.TunnelConfig{URL: "udp://1.2.3.4:3478"})
 		assert.Error(t, err)
 	})
 }
@@ -99,7 +106,7 @@ func TestUpstreamSessionChannel(t *testing.T) {
 	defer srv.Close() //nolint:errcheck
 
 	pc, err := Dialer{Config: Config{
-		Protocol:   stnrv1.ProtocolTURNUDP,
+		Protocol:   stnrv2.ProtocolTURNUDP,
 		ServerAddr: serverConn.LocalAddr().String(),
 		Username:   "user",
 		Password:   "pass",

@@ -2,14 +2,12 @@
 
 trap 'kill $(jobs -p)' EXIT
 RATE=1600
-THREADS=0
 
-[ -z "$1" ] && echo "usage: test2.sh <proto> [udp-thread-num] [PACKET-RATE]" && exit 1
+[ -z "$1" ] && echo "usage: benchmark.sh <proto> [PACKET-RATE]" && exit 1
 [ -z "$1" ] || PROTO=$1
-[ -z "$2" ] || THREADS=$2
-[ -z "$3" ] || RATE=$3
+[ -z "$2" ] || RATE=$2
 
-go run cmd/stunnerd/main.go -l all:ERROR --udp-thread-num=${THREADS} turn://user:pass@127.0.0.1:5000?transport=${PROTO} &
+go run cmd/stunnerd/main.go -l all:ERROR turn://user:pass@127.0.0.1:5000?transport=${PROTO} &
 iperf -s -u -e -i 5 &
 
 go run ./cmd/stunnerd -l all:ERROR udp://127.0.0.1:4999 "turn://user:pass@127.0.0.1:5000?transport=${PROTO}" udp://localhost:5001 &

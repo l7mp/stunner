@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/pion/transport/v5"
 
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
@@ -30,12 +29,9 @@ type Options struct {
 	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
 	// testing.
 	Resolver resolver.DnsResolver
-	// UDPListenerThreadNum determines the number of readloop threads spawned per UDP listener
-	// (default is 4, must be >0 integer). TURN allocations will be automatically load-balanced
-	// by the kernel UDP stack based on the client 5-tuple. This setting controls the maximum
-	// number of CPU cores UDP listeners can scale to. Note that all other listener protocol
-	// types (TCP, TLS and DTLS) use per-client threads, so this setting affects only UDP
-	// listeners. For more info see https://github.com/pion/turn/pull/295.
+	// UDPListenerThreadNum is ignored: every UDP listener runs one read loop per GOMAXPROCS.
+	//
+	// Deprecated: the number of UDP read loops is not configurable.
 	UDPListenerThreadNum int
 	// NodeName is the name of the Kubernetes node the TURN server is running on (if any).
 	NodeName string
@@ -54,11 +50,11 @@ type Options struct {
 
 // NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
-// a server running on the localhost at UDP port 3478, with plain-text authentication using the
-// username/password pair `user:pass`. Health-checking is enabled at the default endpoint, metric
-// scraping is disabled.
-func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
-	u, err := ParseURI(uri)
+// a TURN server listening at UDP port 3478 on every address and advertising its relays at
+// 127.0.0.1, with plain-text authentication using the username/password pair `user:pass`.
+// Health-checking is enabled at the default endpoint, metric scraping is disabled.
+func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
+	u, err := stnrv2.ParseURI(uri)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URI '%s': %s", uri, err)
 	}
@@ -67,40 +63,55 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
 
+	// the TURN URI names a TURN transport: the listener takes the transport underneath
+	if !u.Protocol.IsTURN() {
+		return nil, fmt.Errorf("not a TURN URI: '%s'", uri)
+	}
+	transport := map[stnrv2.Protocol]stnrv2.Protocol{
+		stnrv2.ProtocolTURNUDP:  stnrv2.ProtocolUDP,
+		stnrv2.ProtocolTURNTCP:  stnrv2.ProtocolTCP,
+		stnrv2.ProtocolTURNTLS:  stnrv2.ProtocolTLS,
+		stnrv2.ProtocolTURNDTLS: stnrv2.ProtocolDTLS,
+	}[u.Protocol]
+
 	// Health-checking is enabled at the default endpoint; this is what Validate would default a
 	// nil pointer to anyway, we just make the intention explicit.
-	h := fmt.Sprintf("http://:%d", stnrv1.DefaultHealthCheckPort)
-	c := &stnrv1.StunnerConfig{
-		ApiVersion: stnrv1.ApiVersion,
-		Admin: stnrv1.AdminConfig{
-			LogLevel: stnrv1.DefaultLogLevel,
+	h := fmt.Sprintf("http://:%d", stnrv2.DefaultHealthCheckPort)
+	c := &stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin: stnrv2.AdminConfig{
+			LogLevel: stnrv2.DefaultLogLevel,
 			// MetricsEndpoint: "http://:8088",
 			HealthCheckEndpoint: &h,
 		},
-		Auth: stnrv1.AuthConfig{
+		Auth: stnrv2.AuthConfig{
 			Type:  "plaintext",
-			Realm: stnrv1.DefaultRealm,
+			Realm: stnrv2.DefaultRealm,
 			Credentials: map[string]string{
 				"username": u.Username,
 				"password": u.Password,
 			},
 		},
-		Listeners: []stnrv1.ListenerConfig{{
+		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
-			Protocol: u.Protocol,
-			Addr:     u.Address,
+			Protocol: transport.String(),
 			Port:     u.Port,
-			Routes:   []string{"allow-any"},
+			Servers:  []string{"default-server"},
 		}},
-		Clusters: []stnrv1.ClusterConfig{{
+		Servers: []stnrv2.ServerConfig{{
+			Name:     "default-server",
+			Type:     stnrv2.ServerTypeTURN.String(),
+			Clusters: []string{"allow-any"},
+		}},
+		Clusters: []stnrv2.ClusterConfig{{
 			Name:      "allow-any",
-			Type:      "STATIC",
-			Endpoints: []string{"0.0.0.0/0"},
+			Endpoints: []string{"0.0.0.0/0", "::/0"},
+			Protocol:  "UDP",
+			Addrs:     []string{u.Host},
 		}},
 	}
 
-	p := strings.ToUpper(u.Protocol)
-	if p == "TLS" || p == "DTLS" || p == "TURN-TLS" || p == "TURN-DTLS" {
+	if transport == stnrv2.ProtocolTLS || transport == stnrv2.ProtocolDTLS {
 		certPem, keyPem, err := GenerateSelfSignedKey()
 		if err != nil {
 			return nil, err
@@ -118,17 +129,17 @@ func NewDefaultConfig(uri string) (*stnrv1.StunnerConfig, error) {
 
 // GetConfig returns the configuration of the running STUNner daemon. The root Object assembles
 // the StunnerConfig from its descendants, see internal/object/stunner.go.
-func (s *Stunner) GetConfig() *stnrv1.StunnerConfig {
+func (s *Stunner) GetConfig() *stnrv2.StunnerConfig {
 	s.log.Tracef("getConfig")
-	if c, ok := s.rt.GetConfig(runtime.TypeStunner, "").(*stnrv1.StunnerConfig); ok && c != nil {
+	if c, ok := s.rt.GetConfig(runtime.TypeStunner, "").(*stnrv2.StunnerConfig); ok && c != nil {
 		c.ApiVersion = s.version
 		return c
 	}
-	return &stnrv1.StunnerConfig{ApiVersion: s.version}
+	return &stnrv2.StunnerConfig{ApiVersion: s.version}
 }
 
 // LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.
-func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
+func (s *Stunner) LoadConfig(origin string) (*stnrv2.StunnerConfig, error) {
 	client, err := client.New(origin, s.name, s.node, s.logger)
 	if err != nil {
 		return nil, err
@@ -138,7 +149,7 @@ func (s *Stunner) LoadConfig(origin string) (*stnrv1.StunnerConfig, error) {
 }
 
 // WatchConfig watches a configuration from an origin. This is a shim wrapper around configclient.Watch.
-func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error {
+func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
 	client, err := client.New(origin, s.name, s.node, s.logger)
 	if err != nil {
 		return err

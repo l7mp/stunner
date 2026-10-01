@@ -8,7 +8,7 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Offload is the reconciliation representative of the process-wide offload engine
@@ -29,20 +29,20 @@ type OffloadConfig struct {
 }
 
 func (c *OffloadConfig) Validate() error {
-	if _, err := stnrv1.NewOffloadEngine(c.Engine); err != nil {
+	if _, err := stnrv2.NewOffloadEngine(c.Engine); err != nil {
 		return err
 	}
 	return nil
 }
-func (c *OffloadConfig) ConfigName() string { return stnrv1.DefaultOffloadName }
-func (c *OffloadConfig) DeepEqual(other stnrv1.Config) bool {
+func (c *OffloadConfig) ConfigName() string { return stnrv2.DefaultOffloadName }
+func (c *OffloadConfig) DeepEqual(other stnrv2.Config) bool {
 	o, ok := other.(*OffloadConfig)
 	if !ok {
 		return false
 	}
 	return c.Engine == o.Engine && reflect.DeepEqual(c.Interfaces, o.Interfaces)
 }
-func (c *OffloadConfig) DeepCopyInto(dst stnrv1.Config) {
+func (c *OffloadConfig) DeepCopyInto(dst stnrv2.Config) {
 	d, ok := dst.(*OffloadConfig)
 	if !ok {
 		return
@@ -56,14 +56,14 @@ func (c *OffloadConfig) String() string {
 }
 
 // NewOffload creates an Offload object.
-func NewOffload(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+func NewOffload(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	o := &Offload{rt: rt}
 	if conf == nil {
 		return o, nil
 	}
 	req, ok := conf.(*OffloadConfig)
 	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+		return nil, stnrv2.ErrInvalidConf
 	}
 	if err := o.Reconcile(req); err != nil {
 		return nil, err
@@ -71,27 +71,27 @@ func NewOffload(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error)
 	return o, nil
 }
 
-func (o *Offload) Name() string             { return stnrv1.DefaultOffloadName }
+func (o *Offload) Name() string             { return stnrv2.DefaultOffloadName }
 func (o *Offload) Type() runtime.ObjectType { return runtime.TypeOffload }
 
 // GetConfig returns a copy of the live offload config. Safe for concurrent use.
-func (o *Offload) GetConfig() stnrv1.Config {
+func (o *Offload) GetConfig() stnrv2.Config {
 	if snap := o.conf.Load(); snap != nil {
 		return &OffloadConfig{
 			Engine:     snap.Engine,
 			Interfaces: append([]string(nil), snap.Interfaces...),
 		}
 	}
-	return &OffloadConfig{Engine: stnrv1.OffloadEngineNone.String()}
+	return &OffloadConfig{Engine: stnrv2.OffloadEngineNone.String()}
 }
 
-func (o *Offload) Status() stnrv1.Status {
+func (o *Offload) Status() stnrv2.Status {
 	conf := o.GetConfig().(*OffloadConfig)
-	status := &stnrv1.OffloadStatus{
+	status := &stnrv2.OffloadStatus{
 		Engine:     conf.Engine,
 		Interfaces: conf.Interfaces,
-		Listeners:  map[string]stnrv1.OffloadDirStat{},
-		Clusters:   map[string]stnrv1.OffloadDirStat{},
+		Listeners:  map[string]stnrv2.OffloadDirStat{},
+		Clusters:   map[string]stnrv2.OffloadDirStat{},
 	}
 	stats, err := o.rt.OffloadEngine.Stats()
 	if err != nil {
@@ -100,7 +100,7 @@ func (o *Offload) Status() stnrv1.Status {
 	listeners := o.nameIndex(runtime.TypeListener)
 	clusters := o.nameIndex(runtime.TypeCluster)
 	for k, v := range stats {
-		info := stnrv1.OffloadStatInfo{Pkts: v.Pkts, Bytes: v.Bytes, TimestampLast: v.TimestampLast}
+		info := stnrv2.OffloadStatInfo{Pkts: v.Pkts, Bytes: v.Bytes, TimestampLast: v.TimestampLast}
 		dst := status.Clusters
 		index := clusters
 		if offload.IsListener(k.Flags) {
@@ -131,17 +131,17 @@ func (o *Offload) nameIndex(typ runtime.ObjectType) map[uint16]string {
 	return ret
 }
 
-func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+func (o *Offload) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*OffloadConfig)
 	if !ok {
-		return runtime.ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
 	cur := old.(*OffloadConfig)
-	newEngine, err := stnrv1.NewOffloadEngine(req.Engine)
+	newEngine, err := stnrv2.NewOffloadEngine(req.Engine)
 	if err != nil {
 		return runtime.ActionNone, err
 	}
-	curEngine, err := stnrv1.NewOffloadEngine(cur.Engine)
+	curEngine, err := stnrv2.NewOffloadEngine(cur.Engine)
 	if err != nil {
 		return runtime.ActionNone, err
 	}
@@ -154,12 +154,12 @@ func (o *Offload) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runt
 	return runtime.ActionNone, nil
 }
 
-func (o *Offload) Reconcile(conf stnrv1.Config) error {
+func (o *Offload) Reconcile(conf stnrv2.Config) error {
 	req, ok := conf.(*OffloadConfig)
 	if !ok {
-		return stnrv1.ErrInvalidConf
+		return stnrv2.ErrInvalidConf
 	}
-	eng, err := stnrv1.NewOffloadEngine(req.Engine)
+	eng, err := stnrv2.NewOffloadEngine(req.Engine)
 	if err != nil {
 		return err
 	}

@@ -1,14 +1,14 @@
 // Package runtime is the kernel of the STUNner object system: it defines the node contracts
 // (Runnable, Reconcilable, Object), the Registry that stores every live node keyed by (type,
 // name) with parent edges, and the Runtime, the single cross-object access point carrying
-// process-wide dependencies, registry-backed config/status lookups, relay routing, and the
+// process-wide dependencies, registry-backed config/status lookups, and the
 // readiness/shutdown flags.
 package runtime
 
 import (
 	"errors"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // ErrRestartRequired indicates that an object needs to be restarted for reconciliation.
@@ -27,6 +27,7 @@ const (
 	TypeOffload  ObjectType = "offload"
 	TypeListener ObjectType = "listener"
 	TypeCluster  ObjectType = "cluster"
+	TypeServer   ObjectType = "server"
 )
 
 // Action is the reconciliation action an Object reports from Inspect.
@@ -59,16 +60,16 @@ type Reconcilable interface {
 	// GetConfig returns the live running config. Implementations MUST be safe for
 	// concurrent use: the dataplane reads configs from request handlers while the
 	// reconciler may be writing (use an atomic snapshot, see the concrete objects).
-	GetConfig() stnrv1.Config
+	GetConfig() stnrv2.Config
 	// Inspect compares the live state (old), desired object config (new), and the full
 	// desired StunnerConfig (full) and reports the object-local decision. Recursion into
 	// children is handled by the reconciler walk, not Inspect.
-	Inspect(old, new stnrv1.Config, full *stnrv1.StunnerConfig) (Action, error)
+	Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (Action, error)
 	// Reconcile applies a new config to the Object. The Object must already be Closed if
 	// the previous Inspect call returned ActionRestart.
-	Reconcile(conf stnrv1.Config) error
+	Reconcile(conf stnrv2.Config) error
 	// Status returns the live status of the Object.
-	Status() stnrv1.Status
+	Status() stnrv2.Status
 }
 
 // Object is the full contract for config-driven STUNner objects.

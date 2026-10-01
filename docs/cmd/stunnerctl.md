@@ -42,7 +42,7 @@ The `config` sub-command is used to load or watch running dataplane configs from
     - Name: stunner/udp-gateway/udp-listener
       Protocol: TURN-UDP
       Public address:port: 34.118.88.91:9001
-      Routes: [stunner/iperf-server]
+      Clusters: [stunner/iperf-server]
       Endpoints: [10.76.1.3, 10.80.7.104]
   ```
 

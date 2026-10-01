@@ -1,83 +1,125 @@
-// Package router finds the cluster that serves a request on a listener. The router is
-// deliberately dumb: it looks up the listener's routes and walks them in order, handing each
-// cluster object to the caller's matcher; what a cluster admits is the cluster's business.
-// RoutePeer caches its verdicts in a per-peer LRU that is invalidated explicitly whenever routing
-// state changes (listener and cluster reconcile, DNS re-resolution).
+// Package router implements the routing policies of a cluster over its endpoints.
 package router
 
 import (
+	"fmt"
 	"net"
-	"strconv"
-
-	"k8s.io/utils/lru"
+	"net/netip"
+	"slices"
+	"sync/atomic"
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-const peerRouteCacheSize = 4096
+// New creates the router of a cluster config, skipping the endpoints its policy cannot use.
+func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, log logging.LeveledLogger) (api.Router, error) {
+	policy, err := stnrv2.NewRoutingPolicy(conf.RoutingPolicy)
+	if err != nil {
+		return nil, err
+	}
+	b := base{name: conf.Name, rt: rt}
+	for _, raw := range conf.Endpoints {
+		ep, err := stnrv2.ParseEndpoint(raw)
+		if err != nil {
+			log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
+			continue
+		}
+		_, dialable := ep.HostPort()
+		switch {
+		case policy == stnrv2.RoutingPolicyFilter && ep.RestrictsPort():
+			log.Warnf("cluster %s: the port of endpoint %q is not enforced: a %s cluster admits "+
+				"peers by IP", conf.Name, raw, policy.String())
+		case policy != stnrv2.RoutingPolicyFilter && !dialable:
+			log.Warnf("cluster %s: skipping endpoint %q: a %s cluster needs a single address "+
+				"or domain with a single port", conf.Name, raw, policy.String())
+			continue
+		}
+		b.endpoints = append(b.endpoints, ep)
+	}
 
-var _ runtime.Router = (*router)(nil)
+	if policy == stnrv2.RoutingPolicyRoundRobin {
+		return &RoundRobin{base: b}, nil
+	}
+	return &Filter{base: b}, nil
+}
 
-// router is the default runtime.Router.
-type router struct {
+type base struct {
+	name      string
+	endpoints []*stnrv2.Endpoint
 	rt        *runtime.Runtime
-	peerCache *lru.Cache // listener|proto|peer:port -> *peerVerdict
-	log       logging.LeveledLogger
 }
 
-type peerVerdict struct {
-	cluster string
-	ok      bool
-}
+func (b *base) Name() string { return b.name }
 
-// NewRouter returns the default Router.
-func NewRouter(rt *runtime.Runtime) runtime.Router {
-	return &router{
-		rt:        rt,
-		peerCache: lru.New(peerRouteCacheSize),
-		log:       rt.Logger.NewLogger("router"),
+// addrs returns the IPs of an endpoint, resolving a domain.
+func (b *base) addrs(ep *stnrv2.Endpoint) []net.IP {
+	if ep.Domain == "" {
+		return []net.IP{ep.Prefix.IP}
 	}
+	hosts, err := b.rt.Resolver.Lookup(ep.Domain)
+	if err != nil {
+		return nil
+	}
+	return hosts
 }
 
-func (r *router) InvalidateCache() { r.peerCache.Clear() }
+// Filter admits the destinations an endpoint contains, ports ignored.
+type Filter struct {
+	base
+}
 
-// Route returns the first cluster on the listener's routes satisfying the matcher.
-func (r *router) Route(listener string, match func(runtime.Cluster) bool) (runtime.Cluster, bool) {
-	lconf, ok := r.rt.GetConfig(runtime.TypeListener, listener).(*stnrv1.ListenerConfig)
-	if !ok || lconf == nil {
-		return nil, false
+func (f *Filter) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
+	if !dst.IsValid() {
+		return dst, false, fmt.Errorf("cluster %s: a %s cluster needs a destination", f.name,
+			stnrv2.RoutingPolicyFilter.String())
 	}
-	for _, name := range lconf.Routes {
-		// a route may name a missing cluster (config skew, skipped); anything registered
-		// under TypeCluster is a cluster object, so a load bug panics right here
-		if o, ok := r.rt.Registry.Get(runtime.TypeCluster, name); ok {
-			if c := o.(runtime.Cluster); match(c) {
-				return c, true
+	ip := net.IP(dst.Addr().Unmap().AsSlice())
+	for _, ep := range f.endpoints {
+		if ep.Domain == "" {
+			if ep.Contains(ip) {
+				return dst, true, nil
+			}
+			continue
+		}
+		for _, h := range f.addrs(ep) {
+			if h.Equal(ip) {
+				return dst, true, nil
 			}
 		}
 	}
-	return nil, false
+	return dst, false, nil
 }
 
-// RoutePeer returns the name of the first cluster on the listener's routes with the given
-// protocol that admits (peer, port). The verdict, positive or negative, is served from the LRU
-// until the next invalidation.
-func (r *router) RoutePeer(listener string, proto stnrv1.ClusterProtocol, peer net.IP, port int) (string, bool) {
-	key := listener + "|" + proto.String() + "|" + peer.String() + ":" + strconv.Itoa(port)
-	if v, ok := r.peerCache.Get(key); ok {
-		p := v.(*peerVerdict)
-		return p.cluster, p.ok
-	}
+// RoundRobin chooses the resolved endpoints in turn.
+type RoundRobin struct {
+	base
+	next atomic.Uint64
+}
 
-	v := &peerVerdict{}
-	if c, ok := r.Route(listener, func(c runtime.Cluster) bool {
-		return c.Protocol() == proto && c.Admits(peer, port)
-	}); ok {
-		v.cluster, v.ok = c.Name(), true
+func (r *RoundRobin) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
+	if dst.IsValid() {
+		return dst, false, fmt.Errorf("cluster %s: a %s cluster chooses its own destination",
+			r.name, stnrv2.RoutingPolicyRoundRobin.String())
 	}
-	r.peerCache.Add(key, v)
-	return v.cluster, v.ok
+	targets := []netip.AddrPort{}
+	for _, ep := range r.endpoints {
+		// a domain resolving to both families yields its IPv4 addresses, as Envoy's V4_PREFERRED
+		hosts := r.addrs(ep)
+		if slices.ContainsFunc(hosts, func(h net.IP) bool { return h.To4() != nil }) {
+			hosts = slices.DeleteFunc(hosts, func(h net.IP) bool { return h.To4() == nil })
+		}
+		for _, h := range hosts {
+			if a, ok := netip.AddrFromSlice(h); ok {
+				targets = append(targets, netip.AddrPortFrom(a.Unmap(), uint16(ep.Port)))
+			}
+		}
+	}
+	if len(targets) == 0 {
+		return dst, false, nil
+	}
+	return targets[int((r.next.Add(1)-1)%uint64(len(targets)))], true, nil
 }

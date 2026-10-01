@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/pion/logging"
 )
 
@@ -43,7 +43,7 @@ func (p *CDSClient) String() string {
 }
 
 // Load grabs a new configuration from the config doscovery server.
-func (p *CDSClient) Load() (*stnrv1.StunnerConfig, error) {
+func (p *CDSClient) Load() (*stnrv2.StunnerConfig, error) {
 	configs, err := p.Get(context.Background())
 	if err != nil {
 		return nil, err

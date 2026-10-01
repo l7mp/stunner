@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -20,7 +21,7 @@ import (
 	_ "golang.org/x/crypto/x509roots/fallback"
 
 	"github.com/l7mp/stunner/v2"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/buildinfo"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 )
@@ -59,13 +60,15 @@ func main() {
 	var logFormat = flag.String("log-format", "text", `Log output format: "text" (default) or "json"`)
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>)")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
-	var udpThreadNum = flag.IntP("udp-thread-num", "u", 0,
-		"Number of readloop threads (CPU cores) per UDP listener. Zero disables UDP multithreading (default: 0)")
+	_ = flag.IntP("udp-thread-num", "u", 0, "Number of readloops per UDP listener (deprecated, defaults to GOMAXPROCS)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
+	var noGracefulShutdown = flag.Bool("no-graceful-shutdown", false, "Exit at once on SIGTERM or SIGINT, closing the live sessions, instead of waiting for them to end (default: false)")
 	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the liveness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
 	var sni = flag.String("sni", "", "Server name (SNI) for the TURN/TLS and TURN/DTLS transports (tunnel mode)")
 	var insecure = flag.Bool("insecure", false, "Accept self-signed TURN server TLS certificates (tunnel mode, default: false)")
+	var licenseArg = flag.String("license", "", `License config as the JSON licensegen writes, {"license_config":{"key":"...","hmac":"..."}}, or just {"key":"...","hmac":"..."} (overrides the config's)`)
+	var offload = flag.String("offload", "", `Offload engine on every interface: "none", "xdp", "tc" or "auto" (overrides the config's)`)
 
 	// Kubernetes config flags
 	k8sConfigFlags := cliopt.NewConfigFlags(true)
@@ -82,7 +85,33 @@ func main() {
 
 	flag.Parse()
 
-	logLevel := stnrv1.DefaultLogLevel
+	// the license is what licensegen writes, or the bare license config inside it
+	var license *stnrv2.LicenseConfig
+	if *licenseArg != "" {
+		for _, raw := range []string{*licenseArg, `{"license_config":` + *licenseArg + `}`} {
+			l := struct {
+				LicenseConfig *stnrv2.LicenseConfig `json:"license_config"`
+			}{}
+			if err := json.Unmarshal([]byte(raw), &l); err == nil && l.LicenseConfig != nil &&
+				l.LicenseConfig.Key != "" && l.LicenseConfig.HMAC != "" {
+				license = l.LicenseConfig
+				break
+			}
+		}
+		if license == nil {
+			fmt.Fprint(os.Stderr, "invalid --license: expecting the JSON licensegen writes, "+
+				`{"license_config":{"key":"...","hmac":"..."}}, or {"key":"...","hmac":"..."}`+"\n")
+			os.Exit(1)
+		}
+	}
+	if *offload != "" {
+		if _, err := stnrv2.NewOffloadEngine(*offload); err != nil {
+			fmt.Fprintf(os.Stderr, "invalid --offload: %s\n", err.Error())
+			os.Exit(1)
+		}
+	}
+
+	logLevel := stnrv2.DefaultLogLevel
 	if *verbose {
 		logLevel = "all:DEBUG"
 	}
@@ -102,6 +131,8 @@ func main() {
 			insecure:  *insecure,
 			logLevel:  logLevel,
 			logFormat: *logFormat,
+			license:   license,
+			offload:   *offload,
 		}, k8sConfigFlags, cdsConfigFlags)
 		return
 	}
@@ -110,8 +141,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	configOrigin := stnrv1.DefaultConfigDiscoveryAddress
-	if origin, ok := os.LookupEnv(stnrv1.DefaultEnvVarConfigOrigin); ok {
+	configOrigin := stnrv2.DefaultConfigDiscoveryAddress
+	if origin, ok := os.LookupEnv(stnrv2.DefaultEnvVarConfigOrigin); ok {
 		configOrigin = origin
 	}
 	if *config != "" {
@@ -119,13 +150,13 @@ func main() {
 	}
 
 	nodeName := ""
-	if node, ok := os.LookupEnv(stnrv1.DefaultEnvVarNodeName); ok {
+	if node, ok := os.LookupEnv(stnrv2.DefaultEnvVarNodeName); ok {
 		nodeName = node
 	}
 
 	if *id == "" {
-		name, ok1 := os.LookupEnv(stnrv1.DefaultEnvVarName)
-		namespace, ok2 := os.LookupEnv(stnrv1.DefaultEnvVarNamespace)
+		name, ok1 := os.LookupEnv(stnrv2.DefaultEnvVarName)
+		namespace, ok2 := os.LookupEnv(stnrv2.DefaultEnvVarNamespace)
 		if ok1 && ok2 {
 			*id = fmt.Sprintf("%s/%s", namespace, name)
 		}
@@ -136,7 +167,6 @@ func main() {
 		LogOptions:                  stunner.LogOptions{Level: logLevel, Format: *logFormat},
 		DryRun:                      *dryRun,
 		NodeName:                    nodeName,
-		UDPListenerThreadNum:        *udpThreadNum,
 		ForceReadyDuringTermination: *forceReadyDuringTermination,
 	})
 	defer st.Close()
@@ -146,7 +176,7 @@ func main() {
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
 	log.Infof("starting stunnerd id %q, STUNner %s ", st.GetId(), buildInfo.String())
 
-	conf := make(chan *stnrv1.StunnerConfig, 1)
+	conf := make(chan *stnrv2.StunnerConfig, 1)
 	defer close(conf)
 
 	var cancelConfigLoader context.CancelFunc
@@ -230,6 +260,12 @@ func main() {
 			os.Exit(0)
 
 		case <-sigterm:
+			if *noGracefulShutdown {
+				log.Infof("exiting with %d active connection(s): graceful shutdown is disabled",
+					st.AllocationCount())
+				st.Close()
+				os.Exit(0)
+			}
 			log.Infof("commencing graceful shutdown with %d active connection(s)",
 				st.AllocationCount())
 			st.Shutdown()
@@ -252,17 +288,22 @@ func main() {
 			}()
 
 		case c := <-conf:
-			log.Infof("new configuration available: %q", c.String())
-
-			// command line loglevel overrides config
+			// the command line overrides the config
 			if *verbose || *level != "" {
 				c.Admin.LogLevel = logLevel
 			}
+			if license != nil {
+				c.Admin.LicenseConfig = license
+			}
+			if *offload != "" {
+				c.Admin.OffloadEngine, c.Admin.OffloadInterfaces = *offload, nil
+			}
+			log.Infof("new configuration available: %q", c.String())
 
 			log.Debug("initiating reconciliation")
 
 			if err := st.Reconcile(c); err != nil {
-				if e, ok := err.(stnrv1.ErrRestarted); ok {
+				if e, ok := err.(stnrv2.ErrRestarted); ok {
 					log.Debugf("reconciliation ready: %s", e.Error())
 				} else {
 					log.Errorf("could not reconcile new configuration "+

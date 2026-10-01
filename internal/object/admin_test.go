@@ -11,14 +11,14 @@ import (
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
 func TestAdminObjectSemantics(t *testing.T) {
 	runObjectSemanticsCase(t, objectSemanticsCase{
 		name: "admin",
-		setup: func(t *testing.T) (runtime.Object, stnrv1.Config, *stnrv1.StunnerConfig) {
+		setup: func(t *testing.T) (runtime.Object, stnrv2.Config, *stnrv2.StunnerConfig) {
 			env := newTestEnv()
 
 			health, err := object.NewHealth(&object.HealthConfig{Endpoint: ""}, env.rt)
@@ -29,48 +29,48 @@ func TestAdminObjectSemantics(t *testing.T) {
 			require.NoError(t, err)
 			mustAdd(t, env, metrics)
 
-			offload, err := object.NewOffload(&object.OffloadConfig{Engine: stnrv1.OffloadEngineNone.String(), Interfaces: []string{}}, env.rt)
+			offload, err := object.NewOffload(&object.OffloadConfig{Engine: stnrv2.OffloadEngineNone.String(), Interfaces: []string{}}, env.rt)
 			require.NoError(t, err)
 			mustAdd(t, env, offload)
 
 			obj, err := object.NewAdmin(nil, env.rt)
 			require.NoError(t, err)
 
-			base := &stnrv1.AdminConfig{
-				Name:                stnrv1.DefaultStunnerName,
-				LogLevel:            stnrv1.DefaultLogLevel,
+			base := &stnrv2.AdminConfig{
+				Name:                stnrv2.DefaultStunnerName,
+				LogLevel:            stnrv2.DefaultLogLevel,
 				MetricsEndpoint:     "",
 				HealthCheckEndpoint: strPtr(""),
 				UserQuota:           10,
-				OffloadEngine:       stnrv1.OffloadEngineNone.String(),
+				OffloadEngine:       stnrv2.OffloadEngineNone.String(),
 				OffloadInterfaces:   []string{},
 			}
 
-			return obj, base, &stnrv1.StunnerConfig{}
+			return obj, base, &stnrv2.StunnerConfig{}
 		},
 		expectations: []inspectExpectation{
 			{
 				name: "loglevel-change-reconcile",
-				conf: &stnrv1.AdminConfig{
-					Name:                stnrv1.DefaultStunnerName,
+				conf: &stnrv2.AdminConfig{
+					Name:                stnrv2.DefaultStunnerName,
 					LogLevel:            "all:DEBUG",
 					MetricsEndpoint:     "",
 					HealthCheckEndpoint: strPtr(""),
 					UserQuota:           10,
-					OffloadEngine:       stnrv1.OffloadEngineNone.String(),
+					OffloadEngine:       stnrv2.OffloadEngineNone.String(),
 					OffloadInterfaces:   []string{},
 				},
 				want: runtime.ActionReconcile,
 			},
 			{
 				name: "same-config-none",
-				conf: &stnrv1.AdminConfig{
-					Name:                stnrv1.DefaultStunnerName,
-					LogLevel:            stnrv1.DefaultLogLevel,
+				conf: &stnrv2.AdminConfig{
+					Name:                stnrv2.DefaultStunnerName,
+					LogLevel:            stnrv2.DefaultLogLevel,
 					MetricsEndpoint:     "",
 					HealthCheckEndpoint: strPtr(""),
 					UserQuota:           10,
-					OffloadEngine:       stnrv1.OffloadEngineNone.String(),
+					OffloadEngine:       stnrv2.OffloadEngineNone.String(),
 					OffloadInterfaces:   []string{},
 				},
 				want: runtime.ActionNone,
@@ -84,7 +84,7 @@ func TestAdminObjectSemantics(t *testing.T) {
 // the unspecified address of every available family, IPv6-only clusters included, and a repeated
 // Start with an unchanged endpoint must not try to re-bind the port.
 func TestHealthServerBindsBothFamilies(t *testing.T) {
-	log := logger.NewLoggerFactory(stnrv1.DefaultLogLevel)
+	log := logger.NewLoggerFactory(stnrv2.DefaultLogLevel)
 	r := resolver.NewMockResolver(map[string][]string{}, log)
 	rt := runtime.New(runtime.Config{Logger: log, Resolver: r})
 

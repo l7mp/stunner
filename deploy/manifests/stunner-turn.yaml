@@ -5,7 +5,6 @@ metadata:
 spec:
   args:
   - -w
-  - --udp-thread-num=16
   command:
   - stunnerd
   containerSecurityContext:

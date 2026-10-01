@@ -15,9 +15,9 @@ type ListenerConfig struct {
 	Name string `json:"name,omitempty"`
 	// Protocol is the listener protocol. The TURN protocols ("TURN-UDP", "TURN-TCP",
 	// "TURN-TLS", "TURN-DTLS") serve TURN over the given transport. The plain protocols
-	// ("UDP", "TCP") relay every client flow to the static peer address in PeerAddr, and
-	// "STDIN" relays a single flow between the stdin/stdout pair and PeerAddr. Default is
-	// "TURN-UDP".
+	// ("UDP", "TCP") relay every client flow to an endpoint of the routed clusters, and
+	// "STDIN" relays a single flow between the stdin/stdout pair and such an endpoint. Default
+	// is "TURN-UDP".
 	Protocol string `json:"protocol,omitempty"`
 	// PublicAddr is the Internet-facing public address for the listener (ignored by STUNner). It
 	// must be a bare host: an IP literal (IPv4 or IPv6) or a DNS name, without brackets, port, or
@@ -43,9 +43,6 @@ type ListenerConfig struct {
 	// PQCMode is the post-quantum encryption policy of a TURN-TLS listener: "default",
 	// "preferred" or "enforced".
 	PQCMode string `json:"pqc_mode,omitempty"`
-	// PeerAddr is the peer to which a plain UDP/TCP or STDIN listener relays every client
-	// flow, as "<udp|tcp>://host:port". Ignored for TURN listeners.
-	PeerAddr string `json:"peer_addr,omitempty"`
 	// Routes specifies the list of Routes allowed via a listener.
 	Routes []string `json:"routes,omitempty"`
 }
@@ -114,30 +111,6 @@ func (req *ListenerConfig) Validate() error {
 		req.PQCMode = pqcMode.String()
 	}
 
-	// Plain listeners relay every client flow to a single static peer: raw flows carry no
-	// in-band peer address. TURN-* listeners take their peer addresses in-band, so PeerAddr
-	// is ignored there.
-	if proto == ProtocolUDP || proto == ProtocolTCP || proto == ProtocolSTDIN {
-		if req.PeerAddr == "" {
-			return fmt.Errorf("missing peer address for %s listener", proto.String())
-		}
-		if i := strings.Index(req.PeerAddr, "://"); i >= 0 {
-			if s := strings.ToLower(req.PeerAddr[:i]); s != "udp" && s != "tcp" {
-				return fmt.Errorf("invalid peer transport %q in peer address %q",
-					s, req.PeerAddr)
-			}
-		}
-		_, hostport := req.PeerEndpoint()
-		host, port, err := net.SplitHostPort(hostport)
-		if err != nil || host == "" {
-			return fmt.Errorf("invalid peer address %q: expecting "+
-				"[udp://|tcp://]host:port", req.PeerAddr)
-		}
-		if p, err := strconv.Atoi(port); err != nil || p < 1 || p > 65535 {
-			return fmt.Errorf("invalid port in peer address %q", req.PeerAddr)
-		}
-	}
-
 	if req.PublicAddrs == nil {
 		req.PublicAddrs = []string{}
 	}
@@ -160,21 +133,6 @@ func (req *ListenerConfig) Validate() error {
 
 	sort.Strings(req.Routes)
 	return nil
-}
-
-// PeerEndpoint returns the transport protocol and the "host:port" endpoint of the peer of a
-// plain listener; a bare peer address defaults to a UDP peer.
-func (req *ListenerConfig) PeerEndpoint() (Protocol, string) {
-	addr := req.PeerAddr
-	proto := ProtocolUDP
-	switch lower := strings.ToLower(addr); {
-	case strings.HasPrefix(lower, "udp://"):
-		addr = addr[len("udp://"):]
-	case strings.HasPrefix(lower, "tcp://"):
-		proto = ProtocolTCP
-		addr = addr[len("tcp://"):]
-	}
-	return proto, addr
 }
 
 // Name returns the name of the object to be configured.
@@ -223,10 +181,6 @@ func (req *ListenerConfig) String() string {
 		p = fmt.Sprintf("%d", req.PublicPort)
 	}
 	status = append(status, fmt.Sprintf("public=%s", net.JoinHostPort(a, p)))
-
-	if req.PeerAddr != "" {
-		status = append(status, fmt.Sprintf("peer=%s", req.PeerAddr))
-	}
 
 	c, k := "-", "-"
 	if req.Cert != "" {

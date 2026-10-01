@@ -28,11 +28,11 @@ type ClusterConfig struct {
 	// Protocol specifies the protocol to be used with the cluster: UDP (default) or TCP for
 	// direct relay connections to the peers, or TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS to
 	// pass the traffic through an upstream TURN server reached over the given transport.
-	// TURN-* protocol clusters relay through an upstream TURN server: peer admission is the upstream
-	// server's job, so they take no endpoints and they admit every peer.
+	// TURN-* protocol clusters relay through an upstream TURN server: with no endpoints they admit
+	// every peer, leaving peer admission to the upstream server.
 	Protocol string `json:"protocol,omitempty"`
-	// Endpoints specifies the peers that can be reached via this cluster. Must be empty for
-	// TURN-* protocol clusters.
+	// Endpoints specifies the peers that can be reached via this cluster. Optional for TURN-*
+	// protocol clusters.
 	Endpoints []string `json:"endpoints,omitempty"`
 	// TURNServer specifies the upstream TURN server for TURN-* protocol clusters. Mandatory
 	// for TURN-* protocols, must be omitted otherwise.
@@ -127,14 +127,8 @@ func (req *ClusterConfig) Validate() error {
 
 	sort.Strings(req.Endpoints)
 
-	// TURN-* protocol clusters require an upstream TURN server and take no endpoints (peer
-	// admission is the upstream server's job), direct clusters forbid the TURN server.
+	// TURN-* protocol clusters require an upstream TURN server, direct clusters forbid it.
 	if p.IsTURN() {
-		if len(req.Endpoints) > 0 {
-			return fmt.Errorf("endpoints in %q protocol cluster configuration (peer "+
-				"admission is the upstream TURN server's job): %s",
-				req.Protocol, req.String())
-		}
 		if req.TURNServer == nil {
 			return fmt.Errorf("missing TURN server in %q protocol cluster configuration: %s",
 				req.Protocol, req.String())

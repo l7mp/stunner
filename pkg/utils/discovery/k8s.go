@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // cdsProbeTimeout bounds one probe of a CDS server pod during discovery.
@@ -48,17 +48,17 @@ type CDSConfigFlags struct {
 
 // NewCDSConfigFlags returns CDS service discovery flags with default values set.
 func NewCDSConfigFlags() *CDSConfigFlags {
-	port := stnrv1.DefaultConfigDiscoveryPort
-	if os.Getenv(stnrv1.DefaultCDSServerPortEnv) != "" {
-		p, err := strconv.Atoi(os.Getenv(stnrv1.DefaultCDSServerPortEnv))
+	port := stnrv2.DefaultConfigDiscoveryPort
+	if os.Getenv(stnrv2.DefaultCDSServerPortEnv) != "" {
+		p, err := strconv.Atoi(os.Getenv(stnrv2.DefaultCDSServerPortEnv))
 		if err != nil {
 			port = p
 		}
 	}
 	return &CDSConfigFlags{
-		Addr:      os.Getenv(stnrv1.DefaultCDSServerAddrEnv),
+		Addr:      os.Getenv(stnrv2.DefaultCDSServerAddrEnv),
 		Port:      port,
-		Namespace: os.Getenv(stnrv1.DefaultCDSServerNamespaceEnv),
+		Namespace: os.Getenv(stnrv2.DefaultCDSServerNamespaceEnv),
 	}
 }
 
@@ -84,7 +84,7 @@ type PodConfigFlags struct {
 // NewPodConfigFlags returns Stunnerd service discovery flags with default values set.
 func NewPodConfigFlags() *PodConfigFlags {
 	return &PodConfigFlags{
-		Port: stnrv1.DefaultHealthCheckPort,
+		Port: stnrv2.DefaultHealthCheckPort,
 	}
 }
 
@@ -112,7 +112,7 @@ type AuthConfigFlags struct {
 // NewAuthConfigFlags returns auth service discovery flags with default values set.
 func NewAuthConfigFlags() *AuthConfigFlags {
 	return &AuthConfigFlags{
-		Port: stnrv1.DefaultAuthServicePort,
+		Port: stnrv2.DefaultAuthServicePort,
 	}
 }
 
@@ -209,7 +209,7 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 		return PodInfo{}, fmt.Errorf("failed to init CDS discovery client: %w", err)
 	}
 
-	label := fmt.Sprintf("%s=%s", stnrv1.DefaultCDSServiceLabelKey, stnrv1.DefaultCDSServiceLabelValue)
+	label := fmt.Sprintf("%s=%s", stnrv2.DefaultCDSServiceLabelKey, stnrv2.DefaultCDSServiceLabelValue)
 	d.log.Debugf("querying CDS server pods in namespace %q using label-selector %q", nsLog, label)
 
 	pods, err := d.cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{
@@ -229,11 +229,11 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 
 	// several replicas: the Lease names the leader
 	for _, podNs := range podNamespaces(pods.Items) {
-		lease, err := d.cs.CoordinationV1().Leases(podNs).Get(ctx, stnrv1.DefaultLeaderElectionID,
+		lease, err := d.cs.CoordinationV1().Leases(podNs).Get(ctx, stnrv2.DefaultLeaderElectionID,
 			metav1.GetOptions{})
 		if err != nil {
 			d.log.Debugf("cannot read the operator Lease %s/%s: %s", podNs,
-				stnrv1.DefaultLeaderElectionID, err.Error())
+				stnrv2.DefaultLeaderElectionID, err.Error())
 			continue
 		}
 		holder := ""
@@ -242,11 +242,11 @@ func DiscoverK8sCDSServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, cds
 		}
 		if leader := LeaderPod(holder, pods.Items); leader != nil {
 			d.log.Debugf("operator Lease %s/%s names %s/%s as the leader", podNs,
-				stnrv1.DefaultLeaderElectionID, leader.GetNamespace(), leader.GetName())
+				stnrv2.DefaultLeaderElectionID, leader.GetNamespace(), leader.GetName())
 			return d.PortFwd(ctx, leader, cdsFlags.Port)
 		}
 		d.log.Debugf("operator Lease %s/%s holder %q is not among the CDS server pods",
-			podNs, stnrv1.DefaultLeaderElectionID, holder)
+			podNs, stnrv2.DefaultLeaderElectionID, holder)
 	}
 
 	// no usable Lease: probe the replicas, the leader is the one that answers
@@ -349,15 +349,15 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 	}
 
 	selector := labels.NewSelector()
-	appLabel, err := labels.NewRequirement(stnrv1.DefaultAppLabelKey,
-		selection.Equals, []string{stnrv1.DefaultAppLabelValue})
+	appLabel, err := labels.NewRequirement(stnrv2.DefaultAppLabelKey,
+		selection.Equals, []string{stnrv2.DefaultAppLabelValue})
 	if err != nil {
 		return ps, fmt.Errorf("failed to create app label selector: %w", err)
 	}
 	selector = selector.Add(*appLabel)
 
 	if gwNs != "" {
-		nsLabel, err := labels.NewRequirement(stnrv1.DefaultRelatedGatewayNamespace,
+		nsLabel, err := labels.NewRequirement(stnrv2.DefaultRelatedGatewayNamespace,
 			selection.Equals, []string{gwNs})
 		if err != nil {
 			return ps, fmt.Errorf("failed to create namespace label selector: %w", err)
@@ -365,7 +365,7 @@ func DiscoverK8sStunnerdPods(ctx context.Context, k8sFlags *cliopt.ConfigFlags, 
 		selector = selector.Add(*nsLabel)
 
 		if gw != "" {
-			gwLabel, err := labels.NewRequirement(stnrv1.DefaultRelatedGatewayKey,
+			gwLabel, err := labels.NewRequirement(stnrv2.DefaultRelatedGatewayKey,
 				selection.Equals, []string{gw})
 			if err != nil {
 				return ps, fmt.Errorf("failed to create namespace label selector: %w", err)
@@ -463,7 +463,7 @@ func DiscoverK8sAuthServer(ctx context.Context, k8sFlags *cliopt.ConfigFlags, au
 		return PodInfo{}, fmt.Errorf("failed to init CDS discovery client: %w", err)
 	}
 
-	label := fmt.Sprintf("%s=%s", stnrv1.DefaultAppLabelKey, stnrv1.DefaultAuthAppLabelValue)
+	label := fmt.Sprintf("%s=%s", stnrv2.DefaultAppLabelKey, stnrv2.DefaultAuthAppLabelValue)
 	d.log.Debugf("querying auth service pods in namespace %q using label-selector %q", nsLog, label)
 
 	pods, err := d.cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{

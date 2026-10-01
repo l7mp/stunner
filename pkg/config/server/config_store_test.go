@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
-	"github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
 func TestConfigStore_Upsert(t *testing.T) {
@@ -422,8 +421,17 @@ func collectConfigs(ch chan *Config, count int, timeout time.Duration) []*Config
 }
 
 func testConfig(realm string) *stnrv1.StunnerConfig {
-	c := client.ZeroConfig("dummy/dummy")
-	c.Auth.Realm = realm
+	c := &stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin:      stnrv1.AdminConfig{Name: "dummy/dummy"},
+		Auth: stnrv1.AuthConfig{
+			Type:        "static",
+			Realm:       realm,
+			Credentials: map[string]string{"username": "dummy-username", "password": "dummy-password"},
+		},
+		Listeners: []stnrv1.ListenerConfig{},
+		Clusters:  []stnrv1.ClusterConfig{},
+	}
 	_ = c.Validate() // make sure deepeq works
 	return c
 }

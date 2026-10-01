@@ -223,7 +223,7 @@ NAME                                       AGE
 udproute.stunner.l7mp.io/kms-media-plane   84s
 ```
 
-You can also use the handy CLI tool called [`stunnerctl`](/cmd/stunnerctl/README.md) to dump the running STUNner configuration. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory.
+You can also use the handy CLI tool called [`stunnerctl`](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory.
 
 ```console
 bin/stunnerctl -n stunner config udp-gateway

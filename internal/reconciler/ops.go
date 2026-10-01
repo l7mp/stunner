@@ -2,14 +2,14 @@ package reconciler
 
 import (
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // createPlan is a deferred construction: the plan walk records what to build (kind, config, and
 // parent identity), and the construct phase calls New parents-first once the walk is complete.
 type createPlan struct {
 	typ        runtime.ObjectType
-	config     stnrv1.Config
+	config     stnrv2.Config
 	parentType runtime.ObjectType
 	parentName string
 }
@@ -23,7 +23,7 @@ type constructedRef struct {
 
 type reconcileRef struct {
 	Object runtime.Object
-	Config stnrv1.Config
+	Config stnrv2.Config
 }
 
 type ops struct {
@@ -52,7 +52,7 @@ func restartedErrorFromOps(ops *ops) error {
 	if len(ops.restartedNames) == 0 {
 		return nil
 	}
-	return stnrv1.ErrRestarted{Objects: append([]string(nil), ops.restartedNames...)}
+	return stnrv2.ErrRestarted{Objects: append([]string(nil), ops.restartedNames...)}
 }
 
 func (ops *ops) addStop(o runtime.Runnable) {

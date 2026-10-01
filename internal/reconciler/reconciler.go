@@ -12,7 +12,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Policy holds root-only reconciliation behavior knobs.
@@ -39,23 +39,24 @@ func New(catalog *Catalog, rt *runtime.Runtime, logger logging.LoggerFactory) *R
 
 // Reconcile runs one reconcile against the tree and applies root-only behavior (validation,
 // snapshotting, rollback, dry-run).
-func (r *Reconciler) Reconcile(req *stnrv1.StunnerConfig, p Policy) error {
+func (r *Reconciler) Reconcile(req *stnrv2.StunnerConfig, p Policy) error {
 	if err := req.Validate(); err != nil {
 		return err
 	}
 
-	r.log.Infof("reconciliation: commencing (dry-run=%t,rollback=%t,listeners=%d,clusters=%d) for config=%s",
-		p.DryRun, !p.SuppressRollback, len(req.Listeners), len(req.Clusters), req.String())
+	r.log.Infof("reconciliation: commencing (dry-run=%t,rollback=%t,listeners=%d,servers=%d,"+
+		"clusters=%d) for config=%s", p.DryRun, !p.SuppressRollback, len(req.Listeners),
+		len(req.Servers), len(req.Clusters), req.String())
 
 	root, err := r.root()
 	if err != nil {
 		return err
 	}
-	snapshot := root.GetConfig().(*stnrv1.StunnerConfig)
+	snapshot := root.GetConfig().(*stnrv2.StunnerConfig)
 
 	err = r.run(req, p.DryRun)
 	// ErrRestarted signals a successful reconcile that bounced some objects: never roll back.
-	var restarted stnrv1.ErrRestarted
+	var restarted stnrv2.ErrRestarted
 	if err != nil && !errors.As(err, &restarted) && !p.SuppressRollback {
 		r.log.Infof("reconciliation: rollback initiated")
 		_ = r.run(snapshot, p.DryRun)
@@ -85,7 +86,7 @@ func (r *Reconciler) root() (runtime.Object, error) {
 }
 
 // run performs one reconcile over the whole tree.
-func (r *Reconciler) run(req *stnrv1.StunnerConfig, dryRun bool) error {
+func (r *Reconciler) run(req *stnrv2.StunnerConfig, dryRun bool) error {
 	// Phase 1: plan. Walk the catalog and classify every node into operations. Nothing is
 	// constructed or mutated here; the walk derives the whole desired tree from configs and
 	// names alone.
@@ -208,7 +209,7 @@ func (r *Reconciler) construct(ops *ops) ([]constructedRef, error) {
 // mutates no object. parentType/parentName identify the owning node (both "" at the root); parent
 // is the owning object (nil at the root and under not-yet-constructed parents) and is used only to
 // scope the stale-instance scan.
-func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.ObjectType, parentName string, spec KindSpec, full *stnrv1.StunnerConfig, ops *ops) error {
+func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.ObjectType, parentName string, spec KindSpec, full *stnrv2.StunnerConfig, ops *ops) error {
 	desired, err := spec.ExtractConfigs(parentName, full)
 	if err != nil {
 		return fmt.Errorf("kind %q desired-config resolver: %w", spec.Type, err)

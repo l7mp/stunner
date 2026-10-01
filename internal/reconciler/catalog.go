@@ -2,7 +2,7 @@ package reconciler
 
 import (
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // KindSpec is the complete declarative description of one object kind: its constructor, its
@@ -15,13 +15,13 @@ type KindSpec struct {
 	Children []runtime.ObjectType
 
 	// New constructs an instance. The parent is the owning node (nil for the root).
-	New func(parent runtime.Runnable, conf stnrv1.Config, rt *runtime.Runtime) (runtime.Runnable, error)
+	New func(parent runtime.Runnable, conf stnrv2.Config, rt *runtime.Runtime) (runtime.Runnable, error)
 
 	// ExtractConfigs answers: "given this parent and this full desired config, which instances of
 	// this kind should exist under the parent, and with what configs?" It is given the parent's
 	// name rather than the parent object, so it can only read the desired config and never stale
 	// parent object state (parentName is "" for the root's kind).
-	ExtractConfigs func(parentName string, full *stnrv1.StunnerConfig) ([]stnrv1.Config, error)
+	ExtractConfigs func(parentName string, full *stnrv2.StunnerConfig) ([]stnrv2.Config, error)
 
 	// Singleton marks kinds with exactly one instance per parent; SingletonName resolves the
 	// instance name from the parent's name ("" for the root's kind).

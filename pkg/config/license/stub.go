@@ -3,7 +3,7 @@ package license
 import (
 	"github.com/pion/logging"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 var _ ConfigManager = &Stub{}
@@ -16,7 +16,7 @@ func NewStub(log logging.LeveledLogger) ConfigManager {
 	return s
 }
 
-func (s *Stub) Reconcile(config *stnrv1.LicenseConfig) {
-	s.log.Tracef("licensing status update triggered using config %q", stnrv1.LicensingStatus(config))
+func (s *Stub) Reconcile(config *stnrv2.LicenseConfig) {
+	s.log.Tracef("licensing status update triggered using config %q", stnrv2.LicensingStatus(config))
 	s.baseManager.Reconcile(config)
 }

@@ -7,17 +7,17 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestHealthObjectSemantics(t *testing.T) {
 	runObjectSemanticsCase(t, objectSemanticsCase{
 		name: "health",
-		setup: func(t *testing.T) (runtime.Object, stnrv1.Config, *stnrv1.StunnerConfig) {
+		setup: func(t *testing.T) (runtime.Object, stnrv2.Config, *stnrv2.StunnerConfig) {
 			env := newTestEnv()
 			obj, err := object.NewHealth(nil, env.rt)
 			require.NoError(t, err)
-			return obj, &object.HealthConfig{Endpoint: ""}, &stnrv1.StunnerConfig{}
+			return obj, &object.HealthConfig{Endpoint: ""}, &stnrv2.StunnerConfig{}
 		},
 		expectations: []inspectExpectation{
 			{name: "endpoint-change-restart", conf: &object.HealthConfig{Endpoint: "http://:8086"}, want: runtime.ActionRestart},

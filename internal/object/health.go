@@ -13,7 +13,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Health is the Object that owns the /live, /ready, /status HTTP server.
@@ -42,15 +42,15 @@ type HealthConfig struct {
 }
 
 func (c *HealthConfig) Validate() error    { return nil }
-func (c *HealthConfig) ConfigName() string { return stnrv1.DefaultHealthName }
-func (c *HealthConfig) DeepEqual(other stnrv1.Config) bool {
+func (c *HealthConfig) ConfigName() string { return stnrv2.DefaultHealthName }
+func (c *HealthConfig) DeepEqual(other stnrv2.Config) bool {
 	o, ok := other.(*HealthConfig)
 	if !ok {
 		return false
 	}
 	return c.Endpoint == o.Endpoint
 }
-func (c *HealthConfig) DeepCopyInto(dst stnrv1.Config) {
+func (c *HealthConfig) DeepCopyInto(dst stnrv2.Config) {
 	d, ok := dst.(*HealthConfig)
 	if !ok {
 		return
@@ -62,7 +62,7 @@ func (c *HealthConfig) String() string {
 }
 
 // NewHealth creates a Health object.
-func NewHealth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+func NewHealth(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	h := &Health{
 		dryRun: rt.DryRun,
 		rt:     rt,
@@ -74,7 +74,7 @@ func NewHealth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) 
 	}
 	req, ok := conf.(*HealthConfig)
 	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+		return nil, stnrv2.ErrInvalidConf
 	}
 	if err := h.Reconcile(req); err != nil {
 		return nil, err
@@ -82,11 +82,11 @@ func NewHealth(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) 
 	return h, nil
 }
 
-func (h *Health) Name() string             { return stnrv1.DefaultHealthName }
+func (h *Health) Name() string             { return stnrv2.DefaultHealthName }
 func (h *Health) Type() runtime.ObjectType { return runtime.TypeHealth }
 
 // GetConfig returns a copy of the live health config. Safe for concurrent use.
-func (h *Health) GetConfig() stnrv1.Config {
+func (h *Health) GetConfig() stnrv2.Config {
 	if snap := h.conf.Load(); snap != nil {
 		cp := *snap
 		return &cp
@@ -94,12 +94,12 @@ func (h *Health) GetConfig() stnrv1.Config {
 	return &HealthConfig{}
 }
 
-func (h *Health) Status() stnrv1.Status { return h.GetConfig() }
+func (h *Health) Status() stnrv2.Status { return h.GetConfig() }
 
-func (h *Health) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+func (h *Health) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*HealthConfig)
 	if !ok {
-		return runtime.ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
 	cur := old.(*HealthConfig)
 	if reflect.DeepEqual(req, cur) {
@@ -108,10 +108,10 @@ func (h *Health) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runti
 	return runtime.ActionRestart, nil
 }
 
-func (h *Health) Reconcile(conf stnrv1.Config) error {
+func (h *Health) Reconcile(conf stnrv2.Config) error {
 	req, ok := conf.(*HealthConfig)
 	if !ok {
-		return stnrv1.ErrInvalidConf
+		return stnrv2.ErrInvalidConf
 	}
 	h.endpoint = req.Endpoint
 	h.conf.Store(&HealthConfig{Endpoint: req.Endpoint})
@@ -130,7 +130,7 @@ func (h *Health) Start() error {
 		return nil
 	}
 
-	addr, _ := getAddrFromURL(h.endpoint, stnrv1.DefaultHealthCheckPort)
+	addr, _ := getAddrFromURL(h.endpoint, stnrv2.DefaultHealthCheckPort)
 	if h.servAddr != "" && h.servAddr == addr {
 		// Server is already up at the desired address.
 		return nil
@@ -199,7 +199,7 @@ func (h *Health) buildMux() *http.ServeMux {
 	})
 	mux.HandleFunc("/status", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		var status stnrv1.Status
+		var status stnrv2.Status
 		if h.rt != nil {
 			status = h.rt.GetStatus(runtime.TypeStunner, "")
 		}
@@ -225,6 +225,6 @@ func (h *Health) buildMux() *http.ServeMux {
 // (the user not setting the field) maps to the default `http://:8086` endpoint.
 func defaultHealthEndpoint() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "http://:%d", stnrv1.DefaultHealthCheckPort)
+	fmt.Fprintf(&b, "http://:%d", stnrv2.DefaultHealthCheckPort)
 	return b.String()
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Admin holds the bits of STUNner administration that aren't carved out into
@@ -20,18 +20,18 @@ import (
 type Admin struct {
 	name, logLevel string
 	quota          int
-	licenseConfig  *stnrv1.LicenseConfig
+	licenseConfig  *stnrv2.LicenseConfig
 
 	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
 	// the allocation path via GetConfig.
-	conf atomic.Pointer[stnrv1.AdminConfig]
+	conf atomic.Pointer[stnrv2.AdminConfig]
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
 }
 
 // NewAdmin creates an Admin object.
-func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
+func NewAdmin(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	a := &Admin{
 		rt:  rt,
 		log: rt.Logger.NewLogger("admin"),
@@ -39,9 +39,9 @@ func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	if conf == nil {
 		return a, nil
 	}
-	req, ok := conf.(*stnrv1.AdminConfig)
+	req, ok := conf.(*stnrv2.AdminConfig)
 	if !ok {
-		return nil, stnrv1.ErrInvalidConf
+		return nil, stnrv2.ErrInvalidConf
 	}
 	if err := a.Reconcile(req); err != nil {
 		return nil, err
@@ -49,15 +49,15 @@ func NewAdmin(conf stnrv1.Config, rt *runtime.Runtime) (runtime.Object, error) {
 	return a, nil
 }
 
-func (a *Admin) Name() string             { return stnrv1.DefaultAdminName }
+func (a *Admin) Name() string             { return stnrv2.DefaultAdminName }
 func (a *Admin) Type() runtime.ObjectType { return runtime.TypeAdmin }
 
 // GetConfig returns the full AdminConfig, combining the admin's own snapshot with the
 // Health/Metrics/Offload pieces pulled from the live children. Safe for concurrent use.
-func (a *Admin) GetConfig() stnrv1.Config {
+func (a *Admin) GetConfig() stnrv2.Config {
 	a.log.Tracef("getConfig")
 
-	out := &stnrv1.AdminConfig{}
+	out := &stnrv2.AdminConfig{}
 	if own := a.conf.Load(); own != nil {
 		*out = *own
 	}
@@ -72,7 +72,7 @@ func (a *Admin) GetConfig() stnrv1.Config {
 		out.MetricsEndpoint = mc.Endpoint
 	}
 
-	out.OffloadEngine = stnrv1.OffloadEngineNone.String()
+	out.OffloadEngine = stnrv2.OffloadEngineNone.String()
 	out.OffloadInterfaces = []string{}
 	if oc, ok := a.rt.GetConfig(runtime.TypeOffload, "").(*OffloadConfig); ok && oc != nil {
 		out.OffloadEngine = oc.Engine
@@ -82,12 +82,12 @@ func (a *Admin) GetConfig() stnrv1.Config {
 	return out
 }
 
-func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
-	req, ok := new.(*stnrv1.AdminConfig)
+func (a *Admin) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
+	req, ok := new.(*stnrv2.AdminConfig)
 	if !ok {
-		return runtime.ActionNone, stnrv1.ErrInvalidConf
+		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
-	cur := old.(*stnrv1.AdminConfig)
+	cur := old.(*stnrv2.AdminConfig)
 	// Only compare own-state fields. Sub-fields (Health/Metrics/Offload) are inspected by
 	// their owning Objects.
 	changed := req.Name != cur.Name ||
@@ -102,10 +102,10 @@ func (a *Admin) Inspect(old, new stnrv1.Config, _ *stnrv1.StunnerConfig) (runtim
 	return runtime.ActionNone, nil
 }
 
-func (a *Admin) Reconcile(conf stnrv1.Config) error {
-	req, ok := conf.(*stnrv1.AdminConfig)
+func (a *Admin) Reconcile(conf stnrv2.Config) error {
+	req, ok := conf.(*stnrv2.AdminConfig)
 	if !ok {
-		return stnrv1.ErrInvalidConf
+		return stnrv2.ErrInvalidConf
 	}
 	if err := req.Validate(); err != nil {
 		return err
@@ -118,7 +118,7 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 	a.rt.License.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
-	a.conf.Store(&stnrv1.AdminConfig{
+	a.conf.Store(&stnrv2.AdminConfig{
 		Name:          a.name,
 		LogLevel:      a.logLevel,
 		UserQuota:     a.quota,
@@ -130,17 +130,17 @@ func (a *Admin) Reconcile(conf stnrv1.Config) error {
 func (a *Admin) Start() error       { return nil }
 func (a *Admin) Close(_ bool) error { return nil }
 
-func (a *Admin) Status() stnrv1.Status {
-	conf := a.GetConfig().(*stnrv1.AdminConfig)
+func (a *Admin) Status() stnrv2.Status {
+	conf := a.GetConfig().(*stnrv2.AdminConfig)
 	healthEndpoint := ""
 	if conf.HealthCheckEndpoint != nil {
 		healthEndpoint = *conf.HealthCheckEndpoint
 	}
 	intfs := "all"
-	if conf.OffloadEngine != stnrv1.OffloadEngineNone.String() && len(conf.OffloadInterfaces) > 0 {
+	if conf.OffloadEngine != stnrv2.OffloadEngineNone.String() && len(conf.OffloadInterfaces) > 0 {
 		intfs = strings.Join(conf.OffloadInterfaces, ",")
 	}
-	return &stnrv1.AdminStatus{
+	return &stnrv2.AdminStatus{
 		Name:                conf.Name,
 		LogLevel:            conf.LogLevel,
 		MetricsEndpoint:     conf.MetricsEndpoint,

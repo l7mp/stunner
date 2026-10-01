@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
@@ -57,7 +57,7 @@ func runConfig(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("error creating CDS client: %w", err)
 	}
 
-	confChan := make(chan *stnrv1.StunnerConfig, 8)
+	confChan := make(chan *stnrv2.StunnerConfig, 8)
 	if watch {
 		err := cds.Watch(ctx, confChan, false)
 		if err != nil {

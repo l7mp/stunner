@@ -191,7 +191,7 @@ kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/
 ## Check your config
 
 The current STUNner dataplane configuration is always made available via the convenient
-[`stunnerctl`](/cmd/stunnerctl/README.md) CLI utility. The below will dump the config of the UDP
+[`stunnerctl`](/docs/cmd/stunnerctl.md) CLI utility. The below will dump the config of the UDP
 gateway in human readable format.
 
 ```console

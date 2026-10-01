@@ -5,26 +5,33 @@ import (
 	"net/url"
 	"strings"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-func decodeConfig(r []byte) ([]*stnrv1.StunnerConfig, error) {
-	c := stnrv1.StunnerConfig{}
-	if err := json.Unmarshal(r, &c); err != nil {
+// decodeConfig decodes a config served by the CDS server, of either version.
+func decodeConfig(r []byte) ([]*stnrv2.StunnerConfig, error) {
+	c, err := parseRaw(r)
+	if err != nil {
 		return nil, err
 	}
-
-	// copy
-
-	return []*stnrv1.StunnerConfig{&c}, nil
+	return []*stnrv2.StunnerConfig{c}, nil
 }
 
-func decodeConfigList(r []byte) ([]*stnrv1.StunnerConfig, error) {
+// decodeConfigList decodes a config list served by the CDS server, each item of either version.
+func decodeConfigList(r []byte) ([]*stnrv2.StunnerConfig, error) {
 	l := ConfigList{}
 	if err := json.Unmarshal(r, &l); err != nil {
 		return nil, err
 	}
-	return l.Items, nil
+	ret := make([]*stnrv2.StunnerConfig, 0, len(l.Items))
+	for _, item := range l.Items {
+		c, err := parseRaw(item)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, c)
+	}
+	return ret, nil
 }
 
 // getURI parses a config origin into a URL. The origin is one of: (1) a bare network address

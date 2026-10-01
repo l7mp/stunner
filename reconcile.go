@@ -4,17 +4,17 @@ import (
 	"errors"
 
 	"github.com/l7mp/stunner/v2/internal/reconciler"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
 // Reconcile handles updates to the STUNner configuration. The actual walk is delegated to the
 // reconciler engine; this method only manages the readiness bit.
 //
-// Returns nil if nothing changed in a way that required a restart, stnrv1.ErrRestarted listing
+// Returns nil if nothing changed in a way that required a restart, stnrv2.ErrRestarted listing
 // any objects that were bounced (safe to ignore), or a non-nil error if the config was rejected,
 // in which case the previous configuration is rolled back unless SuppressRollback is set.
-func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
+func (s *Stunner) Reconcile(req *stnrv2.StunnerConfig) error {
 	err := s.reconciler.Reconcile(req, reconciler.Policy{
 		SuppressRollback: s.suppressRollback,
 		DryRun:           s.dryRun,
@@ -27,7 +27,7 @@ func (s *Stunner) Reconcile(req *stnrv1.StunnerConfig) error {
 
 	// Become ready unless we are shutting down, already ready, in rollback, or bootstrapping
 	// with a zero-config. ErrRestarted still counts as a successful reconciliation.
-	var restarted stnrv1.ErrRestarted
+	var restarted stnrv2.ErrRestarted
 	if (err == nil || errors.As(err, &restarted)) &&
 		!s.rt.IsShutdown() && !s.rt.IsReady() && !cdsclient.IsZeroConfig(req) {
 		s.rt.SetReady(true)

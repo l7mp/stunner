@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-func noK8s(k8sName) (*stnrv1.StunnerConfig, error) {
+func noK8s(k8sName) (*stnrv2.StunnerConfig, error) {
 	panic("k8s:// server resolution must not be reached")
 }
 
@@ -51,41 +51,53 @@ func TestParseK8sURI(t *testing.T) {
 }
 
 // TestTunnelConfig covers the CLI-to-config mapping of tunnel mode: the three turncat-shaped
-// positional arguments render one plain (or stdin) listener pinned to the peer, routing to a
-// single TURN-* cluster naming the server.
+// positional arguments render one plain (or stdin) listener feeding an L4 server, whose single
+// cluster holds the peer and reaches it through a tunnel to the TURN server.
 func TestTunnelConfig(t *testing.T) {
 	t.Run("udp client with static auth", func(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://user:pass@1.2.3.4:3478",
 			"udp://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
 
+		assert.Equal(t, stnrv2.ApiVersion, c.ApiVersion, "API version")
+		assert.Equal(t, "tunnel", c.Admin.Name, "admin name")
+		require.NotNil(t, c.Admin.HealthCheckEndpoint, "health check endpoint")
+		assert.Empty(t, *c.Admin.HealthCheckEndpoint, "health check is off")
+		assert.Equal(t, "none", c.Auth.Type, "listener-side auth is off")
+
 		require.Len(t, c.Listeners, 1)
 		l := c.Listeners[0]
+		assert.Equal(t, "tunnel-listener", l.Name, "listener name")
 		assert.Equal(t, "UDP", l.Protocol, "listener protocol")
 		assert.Equal(t, "127.0.0.1", l.Addr, "listener address")
 		assert.Equal(t, 5000, l.Port, "listener port")
-		assert.Equal(t, "udp://10.0.0.1:9000", l.PeerAddr, "peer address")
-		assert.Equal(t, []string{"tunnel-cluster"}, l.Routes, "routes")
+		assert.Equal(t, []string{"tunnel-server"}, l.Servers, "listener server")
+
+		require.Len(t, c.Servers, 1)
+		s := c.Servers[0]
+		assert.Equal(t, "tunnel-server", s.Name, "server name")
+		assert.Equal(t, stnrv2.ServerTypeL4.String(), s.Type, "server type")
+		assert.Equal(t, []string{"tunnel-cluster"}, s.Clusters, "server clusters")
 
 		require.Len(t, c.Clusters, 1)
-		cl := c.Clusters[0]
-		assert.Equal(t, "TURN-UDP", cl.Protocol, "cluster protocol")
-		require.NotNil(t, cl.TURNServer, "TURN server")
-		assert.Equal(t, "1.2.3.4", cl.TURNServer.Address, "server address")
-		assert.Equal(t, 3478, cl.TURNServer.Port, "server port")
-		require.NotNil(t, cl.TURNServer.Auth, "server auth")
-		assert.Equal(t, "static", cl.TURNServer.Auth.Type, "auth type")
-		assert.Equal(t, "user", cl.TURNServer.Auth.Credentials["username"], "username")
-		assert.Equal(t, "pass", cl.TURNServer.Auth.Credentials["password"], "password")
-
-		assert.Equal(t, "none", c.Auth.Type, "listener-side auth is off")
+		d := c.Clusters[0]
+		assert.Equal(t, "tunnel-cluster", d.Name, "cluster name")
+		assert.Equal(t, stnrv2.ClusterTypeStatic.String(), d.Type, "cluster type")
+		assert.Equal(t, []string{"10.0.0.1:9000"}, d.Endpoints, "cluster endpoints")
+		assert.Equal(t, "UDP", d.Protocol, "cluster protocol: the peer's")
+		require.NotNil(t, d.Tunnel, "tunnel")
+		assert.Equal(t, "turn:1.2.3.4:3478?transport=udp", d.Tunnel.URL, "tunnel URL")
+		require.NotNil(t, d.Tunnel.Auth, "tunnel auth")
+		assert.Equal(t, "static", d.Tunnel.Auth.Type, "auth type")
+		assert.Equal(t, "user", d.Tunnel.Auth.Credentials["username"], "username")
+		assert.Equal(t, "pass", d.Tunnel.Auth.Credentials["password"], "password")
 	})
 
 	t.Run("bare secret is ephemeral auth", func(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://my-secret@1.2.3.4:3478",
 			"udp://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
-		auth := c.Clusters[0].TURNServer.Auth
+		auth := c.Clusters[0].Tunnel.Auth
 		require.NotNil(t, auth, "server auth")
 		assert.Equal(t, "ephemeral", auth.Type, "auth type")
 		assert.Equal(t, "my-secret", auth.Credentials["secret"], "secret")
@@ -95,7 +107,7 @@ func TestTunnelConfig(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
 			"udp://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
-		assert.Nil(t, c.Clusters[0].TURNServer.Auth, "no auth block")
+		assert.Nil(t, c.Clusters[0].Tunnel.Auth, "no auth block")
 	})
 
 	t.Run("tcp client", func(t *testing.T) {
@@ -103,7 +115,8 @@ func TestTunnelConfig(t *testing.T) {
 			"udp://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
 		assert.Equal(t, "TCP", c.Listeners[0].Protocol, "listener protocol")
-		assert.Equal(t, "TURN-TCP", c.Clusters[0].Protocol, "cluster protocol")
+		assert.Equal(t, "UDP", c.Clusters[0].Protocol, "cluster protocol: the peer's")
+		assert.Equal(t, "turn:1.2.3.4:3478?transport=tcp", c.Clusters[0].Tunnel.URL, "tunnel URL")
 	})
 
 	t.Run("stdin client", func(t *testing.T) {
@@ -114,16 +127,28 @@ func TestTunnelConfig(t *testing.T) {
 		assert.Equal(t, "STDIN", l.Protocol, "listener protocol")
 		assert.Empty(t, l.Addr, "no listener address")
 		assert.Zero(t, l.Port, "no listener port")
-		assert.Equal(t, "udp://10.0.0.1:9000", l.PeerAddr, "peer address")
+		assert.Equal(t, []string{"tunnel-server"}, l.Servers, "listener server")
+		assert.Equal(t, []string{"10.0.0.1:9000"}, c.Clusters[0].Endpoints, "peer")
 	})
 
 	t.Run("sni and insecure on a TLS transport", func(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:5349?transport=tls",
 			"udp://10.0.0.1:9000", "", tunnelOptions{sni: "turn.example.com", insecure: true}, noK8s, noPeerK8s)
 		require.NoError(t, err)
-		assert.Equal(t, "TURN-TLS", c.Clusters[0].Protocol, "cluster protocol")
-		assert.Equal(t, "turn.example.com", c.Clusters[0].TURNServer.SNI, "SNI")
-		assert.True(t, c.Clusters[0].TURNServer.Insecure, "insecure")
+		d := c.Clusters[0]
+		assert.Equal(t, "turns:1.2.3.4:5349?transport=tcp", d.Tunnel.URL, "tunnel URL")
+		assert.Equal(t, "turn.example.com", d.Tunnel.SNI, "SNI")
+		assert.True(t, d.Tunnel.Insecure, "insecure")
+	})
+
+	t.Run("license and offload from the command line", func(t *testing.T) {
+		lic := &stnrv2.LicenseConfig{Key: "key", HMAC: "hmac"}
+		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
+			"udp://10.0.0.1:9000", "", tunnelOptions{license: lic, offload: "tc"}, noK8s, noPeerK8s)
+		require.NoError(t, err)
+		assert.Equal(t, lic, c.Admin.LicenseConfig, "license")
+		assert.Equal(t, stnrv2.OffloadEngineTC.String(), c.Admin.OffloadEngine, "offload engine")
+		assert.Empty(t, c.Admin.OffloadInterfaces, "offload on every interface")
 	})
 
 	t.Run("sni on a non-TLS transport is refused", func(t *testing.T) {
@@ -136,7 +161,9 @@ func TestTunnelConfig(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
 			"udp://media.example.com:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
-		assert.Equal(t, "udp://media.example.com:9000", c.Listeners[0].PeerAddr, "DNS peer")
+		r := c.Clusters[0]
+		assert.Equal(t, stnrv2.ClusterTypeStrictDNS.String(), r.Type, "cluster type")
+		assert.Equal(t, []string{"media.example.com:9000"}, r.Endpoints, "DNS peer")
 	})
 
 	t.Run("invalid client scheme", func(t *testing.T) {
@@ -149,12 +176,26 @@ func TestTunnelConfig(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478?transport=tcp",
 			"tcp://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		require.NoError(t, err)
-		assert.Equal(t, "tcp://10.0.0.1:9000", c.Listeners[0].PeerAddr, "TCP peer")
+		assert.Equal(t, stnrv2.ClusterTypeStatic.String(), c.Clusters[0].Type, "cluster type")
+		assert.Equal(t, []string{"10.0.0.1:9000"}, c.Clusters[0].Endpoints, "TCP peer")
+		assert.Equal(t, "TCP", c.Clusters[0].Protocol, "a TCP peer makes a TCP cluster")
 	})
 
 	t.Run("invalid peer scheme", func(t *testing.T) {
 		_, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
 			"dtls://10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
+		assert.Error(t, err)
+	})
+
+	t.Run("peer without a transport prefix", func(t *testing.T) {
+		_, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
+			"10.0.0.1:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
+		assert.Error(t, err)
+	})
+
+	t.Run("peer prefix is not a single host", func(t *testing.T) {
+		_, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478",
+			"udp://10.0.0.0/24:9000", "", tunnelOptions{}, noK8s, noPeerK8s)
 		assert.Error(t, err)
 	})
 
@@ -172,32 +213,43 @@ func TestTunnelConfig(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478?transport=tcp",
 			"k8s://media/db:postgres", "", tunnelOptions{}, noK8s, peerFromK8s)
 		require.NoError(t, err)
-		assert.Equal(t, "tcp://10.96.0.12:5432", c.Listeners[0].PeerAddr,
+		assert.Equal(t, []string{"10.96.0.12:5432"}, c.Clusters[0].Endpoints,
 			"peer resolved from the service port")
 	})
 
-	t.Run("k8s server resolution", func(t *testing.T) {
-		fromK8s := func(u k8sName) (*stnrv1.StunnerConfig, error) {
+	gateway := func(serverType string) func(k8sName) (*stnrv2.StunnerConfig, error) {
+		return func(u k8sName) (*stnrv2.StunnerConfig, error) {
 			assert.Equal(t, k8sName{"media", "gw", "l7mp"}, u, "parsed server URI")
-			return &stnrv1.StunnerConfig{
-				Auth: stnrv1.AuthConfig{Type: "static", Credentials: map[string]string{
+			return &stnrv2.StunnerConfig{
+				Auth: stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{
 					"username": "user", "password": "pass"}},
-				Listeners: []stnrv1.ListenerConfig{{
+				Listeners: []stnrv2.ListenerConfig{{
 					Name:       "media/gw/l7mp",
-					Protocol:   "TURN-UDP",
+					Protocol:   "UDP",
 					PublicAddr: "5.6.7.8",
 					PublicPort: 3478,
+					Servers:    []string{"media/gw/l7mp"},
 				}},
+				Servers: []stnrv2.ServerConfig{{Name: "media/gw/l7mp", Type: serverType}},
 			}, nil
 		}
+	}
+
+	t.Run("k8s server resolution", func(t *testing.T) {
 		c, err := tunnelConfig("udp://127.0.0.1:5000", "k8s://media/gw:l7mp",
-			"udp://10.0.0.1:9000", "", tunnelOptions{}, fromK8s, noPeerK8s)
+			"udp://10.0.0.1:9000", "", tunnelOptions{}, gateway(stnrv2.ServerTypeTURN.String()), noPeerK8s)
 		require.NoError(t, err)
-		cl := c.Clusters[0]
-		assert.Equal(t, "TURN-UDP", cl.Protocol, "cluster protocol")
-		assert.Equal(t, "5.6.7.8", cl.TURNServer.Address, "server address")
-		assert.Equal(t, 3478, cl.TURNServer.Port, "server port")
-		require.NotNil(t, cl.TURNServer.Auth, "server auth")
-		assert.Equal(t, "static", cl.TURNServer.Auth.Type, "auth type carried over")
+		d := c.Clusters[0]
+		assert.Equal(t, "turn:5.6.7.8:3478?transport=udp", d.Tunnel.URL,
+			"tunnel transport derived from the listener")
+		require.NotNil(t, d.Tunnel.Auth, "tunnel auth")
+		assert.Equal(t, "static", d.Tunnel.Auth.Type, "auth type carried over")
+		assert.Equal(t, "user", d.Tunnel.Auth.Credentials["username"], "username carried over")
+	})
+
+	t.Run("k8s server listener must feed a TURN server", func(t *testing.T) {
+		_, err := tunnelConfig("udp://127.0.0.1:5000", "k8s://media/gw:l7mp",
+			"udp://10.0.0.1:9000", "", tunnelOptions{}, gateway(stnrv2.ServerTypeL4.String()), noPeerK8s)
+		assert.Error(t, err)
 	})
 }

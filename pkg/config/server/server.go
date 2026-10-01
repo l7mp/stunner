@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gorilla/mux"
-	"github.com/l7mp/stunner/v2/pkg/config/client"
 	"github.com/l7mp/stunner/v2/pkg/config/server/api"
 
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
@@ -145,7 +144,22 @@ func (s *Server) DeleteConfig(id string) {
 		return
 	}
 
-	config := client.ZeroConfig(id)
+	// the zero config clients recognize as a deletion: the operator speaks v1, so does this
+	// server; clients convert it like any other config
+	config := &stnrv1.StunnerConfig{
+		ApiVersion: stnrv1.ApiVersion,
+		Admin:      stnrv1.AdminConfig{Name: id},
+		Auth: stnrv1.AuthConfig{
+			Type:  "static",
+			Realm: stnrv1.DefaultRealm,
+			Credentials: map[string]string{
+				"username": "dummy-username",
+				"password": "dummy-password",
+			},
+		},
+		Listeners: []stnrv1.ListenerConfig{},
+		Clusters:  []stnrv1.ClusterConfig{},
+	}
 	if SuppressConfigDeletion {
 		s.log.Info("suppressing config update for deleted config", "config-id", id)
 		config = nil

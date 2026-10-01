@@ -6,27 +6,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
 type fakeReconcilable struct {
 	name   string
 	typ    runtime.ObjectType
-	config stnrv1.Config
-	status stnrv1.Status
+	config stnrv2.Config
+	status stnrv2.Status
 }
 
 func (o *fakeReconcilable) Name() string             { return o.name }
 func (o *fakeReconcilable) Type() runtime.ObjectType { return o.typ }
 func (o *fakeReconcilable) Start() error             { return nil }
 func (o *fakeReconcilable) Close(_ bool) error       { return nil }
-func (o *fakeReconcilable) GetConfig() stnrv1.Config { return o.config }
-func (o *fakeReconcilable) Status() stnrv1.Status    { return o.status }
-func (o *fakeReconcilable) Inspect(_, _ stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+func (o *fakeReconcilable) GetConfig() stnrv2.Config { return o.config }
+func (o *fakeReconcilable) Status() stnrv2.Status    { return o.status }
+func (o *fakeReconcilable) Inspect(_, _ stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	return runtime.ActionNone, nil
 }
-func (o *fakeReconcilable) Reconcile(conf stnrv1.Config) error {
+func (o *fakeReconcilable) Reconcile(conf stnrv2.Config) error {
 	o.config = conf
 	return nil
 }
@@ -77,17 +77,17 @@ func TestLookupSkipsLifecycleOnly(t *testing.T) {
 	rt := newRuntime(t)
 
 	auth := &fakeReconcilable{
-		name: stnrv1.DefaultAuthName,
+		name: stnrv2.DefaultAuthName,
 		typ:  runtime.TypeAuth,
-		config: &stnrv1.AuthConfig{
-			Type:  stnrv1.AuthTypeStatic.String(),
+		config: &stnrv2.AuthConfig{
+			Type:  stnrv2.AuthTypeStatic.String(),
 			Realm: "example.org",
 			Credentials: map[string]string{
 				"username": "u",
 				"password": "p",
 			},
 		},
-		status: &stnrv1.AuthStatus{},
+		status: &stnrv2.AuthStatus{},
 	}
 	require.NoError(t, rt.Registry.Add(auth, nil))
 
@@ -96,7 +96,7 @@ func TestLookupSkipsLifecycleOnly(t *testing.T) {
 	node := &fakeRunnable{name: "node-a", typ: lifecycleOnly}
 	require.NoError(t, rt.Registry.Add(node, nil))
 
-	gotAuth, ok := rt.GetConfig(runtime.TypeAuth, "").(*stnrv1.AuthConfig)
+	gotAuth, ok := rt.GetConfig(runtime.TypeAuth, "").(*stnrv2.AuthConfig)
 	require.True(t, ok)
 	require.Equal(t, "example.org", gotAuth.Realm)
 

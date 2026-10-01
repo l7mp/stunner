@@ -39,7 +39,7 @@ spec:
 
 This will set the quota to 10. Setting the quota to zero means no quota (the default setting).
 
-You can query the configured user quota using [`stunnerctl`](/cmd/stunnerctl/README.md). Suppose you deployed a TURN/UDP gateway called `udp-gateway` in the `stunner` namespace. The current quota can be obtained as follows:
+You can query the configured user quota using [`stunnerctl`](/docs/cmd/stunnerctl.md). Suppose you deployed a TURN/UDP gateway called `udp-gateway` in the `stunner` namespace. The current quota can be obtained as follows:
 
 ```console
 stunnerctl -n <gateway-namespace> status <gateway-name> -o jsonpath='{.admin.quota}'
@@ -170,7 +170,7 @@ Below is the set of steps to enable relay address discovery:
 
 **Feature:** `TCPRoute`. **Availability:** member and enterprise tiers.
 
-STUNner routes clients to backends over UDP by default: a UDPRoute admits a set of backend Services and `stunnerd` relays client traffic to them in UDP. Some backends, however, speak only TCP. The `TCPRoute` resource is the TCP counterpart of the UDPRoute: it admits the same kinds of backends with the same port-range semantics, but the relay leg towards the backend is a TCP connection.
+STUNner can route clients to backends over TCP over TURN. The `TCPRoute` resource is the TCP counterpart of the UDPRoute: it admits the same kinds of backends, but the relay leg towards the backend is a TCP connection.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -326,6 +326,6 @@ Effective TURN protocol offload requires some low-level tweaking of the underlyi
 
 - The offload engine relies on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
 - Loading the eBPF program requires elevated admin privileges that might be not available on arbitrary Kubernetes clusters. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
-- Offload applies only to a leg between a TURN client and a TURN server, where plaintext ChannelData arrives on one side and raw traffic leaves on the other. See the [combination table](/docs/cmd/stunnerd.md#listener-and-cluster-combinations).
+- Offload applies only to a leg between a TURN client and a TURN server, where plaintext ChannelData arrives on one side and raw traffic leaves on the other: a client of a TURN/UDP listener relaying to a UDPRoute backend, and a UDP client of the [tunnel mode](/docs/cmd/stunnerd.md#tunnel-mode) tunnelling over TURN/UDP. TURN over TCP, TLS or DTLS, TCPRoute backends and TURN relay chaining stay in user space.
 - Currently TURN offload only supports UDP TURN channels. Implementing TURN/TCP acceleration and offloading TURN send indications are on the TODO list, reach out to us if you need these features.
 - TURN/XDP offload is disabled for host-local redirects (except the lo interface). Use the TURN/TC engine when host-local redirect is important, like accelerated symmetric ICE mode deployment.

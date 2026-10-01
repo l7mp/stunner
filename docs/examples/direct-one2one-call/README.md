@@ -209,7 +209,7 @@ NAME                                        AGE
 udproute.stunner.l7mp.io/stunner-headless   2m50s
 ```
 
-You can also use the handy [`stunnerctl` CLI tool](/cmd/stunnerctl/README.md) to dump the running STUNner configuration. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory. Below is the human-readable config of the Gateway called `udp-gateway`:
+You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory. Below is the human-readable config of the Gateway called `udp-gateway`:
 
 ``` console
 bin/stunnerctl -n stunner config udp-gateway

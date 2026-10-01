@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/pion/logging"
 )
 
@@ -32,14 +32,14 @@ var (
 // receiver side.
 type Client interface {
 	// Load grabs a new configuration from the config client.
-	Load() (*stnrv1.StunnerConfig, error)
+	Load() (*stnrv2.StunnerConfig, error)
 	// Watch listens to new configs from a config origin (config file or CDS server) and
 	// returns them on the given channel. The context cancels the watcher. If the origin is not
 	// available watch will retry. If set, the suppressDelete flag instructs the client to
 	// ignore delete config (essentially zero-configs) from the origin.
-	Watch(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error
+	Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
 	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
-	Poll(ctx context.Context, ch chan<- *stnrv1.StunnerConfig, suppressDelete bool) error
+	Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
 	fmt.Stringer
 }
 

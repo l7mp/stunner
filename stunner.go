@@ -16,10 +16,9 @@ import (
 	"github.com/l7mp/stunner/v2/internal/quota"
 	"github.com/l7mp/stunner/v2/internal/reconciler"
 	"github.com/l7mp/stunner/v2/internal/resolver"
-	"github.com/l7mp/stunner/v2/internal/router"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -50,7 +49,6 @@ type Stunner struct {
 	// Object-wide config.
 	name, version string
 	node          string
-	udpThreadNum  int
 
 	// Flags.
 	forceReady, suppressRollback, dryRun bool
@@ -106,11 +104,6 @@ func NewStunner(options Options) *Stunner {
 		log.Warn("virtual net (vnet) is enabled")
 	}
 
-	udpThreadNum := 0
-	if options.UDPListenerThreadNum > 0 {
-		udpThreadNum = options.UDPListenerThreadNum
-	}
-
 	logRateLimit := LogRateLimit
 	if options.LogOptions.RateLimit > 0 {
 		logRateLimit = options.LogOptions.RateLimit
@@ -132,13 +125,12 @@ func NewStunner(options Options) *Stunner {
 
 	s := &Stunner{
 		name:             id,
-		version:          stnrv1.ApiVersion,
+		version:          stnrv2.ApiVersion,
 		logger:           logFactory,
 		log:              log,
 		suppressRollback: options.SuppressRollback,
 		dryRun:           options.DryRun,
 		resolver:         r,
-		udpThreadNum:     udpThreadNum,
 		node:             options.NodeName,
 		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
@@ -179,12 +171,8 @@ func NewStunner(options Options) *Stunner {
 		Telemetry:     s.telemetry,
 		License:       licenseMgr,
 		OffloadEngine: offloadEngine,
-		UdpThreadNum:  s.udpThreadNum,
 		Net:           s.net,
 	})
-	rt.Router = router.NewRouter(rt)
-	// DNS re-resolution changes routing verdicts, so it invalidates the routing cache
-	r.SetOnChange(rt.Router.InvalidateCache)
 	rt.QuotaHandler = quota.New(rt)
 	rt.SetForceReady(s.forceReady)
 	s.rt = rt
@@ -220,6 +208,7 @@ func NewStunner(options Options) *Stunner {
 			for _, n := range rt.Registry.List(runtime.TypeListener) {
 				listeners[offload.NameHash(n.Name())] = n.Name()
 			}
+			// the peer side of an offloaded flow is attributed to its cluster
 			clusters = map[uint16]string{}
 			for _, n := range rt.Registry.List(runtime.TypeCluster) {
 				clusters[offload.NameHash(n.Name())] = n.Name()
@@ -256,18 +245,19 @@ func (s *Stunner) GetLogger() logging.LoggerFactory { return s.logger }
 // SetLogLevel sets the loglevel.
 func (s *Stunner) SetLogLevel(levelSpec string) { s.logger.SetLevel(levelSpec) }
 
-// AllocationCount returns the number of active allocations summed over all listeners.
+// AllocationCount returns the number of live sessions (TURN allocations and L4 flows) summed over
+// all servers.
 func (s *Stunner) AllocationCount() int {
 	n := 0
-	for _, l := range s.GetListeners() {
-		n += l.AllocationCount()
+	for _, srv := range s.GetServers() {
+		n += srv.Sessions()
 	}
 	return n
 }
 
 // GetStatus returns the root status. The root Object aggregates from its descendants.
-func (s *Stunner) GetStatus() stnrv1.Status {
-	status := s.rt.GetStatus(runtime.TypeStunner, "").(*stnrv1.StunnerStatus)
+func (s *Stunner) GetStatus() stnrv2.Status {
+	status := s.rt.GetStatus(runtime.TypeStunner, "").(*stnrv2.StunnerStatus)
 	status.AllocationCount = s.AllocationCount()
 	stat := "READY"
 	if !s.rt.IsReady() {
@@ -309,7 +299,7 @@ func (s *Stunner) GetActiveConnections() int64 { return int64(s.AllocationCount(
 
 // GetAdmin returns the Admin Object, or nil if not registered.
 func (s *Stunner) GetAdmin() *object.Admin {
-	a, ok := s.rt.Registry.Get(runtime.TypeAdmin, stnrv1.DefaultAdminName)
+	a, ok := s.rt.Registry.Get(runtime.TypeAdmin, stnrv2.DefaultAdminName)
 	if !ok {
 		return nil
 	}
@@ -318,7 +308,7 @@ func (s *Stunner) GetAdmin() *object.Admin {
 
 // GetAuth returns the Auth Object, or nil if not registered.
 func (s *Stunner) GetAuth() *object.Auth {
-	a, ok := s.rt.Registry.Get(runtime.TypeAuth, stnrv1.DefaultAuthName)
+	a, ok := s.rt.Registry.Get(runtime.TypeAuth, stnrv2.DefaultAuthName)
 	if !ok {
 		return nil
 	}
@@ -344,21 +334,30 @@ func (s *Stunner) GetListener(name string) *object.Listener {
 	return l.(*object.Listener)
 }
 
-// GetClusters returns every Cluster in stable order.
-func (s *Stunner) GetClusters() []*object.Cluster {
-	objs := s.rt.Registry.List(runtime.TypeCluster)
-	out := make([]*object.Cluster, 0, len(objs))
+// GetServers returns every Server in stable order.
+func (s *Stunner) GetServers() []*object.Server {
+	objs := s.rt.Registry.List(runtime.TypeServer)
+	out := make([]*object.Server, 0, len(objs))
 	for _, o := range objs {
-		out = append(out, o.(*object.Cluster))
+		out = append(out, o.(*object.Server))
 	}
 	return out
 }
 
-// GetCluster returns a Cluster by name, or nil if not found.
-func (s *Stunner) GetCluster(name string) *object.Cluster {
-	c, ok := s.rt.Registry.Get(runtime.TypeCluster, name)
+// GetServer returns a Server by name, or nil if not found.
+func (s *Stunner) GetServer(name string) *object.Server {
+	o, ok := s.rt.Registry.Get(runtime.TypeServer, name)
 	if !ok {
 		return nil
 	}
-	return c.(*object.Cluster)
+	return o.(*object.Server)
+}
+
+// GetCluster returns a Cluster by name, or nil if not found.
+func (s *Stunner) GetCluster(name string) *object.Cluster {
+	o, ok := s.rt.Registry.Get(runtime.TypeCluster, name)
+	if !ok {
+		return nil
+	}
+	return o.(*object.Cluster)
 }

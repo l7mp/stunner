@@ -32,8 +32,9 @@ debug.test*
 # Go workspace file
 go.work
 
-# Our binaries
-stunnerctl
-stunnerd
-icetester
+# Our binaries: make build writes bin/, go build in the repo root writes the bare names there
+/bin/
+/stunnerctl
+/stunnerd
+/icetester
 AGENTS.md

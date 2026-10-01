@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -54,7 +54,7 @@ func (c *fakeConfig) Validate() error { return nil }
 
 func (c *fakeConfig) ConfigName() string { return c.Name }
 
-func (c *fakeConfig) DeepEqual(other stnrv1.Config) bool {
+func (c *fakeConfig) DeepEqual(other stnrv2.Config) bool {
 	o, ok := other.(*fakeConfig)
 	if !ok {
 		return false
@@ -62,7 +62,7 @@ func (c *fakeConfig) DeepEqual(other stnrv1.Config) bool {
 	return *c == *o
 }
 
-func (c *fakeConfig) DeepCopyInto(dst stnrv1.Config) {
+func (c *fakeConfig) DeepCopyInto(dst stnrv2.Config) {
 	out := dst.(*fakeConfig)
 	*out = *c
 }
@@ -94,7 +94,7 @@ type fakeFactory struct {
 	rec     *eventRecorder
 }
 
-func (f *fakeFactory) New(conf stnrv1.Config) (runtime.Runnable, error) {
+func (f *fakeFactory) New(conf stnrv2.Config) (runtime.Runnable, error) {
 	cfg := conf.(*fakeConfig).clone()
 	f.rec.add(fmt.Sprintf("factory:%s/%s", f.objType, cfg.Name))
 
@@ -124,15 +124,15 @@ func (o *fakeObject) Name() string { return o.cfg.Name }
 
 func (o *fakeObject) Type() runtime.ObjectType { return o.objType }
 
-func (o *fakeObject) GetConfig() stnrv1.Config {
+func (o *fakeObject) GetConfig() stnrv2.Config {
 	return o.cfg.clone()
 }
 
-func (o *fakeObject) Status() stnrv1.Status {
+func (o *fakeObject) Status() stnrv2.Status {
 	return fakeStatus{}
 }
 
-func (o *fakeObject) Inspect(_, conf stnrv1.Config, _ *stnrv1.StunnerConfig) (runtime.Action, error) {
+func (o *fakeObject) Inspect(_, conf stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	cfg := conf.(*fakeConfig)
 	o.rec.add(fmt.Sprintf("inspect:%s/%s:%d", o.objType, o.cfg.Name, cfg.Decision))
 
@@ -143,7 +143,7 @@ func (o *fakeObject) Inspect(_, conf stnrv1.Config, _ *stnrv1.StunnerConfig) (ru
 	return cfg.Decision, nil
 }
 
-func (o *fakeObject) Reconcile(conf stnrv1.Config) error {
+func (o *fakeObject) Reconcile(conf stnrv2.Config) error {
 	cfg := conf.(*fakeConfig).clone()
 	o.rec.add(fmt.Sprintf("reconcile:%s/%s", o.objType, o.cfg.Name))
 	o.cfg = cfg
@@ -181,7 +181,7 @@ type testEnv struct {
 	t          *testing.T
 	rt         *runtime.Runtime
 	rec        *eventRecorder
-	desired    map[runtime.ObjectType][]stnrv1.Config
+	desired    map[runtime.ObjectType][]stnrv2.Config
 	reconciler *Reconciler
 }
 
@@ -196,17 +196,17 @@ func newTestEnv(t *testing.T) *testEnv {
 		t:       t,
 		rt:      rt,
 		rec:     rec,
-		desired: map[runtime.ObjectType][]stnrv1.Config{},
+		desired: map[runtime.ObjectType][]stnrv2.Config{},
 	}
 
 	catalog := NewCatalogFromKinds(
 		KindSpec{
 			Type:     testRootType,
 			Children: []runtime.ObjectType{testGroupType},
-			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+			New: func(_ runtime.Runnable, conf stnrv2.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testRootType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv2.StunnerConfig) ([]stnrv2.Config, error) {
 				return env.extractor(testRootType)(), nil
 			},
 			Singleton:     true,
@@ -215,19 +215,19 @@ func newTestEnv(t *testing.T) *testEnv {
 		KindSpec{
 			Type:     testGroupType,
 			Children: []runtime.ObjectType{testItemType},
-			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+			New: func(_ runtime.Runnable, conf stnrv2.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testGroupType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv2.StunnerConfig) ([]stnrv2.Config, error) {
 				return env.extractor(testGroupType)(), nil
 			},
 		},
 		KindSpec{
 			Type: testItemType,
-			New: func(_ runtime.Runnable, conf stnrv1.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+			New: func(_ runtime.Runnable, conf stnrv2.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
 				return (&fakeFactory{objType: testItemType, rec: rec}).New(conf)
 			},
-			ExtractConfigs: func(_ string, _ *stnrv1.StunnerConfig) ([]stnrv1.Config, error) {
+			ExtractConfigs: func(_ string, _ *stnrv2.StunnerConfig) ([]stnrv2.Config, error) {
 				return env.extractor(testItemType)(), nil
 			},
 		},
@@ -238,10 +238,10 @@ func newTestEnv(t *testing.T) *testEnv {
 	return env
 }
 
-func (e *testEnv) extractor(objType runtime.ObjectType) func() []stnrv1.Config {
-	return func() []stnrv1.Config {
+func (e *testEnv) extractor(objType runtime.ObjectType) func() []stnrv2.Config {
+	return func() []stnrv2.Config {
 		confs := e.desired[objType]
-		out := make([]stnrv1.Config, len(confs))
+		out := make([]stnrv2.Config, len(confs))
 		for i := range confs {
 			out[i] = confs[i].(*fakeConfig).clone()
 		}
@@ -276,7 +276,7 @@ func (e *testEnv) addObject(objType runtime.ObjectType, cfg *fakeConfig) *fakeOb
 func (e *testEnv) setDesired(objType runtime.ObjectType, cfgs ...*fakeConfig) {
 	e.t.Helper()
 
-	out := make([]stnrv1.Config, len(cfgs))
+	out := make([]stnrv2.Config, len(cfgs))
 	for i := range cfgs {
 		out[i] = cfgs[i].clone()
 	}
@@ -307,8 +307,8 @@ func TestReconcileFlow(t *testing.T) {
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
-	var restarted stnrv1.ErrRestarted
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
+	var restarted stnrv2.ErrRestarted
 	require.ErrorAs(t, err, &restarted)
 	require.Equal(t, []string{fmt.Sprintf("%s: %s", testItemType, "restart")}, restarted.Objects)
 
@@ -339,8 +339,8 @@ func TestDryRun(t *testing.T) {
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, true)
-	var restarted stnrv1.ErrRestarted
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, true)
+	var restarted stnrv2.ErrRestarted
 	require.ErrorAs(t, err, &restarted)
 	require.Equal(t, []string{fmt.Sprintf("%s: %s", testItemType, "old")}, restarted.Objects)
 
@@ -379,7 +379,7 @@ func TestDeleteSubtree(t *testing.T) {
 	env.setDesired(testGroupType)
 	env.setDesired(testItemType)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.NoError(t, err)
 
 	_, rootFound := env.rt.Registry.Get(testRootType, "root")
@@ -409,7 +409,7 @@ func TestInspectErr(t *testing.T) {
 	env.addObject(testItemType, &fakeConfig{Name: "bad"})
 	env.setDesired(testItemType, &fakeConfig{Name: "bad", InspectErr: true})
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errInspect)
 
 	events := env.rec.snapshot()
@@ -432,7 +432,7 @@ func TestReconcileErr(t *testing.T) {
 		&fakeConfig{Name: "new"},
 	)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errReconcile)
 
 	_, found := env.rt.Registry.Get(testItemType, "new")
@@ -453,7 +453,7 @@ func TestStartErr(t *testing.T) {
 	env.seedBaseTree()
 	env.setDesired(testItemType, &fakeConfig{Name: "new", StartErr: true})
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorIs(t, err, errStart)
 
 	_, found := env.rt.Registry.Get(testItemType, "new")
@@ -475,7 +475,7 @@ func TestReconcileRestartRequired(t *testing.T) {
 		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrRestartRequired},
 	)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorIs(t, err, runtime.ErrRestartRequired)
 
 	events := env.rec.snapshot()
@@ -492,7 +492,7 @@ func TestCreateRestartRequired(t *testing.T) {
 		&fakeConfig{Name: "new", CreateErrMode: fakeErrRestartRequired},
 	)
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorIs(t, err, runtime.ErrRestartRequired)
 
 	_, found := env.rt.Registry.Get(testItemType, "new")
@@ -509,7 +509,7 @@ func TestSingletonWrongName(t *testing.T) {
 
 	env.setDesired(testRootType, &fakeConfig{Name: "renamed-root"})
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorContains(t, err, "singleton item must be named")
 
 	events := env.rec.snapshot()
@@ -525,7 +525,7 @@ func TestSingletonCardinality(t *testing.T) {
 
 	env.setDesired(testRootType, &fakeConfig{Name: "root"}, &fakeConfig{Name: "root"})
 
-	err := env.reconciler.run(&stnrv1.StunnerConfig{}, false)
+	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
 	require.ErrorContains(t, err, "singleton resolver returned")
 
 	events := env.rec.snapshot()

@@ -43,32 +43,12 @@ func (req *AuthConfig) Validate() error {
 		req.Type = DefaultAuthType
 	}
 
-	// Normalize
+	// Normalize. Missing credentials are no config error: a TURN server refuses every client.
 	atype, err := NewAuthType(req.Type)
 	if err != nil {
 		return err
 	}
 	req.Type = atype.String()
-
-	switch atype {
-	case AuthTypeNone:
-		// no auth
-
-	case AuthTypeStatic:
-		_, userFound := req.Credentials["username"]
-		_, passFound := req.Credentials["password"]
-		if !userFound || !passFound {
-			return fmt.Errorf("%s: empty username or password", atype.String())
-		}
-
-	case AuthTypeEphemeral:
-		_, secretFound := req.Credentials["secret"]
-		if !secretFound {
-			return fmt.Errorf("no secret found in %s auth config", atype.String())
-		}
-	default:
-		return fmt.Errorf("invalid authentication type %q", req.Type)
-	}
 
 	if req.Lifetime != "" {
 		if _, err := time.ParseDuration(req.Lifetime); err != nil {

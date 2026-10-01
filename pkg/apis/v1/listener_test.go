@@ -68,123 +68,33 @@ func TestListenerConfigValidate(t *testing.T) {
 			err:  true,
 		},
 		{
-			name: "turn-udp listener ignores the peer address",
-			conf: ListenerConfig{Name: "listener", Protocol: "turn-udp",
-				PeerAddr: "1.2.3.4:5678"},
-		},
-		{
 			name: "plain udp listener",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "1.2.3.4:5678"},
+			conf: ListenerConfig{Name: "listener", Protocol: "udp"},
 		},
 		{
 			name: "plain tcp listener",
-			conf: ListenerConfig{Name: "listener", Protocol: "tcp",
-				PeerAddr: "1.2.3.4:5678"},
-		},
-		{
-			name: "plain udp listener with a DNS peer",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "media.example.com:5678"},
-		},
-		{
-			name: "plain udp listener with a bracketed IPv6 peer",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "[2001:db8::1]:5678"},
-		},
-		{
-			name: "plain udp listener with a udp peer scheme",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "udp://1.2.3.4:5678"},
-		},
-		{
-			name: "plain udp listener with a tcp peer scheme",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "tcp://1.2.3.4:5678"},
-		},
-		{
-			name: "plain udp listener with an uppercase peer scheme",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "UDP://1.2.3.4:5678"},
-		},
-		{
-			name: "plain udp listener with an invalid peer scheme",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "dtls://1.2.3.4:5678"},
-			err: true,
-		},
-		{
-			name: "plain udp listener with a portless scheme peer",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "udp://1.2.3.4"},
-			err: true,
-		},
-		{
-			name: "plain udp listener without a peer address",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp"},
-			err:  true,
-		},
-		{
-			name: "plain tcp listener without a peer address",
 			conf: ListenerConfig{Name: "listener", Protocol: "tcp"},
-			err:  true,
-		},
-		{
-			name: "plain udp listener with a portless peer address",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "1.2.3.4"},
-			err: true,
-		},
-		{
-			name: "plain udp listener with a hostless peer address",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: ":5678"},
-			err: true,
-		},
-		{
-			name: "plain udp listener with an invalid peer port",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "1.2.3.4:notaport"},
-			err: true,
-		},
-		{
-			name: "plain udp listener with a zero peer port",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "1.2.3.4:0"},
-			err: true,
-		},
-		{
-			name: "plain udp listener with an out-of-range peer port",
-			conf: ListenerConfig{Name: "listener", Protocol: "udp",
-				PeerAddr: "1.2.3.4:65536"},
-			err: true,
 		},
 		{
 			name: "stdin listener",
-			conf: ListenerConfig{Name: "listener", Protocol: "stdin",
-				PeerAddr: "1.2.3.4:5678"},
-		},
-		{
-			name: "stdin listener without a peer address",
 			conf: ListenerConfig{Name: "listener", Protocol: "stdin"},
-			err:  true,
 		},
 		{
 			name: "stdin listener with an address",
 			conf: ListenerConfig{Name: "listener", Protocol: "stdin",
-				PeerAddr: "1.2.3.4:5678", Addr: "127.0.0.1"},
+				Addr: "127.0.0.1"},
 			err: true,
 		},
 		{
 			name: "stdin listener with a port",
 			conf: ListenerConfig{Name: "listener", Protocol: "stdin",
-				PeerAddr: "1.2.3.4:5678", Port: 3478},
+				Port: 3478},
 			err: true,
 		},
 		{
 			name: "stdin listener with TLS credentials",
 			conf: ListenerConfig{Name: "listener", Protocol: "stdin",
-				PeerAddr: "1.2.3.4:5678", Cert: "cert", Key: "key"},
+				Cert: "cert", Key: "key"},
 			err: true,
 		},
 	}
@@ -209,36 +119,9 @@ func TestListenerConfigValidateDefaults(t *testing.T) {
 	assert.Equal(t, DefaultPort, c.Port, "port default")
 
 	// STDIN listeners have no listener socket: no address/port defaulting
-	s := ListenerConfig{Name: "listener", Protocol: "stdin", PeerAddr: "1.2.3.4:5678"}
+	s := ListenerConfig{Name: "listener", Protocol: "stdin"}
 	assert.NoError(t, s.Validate())
 	assert.Equal(t, "STDIN", s.Protocol, "protocol normalized")
 	assert.Empty(t, s.Addr, "no address default for stdin")
 	assert.Zero(t, s.Port, "no port default for stdin")
-}
-
-func TestListenerConfigPeerEndpoint(t *testing.T) {
-	for _, tc := range []struct {
-		addr     string
-		proto    Protocol
-		hostport string
-	}{
-		{"1.2.3.4:5678", ProtocolUDP, "1.2.3.4:5678"},
-		{"udp://1.2.3.4:5678", ProtocolUDP, "1.2.3.4:5678"},
-		{"tcp://1.2.3.4:5678", ProtocolTCP, "1.2.3.4:5678"},
-		{"TCP://media.example.com:5678", ProtocolTCP, "media.example.com:5678"},
-		{"udp://[2001:db8::1]:5678", ProtocolUDP, "[2001:db8::1]:5678"},
-	} {
-		t.Run(tc.addr, func(t *testing.T) {
-			c := ListenerConfig{PeerAddr: tc.addr}
-			proto, hostport := c.PeerEndpoint()
-			assert.Equal(t, tc.proto, proto, "peer transport")
-			assert.Equal(t, tc.hostport, hostport, "peer endpoint")
-		})
-	}
-}
-
-func TestListenerConfigStringPeerAddr(t *testing.T) {
-	c := ListenerConfig{Name: "listener", Protocol: "udp", PeerAddr: "1.2.3.4:5678"}
-	assert.NoError(t, c.Validate())
-	assert.Contains(t, c.String(), "peer=1.2.3.4:5678")
 }

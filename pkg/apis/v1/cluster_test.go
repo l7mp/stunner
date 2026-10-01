@@ -84,10 +84,9 @@ func TestClusterConfigValidate(t *testing.T) {
 			conf: ClusterConfig{
 				Name:       "cluster",
 				Protocol:   "turn-udp",
-				Endpoints:  []string{"0.0.0.0/0"},
+				Endpoints:  []string{"10.0.0.1:<5000-5000>"},
 				TURNServer: &TURNServer{Address: "turn.example.com", Port: 3478},
 			},
-			err: true,
 		},
 		{
 			name: "turn cluster with credentials",
@@ -146,7 +145,7 @@ func TestClusterConfigValidate(t *testing.T) {
 						"username": "user1"}},
 				},
 			},
-			err: true,
+			err: false,
 		},
 		{
 			name: "turn cluster with password only",
@@ -160,7 +159,7 @@ func TestClusterConfigValidate(t *testing.T) {
 						"password": "pass1"}},
 				},
 			},
-			err: true,
+			err: false,
 		},
 		{
 			name: "direct cluster with turn server",
@@ -351,18 +350,19 @@ func TestTURNServerValidate(t *testing.T) {
 			err: true,
 		},
 		{
-			name: "ephemeral auth without a secret is rejected",
+			// missing credentials are no config error: the upstream server refuses them
+			name: "ephemeral auth without a secret is accepted",
 			server: TURNServer{Address: "1.2.3.4", Port: 3478, Auth: &AuthConfig{
 				Type: "ephemeral", Credentials: map[string]string{}}},
-			err: true,
+			wantType: "ephemeral",
 		},
 		{name: "missing address", server: TURNServer{Port: 3478}, err: true},
 		{name: "zero port", server: TURNServer{Address: "1.2.3.4"}, err: true},
 		{name: "port out of range", server: TURNServer{Address: "1.2.3.4", Port: 65536}, err: true},
 		{
-			name:   "static auth without a password is rejected",
-			server: TURNServer{Address: "1.2.3.4", Port: 3478, Auth: &AuthConfig{Type: "static", Credentials: map[string]string{"username": "u"}}},
-			err:    true,
+			name:     "static auth without a password is accepted",
+			server:   TURNServer{Address: "1.2.3.4", Port: 3478, Auth: &AuthConfig{Type: "static", Credentials: map[string]string{"username": "u"}}},
+			wantType: "static",
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {

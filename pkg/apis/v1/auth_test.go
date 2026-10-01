@@ -15,7 +15,6 @@ func TestAuthConfigNoneStaysNone(t *testing.T) {
 	assert.Equal(t, "none", a.Type, "explicit none is never defaulted")
 
 	d := AuthConfig{}
-	err := d.Validate()
-	assert.Error(t, err, "an empty type defaults to static, which demands credentials")
+	assert.NoError(t, d.Validate(), "missing credentials are no config error")
 	assert.Equal(t, "static", d.Type, "only an empty type is defaulted")
 }

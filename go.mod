@@ -7,6 +7,7 @@ require (
 	github.com/getkin/kin-openapi v0.145.0
 	github.com/go-logr/logr v1.4.4
 	github.com/go-logr/zapr v1.3.0
+	github.com/go-openapi/testify/v2 v2.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
@@ -16,7 +17,7 @@ require (
 	github.com/pion/dtls/v3 v3.1.9
 	github.com/pion/ice/v4 v4.4.3
 	github.com/pion/logging v0.2.5-0.20260405224506-902883ec686b
-	github.com/pion/transport/v5 v5.0.1
+	github.com/pion/transport/v5 v5.1.1
 	github.com/pion/turn/v5 v5.1.3-0.20260917120801-d17ad27a4f3c
 	github.com/pion/webrtc/v4 v4.2.21-0.20260916154938-65a0eef1af6d
 	github.com/prometheus/client_golang v1.24.1
@@ -30,7 +31,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260916154351-b853e4b620cd
-	golang.org/x/sys v0.48.0
 	golang.org/x/time v0.15.0
 	gonum.org/v1/gonum v0.17.0
 	k8s.io/api v0.36.4
@@ -112,6 +112,7 @@ require (
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
@@ -128,3 +129,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
+
+replace github.com/pion/turn/v5 => github.com/l7mp/turn/v5 v5.0.0-20261001150446-f39c25679b40

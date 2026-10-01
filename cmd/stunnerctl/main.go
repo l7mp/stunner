@@ -5,8 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
-
 	"github.com/pion/logging"
 	"github.com/spf13/cobra"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
@@ -14,6 +12,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/icetester"
 	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 	"github.com/l7mp/stunner/v2/pkg/logger"
+	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 )
 
 // list all configs: stunnerctl get config --all-namespaces

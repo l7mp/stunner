@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/config/client/api"
 	"github.com/pion/logging"
 )
 
 type LicenseStatusClient interface {
-	LicenseStatus(ctx context.Context) (stnrv1.LicenseStatus, error)
+	LicenseStatus(ctx context.Context) (stnrv2.LicenseStatus, error)
 }
 
 type licenseStatusClient struct {
@@ -41,10 +41,10 @@ func NewLicenseStatusClient(addr string, logger logging.LeveledLogger, opts ...C
 	}, nil
 }
 
-func (a *licenseStatusClient) LicenseStatus(ctx context.Context) (stnrv1.LicenseStatus, error) {
+func (a *licenseStatusClient) LicenseStatus(ctx context.Context) (stnrv2.LicenseStatus, error) {
 	a.Debugf("gET: loading license status from CDS server %s", a.addr)
 
-	s := stnrv1.NewEmptyLicenseStatus()
+	s := stnrv2.NewEmptyLicenseStatus()
 	r, err := a.client.GetV1LicenseStatusWithResponse(ctx)
 	if err != nil {
 		return s, err
@@ -56,7 +56,7 @@ func (a *licenseStatusClient) LicenseStatus(ctx context.Context) (stnrv1.License
 	}
 
 	if err := json.Unmarshal(r.Body, &s); err != nil {
-		return stnrv1.NewEmptyLicenseStatus(), err
+		return stnrv2.NewEmptyLicenseStatus(), err
 	}
 
 	return s, nil

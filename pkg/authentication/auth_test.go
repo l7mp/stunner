@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 func TestGenerateCredentials(t *testing.T) {
@@ -20,14 +20,14 @@ func TestGenerateCredentials(t *testing.T) {
 	})
 
 	t.Run("explicit none is identical to nil", func(t *testing.T) {
-		u, p, err := GenerateCredentials(&stnrv1.AuthConfig{Type: "none"})
+		u, p, err := GenerateCredentials(&stnrv2.AuthConfig{Type: "none"})
 		assert.NoError(t, err)
 		assert.Empty(t, u)
 		assert.Empty(t, p)
 	})
 
 	t.Run("static returns the configured pair", func(t *testing.T) {
-		u, p, err := GenerateCredentials(&stnrv1.AuthConfig{Type: "static",
+		u, p, err := GenerateCredentials(&stnrv2.AuthConfig{Type: "static",
 			Credentials: map[string]string{"username": "user", "password": "pass"}})
 		assert.NoError(t, err)
 		assert.Equal(t, "user", u)
@@ -35,7 +35,7 @@ func TestGenerateCredentials(t *testing.T) {
 	})
 
 	t.Run("ephemeral generates a time-windowed credential", func(t *testing.T) {
-		auth := &stnrv1.AuthConfig{Type: "ephemeral", Lifetime: "30m",
+		auth := &stnrv2.AuthConfig{Type: "ephemeral", Lifetime: "30m",
 			Credentials: map[string]string{"secret": "my-secret"}}
 		u, p, err := GenerateCredentials(auth)
 		require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestGenerateCredentials(t *testing.T) {
 	})
 
 	t.Run("ephemeral lifetime defaults", func(t *testing.T) {
-		auth := &stnrv1.AuthConfig{Type: "ephemeral",
+		auth := &stnrv2.AuthConfig{Type: "ephemeral",
 			Credentials: map[string]string{"secret": "my-secret"}}
 		u, _, err := GenerateCredentials(auth)
 		require.NoError(t, err)
@@ -67,12 +67,12 @@ func TestGenerateCredentials(t *testing.T) {
 	})
 
 	t.Run("ephemeral without a secret fails", func(t *testing.T) {
-		_, _, err := GenerateCredentials(&stnrv1.AuthConfig{Type: "ephemeral"})
+		_, _, err := GenerateCredentials(&stnrv2.AuthConfig{Type: "ephemeral"})
 		assert.Error(t, err)
 	})
 
 	t.Run("unknown auth type fails", func(t *testing.T) {
-		_, _, err := GenerateCredentials(&stnrv1.AuthConfig{Type: "bogus"})
+		_, _, err := GenerateCredentials(&stnrv2.AuthConfig{Type: "bogus"})
 		assert.Error(t, err)
 	})
 }
