@@ -1534,6 +1534,7 @@ func relayAddrs(t *testing.T, c *stnrv2.StunnerConfig) []string {
 // and a whole sub-object alike, and the marker left as it is where the patcher leaves it (a
 // single read substitutes no environment).
 func TestCDSPatchLoad(t *testing.T) {
+	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
 	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1"})
 	srv, addr := startPatchServer(t, nodes)
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
@@ -1543,8 +1544,8 @@ func TestCDSPatchLoad(t *testing.T) {
 		addr, realm string
 	}{
 		{nodeLabels("node1"), "1.1.1.1", "realm1"},
-		{nodeLabels("node2"), "$" + stnrv2.DefaultEnvVarNodeAddr, "realm1"}, // no node address
-		{nil, "$" + stnrv2.DefaultEnvVarNodeAddr, "realm1"},                 // no labels
+		{nodeLabels("node2"), "9.9.9.9", "realm1"}, // no node address: the pod environment
+		{nil, "9.9.9.9", "realm1"},                 // no labels: the pod environment
 		{map[string]string{stnrv2.DefaultCDSNodeLabel: "node1", "tenant": "t1"}, "1.1.1.1", "t1"},
 	} {
 		c, err := client.New(addr, "ns1/gw1", tc.labels, logger.NewLoggerFactory(stunnerLogLevel))
@@ -1553,6 +1554,10 @@ func TestCDSPatchLoad(t *testing.T) {
 		require.NoError(t, err, "labels %v", tc.labels)
 		assert.Equal(t, []string{tc.addr}, relayAddrs(t, conf), "labels %v", tc.labels)
 		assert.Equal(t, tc.realm, conf.Auth.Realm, "labels %v: the auth block", tc.labels)
+		if tc.realm == "realm1" {
+			assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, conf.Auth.Credentials["password"],
+				"labels %v: the client never substitutes credentials", tc.labels)
+		}
 	}
 }
 

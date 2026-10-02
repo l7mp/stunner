@@ -11,7 +11,7 @@ import (
 
 // decodeConfig decodes a config served by the CDS server, of either version.
 func decodeConfig(r []byte) ([]*stnrv2.StunnerConfig, error) {
-	c, err := parseRaw(r)
+	c, err := ParseConfig(r)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +26,7 @@ func decodeConfigList(r []byte) ([]*stnrv2.StunnerConfig, error) {
 	}
 	ret := make([]*stnrv2.StunnerConfig, 0, len(l.Items))
 	for _, item := range l.Items {
-		c, err := parseRaw(item)
+		c, err := ParseConfig(item)
 		if err != nil {
 			return nil, err
 		}
