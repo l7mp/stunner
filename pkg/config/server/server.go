@@ -23,23 +23,20 @@ var (
 	SuppressConfigDeletion = false
 )
 
-// ConfigNodePatcher is a callback to patch config updates per node name.
-type ConfigNodePatcher func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig
-
 // Server is a generic config discovery server implementation.
 type Server struct {
 	*http.Server
 	router       *mux.Router
 	addr         string
 	conns        *ConnTrack
-	configs      *ConfigStore[string]
-	patcher      ConfigNodePatcher
+	configs      *ConfigStore
 	licenseStore *LicenseStore
 	log          logr.Logger
 }
 
-// New creates a new config discovery server instance for the specified address.
-func New(addr string, patch ConfigNodePatcher, logger logr.Logger) *Server {
+// New creates a new config discovery server instance for the specified address, patching the
+// config it serves each client with patcher; nil patches nothing.
+func New(addr string, patcher Patcher, logger logr.Logger) *Server {
 	if addr == "" {
 		addr = stnrv2.DefaultConfigDiscoveryAddress
 	}
@@ -47,10 +44,9 @@ func New(addr string, patch ConfigNodePatcher, logger logr.Logger) *Server {
 	return &Server{
 		router:       mux.NewRouter(),
 		conns:        NewConnTrack(),
-		configs:      NewConfigStore[string](),
+		configs:      NewConfigStore(patcher),
 		licenseStore: NewLicenseStore(),
 		addr:         addr,
-		patcher:      patch,
 		log:          logger,
 	}
 }
@@ -66,7 +62,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		s.log.Info("starting CDS server", "address", s.addr, "config-patcher-enabled", s.patcher != nil)
+		s.log.Info("starting CDS server", "address", s.addr)
 
 		err := s.Serve(l)
 		if err != nil {
@@ -100,7 +96,7 @@ func (s *Server) Close() {
 }
 
 // GetConfigStore returns the dataplane config-store of the server.
-func (s *Server) GetConfigStore() *ConfigStore[string] {
+func (s *Server) GetConfigStore() *ConfigStore {
 	return s.configs
 }
 
@@ -118,11 +114,11 @@ func (s *Server) RemoveClient(id string) {
 	}
 }
 
-// PusNodeConfig updates the config at each known client that is subscribed for updates on a
-// given node. This is useful for force pushing a new config when some node address changes.
-func (s *Server) PushNodeConfig(node string) {
-	s.log.V(4).Info("pusing configs for node", "node", node)
-	s.configs.Push(node)
+// Refresh patches every config again for every client and pushes those that changed: call it
+// whenever what the patcher depends on may have changed.
+func (s *Server) Refresh() {
+	s.log.V(4).Info("refreshing the configs of the clients")
+	s.configs.Refresh()
 }
 
 func (s *Server) UpsertConfig(id string, c *stnrv2.StunnerConfig) {

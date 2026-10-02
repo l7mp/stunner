@@ -61,6 +61,8 @@ const (
 	DefaultEnvVarNamespace        = "STUNNER_NAMESPACE"
 	DefaultEnvVarAddr             = "STUNNER_ADDR"
 	DefaultEnvVarAddrs            = "STUNNER_ADDRS"
+	DefaultEnvVarNodeAddr         = "STUNNER_NODE_ADDR"
+	DefaultCDSNodeLabel           = "node"
 	DefaultEnvVarNodeName         = "STUNNER_NODENAME"
 	DefaultEnvVarConfigOrigin     = "STUNNER_CONFIG_ORIGIN"
 	DefaultCDSServerAddrEnv       = "CDS_SERVER_ADDR"

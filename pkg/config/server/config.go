@@ -7,9 +7,6 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// ClientFilter lets a client to filter push notifications.
-type ClientFilter[T comparable] func(expectedValue T) bool
-
 func NamespacedName(id string) (string, string, bool) {
 	parts := strings.SplitN(id, "/", 2)
 	if len(parts) != 2 {
@@ -40,4 +37,17 @@ func (c *Config) DeepCopy() *Config {
 
 func (c *Config) DeepEqual(d *Config) bool {
 	return c.Namespace == d.Namespace && d.Name == c.Name && c.Config.DeepEqual(d.Config)
+}
+
+// parseLabels parses the label query parameters of a client, key=value each.
+func parseLabels(params *[]string) map[string]string {
+	if params == nil {
+		return nil
+	}
+	ret := map[string]string{}
+	for _, l := range *params {
+		k, v, _ := strings.Cut(l, "=")
+		ret[k] = v
+	}
+	return ret
 }

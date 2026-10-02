@@ -22,10 +22,13 @@ func TestTLSConfigDefault(t *testing.T) {
 	cert, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
 	require.NoError(t, err)
 	log := logging.NewDefaultLoggerFactory().NewLogger("test")
+	nw, err := stdnet.NewNet()
+	require.NoError(t, err)
+	rt := newTestRuntime(t, nw)
 
 	for _, mode := range []string{"", "preferred", "enforced"} {
 		conf := &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS", PQCMode: mode}
-		c := newTLSConfig(nil, conf, cert, log)
+		c := newTLSConfig(rt, conf, cert, log)
 		assert.Equal(t, uint16(tls.VersionTLS12), c.MinVersion, "mode %q: default minimum version", mode)
 		assert.Zero(t, c.MaxVersion, "mode %q: default maximum version", mode)
 		assert.Nil(t, c.CurvePreferences, "mode %q: default key exchanges", mode)

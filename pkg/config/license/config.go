@@ -10,7 +10,7 @@ import (
 )
 
 var constructor = NewStub
-var _ ConfigManager = &baseManager{}
+var _ ConfigManager = &BaseManager{}
 
 // Feature defines the supported features.
 type Feature interface {
@@ -52,19 +52,19 @@ func New(log logging.LeveledLogger) ConfigManager {
 	return constructor(log)
 }
 
-// baseManager implements the basic functionality so that all license manager implementations can embed it
-type baseManager struct {
+// BaseManager implements the basic functionality every license manager embeds.
+type BaseManager struct {
 	config *stnrv2.LicenseConfig
 	log    logging.LeveledLogger
 }
 
-func newBaseManager(log logging.LeveledLogger) baseManager {
-	m := baseManager{log: log}
+func newBaseManager(log logging.LeveledLogger) BaseManager {
+	m := BaseManager{log: log}
 	return m
 }
 
-func (m *baseManager) GetConfig() *stnrv2.LicenseConfig       { return m.config }
-func (m *baseManager) Reconcile(config *stnrv2.LicenseConfig) { m.config = config }
-func (m *baseManager) Validate(_ Feature) bool                { return false }
-func (m *baseManager) SubscriptionType() SubscriptionType     { return NewNilSubscriptionType() }
-func (m *baseManager) Status() string                         { return "{tier:free}" }
+func (m *BaseManager) GetConfig() *stnrv2.LicenseConfig       { return m.config }
+func (m *BaseManager) Reconcile(config *stnrv2.LicenseConfig) { m.config = config }
+func (m *BaseManager) Validate(_ Feature) bool                { return false }
+func (m *BaseManager) SubscriptionType() SubscriptionType     { return NewNilSubscriptionType() }
+func (m *BaseManager) Status() string                         { return "{tier:free}" }

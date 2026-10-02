@@ -78,7 +78,7 @@ func TestWsURI(t *testing.T) {
 	cases := []struct {
 		name    string
 		addr    string
-		node    string
+		labels  map[string]string
 		want    string
 		wantErr bool
 	}{
@@ -94,9 +94,10 @@ func TestWsURI(t *testing.T) {
 		{name: "wss stays wss", addr: "wss://1.2.3.4:12345",
 			want: "wss://1.2.3.4:12345/api/v1/configs?watch=true"},
 
-		// node is added to the query when set (keys are sorted by Encode)
-		{name: "node included", addr: "1.2.3.4:12345", node: "node-1",
-			want: "ws://1.2.3.4:12345/api/v1/configs?node=node-1&watch=true"},
+		// labels are added to the query as key=value, one parameter each, sorted
+		{name: "labels included", addr: "1.2.3.4:12345",
+			labels: map[string]string{"node": "node-1", "pod": "pod-1"},
+			want:   "ws://1.2.3.4:12345/api/v1/configs?label=node%3Dnode-1&label=pod%3Dpod-1&watch=true"},
 
 		// bracketed IPv6 round-trips; unbracketed is rejected
 		{name: "bracketed ipv6", addr: "[2600:1f14:1e98:4505:14dc::9]:13478",
@@ -106,7 +107,7 @@ func TestWsURI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := wsURI(tc.addr, endpoint, tc.node)
+			got, err := wsURI(tc.addr, endpoint, tc.labels)
 			if tc.wantErr {
 				assert.Error(t, err, "expected error")
 				return

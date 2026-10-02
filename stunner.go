@@ -48,7 +48,7 @@ type LogOptions = logger.Options
 type Stunner struct {
 	// Object-wide config.
 	name, version string
-	node          string
+	cdsLabels     map[string]string
 
 	// Flags.
 	forceReady, suppressRollback, dryRun bool
@@ -131,7 +131,7 @@ func NewStunner(options Options) *Stunner {
 		suppressRollback: options.SuppressRollback,
 		dryRun:           options.DryRun,
 		resolver:         r,
-		node:             options.NodeName,
+		cdsLabels:        cdsLabels(options.NodeName),
 		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
 		logRateLimit:     logRateLimit,
@@ -360,4 +360,12 @@ func (s *Stunner) GetCluster(name string) *object.Cluster {
 		return nil
 	}
 	return o.(*object.Cluster)
+}
+
+// cdsLabels returns the labels stunnerd describes itself with to the CDS server: its node.
+func cdsLabels(node string) map[string]string {
+	if node == "" {
+		return nil
+	}
+	return map[string]string{stnrv2.DefaultCDSNodeLabel: node}
 }

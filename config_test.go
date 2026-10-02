@@ -445,14 +445,16 @@ func TestStunnerConfigPatcher(t *testing.T) {
 
 	testCDSAddr := "localhost:63479"
 	log.Debugf("create server on %s", testCDSAddr)
-	// rewrite node address if requested
-	patcher := func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig {
-		if node != "" {
-			for i := range conf.Clusters {
-				for j, a := range conf.Clusters[i].Addrs {
-					if a == "STUNNER_NODE_ADDR" {
-						conf.Clusters[i].Addrs[j] = node
-					}
+	// the node address of a client is its node name itself
+	patcher := func(conf *stnrv2.StunnerConfig, _ string, labels map[string]string) *stnrv2.StunnerConfig {
+		node, ok := labels[stnrv2.DefaultCDSNodeLabel]
+		if !ok {
+			return conf
+		}
+		for i := range conf.Clusters {
+			for j, a := range conf.Clusters[i].Addrs {
+				if a == "$"+stnrv2.DefaultEnvVarNodeAddr {
+					conf.Clusters[i].Addrs[j] = node
 				}
 			}
 		}
@@ -510,7 +512,9 @@ func TestStunnerConfigPatcher(t *testing.T) {
 		},
 	}, {
 		name: "node rewrite",
-		prep: func(c *stnrv2.StunnerConfig, _ *testing.T) { c.Clusters[0].Addrs = []string{"STUNNER_NODE_ADDR"} },
+		prep: func(c *stnrv2.StunnerConfig, _ *testing.T) {
+			c.Clusters[0].Addrs = []string{"$" + stnrv2.DefaultEnvVarNodeAddr}
+		},
 		tester: func(c *stnrv2.StunnerConfig) bool {
 			return len(c.Clusters) == 1 && len(c.Clusters[0].Addrs) == 1 &&
 				c.Clusters[0].Addrs[0] == "127.1.2.3"

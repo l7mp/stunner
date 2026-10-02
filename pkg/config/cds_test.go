@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-logr/zapr"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -67,12 +70,12 @@ func TestServerLoad(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", nil, logger)
 	assert.NoError(t, err, "client 2")
 	// nonexistent
-	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", nil, logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("load: error")
@@ -162,11 +165,11 @@ func TestServerPoll(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", nil, logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", nil, logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("poll: no result")
@@ -271,11 +274,11 @@ func TestServerWatch(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
+	client2, err := client.New(testCDSAddr, "ns1/gw2", nil, logger)
 	assert.NoError(t, err, "client 2")
-	client3, err := client.New(testCDSAddr, "ns1/gw3", "", logger)
+	client3, err := client.New(testCDSAddr, "ns1/gw3", nil, logger)
 	assert.NoError(t, err, "client 3")
 
 	testLog.Debug("watch: no result")
@@ -478,7 +481,7 @@ func TestServerWatchBootstrap(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("bootstrap")
@@ -590,7 +593,7 @@ func TestServerAPI(t *testing.T) {
 	assert.NoError(t, err, "client 2")
 	client3, err := client.NewConfigsNamespaceAPI(testCDSAddr, "ns2", logger.NewLogger("ns-config-client-ns2"))
 	assert.NoError(t, err, "client 3")
-	client4, err := client.NewConfigNamespaceNameAPI(testCDSAddr, "ns1", "gw1", "", logger.NewLogger("gw-config-client"))
+	client4, err := client.NewConfigNamespaceNameAPI(testCDSAddr, "ns1", "gw1", nil, logger.NewLogger("gw-config-client"))
 	assert.NoError(t, err, "client 4")
 
 	testLog.Debug("watch: no result")
@@ -1087,7 +1090,7 @@ func TestClientReconnect(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	client1, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client 1")
 
 	testLog.Debug("watch: no result")
@@ -1289,7 +1292,7 @@ func TestDeleteConfigAPI(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	testLog.Debug("create client")
-	c, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
+	c, err := client.New(testCDSAddr, "ns1/gw1", nil, logger)
 	assert.NoError(t, err, "client")
 
 	ch := make(chan *stnrv2.StunnerConfig, 8)
@@ -1369,138 +1372,6 @@ func TestDeleteConfigAPI(t *testing.T) {
 	server.SuppressConfigDeletion = suppressConfigDeletion
 }
 
-func TestServerLoadWithNodeName(t *testing.T) {
-	zc := zap.NewProductionConfig()
-	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
-	z, err := zc.Build()
-	assert.NoError(t, err, "logger created")
-	zlogger := zapr.NewLogger(z)
-	log := zlogger.WithName("tester")
-
-	logger := logger.NewLoggerFactory(stunnerLogLevel)
-	testLog := logger.NewLogger("test")
-
-	// suppress deletions
-	suppressConfigDeletion := server.SuppressConfigDeletion
-	server.SuppressConfigDeletion = true
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	testCDSAddr := getRandCDSAddr()
-	testLog.Debugf("create server on %s", testCDSAddr)
-	patcher := func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig {
-		// rewrite the realm to the node name
-		if node != "" {
-			conf.Auth.Realm = node
-		}
-		return conf
-	}
-	srv := server.New(testCDSAddr, patcher, log)
-	assert.NotNil(t, srv, "server")
-	err = srv.Start(ctx)
-	assert.NoError(t, err, "start")
-
-	time.Sleep(20 * time.Millisecond)
-
-	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "node1", logger)
-	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", "", logger)
-	assert.NoError(t, err, "client 2")
-
-	testLog.Debug("load: error")
-	c, err := client1.Load()
-	assert.Error(t, err, "load")
-	assert.Nil(t, c, "conf")
-	c, err = client2.Load()
-	assert.Error(t, err, "load")
-	assert.Nil(t, c, "conf")
-
-	c1 := testConfig("ns1/gw1", "realm1")
-	c2 := testConfig("ns1/gw2", "realm1")
-	err = srv.UpdateConfig([]server.Config{c1, c2})
-	assert.NoError(t, err, "update")
-
-	testLog.Debug("load: config ok")
-	c, err = client1.Load()
-	assert.NoError(t, err, "load")
-	assert.Equal(t, "node1", c.Auth.Realm, "node name 1")
-	c.Auth.Realm = "realm1" // reset
-	assert.True(t, c.DeepEqual(c1.Config), "deepeq")
-	c, err = client2.Load()
-	assert.NoError(t, err, "load")
-	assert.Equal(t, "realm1", c.Auth.Realm, "node name 1") // node node: no patch
-	assert.True(t, c.DeepEqual(c2.Config), "deepeq")
-
-	server.SuppressConfigDeletion = suppressConfigDeletion
-}
-
-func TestServerWatchWithNodeName(t *testing.T) {
-	zc := zap.NewProductionConfig()
-	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
-	z, err := zc.Build()
-	assert.NoError(t, err, "logger created")
-	zlogger := zapr.NewLogger(z)
-	log := zlogger.WithName("tester")
-
-	logger := logger.NewLoggerFactory(stunnerLogLevel)
-	testLog := logger.NewLogger("test")
-
-	serverCtx, serverCancel := context.WithCancel(context.Background())
-	defer serverCancel()
-
-	testCDSAddr := getRandCDSAddr()
-	testLog.Debugf("create server on %s", testCDSAddr)
-	patcher := func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig {
-		// rewrite the realm to the node name
-		if node != "" {
-			conf.Auth.Realm = node
-		}
-		return conf
-	}
-	srv := server.New(testCDSAddr, patcher, log)
-	assert.NotNil(t, srv, "server")
-	err = srv.Start(serverCtx)
-	assert.NoError(t, err, "start")
-
-	testLog.Debug("create client")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "", logger)
-	assert.NoError(t, err, "client 1")
-	client2, err := client.New(testCDSAddr, "ns1/gw2", "node2", logger)
-	assert.NoError(t, err, "client 2")
-
-	testLog.Debug("watch: no result")
-	ch1 := make(chan *stnrv2.StunnerConfig, 8)
-	defer close(ch1)
-	ch2 := make(chan *stnrv2.StunnerConfig, 8)
-	defer close(ch2)
-
-	clientCtx, clientCancel := context.WithCancel(context.Background())
-	defer clientCancel()
-	err = client1.Watch(clientCtx, ch1, false)
-	assert.NoError(t, err, "client 1 watch")
-	err = client2.Watch(clientCtx, ch2, false)
-	assert.NoError(t, err, "client 2 watch")
-
-	testLog.Debug("poll")
-	c1 := testConfig("ns1/gw1", "realm1")
-	c2 := testConfig("ns1/gw2", "realm1")
-	err = srv.UpdateConfig([]server.Config{c1, c2})
-	assert.NoError(t, err, "update")
-
-	// poll should have fed the configs to the channels
-	s := watchConfig(ch1, 500*time.Millisecond)
-	assert.NotNil(t, s, "config 1")
-	assert.Equal(t, "realm1", s.Auth.Realm, "node name 1")
-	assert.True(t, s.DeepEqual(c1.Config), "deepeq 1")
-	s = watchConfig(ch2, 500*time.Millisecond)
-	assert.NotNil(t, s, "config 2")
-	assert.Equal(t, "node2", s.Auth.Realm, "node name 2")
-	s.Auth.Realm = "realm1" // reset
-	assert.True(t, s.DeepEqual(c2.Config), "deepeq 2")
-}
-
 func TestLicenseLoad(t *testing.T) {
 	zc := zap.NewProductionConfig()
 	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
@@ -1550,188 +1421,338 @@ func TestLicenseLoad(t *testing.T) {
 	}, s, "get license status")
 }
 
-// the relevant parts from Kubernetes corev1
+// nodeTable is the node address table of the patcher tests, changed under the server.
+type nodeTable struct{ sync.Map } // node -> address
 
-type nodeAddressType string
-
-const (
-	nodeHostName    nodeAddressType = "Hostname"
-	nodeInternalIP  nodeAddressType = "InternalIP"
-	nodeExternalIP  nodeAddressType = "ExternalIP"
-	nodeInternalDNS nodeAddressType = "InternalDNS"
-	nodeExternalDNS nodeAddressType = "ExternalDNS"
-)
-
-type nodeAddress struct {
-	aType   nodeAddressType
-	address string
-}
-
-type node struct {
-	name      string
-	addresses []nodeAddress
-}
-
-func TestServerPatcher(t *testing.T) {
-	testNodes := map[string]node{
-		"node1": node{
-			name: "node1",
-			addresses: []nodeAddress{
-				{aType: nodeExternalDNS, address: "node1.com"},
-				{aType: nodeInternalIP, address: "1.2.3.5"},
-				{aType: nodeExternalIP, address: "1.2.3.4"},
-			},
-		},
-		"node2": node{
-			name: "node2",
-			addresses: []nodeAddress{
-				{aType: nodeInternalDNS, address: "node2.com"},
-				{aType: nodeInternalIP, address: "1.2.3.5"},
-			},
-		},
+func newNodeTable(addrs map[string]string) *nodeTable {
+	n := &nodeTable{}
+	for node, a := range addrs {
+		n.Store(node, a)
 	}
+	return n
+}
 
-	zc := zap.NewProductionConfig()
-	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
-	z, err := zc.Build()
-	assert.NoError(t, err, "logger created")
-	zlogger := zapr.NewLogger(z)
-	log := zlogger.WithName("tester")
-
-	logger := logger.NewLoggerFactory(stunnerLogLevel)
-	testLog := logger.NewLogger("test")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	testLog.Debug("create server")
-	patcher := func(conf *stnrv2.StunnerConfig, node string) *stnrv2.StunnerConfig {
-		if conf == nil {
-			return conf
-		}
-		if n, ok := testNodes[node]; ok {
-			for _, a := range n.addresses {
-				if a.aType == nodeExternalIP {
-					c := conf.DeepCopy()
-					for i := range c.Clusters {
-						c.Clusters[i].Addrs = []string{a.address}
-					}
-					testLog.Tracef("patching ready: %s", c.String())
-					return c
+// patch relays a client at the address of its node: it replaces the node address marker among the
+// cluster addresses, and leaves it for the client's environment on a node without an address. A
+// tenant label replaces the whole auth block.
+func (n *nodeTable) patch(conf *stnrv2.StunnerConfig, _ string, labels map[string]string) *stnrv2.StunnerConfig {
+	if a, ok := n.Load(labels[stnrv2.DefaultCDSNodeLabel]); ok {
+		for i := range conf.Clusters {
+			for j, addr := range conf.Clusters[i].Addrs {
+				if addr == "$"+stnrv2.DefaultEnvVarNodeAddr {
+					conf.Clusters[i].Addrs[j] = a.(string)
 				}
 			}
 		}
-		testLog.Tracef("not patching config: %s", conf.String())
-		return conf
 	}
-	testCDSAddr := getRandCDSAddr()
-	srv := server.New(testCDSAddr, patcher, log)
-	assert.NotNil(t, srv, "server")
-	err = srv.Start(ctx)
-	assert.NoError(t, err, "start")
+	if tenant, ok := labels["tenant"]; ok {
+		conf.Auth = stnrv2.AuthConfig{Type: "static", Realm: tenant,
+			Credentials: map[string]string{"username": tenant, "password": tenant + "-pass"}}
+	}
+	return conf
+}
 
+// nodeAddr returns the address of a node, "" if it has none.
+func (n *nodeTable) nodeAddr(node string) string {
+	if a, ok := n.Load(node); ok {
+		return a.(string)
+	}
+	return ""
+}
+
+func (n *nodeTable) set(node, addr string) {
+	if addr == "" {
+		n.Delete(node)
+		return
+	}
+	n.Store(node, addr)
+}
+
+// startPatchServer starts a CDS server patching with a node table, sending deletions whatever an
+// earlier test left the global switch at.
+func startPatchServer(t *testing.T, nodes *nodeTable) (*server.Server, string) {
+	t.Helper()
+	suppress := server.SuppressConfigDeletion
+	server.SuppressConfigDeletion = false
+	t.Cleanup(func() { server.SuppressConfigDeletion = suppress })
+	zc := zap.NewProductionConfig()
+	zc.Level = zap.NewAtomicLevelAt(testerLogLevel)
+	z, err := zc.Build()
+	require.NoError(t, err)
+	addr := getRandCDSAddr()
+	srv := server.New(addr, nodes.patch, zapr.NewLogger(z).WithName("cds-server"))
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	require.NoError(t, srv.Start(ctx))
 	time.Sleep(20 * time.Millisecond)
+	return srv, addr
+}
 
-	c := testConfigListener("ns1/gw1", "realm1")
-	err = srv.UpdateConfig([]server.Config{c})
-	assert.NoError(t, err, "update")
+// patchConfig is a config whose cluster relays at the node address marker, with a credential
+// that looks like a variable.
+func patchConfig(t *testing.T, id, realm string) server.Config {
+	c := zeroConfig(id, realm)
+	c.Auth.Credentials["password"] = "pass-$" + stnrv2.DefaultEnvVarNodeAddr
+	c.Listeners = []stnrv2.ListenerConfig{{Name: "l1", Protocol: "UDP", Port: 3478,
+		Servers: []string{"turn"}}}
+	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
+	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.0/8"},
+		Protocol: "UDP", Addrs: []string{"$" + stnrv2.DefaultEnvVarNodeAddr}}}
+	require.NoError(t, c.Validate())
+	namespace, name, _ := server.NamespacedName(id)
+	return server.Config{Namespace: namespace, Name: name, Config: c}
+}
 
-	testLog.Debug("client 1")
-	client1, err := client.New(testCDSAddr, "ns1/gw1", "node1", logger)
-	assert.NoError(t, err, "client")
-	c1, err := client1.Load()
-	assert.NoError(t, err, "load")
-	// should update listener address
-	assert.Len(t, c1.Listeners, 2, "listeners")
-	assert.Equal(t, []string{"1.2.3.4"}, clusterAddrs(t, c1, "c1"), "the patched relay address")
-
-	testLog.Debug("client 2")
-	client2, err := client.New(testCDSAddr, "ns1/gw1", "node2", logger)
-	assert.NoError(t, err, "client")
-	c2, err := client2.Load()
-	assert.NoError(t, err, "load")
-	// no external ip on node2: no patch
-	assert.Equal(t, c.Config, c2, "deepeq")
-
-	testLog.Debug("client 3")
-	client3, err := client.New(testCDSAddr, "ns1/gw1", "node3", logger)
-	assert.NoError(t, err, "client")
-	c3, err := client3.Load()
-	assert.NoError(t, err, "load")
-	// no node for config: no patch
-	assert.Equal(t, c.Config, c3, "deepeq")
-
-	testLog.Debug("firing watchers")
-	ch1 := make(chan *stnrv2.StunnerConfig, 8)
-	defer close(ch1)
-	err = client1.Watch(ctx, ch1, false)
-	assert.NoError(t, err, "client watch")
-	s1 := watchConfig(ch1, 100*time.Millisecond)
-	assert.NotNil(t, s1, "watch-config")
-	// patched
-	assert.Len(t, s1.Listeners, 2, "listeners")
-	assert.Equal(t, []string{"1.2.3.4"}, clusterAddrs(t, s1, "c1"), "the patched relay address")
-
-	ch2 := make(chan *stnrv2.StunnerConfig, 8)
-	defer close(ch2)
-	err = client2.Watch(ctx, ch2, false)
-	assert.NoError(t, err, "client watch")
-	s2 := watchConfig(ch2, 100*time.Millisecond)
-	assert.NotNil(t, s2, "watch-config")
-	// no external ip on node2: no patch
-	assert.Equal(t, c.Config, s2, "deepeq")
-
-	ch3 := make(chan *stnrv2.StunnerConfig, 8)
-	defer close(ch3)
-	err = client3.Watch(ctx, ch3, false)
-	assert.NoError(t, err, "client watch")
-	s3 := watchConfig(ch3, 100*time.Millisecond)
-	assert.NotNil(t, s3, "watch-config")
-	// no node for config: no patch
-	assert.Equal(t, c.Config, s3, "deepeq")
-
-	testLog.Debug("add an external address on node2 and broadcast")
-	testNodes["node2"].addresses[1].aType = nodeExternalIP
-	srv.PushNodeConfig("node2")
-
-	// no update on client 1
-	s1 = watchConfig(ch1, 20*time.Millisecond)
-	assert.Nil(t, s1, "watch-config")
-
-	// update client 2
-	s2 = watchConfig(ch2, 100*time.Millisecond)
-	assert.NotNil(t, s2, "watch-config")
-	// check the new external ip
-	assert.Len(t, s2.Listeners, 2, "listeners")
-	assert.Equal(t, []string{"1.2.3.5"}, clusterAddrs(t, s2, "c1"), "the patched relay address")
-
-	// no update on client 3
-	s3 = watchConfig(ch3, 20*time.Millisecond)
-	assert.Nil(t, s3, "watch-config")
-
-	testLog.Debug("create node3")
-	testNodes["node3"] = node{
-		name: "node3",
-		addresses: []nodeAddress{
-			{aType: nodeExternalIP, address: "1.2.3.6"},
-		},
+// nodeLabels returns the labels of a client on a node, none for "".
+func nodeLabels(node string) map[string]string {
+	if node == "" {
+		return nil
 	}
-	srv.PushNodeConfig("node3")
+	return map[string]string{stnrv2.DefaultCDSNodeLabel: node}
+}
 
-	// no update on client 1
-	s1 = watchConfig(ch1, 20*time.Millisecond)
-	assert.Nil(t, s1, "watch-config")
+// watchClient starts a watcher of a config for a client with labels.
+func watchClient(t *testing.T, addr, id string, labels map[string]string) chan *stnrv2.StunnerConfig {
+	t.Helper()
+	c, err := client.New(addr, id, labels, logger.NewLoggerFactory(stunnerLogLevel))
+	require.NoError(t, err)
+	ch := make(chan *stnrv2.StunnerConfig, 1024)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	require.NoError(t, c.Watch(ctx, ch, false))
+	return ch
+}
 
-	// no update on client 2
-	s2 = watchConfig(ch2, 20*time.Millisecond)
-	assert.Nil(t, s2, "watch-config")
+// relayAddrs returns the relay addresses a client has for cluster c1.
+func relayAddrs(t *testing.T, c *stnrv2.StunnerConfig) []string {
+	t.Helper()
+	require.NotNil(t, c, "config")
+	return clusterAddrs(t, c, "c1")
+}
 
-	// update client 3
-	s3 = watchConfig(ch3, 100*time.Millisecond)
-	assert.NotNil(t, s3, "watch-config")
-	// check the new external ip
-	assert.Len(t, s3.Listeners, 2, "listeners")
-	assert.Equal(t, []string{"1.2.3.6"}, clusterAddrs(t, s3, "c1"), "the patched relay address")
+// TestCDSPatchLoad pins a single read: the config patched for the labels of the client, a field
+// and a whole sub-object alike, and the marker left as it is where the patcher leaves it (a
+// single read substitutes no environment).
+func TestCDSPatchLoad(t *testing.T) {
+	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1"})
+	srv, addr := startPatchServer(t, nodes)
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
+
+	for _, tc := range []struct {
+		labels      map[string]string
+		addr, realm string
+	}{
+		{nodeLabels("node1"), "1.1.1.1", "realm1"},
+		{nodeLabels("node2"), "$" + stnrv2.DefaultEnvVarNodeAddr, "realm1"}, // no node address
+		{nil, "$" + stnrv2.DefaultEnvVarNodeAddr, "realm1"},                 // no labels
+		{map[string]string{stnrv2.DefaultCDSNodeLabel: "node1", "tenant": "t1"}, "1.1.1.1", "t1"},
+	} {
+		c, err := client.New(addr, "ns1/gw1", tc.labels, logger.NewLoggerFactory(stunnerLogLevel))
+		require.NoError(t, err)
+		conf, err := c.Load()
+		require.NoError(t, err, "labels %v", tc.labels)
+		assert.Equal(t, []string{tc.addr}, relayAddrs(t, conf), "labels %v", tc.labels)
+		assert.Equal(t, tc.realm, conf.Auth.Realm, "labels %v: the auth block", tc.labels)
+	}
+}
+
+// TestCDSPatchWatch pins a watch: the config patched for the labels of the client, and a marker
+// the patcher leaves falling back to the client's environment, credentials excepted.
+func TestCDSPatchWatch(t *testing.T) {
+	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
+	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2"})
+	srv, addr := startPatchServer(t, nodes)
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
+
+	for _, tc := range []struct{ node, want string }{
+		{"node1", "1.1.1.1"},
+		{"node2", "2.2.2.2"},
+		{"node3", "9.9.9.9"}, // a node without an address: the pod environment
+		{"", "9.9.9.9"},      // no labels: the pod environment
+	} {
+		c := watchConfig(watchClient(t, addr, "ns1/gw1", nodeLabels(tc.node)), time.Second)
+		assert.Equal(t, []string{tc.want}, relayAddrs(t, c), "node %q", tc.node)
+		assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, c.Auth.Credentials["password"],
+			"node %q: the client never substitutes credentials", tc.node)
+	}
+
+	c := watchConfig(watchClient(t, addr, "ns1/gw1", map[string]string{"tenant": "t1"}), time.Second)
+	require.NotNil(t, c, "a tenant client")
+	assert.Equal(t, "t1", c.Auth.Realm, "a whole sub-object rewritten")
+	assert.Equal(t, "t1-pass", c.Auth.Credentials["password"])
+}
+
+// TestCDSRefresh pins that a client gets each config it would get exactly once: a refresh pushes
+// only the clients whose node changed, nothing reaches a client whose config did not change, and a
+// changed config, a deletion and a re-addition reach every client, specialized for its node.
+func TestCDSRefresh(t *testing.T) {
+	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
+	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2"})
+	srv, addr := startPatchServer(t, nodes)
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
+
+	names := []string{"node1", "node2", "node3", ""}
+	chs := map[string]chan *stnrv2.StunnerConfig{}
+	for _, n := range names {
+		chs[n] = watchClient(t, addr, "ns1/gw1", nodeLabels(n))
+	}
+	expect := func(step string, want map[string]string) {
+		t.Helper()
+		for _, n := range names {
+			c := watchConfig(chs[n], 300*time.Millisecond)
+			w, ok := want[n]
+			if !ok {
+				assert.Nil(t, c, "%s: node %q gets nothing", step, n)
+				continue
+			}
+			if assert.NotNil(t, c, "%s: node %q gets an update", step, n) {
+				assert.Equal(t, []string{w}, relayAddrs(t, c), "%s: node %q", step, n)
+			}
+		}
+	}
+
+	expect("initial", map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2",
+		"node3": "9.9.9.9", "": "9.9.9.9"})
+
+	srv.Refresh()
+	expect("a refresh with nothing changed", map[string]string{})
+
+	nodes.set("node1", "1.1.1.2")
+	srv.Refresh()
+	expect("a node address changed", map[string]string{"node1": "1.1.1.2"})
+
+	nodes.set("node3", "3.3.3.3")
+	srv.Refresh()
+	expect("a node got an address", map[string]string{"node3": "3.3.3.3"})
+
+	nodes.set("node2", "")
+	srv.Refresh()
+	expect("a node lost its address", map[string]string{"node2": "9.9.9.9"})
+
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
+	expect("the same config again", map[string]string{})
+
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm2")}))
+	expect("a changed config", map[string]string{"node1": "1.1.1.2", "node2": "9.9.9.9",
+		"node3": "3.3.3.3", "": "9.9.9.9"})
+
+	require.NoError(t, srv.UpdateConfig([]server.Config{}))
+	for _, n := range names {
+		c := watchConfig(chs[n], time.Second)
+		assert.True(t, client.IsConfigDeleted(c), "node %q gets the deletion", n)
+	}
+	srv.Refresh()
+	expect("a refresh after the deletion", map[string]string{})
+
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm2")}))
+	expect("the re-added config", map[string]string{"node1": "1.1.1.2", "node2": "9.9.9.9",
+		"node3": "3.3.3.3", "": "9.9.9.9"})
+}
+
+// TestCDSNoSwallowedUpdate races config updates against node address changes and refreshes, and
+// pins that no client ever goes back to an older config and that every client ends up with the
+// last config, specialized for the last address of its node.
+func TestCDSNoSwallowedUpdate(t *testing.T) {
+	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
+	nodes := newNodeTable(map[string]string{"node1": "10.0.1.0", "node2": "10.0.2.0",
+		"node3": "10.0.3.0"})
+	srv, addr := startPatchServer(t, nodes)
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "gen-000")}))
+
+	type watcher struct {
+		node string
+		mu   sync.Mutex
+		gens []int
+		last *stnrv2.StunnerConfig
+	}
+	watchers := []*watcher{}
+	for _, n := range []string{"node1", "node1", "node2", "node2", "node3", "node3", ""} {
+		w := &watcher{node: n}
+		watchers = append(watchers, w)
+		ch := watchClient(t, addr, "ns1/gw1", nodeLabels(n))
+		go func() {
+			for c := range ch {
+				gen := -1
+				_, err := fmt.Sscanf(c.Auth.Realm, "gen-%d", &gen)
+				w.mu.Lock()
+				if err == nil {
+					w.gens = append(w.gens, gen)
+				}
+				w.last = c
+				w.mu.Unlock()
+			}
+		}()
+	}
+
+	const rounds = 100
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for k := 1; k <= rounds; k++ {
+			assert.NoError(t, srv.UpdateConfig([]server.Config{
+				patchConfig(t, "ns1/gw1", fmt.Sprintf("gen-%03d", k))}))
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for j := 1; j <= rounds; j++ {
+			nodes.set(fmt.Sprintf("node%d", 1+j%3), fmt.Sprintf("10.0.%d.%d", 1+j%3, j))
+			srv.Refresh()
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Microsecond)
+		}
+	}()
+	wg.Wait()
+
+	final := map[string]string{"": "9.9.9.9"}
+	for _, n := range []string{"node1", "node2", "node3"} {
+		final[n] = nodes.nodeAddr(n)
+	}
+	for i, w := range watchers {
+		assert.Eventually(t, func() bool {
+			w.mu.Lock()
+			defer w.mu.Unlock()
+			return w.last != nil && w.last.Auth.Realm == fmt.Sprintf("gen-%03d", rounds) &&
+				slices.Equal(w.last.Clusters[0].Addrs, []string{final[w.node]})
+		}, 5*time.Second, 20*time.Millisecond, "watcher %d on node %q ends up with the last config", i, w.node)
+		w.mu.Lock()
+		assert.True(t, slices.IsSorted(w.gens), "watcher %d on node %q never goes back: %v", i, w.node, w.gens)
+		w.mu.Unlock()
+	}
+}
+
+// TestCDSReconnect pins that a client that was away while its config and its node changed gets
+// the last config, specialized for the last address of its node, when it reconnects.
+func TestCDSReconnect(t *testing.T) {
+	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1"})
+	srv, addr := startPatchServer(t, nodes)
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
+
+	ch := watchClient(t, addr, "ns1/gw1", nodeLabels("node1"))
+	c := watchConfig(ch, time.Second)
+	assert.Equal(t, []string{"1.1.1.1"}, relayAddrs(t, c), "initial")
+
+	conns := srv.GetConnTrack().Snapshot()
+	require.Len(t, conns, 1)
+	srv.RemoveClient(conns[0].Id())
+
+	nodes.set("node1", "1.1.1.2")
+	srv.Refresh()
+	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm2")}))
+
+	assert.Eventually(t, func() bool {
+		for {
+			select {
+			case c = <-ch:
+				if c.Auth.Realm == "realm2" && slices.Equal(c.Clusters[0].Addrs, []string{"1.1.1.2"}) {
+					return true
+				}
+			default:
+				return false
+			}
+		}
+	}, 5*time.Second, 50*time.Millisecond, "the reconnected client gets the last config")
 }
 
 // zeroConfig is the zero config the server stores and serves.

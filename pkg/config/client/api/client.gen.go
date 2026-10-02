@@ -57,8 +57,8 @@ type GetV1ConfigNamespaceNameParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
 	Watch *bool `form:"watch,omitempty" json:"watch,omitempty"`
 
-	// Node Name of the node the client runs on.
-	Node *string `form:"node,omitempty" json:"node,omitempty"`
+	// Label A label describing the client, as key=value, repeated per label. The server hands the labels to its config patcher without interpreting them.
+	Label *[]string `form:"label,omitempty" json:"label,omitempty"`
 }
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
@@ -389,9 +389,9 @@ func NewGetV1ConfigNamespaceNameRequest(server string, namespace string, name st
 
 		}
 
-		if params.Node != nil {
+		if params.Label != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "node", *params.Node, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "label", *params.Label, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

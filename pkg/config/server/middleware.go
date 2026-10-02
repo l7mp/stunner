@@ -32,18 +32,8 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 				return next(ctx, w, r, request)
 			}
 
-			var patcher PatchFunc
-			var filter ClientFilter[string]
-			if s.patcher != nil && param.Params.Node != nil {
-				filter = func(expectedNode string) bool {
-					return *param.Params.Node == expectedNode
-				}
-				patcher = func(conf *stnrv2.StunnerConfig) *stnrv2.StunnerConfig {
-					return s.patcher(conf, *param.Params.Node)
-				}
-			}
-
-			ch = s.configs.SubscribeConfig(param.Namespace, param.Name, filter, patcher)
+			ch = s.configs.SubscribeConfig(param.Namespace, param.Name,
+				parseLabels(param.Params.Label))
 
 		case "ListV1ConfigsNamespace":
 			param, ok := request.(api.ListV1ConfigsNamespaceRequestObject)
@@ -57,7 +47,7 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 				return next(ctx, w, r, request)
 			}
 
-			ch = s.configs.SubscribeNamespace(param.Namespace, nil, nil)
+			ch = s.configs.SubscribeNamespace(param.Namespace)
 
 		case "ListV1Configs":
 			param, ok := request.(api.ListV1ConfigsRequestObject)
@@ -71,7 +61,7 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 				return next(ctx, w, r, request)
 			}
 
-			ch = s.configs.SubscribeAll(nil, nil)
+			ch = s.configs.SubscribeAll()
 
 		default:
 			return nil, fmt.Errorf("invalid API operation %q", operationID)

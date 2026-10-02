@@ -103,11 +103,15 @@ paths:
           description: Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
           schema:
             type: boolean
-        - name: node
+        - name: label
           in: query
-          description: Name of the node the client runs on.
+          description: A label describing the client, as key=value, repeated per label. The server hands the labels to its config patcher without interpreting them.
+          style: form
+          explode: true
           schema:
-            type: string
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: OK
@@ -144,9 +148,11 @@ components:
         id:
           description: Client id.
           type: string
-        node:
-          description: Name of the node client is deployed to.
-          type: string
+        labels:
+          description: The labels describing the client.
+          type: object
+          additionalProperties:
+            type: string
     v1.ConfigList:
       description: ConfigList is a list of Configs.
       type: object

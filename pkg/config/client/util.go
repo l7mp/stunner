@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strings"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
@@ -50,7 +51,7 @@ func getURI(addr string) (*url.URL, error) {
 // wsURI converts a config origin into a websocket URL for the given API
 // endpoint. The scheme is mapped to its websocket equivalent: https and wss
 // become wss, everything else becomes ws.
-func wsURI(addr, endpoint, node string) (string, error) {
+func wsURI(addr, endpoint string, labels map[string]string) (string, error) {
 	uri, err := getURI(addr)
 	if err != nil {
 		return "", err
@@ -65,10 +66,20 @@ func wsURI(addr, endpoint, node string) (string, error) {
 	uri.Path = endpoint
 	v := url.Values{}
 	v.Set("watch", "true")
-	if node != "" {
-		v.Set("node", node)
+	for _, l := range labelParams(labels) {
+		v.Add("label", l)
 	}
 	uri.RawQuery = v.Encode()
 
 	return uri.String(), nil
+}
+
+// labelParams renders client labels as the label query parameters, key=value, sorted.
+func labelParams(labels map[string]string) []string {
+	ret := make([]string, 0, len(labels))
+	for k, v := range labels {
+		ret = append(ret, k+"="+v)
+	}
+	slices.Sort(ret)
+	return ret
 }

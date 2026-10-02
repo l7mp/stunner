@@ -275,7 +275,7 @@ func tunnelConfFromK8s(u k8sName, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigF
 		return nil, fmt.Errorf("error searching for CDS server: %w", err)
 	}
 
-	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr.Addr, namespace, name, "",
+	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr.Addr, namespace, name, nil,
 		loggerFactory.NewLogger("cds-client"))
 	if err != nil {
 		return nil, fmt.Errorf("error creating CDS client: %w", err)

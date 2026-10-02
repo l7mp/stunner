@@ -49,8 +49,12 @@ func runConfig(_ *cobra.Command, args []string) error {
 		cds, err = cdsclient.NewConfigsNamespaceAPI(pod.Addr, gwNs, cdslog)
 	} else {
 		gwName := args[0]
-		cds, err = cdsclient.NewConfigNamespaceNameAPI(pod.Addr, gwNs, gwName,
-			configRelayAddressNode, cdslog)
+		// show the config as a dataplane pod on the given node gets it
+		var labels map[string]string
+		if configRelayAddressNode != "" {
+			labels = map[string]string{stnrv2.DefaultCDSNodeLabel: configRelayAddressNode}
+		}
+		cds, err = cdsclient.NewConfigNamespaceNameAPI(pod.Addr, gwNs, gwName, labels, cdslog)
 	}
 
 	if err != nil {

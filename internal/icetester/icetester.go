@@ -349,7 +349,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		gw := gwFromProto(proto, t.namespace)
 
 		log.Infof("checing public address for Gateway %s", gw.GetName())
-		cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsPod.Addr, t.namespace, gw.GetName(), "",
+		cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsPod.Addr, t.namespace, gw.GetName(), nil,
 			t.logger.NewLogger("cds-client"))
 		if err != nil {
 			return t.sendEventComplete(EventGatewayAvailable,

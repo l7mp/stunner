@@ -63,8 +63,8 @@ type GetV1ConfigNamespaceNameParams struct {
 	// Watch Watch for changes to the described resources and return them as a stream of add, update, and remove notifications.
 	Watch *bool `form:"watch,omitempty" json:"watch,omitempty"`
 
-	// Node Name of the node the client runs on.
-	Node *string `form:"node,omitempty" json:"node,omitempty"`
+	// Label A label describing the client, as key=value, repeated per label. The server hands the labels to its config patcher without interpreting them.
+	Label *[]string `form:"label,omitempty" json:"label,omitempty"`
 }
 
 // ServerInterface represents all server handlers.
@@ -207,15 +207,15 @@ func (siw *ServerInterfaceWrapper) GetV1ConfigNamespaceName(w http.ResponseWrite
 		return
 	}
 
-	// ------------- Optional query parameter "node" -------------
+	// ------------- Optional query parameter "label" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "node", r.URL.Query(), &params.Node, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "label", r.URL.Query(), &params.Label, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "node"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "label"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "node", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "label", Err: err})
 		}
 		return
 	}
@@ -720,25 +720,26 @@ func (sh *strictHandler) GetV1LicenseStatus(w http.ResponseWriter, r *http.Reque
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

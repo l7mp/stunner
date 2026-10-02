@@ -68,10 +68,7 @@ func (s *Server) GetV1ConfigNamespaceName(ctx context.Context, request api.GetV1
 		}, nil
 	}
 
-	if s.patcher != nil && request.Params.Node != nil {
-		c.Config = s.patcher(c.Config, *request.Params.Node)
-		s.log.V(4).Info("getV1ConfigNamespaceName: patch config", "config", c.String())
-	}
+	c = s.configs.Patch(c, parseLabels(request.Params.Label))
 
 	s.log.V(3).Info("getV1ConfigNamespaceName API handler: ready", "config", c.String())
 
