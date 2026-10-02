@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -53,7 +54,7 @@ func (req *ServerConfig) DeepEqual(other Config) bool {
 func (req *ServerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*ServerConfig)
 	*ret = *req
-	ret.Clusters = append([]string{}, req.Clusters...)
+	ret.Clusters = slices.Clone(req.Clusters)
 }
 
 // String stringifies the configuration.

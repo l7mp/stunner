@@ -121,17 +121,24 @@ func (req *StunnerConfig) DeepCopyInto(dst Config) {
 	ret.ApiVersion = req.ApiVersion
 	req.Admin.DeepCopyInto(&ret.Admin)
 	req.Auth.DeepCopyInto(&ret.Auth)
-	ret.Listeners = make([]ListenerConfig, len(req.Listeners))
-	for i := range req.Listeners {
-		req.Listeners[i].DeepCopyInto(&ret.Listeners[i])
+	ret.Listeners, ret.Servers, ret.Clusters = nil, nil, nil
+	if req.Listeners != nil {
+		ret.Listeners = make([]ListenerConfig, len(req.Listeners))
+		for i := range req.Listeners {
+			req.Listeners[i].DeepCopyInto(&ret.Listeners[i])
+		}
 	}
-	ret.Servers = make([]ServerConfig, len(req.Servers))
-	for i := range req.Servers {
-		req.Servers[i].DeepCopyInto(&ret.Servers[i])
+	if req.Servers != nil {
+		ret.Servers = make([]ServerConfig, len(req.Servers))
+		for i := range req.Servers {
+			req.Servers[i].DeepCopyInto(&ret.Servers[i])
+		}
 	}
-	ret.Clusters = make([]ClusterConfig, len(req.Clusters))
-	for i := range req.Clusters {
-		req.Clusters[i].DeepCopyInto(&ret.Clusters[i])
+	if req.Clusters != nil {
+		ret.Clusters = make([]ClusterConfig, len(req.Clusters))
+		for i := range req.Clusters {
+			req.Clusters[i].DeepCopyInto(&ret.Clusters[i])
+		}
 	}
 }
 

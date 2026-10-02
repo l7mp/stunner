@@ -2,6 +2,7 @@ package v2
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -140,5 +141,56 @@ func TestStunnerConfigValidateAccepts(t *testing.T) {
 			tc.mutate(c)
 			assert.NoError(t, c.Validate())
 		})
+	}
+}
+
+// TestDeepCopyIsExact pins the copy contract: a copy equals its original, nil and empty alike, and
+// shares nothing with it.
+func TestDeepCopyIsExact(t *testing.T) {
+	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
+	full := validConfig()
+	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
+	validated := validConfig()
+	require.NoError(t, validated.Validate())
+
+	for name, c := range map[string]*StunnerConfig{"zero": {}, "validated": validated, "full": full} {
+		cp := c.DeepCopy()
+		assert.True(t, reflect.DeepEqual(c, cp), "%s: the copy equals the original", name)
+
+		orig := c.DeepCopy()
+		if cp.Admin.HealthCheckEndpoint != nil {
+			*cp.Admin.HealthCheckEndpoint = "changed"
+		}
+		if cp.Admin.LicenseConfig != nil {
+			cp.Admin.LicenseConfig.Key = "changed"
+		}
+		for k := range cp.Auth.Credentials {
+			cp.Auth.Credentials[k] = "changed"
+		}
+		for i := range cp.Clusters {
+			for j := range cp.Clusters[i].Endpoints {
+				cp.Clusters[i].Endpoints[j] = "changed"
+			}
+			if cp.Clusters[i].Tunnel != nil {
+				cp.Clusters[i].Tunnel.URL = "changed"
+			}
+		}
+		assert.True(t, reflect.DeepEqual(c, orig), "%s: the copy shares nothing with the original", name)
+	}
+}
+
+// TestValidateIsIdempotent pins that validating a validated config changes nothing: comparing two
+// validated configs is how every config change is detected.
+func TestValidateIsIdempotent(t *testing.T) {
+	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
+	full := validConfig()
+	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
+
+	minimal := &StunnerConfig{ApiVersion: ApiVersion} // everything else defaulted
+	for name, c := range map[string]*StunnerConfig{"minimal": minimal, "valid": validConfig(), "full": full} {
+		require.NoError(t, c.Validate(), name)
+		once := c.DeepCopy()
+		require.NoError(t, c.Validate(), name)
+		assert.True(t, reflect.DeepEqual(once, c), "%s: a second validation changes nothing", name)
 	}
 }

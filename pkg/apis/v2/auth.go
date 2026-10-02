@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -82,10 +83,7 @@ func (req *AuthConfig) DeepEqual(other Config) bool {
 func (req *AuthConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*AuthConfig)
 	*ret = *req
-	ret.Credentials = make(map[string]string, len(req.Credentials))
-	for k, v := range req.Credentials {
-		ret.Credentials[k] = v
-	}
+	ret.Credentials = maps.Clone(req.Credentials)
 }
 
 // String stringifies the configuration.

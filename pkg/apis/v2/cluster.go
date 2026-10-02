@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -143,8 +144,8 @@ func (req *ClusterConfig) DeepEqual(other Config) bool {
 func (req *ClusterConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*ClusterConfig)
 	*ret = *req
-	ret.Endpoints = append([]string{}, req.Endpoints...)
-	ret.Addrs = append([]string{}, req.Addrs...)
+	ret.Endpoints = slices.Clone(req.Endpoints)
+	ret.Addrs = slices.Clone(req.Addrs)
 	if req.Tunnel != nil {
 		ret.Tunnel = req.Tunnel.DeepCopy()
 	}

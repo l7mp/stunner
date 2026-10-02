@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -116,8 +117,15 @@ func (req *AdminConfig) DeepEqual(other Config) bool {
 func (req *AdminConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*AdminConfig)
 	*ret = *req
-	ret.OffloadInterfaces = make([]string, len(req.OffloadInterfaces))
-	copy(ret.OffloadInterfaces, req.OffloadInterfaces)
+	if req.HealthCheckEndpoint != nil {
+		e := *req.HealthCheckEndpoint
+		ret.HealthCheckEndpoint = &e
+	}
+	ret.OffloadInterfaces = slices.Clone(req.OffloadInterfaces)
+	if req.LicenseConfig != nil {
+		l := *req.LicenseConfig
+		ret.LicenseConfig = &l
+	}
 }
 
 // String stringifies the configuration.

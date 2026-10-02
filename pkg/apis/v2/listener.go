@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -107,8 +108,8 @@ func (req *ListenerConfig) DeepEqual(other Config) bool {
 func (req *ListenerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*ListenerConfig)
 	*ret = *req
-	ret.Servers = append([]string{}, req.Servers...)
-	ret.PublicAddrs = append([]string{}, req.PublicAddrs...)
+	ret.Servers = slices.Clone(req.Servers)
+	ret.PublicAddrs = slices.Clone(req.PublicAddrs)
 }
 
 // String stringifies the configuration.
