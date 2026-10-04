@@ -118,6 +118,8 @@ func (s *Server) Start() error {
 		srv = turn.NewServer(s.name, s.rt)
 	case stnrv2.ServerTypeL4:
 		srv = l4.NewServer(s.name, s.rt)
+	case stnrv2.ServerTypeSIP, stnrv2.ServerTypeRTP:
+		return fmt.Errorf("server type %s is not available in this build", t.String())
 	default:
 		return fmt.Errorf("unsupported server type %q", s.conf.Load().Type)
 	}

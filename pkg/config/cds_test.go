@@ -1171,7 +1171,7 @@ func TestServerUpdate(t *testing.T) {
 	assert.NoError(t, err, "start")
 
 	oldC := &stnrv2.StunnerConfig{}
-	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/udp-gateway","loglevel":"all:INFO"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name":"stunner/udp-gateway/udp-listener","protocol":"UDP","port":3478,"servers":["stunner/udp-gateway/udp-listener"]}],"servers":[{"name":"stunner/udp-gateway/udp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[]}`), oldC)
+	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/udp-gateway","loglevel":"all:INFO"},"auths":[{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}}],"listeners":[{"name":"stunner/udp-gateway/udp-listener","protocol":"UDP","port":3478,"servers":["stunner/udp-gateway/udp-listener"]}],"servers":[{"name":"stunner/udp-gateway/udp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[]}`), oldC)
 	assert.NoError(t, oldC.Validate(), "validate")
 	assert.NoError(t, err, "parse 1")
 

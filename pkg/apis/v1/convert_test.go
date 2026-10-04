@@ -81,11 +81,11 @@ func TestConvertToV2(t *testing.T) {
 	// TURN-* listeners get TURN servers, the others L4 servers; the clusters carry over in order
 	s, err := v2.GetServerConfig("ns/gw/udp")
 	require.NoError(t, err)
-	assert.Equal(t, "turn", s.Type)
+	assert.Equal(t, "TURN", s.Type)
 	assert.Equal(t, []string{"dns", "media"}, s.Clusters, "v1 validation sorts the clusters")
 	s, err = v2.GetServerConfig("ns/gw/tcp")
 	require.NoError(t, err)
-	assert.Equal(t, "l4", s.Type)
+	assert.Equal(t, "L4", s.Type)
 
 	// v1 cluster endpoints convert to the v2 syntax
 	r, err := v2.GetClusterConfig("media")
@@ -139,11 +139,11 @@ func TestConvertListener(t *testing.T) {
 		Port: 3478, PublicAddr: "1.2.3.4", Routes: []string{"media"}})
 	assert.Equal(t, stnrv2.ListenerConfig{Name: "ns/gw/udp", Protocol: "UDP", Port: 3478,
 		PublicAddr: "1.2.3.4", Servers: []string{"ns/gw/udp"}}, l, "the address moves to the clusters")
-	assert.Equal(t, stnrv2.ServerConfig{Name: "ns/gw/udp", Type: "turn", Clusters: []string{"media"}}, s)
+	assert.Equal(t, stnrv2.ServerConfig{Name: "ns/gw/udp", Type: "TURN", Clusters: []string{"media"}}, s)
 
 	l, s = ConvertListener(ListenerConfig{Name: "plain", Protocol: "TCP", Port: 5000})
 	assert.Equal(t, "TCP", l.Protocol)
-	assert.Equal(t, "l4", s.Type)
+	assert.Equal(t, "L4", s.Type)
 }
 
 func TestConvertCluster(t *testing.T) {

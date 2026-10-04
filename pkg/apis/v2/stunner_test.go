@@ -90,7 +90,7 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"unknown PQC mode", func(c *StunnerConfig) { c.Listeners[1].PQCMode = "sometimes" }},
 		{"duplicate listener", func(c *StunnerConfig) { c.Listeners[2].Name = "turn-udp" }},
 		{"duplicate cluster", func(c *StunnerConfig) { c.Clusters[1].Name = "media-pods" }},
-		{"unknown server type", func(c *StunnerConfig) { c.Servers[0].Type = "sip" }},
+		{"unknown server type", func(c *StunnerConfig) { c.Servers[0].Type = "no-such-type" }},
 		{"invalid endpoint", func(c *StunnerConfig) { c.Clusters[0].Endpoints = []string{"10.0.0.1:0"} }},
 		{"missing cluster protocol", func(c *StunnerConfig) { c.Clusters[0].Protocol = "" }},
 		{"unknown cluster protocol", func(c *StunnerConfig) { c.Clusters[0].Protocol = "SCTP" }},

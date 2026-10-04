@@ -7,7 +7,7 @@ const (
 	ApiVersion                    string = "v2"
 	DefaultStunnerName                   = "default-stunnerd"
 	DefaultListenerProtocol              = "UDP"
-	DefaultServerType                    = "turn"
+	DefaultServerType                    = "TURN"
 	DefaultPort                   int    = 3478
 	DefaultLogLevel                      = "all:INFO"
 	DefaultRealm                         = "stunner.l7mp.io"

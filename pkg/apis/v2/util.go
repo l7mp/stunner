@@ -295,20 +295,30 @@ const (
 	ServerTypeTURN
 	// ServerTypeL4 forwards every client flow to an endpoint load-balanced over its clusters.
 	ServerTypeL4
+	// ServerTypeSIP is reserved for the SIP proxy of the SIP gateway.
+	ServerTypeSIP
+	// ServerTypeRTP is reserved for the media proxy of the SIP gateway.
+	ServerTypeRTP
 )
 
 const (
-	serverTypeTURNStr = "turn"
-	serverTypeL4Str   = "l4"
+	serverTypeTURNStr = "TURN"
+	serverTypeL4Str   = "L4"
+	serverTypeSIPStr  = "SIP"
+	serverTypeRTPStr  = "RTP"
 )
 
 // NewServerType parses a server type.
 func NewServerType(raw string) (ServerType, error) {
-	switch strings.ToLower(raw) {
+	switch strings.ToUpper(raw) {
 	case serverTypeTURNStr:
 		return ServerTypeTURN, nil
 	case serverTypeL4Str:
 		return ServerTypeL4, nil
+	case serverTypeSIPStr:
+		return ServerTypeSIP, nil
+	case serverTypeRTPStr:
+		return ServerTypeRTP, nil
 	default:
 		return ServerTypeUnknown, fmt.Errorf("unknown server type: %q", raw)
 	}
@@ -321,6 +331,10 @@ func (t ServerType) String() string {
 		return serverTypeTURNStr
 	case ServerTypeL4:
 		return serverTypeL4Str
+	case ServerTypeSIP:
+		return serverTypeSIPStr
+	case ServerTypeRTP:
+		return serverTypeRTPStr
 	default:
 		return "<unknown>"
 	}
