@@ -13,8 +13,9 @@ type TunnelConfig struct {
 	// URL is the upstream TURN server as an ICE server URI (RFC 7065), for example
 	// "turn:host:port?transport=tcp" or "turns:host:port?transport=udp" (DTLS). Mandatory.
 	URL string `json:"url"`
-	// Auth is the static or ephemeral auth towards the TURN server, omitted for none.
-	Auth *AuthConfig `json:"auth,omitempty"`
+	// Auth names the authentication policy whose credentials the tunnel presents to the TURN
+	// server, static or ephemeral; none for a server that authenticates nobody.
+	Auth string `json:"auth,omitempty"`
 	// Insecure skips the verification of the TURN server's certificate over TLS and DTLS.
 	Insecure bool `json:"insecure,omitempty"`
 	// SNI overrides the server name the TURN server's certificate is verified against.
@@ -30,23 +31,12 @@ func (t *TunnelConfig) Validate() error {
 	if !u.Protocol.IsTURN() {
 		return fmt.Errorf("invalid tunnel URL %q: not a TURN URL", t.URL)
 	}
-	if t.Auth != nil {
-		if err := t.Auth.Validate(); err != nil {
-			return fmt.Errorf("invalid tunnel auth: %w", err)
-		}
-	}
 	return nil
 }
 
 // DeepCopy copies a tunnel configuration.
 func (t *TunnelConfig) DeepCopy() *TunnelConfig {
 	ret := *t
-	if t.Auth != nil {
-		// the auth config owns a map: copy it instead of aliasing it
-		a := AuthConfig{}
-		t.Auth.DeepCopyInto(&a)
-		ret.Auth = &a
-	}
 	return &ret
 }
 
@@ -165,9 +155,8 @@ func (req *ClusterConfig) String() string {
 		if req.Tunnel.SNI != "" {
 			status = append(status, fmt.Sprintf("tunnel-sni=%q", req.Tunnel.SNI))
 		}
-		if req.Tunnel.Auth != nil {
-			// AuthConfig.String redacts the credentials
-			status = append(status, "tunnel-auth="+req.Tunnel.Auth.String())
+		if req.Tunnel.Auth != "" {
+			status = append(status, fmt.Sprintf("tunnel-auth=%q", req.Tunnel.Auth))
 		}
 	}
 	if len(req.Addrs) > 0 {

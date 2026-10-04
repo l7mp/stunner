@@ -58,9 +58,11 @@ func TestConvertToV2(t *testing.T) {
 	assert.Equal(t, quota, v2.Admin.UserQuota)
 	require.NotNil(t, v2.Admin.LicenseConfig)
 	assert.Equal(t, "key", v2.Admin.LicenseConfig.Key)
-	assert.Equal(t, "ephemeral", v2.Auth.Type)
-	assert.Equal(t, "example.com", v2.Auth.Realm)
-	assert.Equal(t, "s", v2.Auth.Credentials["secret"])
+	require.Len(t, v2.Auths, 2, "the v1 auth is the default policy, the tunnel credentials another")
+	assert.Equal(t, stnrv2.DefaultAuthName, v2.Auths[0].Name)
+	assert.Equal(t, "ephemeral", v2.Auths[0].Type)
+	assert.Equal(t, "example.com", v2.Auths[0].Realm)
+	assert.Equal(t, "s", v2.Auths[0].Credentials["secret"])
 
 	// listeners keep their port and feed a server of their own name; a v1 address is a relay
 	// address, so the listener binds every address
@@ -121,8 +123,10 @@ func TestConvertToV2(t *testing.T) {
 	assert.Equal(t, "UDP", d.Protocol)
 	require.NotNil(t, d.Tunnel)
 	assert.Equal(t, "turn:turn.example.com:3478?transport=tcp", d.Tunnel.URL)
-	require.NotNil(t, d.Tunnel.Auth)
-	assert.Equal(t, "u", d.Tunnel.Auth.Credentials["username"])
+	assert.Equal(t, "upstream", d.Tunnel.Auth, "the tunnel names a policy of the credentials")
+	tunnelAuth, err := v2.GetAuthConfig(d.Tunnel.Auth)
+	require.NoError(t, err)
+	assert.Equal(t, "u", tunnelAuth.Credentials["username"])
 
 	// an invalid v1 config does not convert
 	v1.ApiVersion = "v0"

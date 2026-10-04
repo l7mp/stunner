@@ -8,8 +8,11 @@ import (
 	"time"
 )
 
-// Auth specifies the STUN/TURN authentication mechanism used by STUNner.
+// AuthConfig is an authentication policy: the credentials a TURN server checks its clients
+// against, a tunnel presents to its upstream TURN server.
 type AuthConfig struct {
+	// Name of the policy, the name servers refer to it by. Default is "default".
+	Name string `json:"name,omitempty"`
 	// Type of the STUN/TURN authentication mechanism ("static" or "ephemeral"). The deprecated
 	// type name "plaintext" is accepted for "static" and the deprecated type name "longterm"
 	// is accepted for "ephemeral" for compatibility with older versions.
@@ -68,10 +71,9 @@ func (req *AuthConfig) Validate() error {
 	return nil
 }
 
-// Name returns the name of the object to be configured.
+// ConfigName returns the name of the object to be configured.
 func (req *AuthConfig) ConfigName() string {
-	// Singleton!
-	return DefaultAuthName
+	return req.Name
 }
 
 // DeepEqual compares two configurations.
@@ -139,7 +141,11 @@ func (req *AuthConfig) String() string {
 		}
 	}
 
-	return fmt.Sprintf("%s-auth:{%s}", req.Type, strings.Join(status, ","))
+	n := ""
+	if req.Name != "" {
+		n = fmt.Sprintf("%q:", req.Name)
+	}
+	return fmt.Sprintf("%s%s-auth:{%s}", n, req.Type, strings.Join(status, ","))
 }
 
 // AuthStatus represents the authentication status.

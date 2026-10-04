@@ -251,7 +251,7 @@ func TestOffloadMatrix(t *testing.T) {
 					cconf.Protocol = stnrv2.ProtocolUDP.String()
 					cconf.Tunnel = &stnrv2.TunnelConfig{
 						URL:  (&stnrv2.URI{Protocol: row.cluster, Host: "127.0.0.1", Port: p}).String(),
-						Auth: staticAuthConfig(), Insecure: true}
+						Auth: stnrv2.DefaultAuthName, Insecure: true}
 				}
 				cl, err := object.NewCluster(cconf, env.rt)
 				require.NoError(t, err)

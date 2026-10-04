@@ -306,9 +306,9 @@ func (s *Stunner) GetAdmin() *object.Admin {
 	return a.(*object.Admin)
 }
 
-// GetAuth returns the Auth Object, or nil if not registered.
-func (s *Stunner) GetAuth() *object.Auth {
-	a, ok := s.rt.Registry.Get(runtime.TypeAuth, stnrv2.DefaultAuthName)
+// GetAuth returns the authentication policy of a name, or nil if there is none.
+func (s *Stunner) GetAuth(name string) *object.Auth {
+	a, ok := s.rt.Registry.Get(runtime.TypeAuth, name)
 	if !ok {
 		return nil
 	}

@@ -58,7 +58,7 @@ func TestClusterObjectSemantics(t *testing.T) {
 	// a router or address change reconciles in place, a dialer change restarts: live sessions
 	// keep their dialers, new ones use the new one
 	tunnel := func(port string) *stnrv2.TunnelConfig {
-		return &stnrv2.TunnelConfig{URL: "turn:turn.example.com:" + port, Auth: staticAuthConfig()}
+		return &stnrv2.TunnelConfig{URL: "turn:turn.example.com:" + port, Auth: stnrv2.DefaultAuthName}
 	}
 	transport := func(proto stnrv2.Protocol, tn *stnrv2.TunnelConfig, addrs ...string) *stnrv2.ClusterConfig {
 		c := cluster(stnrv2.ClusterTypeStatic, "10.0.0.1", "10.1.0.0/16")

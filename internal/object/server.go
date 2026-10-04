@@ -19,8 +19,10 @@ type Server struct {
 	name string
 
 	conf atomic.Pointer[stnrv2.ServerConfig]
-	// realm is the auth realm a running TURN server was started with.
+	// realm is the auth realm a running TURN server was started with, and stun whether its
+	// policy was of type none, which makes a pure STUN server.
 	realm string
+	stun  bool
 
 	server atomic.Pointer[api.Server]
 
@@ -51,7 +53,8 @@ func NewServer(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) 
 func (s *Server) Name() string             { return s.name }
 func (s *Server) Type() runtime.ObjectType { return runtime.TypeServer }
 
-// Inspect restarts on a type change, and a TURN server on a realm change.
+// Inspect restarts on a type change, and a TURN server on a change of the realm of its policy or of
+// whether its policy is of type none.
 func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv2.ServerConfig)
 	if !ok {
@@ -64,9 +67,16 @@ func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (ru
 	if cur.Type != req.Type {
 		return runtime.ActionRestart, nil
 	}
-	if req.Type == stnrv2.ServerTypeTURN.String() && full != nil && s.realm != "" &&
-		full.Auth.Realm != s.realm {
-		return runtime.ActionRestart, nil
+	// a TURN server bakes in its realm and whether it is pure STUN (a missing policy is not none)
+	if req.Type == stnrv2.ServerTypeTURN.String() && full != nil && s.realm != "" {
+		auth, err := full.GetAuthConfig(req.Auth)
+		if err == nil && auth.Realm != s.realm {
+			return runtime.ActionRestart, nil
+		}
+		t, _ := stnrv2.NewAuthType(auth.Type)
+		if (err == nil && t == stnrv2.AuthTypeNone) != s.stun {
+			return runtime.ActionRestart, nil
+		}
 	}
 	if cur.DeepEqual(req) {
 		return runtime.ActionNone, nil
@@ -114,9 +124,10 @@ func (s *Server) Start() error {
 	if err := srv.Start(); err != nil {
 		return err
 	}
-	s.realm = stnrv2.DefaultRealm
-	if auth, ok := s.rt.GetConfig(runtime.TypeAuth, "").(*stnrv2.AuthConfig); ok && auth != nil {
-		s.realm = auth.Realm
+	s.realm, s.stun = stnrv2.DefaultRealm, false
+	if auth := s.rt.AuthConfig(s.conf.Load().Auth); auth != nil {
+		t, _ := stnrv2.NewAuthType(auth.Type)
+		s.realm, s.stun = auth.Realm, t == stnrv2.AuthTypeNone
 	}
 	s.server.Store(&srv)
 	return nil

@@ -156,7 +156,7 @@ func TestConfigStore_SubscribeConfig(t *testing.T) {
 	// Check we receive only the update to the subscribed config
 	configs = collectConfigs(ch, 1, 500*time.Millisecond)
 	assert.Len(t, configs, 1, "Should receive only the update to subscribed config")
-	assert.Equal(t, "updated-config1", configs[0].Config.Auth.Realm)
+	assert.Equal(t, "updated-config1", configs[0].Config.Auths[0].Realm)
 
 	// Clean up
 	store.Unsubscribe(ch)
@@ -168,7 +168,7 @@ type testRealms struct{ sync.Map } // node -> realm
 // patch sets the realm of the client's node, if the table has one.
 func (r *testRealms) patch(conf *stnrv2.StunnerConfig, _ string, labels map[string]string) *stnrv2.StunnerConfig {
 	if realm, ok := r.Load(labels["node"]); ok {
-		conf.Auth.Realm = realm.(string)
+		conf.Auths[0].Realm = realm.(string)
 	}
 	return conf
 }
@@ -189,8 +189,8 @@ func TestConfigStore_Patcher(t *testing.T) {
 	var gotLabels map[string]string
 	store := NewConfigStore(func(conf *stnrv2.StunnerConfig, id string, labels map[string]string) *stnrv2.StunnerConfig {
 		gotID, gotLabels = id, labels
-		conf.Auth = stnrv2.AuthConfig{Type: "static", Realm: "realm-" + labels["tenant"],
-			Credentials: map[string]string{"username": "u-" + labels["tenant"], "password": "p"}}
+		conf.Auths = []stnrv2.AuthConfig{{Type: "static", Realm: "realm-" + labels["tenant"],
+			Credentials: map[string]string{"username": "u-" + labels["tenant"], "password": "p"}}}
 		return conf
 	})
 	store.Upsert("ns1", "cfg1", testConfig("config1"))
@@ -200,19 +200,19 @@ func TestConfigStore_Patcher(t *testing.T) {
 	require.Len(t, got, 1, "initial config")
 	assert.Equal(t, "ns1/cfg1", gotID, "the patcher gets the config id")
 	assert.Equal(t, map[string]string{"tenant": "a"}, gotLabels, "and the client's labels")
-	assert.Equal(t, "realm-a", got[0].Config.Auth.Realm, "a whole sub-object rewritten")
-	assert.Equal(t, "u-a", got[0].Config.Auth.Credentials["username"])
+	assert.Equal(t, "realm-a", got[0].Config.Auths[0].Realm, "a whole sub-object rewritten")
+	assert.Equal(t, "u-a", got[0].Config.Auths[0].Credentials["username"])
 
 	cfg, ok := store.Get("ns1", "cfg1")
 	require.True(t, ok)
-	assert.Equal(t, "config1", cfg.Config.Auth.Realm, "the stored config is untouched")
-	assert.Equal(t, "realm-b", store.Patch(cfg, map[string]string{"tenant": "b"}).Config.Auth.Realm,
+	assert.Equal(t, "config1", cfg.Config.Auths[0].Realm, "the stored config is untouched")
+	assert.Equal(t, "realm-b", store.Patch(cfg, map[string]string{"tenant": "b"}).Config.Auths[0].Realm,
 		"a single read is patched the same way")
 
 	nch := store.SubscribeNamespace("ns1")
 	got = collectConfigs(nch, 1, 100*time.Millisecond)
 	require.Len(t, got, 1, "initial config")
-	assert.Equal(t, "config1", got[0].Config.Auth.Realm, "a namespace subscriber gets it unpatched")
+	assert.Equal(t, "config1", got[0].Config.Auths[0].Realm, "a namespace subscriber gets it unpatched")
 
 	store.Unsubscribe(ch)
 	store.Unsubscribe(nch)
@@ -241,14 +241,14 @@ func TestConfigStore_Refresh(t *testing.T) {
 	store.Refresh()
 	got := collectConfigs(ch1, 1, 100*time.Millisecond)
 	require.Len(t, got, 1, "the node whose patch changed")
-	assert.Equal(t, "realm-1.1.1.9", got[0].Config.Auth.Realm)
+	assert.Equal(t, "realm-1.1.1.9", got[0].Config.Auths[0].Realm)
 	assert.Empty(t, collectConfigs(ch2, 1, 50*time.Millisecond), "the other node")
 
 	realms.set("node1", "")
 	store.Refresh()
 	got = collectConfigs(ch1, 1, 100*time.Millisecond)
 	require.Len(t, got, 1, "a patch that is gone")
-	assert.Equal(t, "realm-default", got[0].Config.Auth.Realm, "the config as it is")
+	assert.Equal(t, "realm-default", got[0].Config.Auths[0].Realm, "the config as it is")
 
 	store.Upsert("ns1", "cfg1", testConfig("realm-default"))
 	assert.Empty(t, collectConfigs(ch1, 1, 50*time.Millisecond), "an unchanged upsert")
@@ -262,7 +262,7 @@ func TestConfigStore_Refresh(t *testing.T) {
 	assert.Equal(t, "all:DEBUG", got[0].Config.Admin.LogLevel)
 	got = collectConfigs(ch2, 1, 100*time.Millisecond)
 	require.Len(t, got, 1, "a changed upsert")
-	assert.Equal(t, "realm-2.2.2.2", got[0].Config.Auth.Realm, "patched")
+	assert.Equal(t, "realm-2.2.2.2", got[0].Config.Auths[0].Realm, "patched")
 
 	store.Delete("ns1", "cfg1", testConfig("deleted"))
 	assert.Len(t, collectConfigs(ch1, 1, 100*time.Millisecond), 1, "a deletion")
@@ -320,7 +320,7 @@ func TestConfigStore_MultipleSubscribers(t *testing.T) {
 	for _, ch := range []chan *Config{ch1, ch2, ch3} {
 		configs := collectConfigs(ch, 1, 100*time.Millisecond)
 		assert.Len(t, configs, 1, "Should receive initial config")
-		assert.Equal(t, "config1", configs[0].Config.Auth.Realm)
+		assert.Equal(t, "config1", configs[0].Config.Auths[0].Realm)
 	}
 
 	// Update the config
@@ -331,7 +331,7 @@ func TestConfigStore_MultipleSubscribers(t *testing.T) {
 	for _, ch := range []chan *Config{ch1, ch2, ch3} {
 		configs := collectConfigs(ch, 1, 500*time.Millisecond)
 		assert.Len(t, configs, 1, "Should receive updated config")
-		assert.Equal(t, "updated-config1", configs[0].Config.Auth.Realm)
+		assert.Equal(t, "updated-config1", configs[0].Config.Auths[0].Realm)
 	}
 
 	// Clean up
@@ -353,12 +353,12 @@ func TestConfigStore_DeepCopy(t *testing.T) {
 	// Verify it's a deep copy
 	assert.Equal(t, original.Namespace, copy.Namespace)
 	assert.Equal(t, original.Name, copy.Name)
-	assert.Equal(t, original.Config.Auth.Realm, copy.Config.Auth.Realm)
+	assert.Equal(t, original.Config.Auths[0].Realm, copy.Config.Auths[0].Realm)
 
 	// Modify the copy and check that original is unchanged
-	copy.Config.Auth.Realm = "modified"
-	assert.NotEqual(t, original.Config.Auth.Realm, copy.Config.Auth.Realm)
-	assert.Equal(t, "config1", original.Config.Auth.Realm)
+	copy.Config.Auths[0].Realm = "modified"
+	assert.NotEqual(t, original.Config.Auths[0].Realm, copy.Config.Auths[0].Realm)
+	assert.Equal(t, "config1", original.Config.Auths[0].Realm)
 }
 
 func TestConfigStore_DeepEqual(t *testing.T) {
@@ -415,11 +415,11 @@ func testConfig(realm string) *stnrv2.StunnerConfig {
 	c := &stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{Name: "dummy/dummy"},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:        "static",
 			Realm:       realm,
 			Credentials: map[string]string{"username": "dummy-username", "password": "dummy-password"},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{},
 		Clusters:  []stnrv2.ClusterConfig{},
 	}

@@ -1446,8 +1446,8 @@ func (n *nodeTable) patch(conf *stnrv2.StunnerConfig, _ string, labels map[strin
 		}
 	}
 	if tenant, ok := labels["tenant"]; ok {
-		conf.Auth = stnrv2.AuthConfig{Type: "static", Realm: tenant,
-			Credentials: map[string]string{"username": tenant, "password": tenant + "-pass"}}
+		conf.Auths = []stnrv2.AuthConfig{{Type: "static", Realm: tenant,
+			Credentials: map[string]string{"username": tenant, "password": tenant + "-pass"}}}
 	}
 	return conf
 }
@@ -1492,7 +1492,7 @@ func startPatchServer(t *testing.T, nodes *nodeTable) (*server.Server, string) {
 // that looks like a variable.
 func patchConfig(t *testing.T, id, realm string) server.Config {
 	c := zeroConfig(id, realm)
-	c.Auth.Credentials["password"] = "pass-$" + stnrv2.DefaultEnvVarNodeAddr
+	c.Auths[0].Credentials["password"] = "pass-$" + stnrv2.DefaultEnvVarNodeAddr
 	c.Listeners = []stnrv2.ListenerConfig{{Name: "l1", Protocol: "UDP", Port: 3478,
 		Servers: []string{"turn"}}}
 	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
@@ -1553,9 +1553,9 @@ func TestCDSPatchLoad(t *testing.T) {
 		conf, err := c.Load()
 		require.NoError(t, err, "labels %v", tc.labels)
 		assert.Equal(t, []string{tc.addr}, relayAddrs(t, conf), "labels %v", tc.labels)
-		assert.Equal(t, tc.realm, conf.Auth.Realm, "labels %v: the auth block", tc.labels)
+		assert.Equal(t, tc.realm, conf.Auths[0].Realm, "labels %v: the auth block", tc.labels)
 		if tc.realm == "realm1" {
-			assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, conf.Auth.Credentials["password"],
+			assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, conf.Auths[0].Credentials["password"],
 				"labels %v: the client never substitutes credentials", tc.labels)
 		}
 	}
@@ -1577,14 +1577,14 @@ func TestCDSPatchWatch(t *testing.T) {
 	} {
 		c := watchConfig(watchClient(t, addr, "ns1/gw1", nodeLabels(tc.node)), time.Second)
 		assert.Equal(t, []string{tc.want}, relayAddrs(t, c), "node %q", tc.node)
-		assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, c.Auth.Credentials["password"],
+		assert.Equal(t, "pass-$"+stnrv2.DefaultEnvVarNodeAddr, c.Auths[0].Credentials["password"],
 			"node %q: the client never substitutes credentials", tc.node)
 	}
 
 	c := watchConfig(watchClient(t, addr, "ns1/gw1", map[string]string{"tenant": "t1"}), time.Second)
 	require.NotNil(t, c, "a tenant client")
-	assert.Equal(t, "t1", c.Auth.Realm, "a whole sub-object rewritten")
-	assert.Equal(t, "t1-pass", c.Auth.Credentials["password"])
+	assert.Equal(t, "t1", c.Auths[0].Realm, "a whole sub-object rewritten")
+	assert.Equal(t, "t1-pass", c.Auths[0].Credentials["password"])
 }
 
 // TestCDSRefresh pins that a client gets each config it would get exactly once: a refresh pushes
@@ -1678,7 +1678,7 @@ func TestCDSNoSwallowedUpdate(t *testing.T) {
 		go func() {
 			for c := range ch {
 				gen := -1
-				_, err := fmt.Sscanf(c.Auth.Realm, "gen-%d", &gen)
+				_, err := fmt.Sscanf(c.Auths[0].Realm, "gen-%d", &gen)
 				w.mu.Lock()
 				if err == nil {
 					w.gens = append(w.gens, gen)
@@ -1718,7 +1718,7 @@ func TestCDSNoSwallowedUpdate(t *testing.T) {
 		assert.Eventually(t, func() bool {
 			w.mu.Lock()
 			defer w.mu.Unlock()
-			return w.last != nil && w.last.Auth.Realm == fmt.Sprintf("gen-%03d", rounds) &&
+			return w.last != nil && w.last.Auths[0].Realm == fmt.Sprintf("gen-%03d", rounds) &&
 				slices.Equal(w.last.Clusters[0].Addrs, []string{final[w.node]})
 		}, 5*time.Second, 20*time.Millisecond, "watcher %d on node %q ends up with the last config", i, w.node)
 		w.mu.Lock()
@@ -1750,7 +1750,7 @@ func TestCDSReconnect(t *testing.T) {
 		for {
 			select {
 			case c = <-ch:
-				if c.Auth.Realm == "realm2" && slices.Equal(c.Clusters[0].Addrs, []string{"1.1.1.2"}) {
+				if c.Auths[0].Realm == "realm2" && slices.Equal(c.Clusters[0].Addrs, []string{"1.1.1.2"}) {
 					return true
 				}
 			default:
@@ -1765,11 +1765,11 @@ func zeroConfig(id, realm string) *stnrv2.StunnerConfig {
 	return &stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{Name: id},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:        "static",
 			Realm:       realm,
 			Credentials: map[string]string{"username": "dummy-username", "password": "dummy-password"},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{},
 		Servers:   []stnrv2.ServerConfig{},
 		Clusters:  []stnrv2.ClusterConfig{},

@@ -78,10 +78,10 @@ if [[ $platform == "local" ]]; then
     sleep 2
 
 elif [[ $platform == "k8s" ]]; then
-    # STUNNER_PUBLIC_ADDR=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_address)
-    # STUNNER_PUBLIC_PORT=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .listeners[0].public_port)
-    # STUNNER_PASSWORD=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.password)
-    # STUNNER_USERNAME=$(kubectl get cm stunnerd-config -n stunner -o jsonpath='{.data.stunnerd\.conf}' | jq -r .auth.credentials.username)
+    STUNNER_PUBLIC_ADDR=$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    STUNNER_PUBLIC_PORT="3478"
+    STUNNER_USERNAME=$(kubectl get gatewayconfig stunner-gatewayconfig -n stunner -o jsonpath='{.spec.userName}')
+    STUNNER_PASSWORD=$(kubectl get gatewayconfig stunner-gatewayconfig -n stunner -o jsonpath='{.spec.password}')
     UDP_ECHO_IP=$(kubectl get svc iperf-server -o jsonpath='{.spec.clusterIP}')
     IPERF_PORT="5000"
 else
@@ -93,7 +93,8 @@ for i in $(seq "$num_of_processes");
 do
     port=$((8999+i))
     go run ../../../cmd/stunnerd --log=all:INFO udp://127.0.0.1:$port \
-        k8s://stunner/udp-gateway:udp-listener udp://"${UDP_ECHO_IP}":$IPERF_PORT >/dev/null 2>&1 &
+        turn://${STUNNER_USERNAME}:${STUNNER_PASSWORD}@${STUNNER_PUBLIC_ADDR}:${STUNNER_PUBLIC_PORT} \
+        udp://"${UDP_ECHO_IP}":$IPERF_PORT >/dev/null 2>&1 &
 done
 
 sleep 2

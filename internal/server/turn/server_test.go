@@ -97,7 +97,7 @@ func newTestServer(t *testing.T) *testServer {
 		Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
 	rt.QuotaHandler = quota.New(rt)
 
-	auth := &stnrv2.AuthConfig{Type: "static", Realm: realm,
+	auth := &stnrv2.AuthConfig{Name: stnrv2.DefaultAuthName, Type: "static", Realm: realm,
 		Credentials: map[string]string{"username": "user", "password": "pass"}}
 	require.NoError(t, auth.Validate())
 	admin := &stnrv2.AdminConfig{}

@@ -84,14 +84,14 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			// MetricsEndpoint: "http://:8088",
 			HealthCheckEndpoint: &h,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:  "plaintext",
 			Realm: stnrv2.DefaultRealm,
 			Credentials: map[string]string{
 				"username": u.Username,
 				"password": u.Password,
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: transport.String(),

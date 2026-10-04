@@ -14,8 +14,7 @@ func TestAuthObjectSemantics(t *testing.T) {
 	runObjectSemanticsCase(t, objectSemanticsCase{
 		name: "auth",
 		setup: func(t *testing.T) (runtime.Object, stnrv2.Config, *stnrv2.StunnerConfig) {
-			env := newTestEnv()
-			obj, err := object.NewAuth(nil, env.rt)
+			obj, err := object.NewAuth(staticAuthConfig())
 			require.NoError(t, err)
 			return obj, staticAuthConfig(), &stnrv2.StunnerConfig{}
 		},
@@ -23,6 +22,7 @@ func TestAuthObjectSemantics(t *testing.T) {
 			{
 				name: "realm-change-reconcile",
 				conf: &stnrv2.AuthConfig{
+					Name:  stnrv2.DefaultAuthName,
 					Type:  stnrv2.AuthTypeStatic.String(),
 					Realm: "example.org",
 					Credentials: map[string]string{

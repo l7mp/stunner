@@ -31,7 +31,8 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 			OffloadEngine:       c.Admin.OffloadEngine,
 			OffloadInterfaces:   c.Admin.OffloadInterfaces,
 		},
-		Auth: stnrv2.AuthConfig(c.Auth),
+		// the v1 auth is the default policy, the one a TURN server refers to unless told otherwise
+		Auths: []stnrv2.AuthConfig{convertAuth(c.Auth, stnrv2.DefaultAuthName)},
 	}
 	if c.Admin.LicenseConfig != nil {
 		l := stnrv2.LicenseConfig(*c.Admin.LicenseConfig)
@@ -49,6 +50,10 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 			return nil, err
 		}
 		ret.Clusters = append(ret.Clusters, cluster)
+		// the credentials of a TURN-* cluster's tunnel become a policy the tunnel names
+		if cl.TURNServer != nil && cl.TURNServer.Auth != nil && cluster.Tunnel != nil {
+			ret.Auths = append(ret.Auths, convertAuth(*cl.TURNServer.Auth, cluster.Tunnel.Auth))
+		}
 	}
 
 	if err := ret.Validate(); err != nil {
@@ -178,10 +183,16 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 				Port: s.Port}).String()
 			cluster.Tunnel.Insecure, cluster.Tunnel.SNI = s.Insecure, s.SNI
 			if s.Auth != nil {
-				auth := stnrv2.AuthConfig(*s.Auth)
-				cluster.Tunnel.Auth = &auth
+				// the policy itself is added by ConvertToV2, under this name
+				cluster.Tunnel.Auth = cl.Name
 			}
 		}
 	}
 	return cluster, nil
+}
+
+// convertAuth converts a v1 auth config into a v2 authentication policy of a name.
+func convertAuth(a AuthConfig, name string) stnrv2.AuthConfig {
+	return stnrv2.AuthConfig{Name: name, Type: a.Type, Realm: a.Realm, Credentials: a.Credentials,
+		Lifetime: a.Lifetime}
 }

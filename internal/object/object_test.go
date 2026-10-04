@@ -81,7 +81,7 @@ func newLiveEnv(t *testing.T, eng offload.Engine) *testEnv {
 	rt.QuotaHandler = quota.New(rt)
 	env := &testEnv{rt: rt}
 
-	auth, err := object.NewAuth(staticAuthConfig(), rt)
+	auth, err := object.NewAuth(staticAuthConfig())
 	require.NoError(t, err)
 	mustAdd(t, env, auth)
 	admin, err := object.NewAdmin(&stnrv2.AdminConfig{}, rt)
@@ -127,6 +127,7 @@ func mustAdd(t *testing.T, env *testEnv, o runtime.Runnable) {
 
 func staticAuthConfig() *stnrv2.AuthConfig {
 	return &stnrv2.AuthConfig{
+		Name:  stnrv2.DefaultAuthName,
 		Type:  stnrv2.AuthTypeStatic.String(),
 		Realm: stnrv2.DefaultRealm,
 		Credentials: map[string]string{

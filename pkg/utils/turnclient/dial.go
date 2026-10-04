@@ -70,14 +70,12 @@ func (c Config) dialTLS(nw transport.Net) (net.Conn, error) {
 	return conn, nil
 }
 
-// NewConfig builds the client config for the upstream TURN server of a cluster's tunnel: the tunnel
-// URL names the server and the transport to reach it over. Credentials are generated fresh on
-// every call, so with "ephemeral" auth each dial (that is, each allocation) authenticates with its
-// own time-windowed credential. Callers add their own LoggerFactory.
+// NewConfig builds the client config of a tunnel's upstream TURN server, presenting auth (nil for
+// none). Credentials are generated per call, so ephemeral auth gets per-allocation credentials.
 //
 // Realm is a seed only: the server states its realm in the 401 challenge and the client overwrites
 // the configured value with it before computing the message integrity.
-func NewConfig(t *stnrv2.TunnelConfig) (Config, error) {
+func NewConfig(t *stnrv2.TunnelConfig, auth *stnrv2.AuthConfig) (Config, error) {
 	u, err := stnrv2.ParseURI(t.URL)
 	if err != nil {
 		return Config{}, err
@@ -85,7 +83,7 @@ func NewConfig(t *stnrv2.TunnelConfig) (Config, error) {
 	if !u.Protocol.IsTURN() {
 		return Config{}, fmt.Errorf("not a TURN URL: %q", t.URL)
 	}
-	user, pass, err := a12n.GenerateCredentials(t.Auth)
+	user, pass, err := a12n.GenerateCredentials(auth)
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to generate credentials for TURN server %q: %w",
 			u.HostPort(), err)
@@ -106,8 +104,8 @@ func NewConfig(t *stnrv2.TunnelConfig) (Config, error) {
 		ServerName: serverName,
 		Insecure:   t.Insecure,
 	}
-	if t.Auth != nil {
-		c.Realm = t.Auth.Realm
+	if auth != nil {
+		c.Realm = auth.Realm
 	}
 	return c, nil
 }

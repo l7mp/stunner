@@ -14,10 +14,10 @@ import (
 func validConfig() *StunnerConfig {
 	return &StunnerConfig{
 		ApiVersion: ApiVersion,
-		Auth: AuthConfig{
+		Auths: []AuthConfig{{
 			Type:        "static",
 			Credentials: map[string]string{"username": "user", "password": "pass"},
-		},
+		}},
 		Listeners: []ListenerConfig{
 			{Name: "turn-udp", Protocol: "UDP", Port: 3478, Servers: []string{"media-gw"}},
 			{Name: "turn-tls", Protocol: "TLS", Port: 443, Servers: []string{"media-gw"}, Cert: "cert",
@@ -164,8 +164,10 @@ func TestDeepCopyIsExact(t *testing.T) {
 		if cp.Admin.LicenseConfig != nil {
 			cp.Admin.LicenseConfig.Key = "changed"
 		}
-		for k := range cp.Auth.Credentials {
-			cp.Auth.Credentials[k] = "changed"
+		for i := range cp.Auths {
+			for k := range cp.Auths[i].Credentials {
+				cp.Auths[i].Credentials[k] = "changed"
+			}
 		}
 		for i := range cp.Clusters {
 			for j := range cp.Clusters[i].Endpoints {

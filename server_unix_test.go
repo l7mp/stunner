@@ -22,13 +22,13 @@ var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "plaintext",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "UDP",
@@ -80,13 +80,13 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 		Admin: stnrv2.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type: "plaintext",
 			Credentials: map[string]string{
 				"username": "user1",
 				"password": "passwd1",
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: proto,
@@ -160,7 +160,8 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			LogLevel:            stunnerTestLoglevel,
 			HealthCheckEndpoint: &noHealthCheck,
 		},
-		Auth: stnrv2.AuthConfig{Type: "none"},
+		Auths: []stnrv2.AuthConfig{{Type: "none"}, {Name: "upstream", Type: "static",
+			Credentials: map[string]string{"username": "user1", "password": "passwd1"}}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "tunnel-listener",
 			Protocol: clientProto,
@@ -179,9 +180,8 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			RoutingPolicy: "ROUND_ROBIN",
 			Protocol:      "UDP",
 			Tunnel: &stnrv2.TunnelConfig{
-				URL: (&stnrv2.URI{Protocol: tunnelProto, Host: "127.0.0.1", Port: 23478}).String(),
-				Auth: &stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{
-					"username": "user1", "password": "passwd1"}},
+				URL:      (&stnrv2.URI{Protocol: tunnelProto, Host: "127.0.0.1", Port: 23478}).String(),
+				Auth:     "upstream",
 				Insecure: true,
 			},
 		}},

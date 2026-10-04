@@ -164,7 +164,7 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 	}
 
 	// the gate reserves the quota: every later failure path must release it
-	user, realm := flowIdentity(s.rt, client.RemoteAddr())
+	user, realm := flowIdentity(s.rt, s.name, client.RemoteAddr())
 	if !s.gate(user, realm, client.RemoteAddr()) {
 		return nil, errQuotaExceeded
 	}

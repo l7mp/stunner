@@ -44,9 +44,7 @@ Usage (the positional argument count selects the mode):
         Tunnel a local client to a peer through a remote TURN server:
         client-addr: <udp|tcp>://<addr>:<port>, or "-" to tunnel stdin/stdout
         turn-server-addr: turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls]
-                          or k8s://<gw-namespace>/<gw-name>:<listener>
         peer-addr: <udp|tcp>://<addr>:<port>
-                   or k8s://<namespace>/<service>:<port-name-or-number>
         auth: <username:password|secret>
 
 Options:
@@ -133,7 +131,7 @@ func main() {
 			logFormat: *logFormat,
 			license:   license,
 			offload:   *offload,
-		}, k8sConfigFlags, cdsConfigFlags)
+		})
 		return
 	}
 	if flag.NArg() > 1 {

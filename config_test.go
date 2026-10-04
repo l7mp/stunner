@@ -265,7 +265,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 const (
 	testConfigV1 = `{"version":"v1","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"static","credentials":{"password":"passwd1","username":"user1"}},"listeners":[{"name":"udp","protocol":"turn-udp","address":"1.2.3.4","port":3478,"routes":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"]}]}`
-	testConfigV2 = `{"version":"v2","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auth":{"type":"ephemeral","credentials":{"secret":"test-secret"}},"listeners":[{"name":"udp","protocol":"UDP","servers":["udp"],"port":3478}],"servers":[{"name":"udp","type":"turn","clusters":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"],"protocol":"UDP","addresses":["1.2.3.4"]}]}`
+	testConfigV2 = `{"version":"v2","admin":{"name":"ns1/tester", "loglevel":"all:ERROR"},"auths":[{"type":"ephemeral","credentials":{"secret":"test-secret"}}],"listeners":[{"name":"udp","protocol":"UDP","servers":["udp"],"port":3478}],"servers":[{"name":"udp","type":"turn","clusters":["echo-server-cluster"]}],"clusters":[{"name":"echo-server-cluster","type":"STATIC","endpoints":["1.2.3.5"],"protocol":"UDP","addresses":["1.2.3.4"]}]}`
 )
 
 // TestStunnerConfigFileWatcherMultiVersion feeds a v1 and a v2 config file to the watcher: both
@@ -529,12 +529,12 @@ func TestStunnerConfigPatcher(t *testing.T) {
 				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv2.AuthConfig{
+				Auths: []stnrv2.AuthConfig{{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
-				},
+				}},
 				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
 					Protocol: "UDP",
@@ -599,18 +599,18 @@ func TestCredentialParser(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
 			c, err := cdsclient.ParseConfig(testConf.config)
 			assert.NoError(t, err, "parser")
-			assert.Equal(t, testConf.user, c.Auth.Credentials["username"], "username")
-			assert.Equal(t, testConf.pass, c.Auth.Credentials["password"], "password")
-			assert.Equal(t, testConf.secret, c.Auth.Credentials["secret"], "secret")
+			assert.Equal(t, testConf.user, c.Auths[0].Credentials["username"], "username")
+			assert.Equal(t, testConf.pass, c.Auths[0].Credentials["password"], "password")
+			assert.Equal(t, testConf.secret, c.Auths[0].Credentials["secret"], "secret")
 		})
 	}
 }
 
 func checkDefaultConfig(t *testing.T, c *stnrv2.StunnerConfig, proto string) {
 	t.Helper()
-	assert.Equal(t, "static", c.Auth.Type, "auth-type")
-	assert.Equal(t, "user1", c.Auth.Credentials["username"], "username")
-	assert.Equal(t, "passwd1", c.Auth.Credentials["password"], "passwd")
+	assert.Equal(t, "static", c.Auths[0].Type, "auth-type")
+	assert.Equal(t, "user1", c.Auths[0].Credentials["username"], "username")
+	assert.Equal(t, "passwd1", c.Auths[0].Credentials["password"], "passwd")
 	assert.Len(t, c.Listeners, 1, "listeners len")
 	assert.Empty(t, c.Listeners[0].Addr, "listener binds all interfaces")
 	assert.Equal(t, 3478, c.Listeners[0].Port, "listener port")
@@ -632,7 +632,7 @@ func checkEchoServerConfig(t *testing.T, c *stnrv2.StunnerConfig) {
 	t.Helper()
 	assert.Equal(t, stnrv2.ApiVersion, c.ApiVersion, "version")
 	assert.Equal(t, "all:ERROR", c.Admin.LogLevel, "loglevel")
-	assert.True(t, c.Auth.Type == "static" || c.Auth.Type == "ephemeral", "auth type")
+	assert.True(t, c.Auths[0].Type == "static" || c.Auths[0].Type == "ephemeral", "auth type")
 	assert.Len(t, c.Listeners, 1, "listeners len")
 	assert.Equal(t, "udp", c.Listeners[0].Name, "listener name")
 	assert.Equal(t, "UDP", c.Listeners[0].Protocol, "listener proto")

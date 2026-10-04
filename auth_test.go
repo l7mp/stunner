@@ -53,13 +53,13 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -89,12 +89,12 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -123,12 +123,12 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -160,12 +160,12 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -199,12 +199,12 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -238,12 +238,12 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",

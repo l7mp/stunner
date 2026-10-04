@@ -49,12 +49,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -81,8 +81,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// make sure we get the right loglevel, we may override this for debugging the tests
 			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
-			assert.NotNil(t, s.GetAuth(), "authManager keys")
-			auth := s.GetAuth()
+			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
@@ -130,11 +130,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -163,11 +163,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -196,9 +196,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "none",
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -218,8 +218,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "empty username or password is OK with auth type none")
-			assert.Equal(t, stnrv2.AuthTypeNone, mustAuthType(t, s.GetAuth()))
-			authConfig, ok := s.GetAuth().GetConfig().(*stnrv2.AuthConfig)
+			assert.Equal(t, stnrv2.AuthTypeNone, mustAuthType(t, s.GetAuth(stnrv2.DefaultAuthName)))
+			authConfig, ok := s.GetAuth(stnrv2.DefaultAuthName).GetConfig().(*stnrv2.AuthConfig)
 			assert.True(t, ok)
 			assert.Empty(t, authConfig.Credentials)
 		},
@@ -231,12 +231,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
@@ -257,12 +257,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
@@ -290,12 +290,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -320,12 +320,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -357,12 +357,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "new-name",
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -390,8 +390,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, mustAdminName(t, admin), "new-name", "stunner name")
 			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
-			assert.NotNil(t, s.GetAuth(), "authManager keys")
-			auth := s.GetAuth()
+			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
@@ -437,12 +437,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: "anything",
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -469,8 +469,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
 			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
-			assert.NotNil(t, s.GetAuth(), "authManager keys")
-			auth := s.GetAuth()
+			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
@@ -517,12 +517,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				LogLevel:        "anything",
 				MetricsEndpoint: "http://0.0.0.0:8080/metrics",
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -556,8 +556,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, adminConf.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
 
-			assert.NotNil(t, s.GetAuth(), "authManager keys")
-			auth := s.GetAuth()
+			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
@@ -604,12 +604,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "newuser",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -631,7 +631,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// no restart!
 			assert.NoError(t, err, "no restart needed")
 
-			auth := s.GetAuth()
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "newuser", "username ok")
@@ -682,12 +682,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "newpass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -709,7 +709,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// no restart!
 			assert.NoError(t, err, "no restart needed")
 
-			auth := s.GetAuth()
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeStatic, mustAuthType(t, auth), "auth type ok")
 
 			assert.Equal(t, authCreds(t, auth)["username"], "user", "username ok")
@@ -760,12 +760,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "newsecret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -787,7 +787,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			// no restart!
 			assert.NoError(t, err, "no restart needed")
 
-			auth := s.GetAuth()
+			auth := s.GetAuth(stnrv2.DefaultAuthName)
 			assert.Equal(t, stnrv2.AuthTypeEphemeral, mustAuthType(t, auth), "auth type ok")
 			assert.Equal(t, authCreds(t, auth)["secret"], "newsecret")
 
@@ -845,12 +845,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Protocol: "TCP",
@@ -913,12 +913,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "renamed-listener",
 				Addr:     "127.0.0.1",
@@ -958,12 +958,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "newlistener",
 				Protocol: "TCP",
@@ -1018,12 +1018,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "newlistener",
 				Protocol: "TLS",
@@ -1055,12 +1055,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1132,12 +1132,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1217,12 +1217,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1302,12 +1302,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
@@ -1359,12 +1359,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
@@ -1395,12 +1395,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1439,12 +1439,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1487,12 +1487,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1534,12 +1534,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1581,12 +1581,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1636,12 +1636,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1692,12 +1692,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1748,12 +1748,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -1781,12 +1781,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				UserQuota: 12,
 				LogLevel:  stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -1812,9 +1812,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				OffloadEngine: "XDP",
 				LogLevel:      stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "none",
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -1846,9 +1846,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				OffloadInterfaces: []string{"c", "a", "b"}, // badly sorted
 				LogLevel:          stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "none",
-			},
+			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.Error(t, err, "restarted") // changing the offload interfaces requires a restart
@@ -1873,10 +1873,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "tcp",
 				Protocol: "TCP",
@@ -1923,9 +1923,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "2001:db8::1",
@@ -1960,9 +1960,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
@@ -1997,9 +1997,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "default-listener",
 				Addr:       "2001:db8::1",
@@ -2037,9 +2037,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -2072,9 +2072,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -2106,9 +2106,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{"username": "user", "password": "pass"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
@@ -2142,12 +2142,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Protocol: "TLS",
@@ -2185,8 +2185,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				return &stnrv2.StunnerConfig{
 					ApiVersion: stnrv2.ApiVersion,
 					Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-					Auth: stnrv2.AuthConfig{Credentials: map[string]string{
-						"username": "user", "password": "pass"}},
+					Auths: []stnrv2.AuthConfig{{Credentials: map[string]string{
+						"username": "user", "password": "pass"}}},
 					Listeners: []stnrv2.ListenerConfig{{
 						Name:     "default-listener",
 						Protocol: "TLS",
@@ -2288,7 +2288,7 @@ func TestStunnerReconcile(t *testing.T) {
 
 			require.True(t, conf.Admin.DeepEqual(&runningConf.Admin),
 				"default stunner admin config ok")
-			require.True(t, conf.Auth.DeepEqual(&runningConf.Auth),
+			require.True(t, conf.Auths[0].DeepEqual(&runningConf.Auths[0]),
 				"default stunner auth config ok")
 			require.NotEmpty(t, conf.Listeners, "default conf listener config")
 			require.NotEmpty(t, runningConf.Listeners, "running conf listener config")
@@ -2348,7 +2348,7 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 				if auth != nil {
 					_, _, _ = auth(&turn.RequestAttributes{
 						Username: "user",
-						Realm:    cfg.Auth.Realm,
+						Realm:    cfg.Auths[0].Realm,
 						SrcAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 20000},
 					})
 				}
@@ -2480,9 +2480,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "none",
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "default-listener",
 				Protocol: "UDP",
@@ -2498,7 +2498,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Clusters: []stnrv2.ClusterConfig{},
 		},
 		echoServerAddr:  "1.2.3.5:6678",
-		restart:         false,
+		restart:         true, // the policy turned none: a pure STUN server is rebuilt
 		bindSuccess:     true,
 		allocateSuccess: false,
 		echoResult:      false,
@@ -2510,12 +2510,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -2533,12 +2533,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -2566,12 +2566,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -2604,12 +2604,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2652,12 +2652,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2701,12 +2701,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "dummy",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2749,12 +2749,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "dummy",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2797,13 +2797,13 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2846,13 +2846,13 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Realm: "dummy",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2897,13 +2897,13 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Realm: "stunner.l7mp.io",
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -2948,12 +2948,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3001,12 +3001,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3049,12 +3049,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3102,12 +3102,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3145,12 +3145,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3188,12 +3188,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3226,12 +3226,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3264,12 +3264,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3302,12 +3302,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3340,12 +3340,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3378,12 +3378,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3417,12 +3417,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3455,12 +3455,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp-ok",
 				Protocol: "UDP",
@@ -3488,12 +3488,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -3512,12 +3512,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				OffloadEngine: "XDP",
 				LogLevel:      stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -3538,12 +3538,12 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				OffloadInterfaces: []string{"eth0"},
 				LogLevel:          stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Credentials: map[string]string{
 					"username": "user",
 					"password": "pass",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters:  []stnrv2.ClusterConfig{},
@@ -3576,12 +3576,12 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv2.AuthConfig{
+				Auths: []stnrv2.AuthConfig{{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
-				},
+				}},
 				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
 					Protocol: "UDP",
@@ -3616,12 +3616,12 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 				Admin: stnrv2.AdminConfig{
 					LogLevel: stunnerTestLoglevel,
 				},
-				Auth: stnrv2.AuthConfig{
+				Auths: []stnrv2.AuthConfig{{
 					Credentials: map[string]string{
 						"username": "user",
 						"password": "pass",
 					},
-				},
+				}},
 				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
 					Protocol: "TLS",
@@ -3664,7 +3664,7 @@ func TestStunnerReconcileWithVNetRollback(t *testing.T) {
 }
 
 func newAuthHandler(s *Stunner) a12n.AuthHandler {
-	return objectturn.NewAuthHandler(s.rt, s.log)
+	return objectturn.NewAuthHandler(s.rt, "default-server", s.log)
 }
 
 func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
@@ -3742,14 +3742,14 @@ func makeRaceConfig(realm string) stnrv2.StunnerConfig {
 		Admin: stnrv2.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:  stnrv2.AuthTypeStatic.String(),
 			Realm: realm,
 			Credentials: map[string]string{
 				"username": "user",
 				"password": "pass",
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: "UDP",

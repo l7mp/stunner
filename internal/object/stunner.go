@@ -37,8 +37,8 @@ func (s *Stunner) GetConfig() stnrv2.Config {
 	if a, ok := s.rt.GetConfig(runtime.TypeAdmin, "").(*stnrv2.AdminConfig); ok && a != nil {
 		out.Admin = *a
 	}
-	if a, ok := s.rt.GetConfig(runtime.TypeAuth, "").(*stnrv2.AuthConfig); ok && a != nil {
-		out.Auth = *a
+	for _, a := range s.rt.GetConfigs(runtime.TypeAuth) {
+		out.Auths = append(out.Auths, *(a.(*stnrv2.AuthConfig)))
 	}
 	for _, l := range s.rt.GetConfigs(runtime.TypeListener) {
 		out.Listeners = append(out.Listeners, *(l.(*stnrv2.ListenerConfig)))
@@ -62,8 +62,9 @@ func (s *Stunner) Status() stnrv2.Status {
 	if a, ok := s.rt.GetStatus(runtime.TypeAdmin, "").(*stnrv2.AdminStatus); ok {
 		status.Admin = a
 	}
-	if a, ok := s.rt.GetStatus(runtime.TypeAuth, "").(*stnrv2.AuthConfig); ok {
-		status.Auth = a
+	status.Auths = []*stnrv2.AuthStatus{}
+	for _, st := range s.rt.GetStatuses(runtime.TypeAuth) {
+		status.Auths = append(status.Auths, st.(*stnrv2.AuthStatus))
 	}
 	listenerStatuses := s.rt.GetStatuses(runtime.TypeListener)
 	status.Listeners = make([]*stnrv2.ListenerStatus, 0, len(listenerStatuses))

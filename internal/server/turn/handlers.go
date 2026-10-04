@@ -16,23 +16,23 @@ import (
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
-// NewAuthHandler returns an authentication handler callback for a TURN server.
-func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.AuthHandler {
-	// We must return a nil auth-handler to switch pure STUN on.
-	a, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv2.AuthConfig)
-	if !ok || a == nil {
-		log.Warn("auth handler: no auth config in runtime")
+// NewAuthHandler returns the authentication handler callback of a TURN server, which authenticates
+// by the policy its config names, looked up on every request. A policy of type none makes a pure
+// STUN server (a nil handler); a missing one refuses every client.
+func NewAuthHandler(rt *objruntime.Runtime, server string, log logging.LeveledLogger) a12n.AuthHandler {
+	policy := func() *stnrv2.AuthConfig {
+		if conf := rt.ServerConfig(server); conf != nil {
+			return rt.AuthConfig(conf.Auth)
+		}
 		return nil
 	}
-	typeVal, err := stnrv2.NewAuthType(a.Type)
-	if err != nil {
-		log.Errorf("auth handler: invalid auth type %q", a.Type)
+	if a := policy(); a == nil {
+		log.Warnf("auth handler: server %s names no authentication policy: every client is refused",
+			server)
+	} else if typeVal, err := stnrv2.NewAuthType(a.Type); err == nil && typeVal == stnrv2.AuthTypeNone {
+		// a nil handler switches pure STUN on
 		return nil
-	}
-	if typeVal == stnrv2.AuthTypeNone {
-		return nil
-	}
-	if (typeVal == stnrv2.AuthTypeStatic && (a.Credentials["username"] == "" || a.Credentials["password"] == "")) ||
+	} else if (typeVal == stnrv2.AuthTypeStatic && (a.Credentials["username"] == "" || a.Credentials["password"] == "")) ||
 		(typeVal == stnrv2.AuthTypeEphemeral && a.Credentials["secret"] == "") {
 		log.Warnf("auth handler: %s auth without credentials: every client is refused",
 			typeVal.String())
@@ -43,9 +43,9 @@ func NewAuthHandler(rt *objruntime.Runtime, log logging.LeveledLogger) a12n.Auth
 		realm := ra.Realm
 		srcAddr := ra.SrcAddr
 
-		auth, ok := rt.GetConfig(objruntime.TypeAuth, "").(*stnrv2.AuthConfig)
-		if !ok || auth == nil {
-			log.Infof("auth request: failed: auth config is unavailable")
+		auth := policy()
+		if auth == nil {
+			log.Infof("auth request: failed: no authentication policy")
 			return "", nil, false
 		}
 		authType, err := stnrv2.NewAuthType(auth.Type)

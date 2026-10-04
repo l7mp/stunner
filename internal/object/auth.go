@@ -3,55 +3,43 @@ package object
 import (
 	"sync/atomic"
 
-	"github.com/pion/logging"
-
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// Auth is the STUNner authenticator. TURN handlers read the live auth config per request via
-// rt.GetConfig(TypeAuth, ""), which loads the atomic snapshot published by Reconcile.
+// Auth is an authentication policy. The servers referring to it read its live config per request
+// through rt.AuthConfig, which loads the snapshot Reconcile publishes.
 type Auth struct {
-	authType                          stnrv2.AuthType
-	realm, username, password, secret string
-
-	// conf is the atomic snapshot read by the auth handler on the request path.
+	name string
 	conf atomic.Pointer[stnrv2.AuthConfig]
-
-	log logging.LeveledLogger
 }
 
-// NewAuth creates an Auth object.
-func NewAuth(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
-	a := &Auth{
-		log: rt.Logger.NewLogger("auth"),
-	}
-	if conf == nil {
-		return a, nil
-	}
+// NewAuth creates an authentication policy object.
+func NewAuth(conf stnrv2.Config) (runtime.Object, error) {
 	req, ok := conf.(*stnrv2.AuthConfig)
 	if !ok {
 		return nil, stnrv2.ErrInvalidConf
 	}
+	a := &Auth{name: req.Name}
 	if err := a.Reconcile(req); err != nil {
 		return nil, err
 	}
 	return a, nil
 }
 
-func (a *Auth) Name() string             { return stnrv2.DefaultAuthName }
+func (a *Auth) Name() string             { return a.name }
 func (a *Auth) Type() runtime.ObjectType { return runtime.TypeAuth }
 
+// Inspect reconciles every change in place.
 func (a *Auth) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv2.AuthConfig)
 	if !ok {
 		return runtime.ActionNone, stnrv2.ErrInvalidConf
 	}
-	cur := old.(*stnrv2.AuthConfig)
-	if !cur.DeepEqual(req) {
-		return runtime.ActionReconcile, nil
+	if old.(*stnrv2.AuthConfig).DeepEqual(req) {
+		return runtime.ActionNone, nil
 	}
-	return runtime.ActionNone, nil
+	return runtime.ActionReconcile, nil
 }
 
 func (a *Auth) Reconcile(conf stnrv2.Config) error {
@@ -62,61 +50,24 @@ func (a *Auth) Reconcile(conf stnrv2.Config) error {
 	if err := req.Validate(); err != nil {
 		return err
 	}
-	atype, _ := stnrv2.NewAuthType(req.Type)
-	a.log.Debugf("using authentication: %s", atype.String())
-
-	a.authType = atype
-	a.realm = req.Realm
-	a.username, a.password, a.secret = "", "", ""
-	switch atype {
-	case stnrv2.AuthTypeNone:
-	case stnrv2.AuthTypeStatic:
-		a.username = req.Credentials["username"]
-		a.password = req.Credentials["password"]
-	case stnrv2.AuthTypeEphemeral:
-		a.secret = req.Credentials["secret"]
-	}
-
-	// Publish the snapshot for the request path.
-	snap := &stnrv2.AuthConfig{
-		Type:        atype.String(),
-		Realm:       a.realm,
-		Credentials: make(map[string]string),
-	}
-	switch atype {
-	case stnrv2.AuthTypeNone:
-	case stnrv2.AuthTypeStatic:
-		snap.Credentials["username"] = a.username
-		snap.Credentials["password"] = a.password
-	case stnrv2.AuthTypeEphemeral:
-		snap.Credentials["secret"] = a.secret
-	}
-	a.conf.Store(snap)
+	cp := &stnrv2.AuthConfig{}
+	req.DeepCopyInto(cp)
+	a.conf.Store(cp)
 	return nil
 }
 
-// GetConfig returns a copy of the live auth config. Safe for concurrent use.
+// GetConfig returns a copy of the live config. Safe for concurrent use.
 func (a *Auth) GetConfig() stnrv2.Config {
-	snap := a.conf.Load()
-	if snap == nil {
-		return &stnrv2.AuthConfig{
-			Type:        stnrv2.AuthTypeNone.String(),
-			Credentials: map[string]string{},
-		}
+	cp := &stnrv2.AuthConfig{Name: a.name}
+	if c := a.conf.Load(); c != nil {
+		c.DeepCopyInto(cp)
 	}
-	out := stnrv2.AuthConfig{
-		Type:        snap.Type,
-		Realm:       snap.Realm,
-		Credentials: make(map[string]string, len(snap.Credentials)),
-	}
-	for k, v := range snap.Credentials {
-		out.Credentials[k] = v
-	}
-	return &out
+	return cp
 }
 
 func (a *Auth) Start() error       { return nil }
 func (a *Auth) Close(_ bool) error { return nil }
+
 func (a *Auth) Status() stnrv2.Status {
 	return a.GetConfig()
 }

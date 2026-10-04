@@ -18,7 +18,7 @@ const (
 	DefaultClusterType                   = "STATIC"
 	DefaultRoutingPolicy                 = "FILTER"
 	DefaultAdminName                     = "default-admin-config"
-	DefaultAuthName                      = "default-auth-config"
+	DefaultAuthName                      = "default"
 	DefaultHealthName                    = "default-health"
 	DefaultMetricsName                   = "default-metrics"
 	DefaultOffloadName                   = "default-offload"

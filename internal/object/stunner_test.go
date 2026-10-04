@@ -29,7 +29,7 @@ func TestStunnerObjectSemantics(t *testing.T) {
 			require.NoError(t, err)
 			mustAdd(t, env, offload)
 
-			auth, err := object.NewAuth(staticAuthConfig(), env.rt)
+			auth, err := object.NewAuth(staticAuthConfig())
 			require.NoError(t, err)
 			mustAdd(t, env, auth)
 
@@ -79,7 +79,7 @@ func TestStunnerObjectSemantics(t *testing.T) {
 			base := &stnrv2.StunnerConfig{
 				ApiVersion: stnrv2.ApiVersion,
 				Admin:      *admin.GetConfig().(*stnrv2.AdminConfig),
-				Auth:       *auth.GetConfig().(*stnrv2.AuthConfig),
+				Auths:      []stnrv2.AuthConfig{*auth.GetConfig().(*stnrv2.AuthConfig)},
 				Listeners:  []stnrv2.ListenerConfig{*listener.GetConfig().(*stnrv2.ListenerConfig)},
 				Servers:    []stnrv2.ServerConfig{*server.GetConfig().(*stnrv2.ServerConfig)},
 				Clusters:   []stnrv2.ClusterConfig{*cluster.GetConfig().(*stnrv2.ClusterConfig)},

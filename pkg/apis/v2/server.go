@@ -19,6 +19,9 @@ type ServerConfig struct {
 	Type string `json:"type,omitempty"`
 	// Clusters lists the names of the clusters the server uses, in order.
 	Clusters []string `json:"clusters,omitempty"`
+	// Auth names the authentication policy of the server: a TURN server authenticates its clients
+	// by it (default: "default").
+	Auth string `json:"auth,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -36,6 +39,9 @@ func (req *ServerConfig) Validate() error {
 	req.Type = t.String()
 	if req.Clusters == nil {
 		req.Clusters = []string{}
+	}
+	if req.Auth == "" && t == ServerTypeTURN {
+		req.Auth = DefaultAuthName
 	}
 	return nil
 }
@@ -63,7 +69,12 @@ func (req *ServerConfig) String() string {
 	if req.Name != "" {
 		n = req.Name
 	}
-	return fmt.Sprintf("%q:{type=%s,clusters=[%s]}", n, req.Type, strings.Join(req.Clusters, ","))
+	opts := ""
+	if req.Auth != "" {
+		opts += ",auth=" + req.Auth
+	}
+	return fmt.Sprintf("%q:{type=%s,clusters=[%s]%s}", n, req.Type, strings.Join(req.Clusters, ","),
+		opts)
 }
 
 // ServerStatus is the status of a server: its config and its live session count (TURN

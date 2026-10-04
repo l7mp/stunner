@@ -17,20 +17,21 @@ type ConfigSkeleton struct {
 	ApiVersion string `json:"version"`
 }
 
-// EmptyConfig builds a minimal configuration. The minimal config defaults to static authentication
-// with a dummy username and password and has no listeners, servers or clusters.
+// EmptyConfig builds a minimal configuration. The minimal config has a default authentication
+// policy, static with a dummy username and password, and no listeners, servers or clusters.
 func EmptyConfig() *stnrv2.StunnerConfig {
 	return &stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
+			Name:  stnrv2.DefaultAuthName,
 			Type:  "static",
 			Realm: stnrv2.DefaultRealm,
 			Credentials: map[string]string{
 				"username": "dummy-username",
 				"password": "dummy-password",
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{},
 		Servers:   []stnrv2.ServerConfig{},
 		Clusters:  []stnrv2.ClusterConfig{},
@@ -77,10 +78,12 @@ func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
 	// save the credentials before env substitution so that substitution does not affect them;
 	// only the credentials are parsed here, as other fields (say, a numeric port) may hold
 	// placeholders that parse only after substitution
+	type creds struct {
+		Credentials map[string]string `json:"credentials"`
+	}
 	credRaw := struct {
-		Auth struct {
-			Credentials map[string]string `json:"credentials"`
-		} `json:"auth"`
+		Auth  creds   `json:"auth"`  // v1
+		Auths []creds `json:"auths"` // v2
 	}{}
 	if err := unmarshal(c, &credRaw); err != nil {
 		return nil, err
@@ -93,8 +96,18 @@ func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
 		return nil, err
 	}
 
-	// restore credentials
-	maps.Copy(confExp.Auth.Credentials, credRaw.Auth.Credentials)
+	// restore credentials: a v1 auth converts to the first policy
+	if credRaw.Auths == nil && credRaw.Auth.Credentials != nil {
+		credRaw.Auths = []creds{credRaw.Auth}
+	}
+	for i := range confExp.Auths {
+		if i < len(credRaw.Auths) {
+			if confExp.Auths[i].Credentials == nil {
+				confExp.Auths[i].Credentials = map[string]string{}
+			}
+			maps.Copy(confExp.Auths[i].Credentials, credRaw.Auths[i].Credentials)
+		}
+	}
 
 	return confExp, nil
 }

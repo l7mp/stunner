@@ -15,7 +15,7 @@ type Catalog = reconciler.Catalog
 //
 //	Stunner (root, singleton)
 //	+-- Admin -- Health / Metrics / Offload    (singletons)
-//	+-- Auth                                   (singleton)
+//	+-- Auth [N from config]
 //	+-- Cluster [N from config]
 //	+-- Server [N from config]
 //	+-- Listener [N from config]
@@ -70,15 +70,17 @@ func NewCatalog() *Catalog {
 
 	register(KindSpec{
 		Type: runtime.TypeAuth,
-		New: func(_ runtime.Runnable, conf stnrv2.Config, rt *runtime.Runtime) (runtime.Runnable, error) {
-			return NewAuth(conf, rt)
+		New: func(_ runtime.Runnable, conf stnrv2.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+			return NewAuth(conf)
 		},
 		ExtractConfigs: func(_ string, full *stnrv2.StunnerConfig) ([]stnrv2.Config, error) {
-			cp := full.Auth
-			return []stnrv2.Config{&cp}, nil
+			out := make([]stnrv2.Config, len(full.Auths))
+			for i := range full.Auths {
+				ac := full.Auths[i]
+				out[i] = &ac
+			}
+			return out, nil
 		},
-		Singleton:     true,
-		SingletonName: func(_ string) string { return stnrv2.DefaultAuthName },
 	})
 
 	register(KindSpec{

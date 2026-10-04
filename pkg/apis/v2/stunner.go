@@ -11,8 +11,8 @@ type StunnerConfig struct {
 	ApiVersion string `json:"version"`
 	// Admin holds the administrative configuration.
 	Admin AdminConfig `json:"admin,omitempty"`
-	// Auth defines the client authentication mechanism.
-	Auth AuthConfig `json:"auth"`
+	// Auths are the authentication policies servers refer to by name.
+	Auths []AuthConfig `json:"auths,omitempty"`
 	// Listeners are the client-facing sockets.
 	Listeners []ListenerConfig `json:"listeners,omitempty"`
 	// Servers are the dataplane behaviors the listeners feed.
@@ -31,9 +31,6 @@ func (req *StunnerConfig) Validate() error {
 	if err := req.Admin.Validate(); err != nil {
 		return err
 	}
-	if err := req.Auth.Validate(); err != nil {
-		return err
-	}
 
 	if req.Listeners == nil {
 		req.Listeners = []ListenerConfig{}
@@ -43,6 +40,9 @@ func (req *StunnerConfig) Validate() error {
 	}
 	if req.Clusters == nil {
 		req.Clusters = []ClusterConfig{}
+	}
+	if req.Auths == nil {
+		req.Auths = []AuthConfig{}
 	}
 
 	names := map[string]bool{}
@@ -77,6 +77,17 @@ func (req *StunnerConfig) Validate() error {
 			return err
 		}
 	}
+	for i := range req.Auths {
+		if req.Auths[i].Name == "" {
+			req.Auths[i].Name = DefaultAuthName
+		}
+		if err := req.Auths[i].Validate(); err != nil {
+			return err
+		}
+		if err := checkName("auth", req.Auths[i].Name); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -93,7 +104,7 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 		return false
 	}
 	if req.ApiVersion != b.ApiVersion || !req.Admin.DeepEqual(&b.Admin) ||
-		!req.Auth.DeepEqual(&b.Auth) || len(req.Listeners) != len(b.Listeners) ||
+		len(req.Auths) != len(b.Auths) || len(req.Listeners) != len(b.Listeners) ||
 		len(req.Servers) != len(b.Servers) || len(req.Clusters) != len(b.Clusters) {
 		return false
 	}
@@ -112,6 +123,11 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 			return false
 		}
 	}
+	for i := range req.Auths {
+		if !req.Auths[i].DeepEqual(&b.Auths[i]) {
+			return false
+		}
+	}
 	return true
 }
 
@@ -120,8 +136,13 @@ func (req *StunnerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*StunnerConfig)
 	ret.ApiVersion = req.ApiVersion
 	req.Admin.DeepCopyInto(&ret.Admin)
-	req.Auth.DeepCopyInto(&ret.Auth)
-	ret.Listeners, ret.Servers, ret.Clusters = nil, nil, nil
+	ret.Listeners, ret.Servers, ret.Clusters, ret.Auths = nil, nil, nil, nil
+	if req.Auths != nil {
+		ret.Auths = make([]AuthConfig, len(req.Auths))
+		for i := range req.Auths {
+			req.Auths[i].DeepCopyInto(&ret.Auths[i])
+		}
+	}
 	if req.Listeners != nil {
 		ret.Listeners = make([]ListenerConfig, len(req.Listeners))
 		for i := range req.Listeners {
@@ -179,10 +200,24 @@ func (req *StunnerConfig) GetClusterConfig(name string) (ClusterConfig, error) {
 	return ClusterConfig{}, ErrNoSuchCluster
 }
 
+// GetAuthConfig finds an authentication policy by name.
+func (req *StunnerConfig) GetAuthConfig(name string) (AuthConfig, error) {
+	for _, a := range req.Auths {
+		if a.Name == name {
+			return a, nil
+		}
+	}
+	return AuthConfig{}, ErrNoSuchAuth
+}
+
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
+	as := []string{}
+	for _, a := range req.Auths {
+		as = append(as, a.String())
+	}
 	status := []string{fmt.Sprintf("version=%q", req.ApiVersion), req.Admin.String(),
-		req.Auth.String()}
+		fmt.Sprintf("auths=[%s]", strings.Join(as, ","))}
 	ls := []string{}
 	for _, l := range req.Listeners {
 		ls = append(ls, l.String())
@@ -217,16 +252,20 @@ func (req *StunnerConfig) Summary() string {
 		return "<none>"
 	}
 	status := fmt.Sprintf("Gateway: %s (loglevel: %q)\n", req.Admin.Name, req.Admin.LogLevel)
-	if t, err := NewAuthType(req.Auth.Type); err == nil {
+	for _, a := range req.Auths {
+		t, err := NewAuthType(a.Type)
+		if err != nil {
+			continue
+		}
 		switch t {
 		case AuthTypeStatic:
-			status += fmt.Sprintf("Authentication type: static, username/password: %s/%s\n",
-				req.Auth.Credentials["username"], req.Auth.Credentials["password"])
+			status += fmt.Sprintf("Authentication %s: static, username/password: %s/%s\n", a.Name,
+				a.Credentials["username"], a.Credentials["password"])
 		case AuthTypeEphemeral:
-			status += fmt.Sprintf("Authentication type: ephemeral, shared-secret: %s\n",
-				req.Auth.Credentials["secret"])
+			status += fmt.Sprintf("Authentication %s: ephemeral, shared-secret: %s\n", a.Name,
+				a.Credentials["secret"])
 		default:
-			status += "Authentication type: none\n"
+			status += fmt.Sprintf("Authentication %s: none\n", a.Name)
 		}
 	}
 
@@ -262,7 +301,7 @@ func (req *StunnerConfig) Summary() string {
 type StunnerStatus struct {
 	ApiVersion      string            `json:"version"`
 	Admin           *AdminStatus      `json:"admin"`
-	Auth            *AuthStatus       `json:"auth"`
+	Auths           []*AuthStatus     `json:"auths"`
 	Listeners       []*ListenerStatus `json:"listeners"`
 	Servers         []*ServerStatus   `json:"servers"`
 	Clusters        []*ClusterStatus  `json:"clusters"`
@@ -282,8 +321,12 @@ func (s *StunnerStatus) String() string {
 	for _, c := range s.Clusters {
 		cs = append(cs, c.String())
 	}
-	return fmt.Sprintf("%s/%s/listeners:[%s]/servers:[%s]/clusters:[%s]/allocs:%d/status=%s",
-		s.Admin.String(), s.Auth.String(), strings.Join(ls, ","), strings.Join(ss, ","),
+	as := []string{}
+	for _, a := range s.Auths {
+		as = append(as, a.String())
+	}
+	return fmt.Sprintf("%s/auths:[%s]/listeners:[%s]/servers:[%s]/clusters:[%s]/allocs:%d/status=%s",
+		s.Admin.String(), strings.Join(as, ","), strings.Join(ls, ","), strings.Join(ss, ","),
 		strings.Join(cs, ","), s.AllocationCount, s.Status)
 }
 
@@ -317,7 +360,11 @@ func (s *StunnerStatus) Summary() string {
 	for _, c := range s.Clusters {
 		cs = append(cs, c.String())
 	}
-	return fmt.Sprintf("%s\n\t%s\n\tlisteners:%s\n\tservers:%s\n\tclusters:%s\n\t"+
-		"allocs:%d/status=%s", s.Admin.String(), s.Auth.String(), strings.Join(ls, ","),
+	as := []string{}
+	for _, a := range s.Auths {
+		as = append(as, a.String())
+	}
+	return fmt.Sprintf("%s\n\tauths:%s\n\tlisteners:%s\n\tservers:%s\n\tclusters:%s\n\t"+
+		"allocs:%d/status=%s", s.Admin.String(), strings.Join(as, ","), strings.Join(ls, ","),
 		strings.Join(ss, ","), strings.Join(cs, ","), s.AllocationCount, s.Status)
 }

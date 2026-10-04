@@ -16,10 +16,10 @@ import (
 
 func TestNewConfig(t *testing.T) {
 	t.Run("static auth", func(t *testing.T) {
-		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
-			Auth: &stnrv2.AuthConfig{Type: "static", Realm: "example.org",
-				Credentials: map[string]string{"username": "user", "password": "pass"}}}
-		c, err := NewConfig(s)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478", Auth: "upstream"}
+		auth := &stnrv2.AuthConfig{Type: "static", Realm: "example.org",
+			Credentials: map[string]string{"username": "user", "password": "pass"}}
+		c, err := NewConfig(s, auth)
 		require.NoError(t, err)
 		assert.Equal(t, stnrv2.ProtocolTURNUDP, c.Protocol)
 		assert.Equal(t, "1.2.3.4:3478", c.ServerAddr)
@@ -31,7 +31,7 @@ func TestNewConfig(t *testing.T) {
 
 	t.Run("no auth block dials anonymously", func(t *testing.T) {
 		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478?transport=tcp"}
-		c, err := NewConfig(s)
+		c, err := NewConfig(s, nil)
 		require.NoError(t, err)
 		assert.Equal(t, stnrv2.ProtocolTURNTCP, c.Protocol)
 		assert.Empty(t, c.Username)
@@ -43,19 +43,18 @@ func TestNewConfig(t *testing.T) {
 		// a nil auth block and an explicit "none" must behave identically on the wire:
 		// no credentials either way (the realm seed is inert without credentials, no
 		// message integrity is ever computed from it)
-		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
-			Auth: &stnrv2.AuthConfig{Type: "none"}}
-		c, err := NewConfig(s)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478", Auth: "anonymous"}
+		c, err := NewConfig(s, &stnrv2.AuthConfig{Type: "none"})
 		require.NoError(t, err)
 		assert.Empty(t, c.Username)
 		assert.Empty(t, c.Password)
 	})
 
 	t.Run("ephemeral auth generates per-call credentials", func(t *testing.T) {
-		s := &stnrv2.TunnelConfig{URL: "turns:[2001:db8::1]:3478?transport=tcp",
-			Auth: &stnrv2.AuthConfig{Type: "ephemeral", Lifetime: "10m",
-				Credentials: map[string]string{"secret": "my-secret"}}}
-		c, err := NewConfig(s)
+		s := &stnrv2.TunnelConfig{URL: "turns:[2001:db8::1]:3478?transport=tcp", Auth: "upstream"}
+		auth := &stnrv2.AuthConfig{Type: "ephemeral", Lifetime: "10m",
+			Credentials: map[string]string{"secret": "my-secret"}}
+		c, err := NewConfig(s, auth)
 		require.NoError(t, err)
 		assert.Equal(t, stnrv2.ProtocolTURNTLS, c.Protocol)
 		assert.Equal(t, "[2001:db8::1]:3478", c.ServerAddr, "IPv6 host is bracketed")
@@ -66,21 +65,20 @@ func TestNewConfig(t *testing.T) {
 
 	t.Run("SNI overrides the server name", func(t *testing.T) {
 		s := &stnrv2.TunnelConfig{URL: "turns:1.2.3.4:5349?transport=tcp", SNI: "turn.example.com"}
-		c, err := NewConfig(s)
+		c, err := NewConfig(s, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "turn.example.com", c.ServerName, "SNI wins")
 		assert.Equal(t, "1.2.3.4:5349", c.ServerAddr, "dial address unchanged")
 	})
 
 	t.Run("broken auth config fails the dial early", func(t *testing.T) {
-		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478",
-			Auth: &stnrv2.AuthConfig{Type: "ephemeral"}}
-		_, err := NewConfig(s)
+		s := &stnrv2.TunnelConfig{URL: "turn:1.2.3.4:3478", Auth: "upstream"}
+		_, err := NewConfig(s, &stnrv2.AuthConfig{Type: "ephemeral"})
 		assert.Error(t, err)
 	})
 
 	t.Run("a non-TURN URL fails", func(t *testing.T) {
-		_, err := NewConfig(&stnrv2.TunnelConfig{URL: "udp://1.2.3.4:3478"})
+		_, err := NewConfig(&stnrv2.TunnelConfig{URL: "udp://1.2.3.4:3478"}, nil)
 		assert.Error(t, err)
 	})
 }

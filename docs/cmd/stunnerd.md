@@ -73,11 +73,12 @@ version: v2
 admin:
   name: my-stunnerd
   loglevel: all:DEBUG
-auth:
-  type: ephemeral
-  realm: "my-realm.example.com"
-  credentials:
-    secret: $STUNNER_SHARED_SECRET
+auths:
+  - name: default
+    type: ephemeral
+    realm: "my-realm.example.com"
+    credentials:
+      secret: $STUNNER_SHARED_SECRET
 listeners:
   - name: stunnerd-udp
     protocol: UDP
@@ -128,12 +129,12 @@ The positional argument count selects `stunnerd`'s mode: no arguments run the da
 stunnerd [options] <client-addr> <turn-server-addr> <peer-addr>
 ```
 
-where `client-addr` is `udp://<addr>:<port>`, `tcp://<addr>:<port>`, or `-` for a stdin/stdout tunnel; `turn-server-addr` is either a TURN URI (`turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls]`, the `<auth>` userinfo being a `username:password` pair for static authentication or a bare shared secret for ephemeral credentials) or the `k8s://<gateway-namespace>/<gateway-name>:<listener>` meta-URI that discovers the running config of a STUNner gateway listener from the cluster (kubeconfig flags apply); and `peer-addr` is `udp://<addr>:<port>`, `tcp://<addr>:<port>`, or the `k8s://<namespace>/<service>:<port-name-or-number>` meta-URI naming a Kubernetes Service port, resolved once at startup into the Service's cluster IP and port with the peer transport taken from the Service port spec.
+where `client-addr` is `udp://<addr>:<port>`, `tcp://<addr>:<port>`, or `-` for a stdin/stdout tunnel; `turn-server-addr` is a TURN URI (`turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls]`, the `<auth>` userinfo being a `username:password` pair for static authentication or a bare shared secret for ephemeral credentials); and `peer-addr` is `udp://<addr>:<port>` or `tcp://<addr>:<port>`, the transport the tunnel reaches the peer over (the address may be a domain name, resolved where the tunnel runs).
 
-The below opens a local UDP tunnel endpoint at port 5000 that relays through the `udp-listener` listener of the `udp-gateway` gateway in the `stunner` namespace to a media server service, without ever looking up the service's cluster IP by hand:
+The below opens a local UDP tunnel endpoint at port 5000 that relays through the TURN server at `1.2.3.4:3478` to a media server at `10.0.0.1:9000`:
 
 ```console
-stunnerd udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener k8s://media/media-server:rtp
+stunnerd udp://127.0.0.1:5000 turn://user:pass@1.2.3.4:3478 udp://10.0.0.1:9000
 ```
 
 The `--sni` and `--insecure` flags apply to the TLS/DTLS transports (note that `--insecure` has no `-i` shorthand, which belongs to `--id`). A tunnel is quiet by default (`all:WARN`) unless a log level is set. Internally, tunnel mode renders a `UDP`, `TCP` or `STDIN` listener feeding an `l4` server, a single cluster holding the peer and tunnelled through the TURN server, and runs the normal reconcile machinery on the result: there is no separate tunnel datapath. Logs go to stderr, so a stdin/stdout tunnel composes cleanly in shell pipelines; the process exits when the stdin flow ends.

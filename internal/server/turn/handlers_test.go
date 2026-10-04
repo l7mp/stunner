@@ -65,9 +65,12 @@ func TestAuthHandlerWithoutCredentials(t *testing.T) {
 		{Type: "ephemeral"},
 	} {
 		require.NoError(t, auth.Validate(), "missing credentials are no config error")
+		auth.Name = stnrv2.DefaultAuthName
 		rt := runtime.New(runtime.Config{Logger: log})
 		require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeAuth, conf: auth}, nil))
-		h := turn.NewAuthHandler(rt, log.NewLogger("auth"))
+		require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeServer,
+			conf: &stnrv2.ServerConfig{Name: "turn", Type: "TURN", Auth: auth.Name}}, nil))
+		h := turn.NewAuthHandler(rt, "turn", log.NewLogger("auth"))
 		require.NotNil(t, h, auth.Type)
 		for _, user := range []string{"", "user", "1700000000:user"} {
 			_, _, ok := h(&pion.RequestAttributes{Username: user, Realm: auth.Realm,

@@ -36,10 +36,11 @@ Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster
 export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.clusterIP}')
 ```
 
-Build [`stunnerd`](cmd/stunnerd.md), fire up a tunnel with a UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service through STUNner.
+Build [`stunnerd`](cmd/stunnerd.md), fire up a tunnel with a UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service through STUNner, using the public address of the Gateway and the TURN credentials of your installation.
 
 ```console
-./stunnerd --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener udp://${KUBE_DNS_IP}:53
+export STUNNER_IP=$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+./stunnerd --log=all:DEBUG udp://127.0.0.1:5000 turn://<username>:<password>@${STUNNER_IP}:3478 udp://${KUBE_DNS_IP}:53
 ```
 
 Now, in another terminal query the Kubernetes DNS service through the tunnel.

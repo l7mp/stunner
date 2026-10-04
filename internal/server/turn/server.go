@@ -50,14 +50,16 @@ func (s *Server) Name() string { return s.name }
 // Start builds the pion instance.
 func (s *Server) Start() error {
 	realm := stnrv2.DefaultRealm
-	if auth, ok := s.rt.GetConfig(objruntime.TypeAuth, "").(*stnrv2.AuthConfig); ok && auth != nil {
-		realm = auth.Realm
+	if conf := s.rt.ServerConfig(s.name); conf != nil {
+		if auth := s.rt.AuthConfig(conf.Auth); auth != nil {
+			realm = auth.Realm
+		}
 	}
 	// the handlers of a pion instance use its own conntrack: they outlive a restart
 	queue, ct := server.NewAcceptQueue(server.Backlog), server.NewConntrack(PreAllocationTimeout)
 	pion, err := turn.NewServer(turn.ServerConfig{
 		Realm:        realm,
-		AuthHandler:  NewAuthHandler(s.rt, s.log),
+		AuthHandler:  NewAuthHandler(s.rt, s.name, s.log),
 		EventHandler: s.eventHandler(ct),
 		QuotaHandler: s.quota.QuotaHandler(),
 		ListenerConfigs: []turn.ListenerConfig{{

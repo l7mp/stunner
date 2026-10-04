@@ -49,8 +49,8 @@ func udpEcho(t *testing.T) net.PacketConn {
 }
 
 // turnServer runs an upstream pion TURN server on loopback with static credentials user/pass and
-// returns the tunnel to it over UDP.
-func turnServer(t *testing.T) *stnrv2.TunnelConfig {
+// returns the tunnel to it over UDP, presenting the policy "upstream" it registers.
+func turnServer(t *testing.T, rt *runtime.Runtime) *stnrv2.TunnelConfig {
 	t.Helper()
 	pc, err := net.ListenPacket("udp4", "127.0.0.1:0") //nolint:noctx
 	require.NoError(t, err)
@@ -69,9 +69,11 @@ func turnServer(t *testing.T) *stnrv2.TunnelConfig {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = server.Close() })
+	auth := &stnrv2.AuthConfig{Name: "upstream", Type: "static", Realm: "example.org",
+		Credentials: map[string]string{"username": "user", "password": "pass"}}
+	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeAuth, conf: auth}, nil))
 	tunnel := &stnrv2.TunnelConfig{URL: "turn:" + pc.LocalAddr().String() + "?transport=udp",
-		Auth: &stnrv2.AuthConfig{Type: "static", Realm: "example.org",
-			Credentials: map[string]string{"username": "user", "password": "pass"}}}
+		Auth: auth.Name}
 	require.NoError(t, tunnel.Validate())
 	return tunnel
 }
@@ -87,12 +89,15 @@ func echo(t *testing.T, c net.Conn, msg string) {
 	assert.Equal(t, msg, string(buf[:n]))
 }
 
-// stubObject stands in for the cluster object in the registry: the dialer reads its config
-// from there.
-type stubObject struct{ conf *stnrv2.ClusterConfig }
+// stubObject stands in for a cluster or an auth object in the registry: the dialer reads their
+// configs from there.
+type stubObject struct {
+	typ  runtime.ObjectType
+	conf stnrv2.Config
+}
 
-func (o stubObject) Name() string                { return o.conf.Name }
-func (stubObject) Type() runtime.ObjectType      { return runtime.TypeCluster }
+func (o stubObject) Name() string                { return o.conf.ConfigName() }
+func (o stubObject) Type() runtime.ObjectType    { return o.typ }
 func (stubObject) Start() error                  { return nil }
 func (stubObject) Close(bool) error              { return nil }
 func (o stubObject) GetConfig() stnrv2.Config    { return o.conf }
@@ -105,7 +110,7 @@ func (stubObject) Inspect(_, _ stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.
 func newDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ClusterConfig) api.Dialer {
 	t.Helper()
 	require.NoError(t, conf.Validate())
-	require.NoError(t, rt.Registry.Add(stubObject{conf: conf}, nil))
+	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeCluster, conf: conf}, nil))
 	cl, err := New(conf, rt)
 	require.NoError(t, err)
 	require.NoError(t, cl.Start())
@@ -213,7 +218,7 @@ func TestTCPDialer(t *testing.T) {
 
 func TestTunnelDialer(t *testing.T) {
 	rt := newTestRuntime(t)
-	tunnel := turnServer(t)
+	tunnel := turnServer(t, rt)
 	cl := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "upstream", Protocol: "UDP", Tunnel: tunnel})
 	peer := udpEcho(t)
 

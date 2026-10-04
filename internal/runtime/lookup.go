@@ -9,7 +9,6 @@ import (
 var defaultSingletonNames = map[ObjectType]string{
 	TypeStunner: stnrv2.DefaultStunnerName,
 	TypeAdmin:   stnrv2.DefaultAdminName,
-	TypeAuth:    stnrv2.DefaultAuthName,
 	TypeHealth:  stnrv2.DefaultHealthName,
 	TypeMetrics: stnrv2.DefaultMetricsName,
 	TypeOffload: stnrv2.DefaultOffloadName,
@@ -149,4 +148,15 @@ func (rt *Runtime) reconcilable(objType ObjectType, name string) Reconcilable {
 		return nil
 	}
 	return r
+}
+
+// AuthConfig returns the live config of the authentication policy of a name, nil if there is none.
+func (rt *Runtime) AuthConfig(name string) *stnrv2.AuthConfig {
+	if name == "" {
+		return nil
+	}
+	if c, ok := rt.GetConfig(TypeAuth, name).(*stnrv2.AuthConfig); ok && c != nil {
+		return c
+	}
+	return nil
 }

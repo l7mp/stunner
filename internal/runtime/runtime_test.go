@@ -96,8 +96,8 @@ func TestLookupSkipsLifecycleOnly(t *testing.T) {
 	node := &fakeRunnable{name: "node-a", typ: lifecycleOnly}
 	require.NoError(t, rt.Registry.Add(node, nil))
 
-	gotAuth, ok := rt.GetConfig(runtime.TypeAuth, "").(*stnrv2.AuthConfig)
-	require.True(t, ok)
+	gotAuth := rt.AuthConfig(stnrv2.DefaultAuthName)
+	require.NotNil(t, gotAuth)
 	require.Equal(t, "example.org", gotAuth.Realm)
 
 	require.Nil(t, rt.GetConfig(lifecycleOnly, "node-a"))

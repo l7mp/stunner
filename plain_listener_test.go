@@ -26,10 +26,10 @@ func plainListenerConfig(proto, host string, port int, endpoints ...string) *stn
 			LogLevel:            stunnerTestLoglevel,
 			HealthCheckEndpoint: &noHealthCheck,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:        "static",
 			Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "plain",
 			Protocol: proto,
@@ -375,7 +375,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
 				ApiVersion: stnrv2.ApiVersion,
 				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
-				Auth:       upstreamAuth,
+				Auths:      []stnrv2.AuthConfig{upstreamAuth},
 				Listeners: []stnrv2.ListenerConfig{{
 					Name: "upstream", Protocol: tc.upstreamProto, Servers: []string{"upstream"},
 					Addr: tn.host, Port: 23479,
@@ -391,7 +391,8 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
 				ApiVersion: stnrv2.ApiVersion,
 				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
-				Auth:       stnrv2.AuthConfig{Type: "none"},
+				Auths: []stnrv2.AuthConfig{{Type: "none"},
+					{Name: "upstream", Type: serverAuth.Type, Credentials: serverAuth.Credentials}},
 				Listeners: []stnrv2.ListenerConfig{{
 					Name: "downstream", Protocol: tc.clientProto, Servers: []string{"downstream"},
 					Addr: tn.host, Port: 23478,
@@ -404,7 +405,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 					Endpoints:     []string{peerAddr},
 					RoutingPolicy: "ROUND_ROBIN",
 					Protocol:      peerProto,
-					Tunnel:        &stnrv2.TunnelConfig{URL: tunnelURL, Auth: &serverAuth},
+					Tunnel:        &stnrv2.TunnelConfig{URL: tunnelURL, Auth: "upstream"},
 				}},
 			}), "downstream server started")
 

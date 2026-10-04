@@ -20,12 +20,12 @@ const v1Conf = `{"version":"v1","admin":{"name":"ns/gw1"},"auth":{"type":"static
 const v2Conf = `version: v2
 admin:
   name: ns/gw2
-auth:
-  type: static
-  realm: stunner.l7mp.io
-  credentials:
-    username: user
-    password: pass
+auths:
+  - type: static
+    realm: stunner.l7mp.io
+    credentials:
+      username: user
+      password: pass
 listeners:
   - name: ns/gw2/tcp
     protocol: TCP
@@ -74,8 +74,8 @@ func TestParseRaw(t *testing.T) {
 		assert.True(t, c.DeepEqual(&stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{Name: "ns/gw2"},
-			Auth: stnrv2.AuthConfig{Type: "static", Realm: "stunner.l7mp.io",
-				Credentials: map[string]string{"username": "user", "password": "pass"}},
+			Auths: []stnrv2.AuthConfig{{Type: "static", Realm: "stunner.l7mp.io",
+				Credentials: map[string]string{"username": "user", "password": "pass"}}},
 			Listeners: []stnrv2.ListenerConfig{{Name: "ns/gw2/tcp", Protocol: "TCP",
 				Servers: []string{"ns/gw2/tcp"}, Addr: "1.2.3.5", Port: 3478}},
 			Servers: []stnrv2.ServerConfig{{Name: "ns/gw2/tcp", Type: "turn",

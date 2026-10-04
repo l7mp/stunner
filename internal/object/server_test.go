@@ -16,21 +16,41 @@ import (
 )
 
 func TestServerObjectSemantics(t *testing.T) {
-	otherRealm := &stnrv2.StunnerConfig{Auth: stnrv2.AuthConfig{
+	otherRealm := &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{{
+		Name:        stnrv2.DefaultAuthName,
 		Type:        stnrv2.AuthTypeStatic.String(),
 		Realm:       "example.org",
 		Credentials: map[string]string{"username": "user", "password": "pass"},
-	}}
+	}}}
 
 	for _, tc := range []struct {
 		typ, otherType stnrv2.ServerType
 		// realmChange is the action a realm change alone takes: a TURN server bakes the
-		// realm into its instance, an L4 server has no realm
-		realmChange runtime.Action
+		// realm into its instance, an L4 server has no realm; noneChange is the action of a
+		// policy turning type none: a TURN server rebuilds as a pure STUN server
+		realmChange, noneChange runtime.Action
+		// otherRealmSwitch is the action of a switch to a policy of another realm
+		otherRealmSwitch runtime.Action
 	}{
-		{typ: stnrv2.ServerTypeTURN, otherType: stnrv2.ServerTypeL4, realmChange: runtime.ActionRestart},
-		{typ: stnrv2.ServerTypeL4, otherType: stnrv2.ServerTypeTURN, realmChange: runtime.ActionNone},
+		{typ: stnrv2.ServerTypeTURN, otherType: stnrv2.ServerTypeL4, realmChange: runtime.ActionRestart,
+			noneChange: runtime.ActionRestart, otherRealmSwitch: runtime.ActionRestart},
+		{typ: stnrv2.ServerTypeL4, otherType: stnrv2.ServerTypeTURN, realmChange: runtime.ActionNone,
+			noneChange: runtime.ActionNone, otherRealmSwitch: runtime.ActionReconcile},
 	} {
+		// policy is the full config with the default policy of a type, in the realm of the base
+		policy := func(typ string, creds map[string]string) *stnrv2.StunnerConfig {
+			return &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{{Name: stnrv2.DefaultAuthName,
+				Type: typ, Realm: stnrv2.DefaultRealm, Credentials: creds}}}
+		}
+		// named is the full config with a static policy of a name and a realm
+		named := func(name, realm string) *stnrv2.StunnerConfig {
+			return &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{{Name: name, Type: "static",
+				Realm: realm, Credentials: map[string]string{"username": "u", "password": "p"}}}}
+		}
+		withAuth := func(c *stnrv2.ServerConfig, auth string) *stnrv2.ServerConfig {
+			c.Auth = auth
+			return c
+		}
 		server := func(typ stnrv2.ServerType, clusters ...string) *stnrv2.ServerConfig {
 			c := &stnrv2.ServerConfig{Name: "server-a", Type: typ.String(), Clusters: clusters}
 			require.NoError(t, c.Validate())
@@ -46,13 +66,23 @@ func TestServerObjectSemantics(t *testing.T) {
 				obj, err := object.NewServer(base, env.rt)
 				require.NoError(t, err)
 				env.start(t, obj, nil)
-				return obj, base, &stnrv2.StunnerConfig{Auth: *staticAuthConfig()}
+				return obj, base, &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{*staticAuthConfig()}}
 			},
 			expectations: []inspectExpectation{
 				{name: "unchanged-none", conf: server(tc.typ, "cluster-a"), want: runtime.ActionNone},
 				{name: "clusters-change-reconcile", conf: server(tc.typ, "cluster-a", "cluster-b"), want: runtime.ActionReconcile},
 				{name: "type-change-restart", conf: server(tc.otherType, "cluster-a"), want: runtime.ActionRestart},
 				{name: "realm-change", conf: server(tc.typ, "cluster-a"), full: otherRealm, want: tc.realmChange},
+				{name: "policy-turns-none", conf: server(tc.typ, "cluster-a"), full: policy("none", nil),
+					want: tc.noneChange},
+				{name: "policy-turns-ephemeral-live", conf: server(tc.typ, "cluster-a"),
+					full: policy("ephemeral", map[string]string{"secret": "s"}), want: runtime.ActionNone},
+				{name: "policy-missing-not-none", conf: server(tc.typ, "cluster-a"),
+					full: &stnrv2.StunnerConfig{}, want: runtime.ActionNone},
+				{name: "switch-to-equivalent-policy-live", conf: withAuth(server(tc.typ, "cluster-a"), "other"),
+					full: named("other", stnrv2.DefaultRealm), want: runtime.ActionReconcile},
+				{name: "switch-to-policy-of-other-realm", conf: withAuth(server(tc.typ, "cluster-a"), "other"),
+					full: named("other", "other.example.org"), want: tc.otherRealmSwitch},
 			},
 		})
 	}

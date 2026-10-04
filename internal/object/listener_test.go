@@ -38,7 +38,7 @@ func TestListenerObjectSemantics(t *testing.T) {
 			base := listener(func(*stnrv2.ListenerConfig) {})
 			obj, err := object.NewListener(base, env.rt)
 			require.NoError(t, err)
-			return obj, base, &stnrv2.StunnerConfig{Auth: *staticAuthConfig()}
+			return obj, base, &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{*staticAuthConfig()}}
 		},
 		expectations: []inspectExpectation{
 			{
@@ -81,11 +81,11 @@ func TestListenerObjectSemantics(t *testing.T) {
 				// the realm lives on the TURN server, not on the listener feeding it
 				name: "auth-realm-change-none",
 				conf: listener(func(*stnrv2.ListenerConfig) {}),
-				full: &stnrv2.StunnerConfig{Auth: stnrv2.AuthConfig{
+				full: &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{{
 					Type:        stnrv2.AuthTypeStatic.String(),
 					Realm:       "example.org",
 					Credentials: map[string]string{"username": "user", "password": "pass"},
-				}},
+				}}},
 				want: runtime.ActionNone,
 			},
 		},
@@ -121,7 +121,7 @@ func TestListenerTLSObjectSemantics(t *testing.T) {
 			base := listener(func(*stnrv2.ListenerConfig) {})
 			obj, err := object.NewListener(base, env.rt)
 			require.NoError(t, err)
-			return obj, base, &stnrv2.StunnerConfig{Auth: *staticAuthConfig()}
+			return obj, base, &stnrv2.StunnerConfig{Auths: []stnrv2.AuthConfig{*staticAuthConfig()}}
 		},
 		expectations: []inspectExpectation{
 			{

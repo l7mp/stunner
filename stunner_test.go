@@ -470,13 +470,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "UDP",
@@ -507,12 +507,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "udp",
 				Protocol:   "UDP",
@@ -543,13 +543,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "TCP",
@@ -580,12 +580,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "TCP",
@@ -616,13 +616,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "TCP",
@@ -653,12 +653,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tcp",
 				Protocol:   "TCP",
@@ -690,13 +690,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tls",
 				Protocol:   "TLS",
@@ -729,13 +729,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tls",
 				Protocol:   "TLS",
@@ -768,12 +768,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "ephemeral",
 				Credentials: map[string]string{
 					"secret": "my-secret",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "tls",
 				Protocol:   "TLS",
@@ -806,13 +806,13 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:       "dtls",
 				Protocol:   "DTLS",
@@ -843,10 +843,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// IPv6 udp, static: IPv6 listener -> IPv6 relay -> IPv6 peer
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -873,10 +873,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// IPv6 tcp, static
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "tcp",
 				Protocol: "TCP",
@@ -903,10 +903,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// IPv6 TCP listener, TCP cluster (RFC 6062), static
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "tcp",
 				Protocol: "TCP",
@@ -933,10 +933,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// IPv6 tls, static
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "tls",
 				Protocol: "TLS",
@@ -965,10 +965,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// IPv6 dtls, static
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "dtls",
 				Protocol: "DTLS",
@@ -999,10 +999,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 			// even though the cluster admits the peer.
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type:        "static",
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1065,7 +1065,7 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 
 	for _, test := range tests {
 		c := *test.config.DeepCopy()
-		auth := c.Auth.Type
+		auth := c.Auths[0].Type
 		proto := c.Listeners[0].Protocol
 		clusterProto := c.Clusters[0].Protocol
 		if clusterProto == "" {
@@ -1265,13 +1265,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1302,13 +1302,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1338,13 +1338,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1375,13 +1375,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1412,13 +1412,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1455,13 +1455,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1498,13 +1498,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1535,13 +1535,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1572,13 +1572,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1609,13 +1609,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1646,13 +1646,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1683,13 +1683,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1758,7 +1758,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
-			auth := c.config.Auth.Type
+			auth := c.config.Auths[0].Type
 			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			log.Debug("creating a client")
@@ -1788,13 +1788,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1856,13 +1856,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1930,13 +1930,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -1998,13 +1998,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -2066,13 +2066,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -2140,13 +2140,13 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
-			Auth: stnrv2.AuthConfig{
+			Auths: []stnrv2.AuthConfig{{
 				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
 				},
-			},
+			}},
 			Listeners: []stnrv2.ListenerConfig{{
 				Name:     "udp",
 				Protocol: "UDP",
@@ -2216,7 +2216,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			log.Debug("starting stunnerd")
 			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
 
-			auth := c.config.Auth.Type
+			auth := c.config.Auths[0].Type
 			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
 
 			log.Debug("creating a client")
@@ -2486,12 +2486,12 @@ func TestStunnerLifecycle(t *testing.T) {
 	conf := stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Credentials: map[string]string{
 				"username": "user-1",
 				"password": "pass-1",
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{},
 		Servers:   []stnrv2.ServerConfig{},
 		Clusters:  []stnrv2.ClusterConfig{},
@@ -2657,12 +2657,12 @@ func TestStunnerMetrics(t *testing.T) {
 	conf := stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Credentials: map[string]string{
 				"username": "user-1",
 				"password": "pass-1",
 			},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{},
 		Servers:   []stnrv2.ServerConfig{},
 		Clusters:  []stnrv2.ClusterConfig{},

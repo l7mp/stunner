@@ -80,10 +80,10 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			LogLevel:            stunnerTestLoglevel,
 			HealthCheckEndpoint: &noHealthCheck,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:        "static",
 			Credentials: map[string]string{"username": "user2", "password": "passwd2"},
-		},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "upstream",
 			Protocol: upstreamProto,
@@ -116,10 +116,14 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			LogLevel:            stunnerTestLoglevel,
 			HealthCheckEndpoint: &noHealthCheck,
 		},
-		Auth: stnrv2.AuthConfig{
+		Auths: []stnrv2.AuthConfig{{
 			Type:        "static",
 			Credentials: map[string]string{"username": "user1", "password": "passwd1"},
-		},
+		}, {
+			Name:        "upstream",
+			Type:        "static",
+			Credentials: map[string]string{"username": "user2", "password": "passwd2"},
+		}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "downstream",
 			Protocol: "UDP",
@@ -137,9 +141,8 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Endpoints: []string{"0.0.0.0/0", "::/0"},
 			Protocol:  "UDP",
 			Tunnel: &stnrv2.TunnelConfig{
-				URL: "turn:" + net.JoinHostPort(tn.host, "23479") + "?transport=" + strings.ToLower(upstreamProto),
-				Auth: &stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{
-					"username": "user2", "password": "passwd2"}},
+				URL:  "turn:" + net.JoinHostPort(tn.host, "23479") + "?transport=" + strings.ToLower(upstreamProto),
+				Auth: "upstream",
 			},
 		}},
 	}), "downstream server started")
@@ -170,7 +173,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 	require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
-		Auth:       stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{"username": "user2", "password": "passwd2"}},
+		Auths:      []stnrv2.AuthConfig{{Type: "static", Credentials: map[string]string{"username": "user2", "password": "passwd2"}}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name: "upstream", Protocol: "TCP", Servers: []string{"upstream"}, Addr: "127.0.0.1", Port: 23479,
 		}},
@@ -192,7 +195,8 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 	require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
-		Auth:       stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{"username": "user1", "password": "passwd1"}},
+		Auths: []stnrv2.AuthConfig{{Type: "static", Credentials: map[string]string{"username": "user1", "password": "passwd1"}},
+			{Name: "upstream", Type: "static", Credentials: map[string]string{"username": "user2", "password": "passwd2"}}},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name: "downstream", Protocol: "TCP", Servers: []string{"downstream"}, Addr: "127.0.0.1", Port: 23478,
 		}},
@@ -203,7 +207,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 			Name:      "turn-relay",
 			Endpoints: []string{"0.0.0.0/0", "::/0"},
 			Protocol:  "TCP",
-			Tunnel:    &stnrv2.TunnelConfig{URL: "turn:127.0.0.1:23479?transport=tcp", Auth: &stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{"username": "user2", "password": "passwd2"}}},
+			Tunnel:    &stnrv2.TunnelConfig{URL: "turn:127.0.0.1:23479?transport=tcp", Auth: "upstream"},
 		}},
 	}), "downstream server started")
 	defer closeStunner(downstream)

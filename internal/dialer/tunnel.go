@@ -5,12 +5,19 @@ import (
 	"fmt"
 	"net"
 
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/utils/turnclient"
 )
 
-// client returns a TURN client of the tunnel, with fresh per-allocation credentials.
+// client returns a TURN client of the tunnel, with fresh per-allocation credentials of the live
+// authentication policy the tunnel names.
 func (b *base) client() (turnclient.Dialer, error) {
-	conf, err := turnclient.NewConfig(b.tunnel)
+	auth := b.rt.AuthConfig(b.tunnel.Auth)
+	if b.tunnel.Auth != "" && auth == nil {
+		return turnclient.Dialer{}, fmt.Errorf("tunnel of cluster %q: %w %q", b.name,
+			stnrv2.ErrNoSuchAuth, b.tunnel.Auth)
+	}
+	conf, err := turnclient.NewConfig(b.tunnel, auth)
 	if err != nil {
 		return turnclient.Dialer{}, err
 	}
