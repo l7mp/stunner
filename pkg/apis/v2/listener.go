@@ -40,6 +40,8 @@ type ListenerConfig struct {
 	// PQCMode is the post-quantum key exchange policy of a TLS listener: "default",
 	// "preferred" or "enforced".
 	PQCMode string `json:"pqc_mode,omitempty"`
+	// Filters name the filters checking a client's source before a conn is made for it.
+	Filters []string `json:"filters,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -83,6 +85,10 @@ func (req *ListenerConfig) Validate() error {
 		req.Servers = []string{}
 	}
 
+	if req.Filters == nil {
+		req.Filters = []string{}
+	}
+
 	return nil
 }
 
@@ -110,6 +116,7 @@ func (req *ListenerConfig) DeepCopyInto(dst Config) {
 	*ret = *req
 	ret.Servers = slices.Clone(req.Servers)
 	ret.PublicAddrs = slices.Clone(req.PublicAddrs)
+	ret.Filters = slices.Clone(req.Filters)
 }
 
 // String stringifies the configuration.
@@ -148,6 +155,9 @@ func (req *ListenerConfig) String() string {
 	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
 	if req.PQCMode != "" {
 		status = append(status, fmt.Sprintf("pqc=%s", req.PQCMode))
+	}
+	if len(req.Filters) > 0 {
+		status = append(status, fmt.Sprintf("filters=[%s]", strings.Join(req.Filters, ",")))
 	}
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))

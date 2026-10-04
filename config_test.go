@@ -546,9 +546,8 @@ func TestStunnerConfigPatcher(t *testing.T) {
 					Clusters: []string{"allow-any"},
 				}},
 				Clusters: []stnrv2.ClusterConfig{{
-					Name:      "allow-any",
-					Endpoints: []string{"0.0.0.0/0"},
-					Protocol:  "UDP",
+					Name:     "allow-any",
+					Protocol: "UDP",
 				}},
 			}
 			testCase.prep(config, t)
@@ -621,7 +620,7 @@ func checkDefaultConfig(t *testing.T, c *stnrv2.StunnerConfig, proto string) {
 	assert.Equal(t, []string{"allow-any"}, c.Servers[0].Clusters, "server clusters")
 	assert.Len(t, c.Clusters, 1, "clusters len")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
-	assert.Equal(t, []string{"0.0.0.0/0", "::/0"}, c.Clusters[0].Endpoints, "cluster endpoints")
+	assert.Empty(t, c.Clusters[0].Endpoints, "the cluster routes every peer")
 	assert.Equal(t, "UDP", c.Clusters[0].Protocol, "cluster proto")
 	assert.Equal(t, []string{"1.2.3.4"}, c.Clusters[0].Addrs, "cluster addresses")
 }

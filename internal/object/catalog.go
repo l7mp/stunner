@@ -16,6 +16,7 @@ type Catalog = reconciler.Catalog
 //	Stunner (root, singleton)
 //	+-- Admin -- Health / Metrics / Offload    (singletons)
 //	+-- Auth [N from config]
+//	+-- Filter [N from config]
 //	+-- Cluster [N from config]
 //	+-- Server [N from config]
 //	+-- Listener [N from config]
@@ -36,6 +37,7 @@ func NewCatalog() *Catalog {
 		Children: []runtime.ObjectType{
 			runtime.TypeAdmin,
 			runtime.TypeAuth,
+			runtime.TypeFilter,
 			runtime.TypeCluster,
 			runtime.TypeServer,
 			runtime.TypeListener,
@@ -124,6 +126,21 @@ func NewCatalog() *Catalog {
 		},
 		Singleton:     true,
 		SingletonName: func(_ string) string { return stnrv2.DefaultOffloadName },
+	})
+
+	register(KindSpec{
+		Type: runtime.TypeFilter,
+		New: func(_ runtime.Runnable, conf stnrv2.Config, _ *runtime.Runtime) (runtime.Runnable, error) {
+			return NewFilter(conf)
+		},
+		ExtractConfigs: func(_ string, full *stnrv2.StunnerConfig) ([]stnrv2.Config, error) {
+			out := make([]stnrv2.Config, len(full.Filters))
+			for i := range full.Filters {
+				fc := full.Filters[i]
+				out[i] = &fc
+			}
+			return out, nil
+		},
 	})
 
 	register(KindSpec{

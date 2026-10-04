@@ -492,10 +492,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=udp",
@@ -528,10 +527,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=udp",
@@ -565,10 +563,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=tcp",
@@ -601,10 +598,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=tcp",
@@ -638,10 +634,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "TCP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "TCP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=tcp",
@@ -674,10 +669,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "TCP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "TCP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=tcp",
@@ -714,10 +708,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "TCP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "TCP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turns:1.2.3.4:3478?transport=tcp",
@@ -753,10 +746,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turns:1.2.3.4:3478?transport=tcp",
@@ -791,10 +783,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turns:1.2.3.4:3478?transport=tcp",
@@ -830,10 +821,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turns:1.2.3.4:3478?transport=udp",
@@ -860,10 +850,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri: "turn:[::1]:23478?transport=udp",
@@ -890,10 +879,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri: "turn:[::1]:23478?transport=tcp",
@@ -920,10 +908,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "TCP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "TCP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri: "turn:[::1]:23478?transport=tcp",
@@ -952,10 +939,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri: "turns:[::1]:23478?transport=tcp",
@@ -984,10 +970,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri: "turns:[::1]:23478?transport=udp",
@@ -1016,10 +1001,9 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0", "::/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"::1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"::1"},
 			}},
 		},
 		uri:            "turn:[::1]:23478?transport=udp",
@@ -1369,7 +1353,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 		result:         true,
 	},
 	{
-		testName: "static endpoint with wrong peer addr: fail",
+		testName: "static endpoint with a peer the server filter denies: fail",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -1390,9 +1374,10 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				Name:              "udp",
+				Type:              "turn",
+				Clusters:          []string{"echo-server-cluster"},
+				PermissionFilters: []string{"peers"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -1401,6 +1386,10 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
 			}},
+			Filters: []stnrv2.FilterConfig{{Name: "peers", Rules: []stnrv2.FilterRule{
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.6/32"}},
+				{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}},
+			}}},
 		},
 		echoServerAddr: "1.2.3.5:6678",
 		result:         false,
@@ -1449,7 +1438,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 		result:         true,
 	},
 	{
-		testName: "static endpoint with multiple clusters and wrong peer addr fail",
+		testName: "static endpoint with multiple clusters and a peer the server filter denies fail",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -1470,9 +1459,10 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"dummy_cluster", "echo-server-cluster"},
+				Name:              "udp",
+				Type:              "turn",
+				Clusters:          []string{"dummy_cluster", "echo-server-cluster"},
+				PermissionFilters: []string{"peers"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -1487,6 +1477,11 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
 			}},
+			Filters: []stnrv2.FilterConfig{{Name: "peers", Rules: []stnrv2.FilterRule{
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.6/32"}},
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "9.8.7.6/32"}},
+				{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}},
+			}}},
 		},
 		echoServerAddr: "1.2.3.5:6678",
 		result:         false,
@@ -1529,7 +1524,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 		result:         true,
 	},
 	{
-		testName: "static endpoint with multiple ips with wrong peer addr fail",
+		testName: "static endpoint with multiple ips with a peer the server filter denies fail",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -1550,9 +1545,10 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				Name:              "udp",
+				Type:              "turn",
+				Clusters:          []string{"echo-server-cluster"},
+				PermissionFilters: []string{"peers"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -1561,6 +1557,13 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
 			}},
+			Filters: []stnrv2.FilterConfig{{Name: "peers", Rules: []stnrv2.FilterRule{
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.1/32"}},
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.2/32"}},
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.3/32"}},
+				{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.6/32"}},
+				{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}},
+			}}},
 		},
 		echoServerAddr: "1.2.3.5:6678",
 		result:         false,
@@ -1602,43 +1605,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 		echoServerAddr: "1.2.3.5:6678",
 		result:         true,
 	},
-	{
-		testName: "strict_dns cluster and wrong peer addr fail",
-		config: stnrv2.StunnerConfig{
-			ApiVersion: stnrv2.ApiVersion,
-			Admin: stnrv2.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auths: []stnrv2.AuthConfig{{
-				Type: "static",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			}},
-			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "UDP",
-				Servers:  []string{"udp"},
-				Addr:     "1.2.3.4",
-				Port:     3478,
-			}},
-			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
-			}},
-			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "echo-server-cluster",
-				Type:      "STRICT_DNS",
-				Endpoints: []string{"echo-server.l7mp.io"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
-			}},
-		},
-		echoServerAddr: "1.2.3.10:6678",
-		result:         false,
-	},
+
 	{
 		testName: "strict_dns cluster with multiple domains ok",
 		config: stnrv2.StunnerConfig{
@@ -1782,7 +1749,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 // *****************
 var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 	{
-		testName: "static endpoint with peer address in the admitted port range ok",
+		testName: "static endpoint with peer address in the port range a filter admits ok",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -1810,9 +1777,15 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
 				Type:      "STATIC",
-				Endpoints: []string{"1.2.3.5:6670-6680"},
+				Endpoints: []string{"1.2.3.5"},
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
+				Filters:   []string{"echo-ports"},
+			}},
+			Filters: []stnrv2.FilterConfig{{
+				Name: "echo-ports",
+				Rules: []stnrv2.FilterRule{{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.5"},
+					Ports: []stnrv2.FilterPort{{Port: 6670, EndPort: 6680}}}},
 			}},
 		},
 		echoServerAddr: "1.2.3.5:6678",
@@ -1885,74 +1858,6 @@ var testPortRangeConfigsWithVNet = []StunnerTestClusterConfig{
 				Name:      "echo-server-cluster",
 				Type:      "STATIC",
 				Endpoints: []string{"1.2.3.5:6678"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
-			}},
-		},
-		echoServerAddr: "1.2.3.5:6678",
-		result:         true,
-		tester: func(h *telemetrytester.Tester) {
-			// stunner_listener_connections_total
-			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections_total")) // name: udp
-			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
-			assert.Equal(h, 1, h.CollectAndGetInt("stunner_listener_connections_total", "name", "udp"))
-
-			// stunner_listener_connections
-			assert.Equal(h, 1, h.CollectAndCount("stunner_listener_connections")) // name: udp
-			// the client conn is counted while it lives and is gone once the test has closed it
-			assert.Equal(h, 0, h.CollectAndGetInt("stunner_listener_connections", "name", "udp"))
-
-			// stunner_listener_packets_total
-			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_packets_total"))
-			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "rx"), 200)
-			assert.Greater(h, h.CollectAndGetInt("stunner_listener_packets_total", "name", "udp", "direction", "tx"), 200)
-
-			// stunner_listener_bytes_total
-			assert.Equal(h, 2, h.CollectAndCount("stunner_listener_bytes_total"))
-			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "rx"), 2000)
-			assert.Greater(h, h.CollectAndGetInt("stunner_listener_bytes_total", "name", "udp", "direction", "tx"), 2000)
-
-			// stunner_cluster_packets_total
-			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_packets_total"))
-			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "rx"), 200)
-			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_packets_total", "name", "echo-server-cluster", "direction", "tx"), 200)
-
-			// stunner_cluster_bytes_total
-			assert.Equal(h, 2, h.CollectAndCount("stunner_cluster_bytes_total"))
-			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "rx"), 2000)
-			assert.Greater(h, h.CollectAndGetInt("stunner_cluster_bytes_total", "name", "echo-server-cluster", "direction", "tx"), 2000)
-		},
-	},
-	{
-		testName: "static endpoint with peer address outside the port range ok: ports are not enforced",
-		config: stnrv2.StunnerConfig{
-			ApiVersion: stnrv2.ApiVersion,
-			Admin: stnrv2.AdminConfig{
-				LogLevel: stunnerTestLoglevel,
-			},
-			Auths: []stnrv2.AuthConfig{{
-				Type: "static",
-				Credentials: map[string]string{
-					"username": "user1",
-					"password": "passwd1",
-				},
-			}},
-			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "UDP",
-				Servers:  []string{"udp"},
-				Addr:     "1.2.3.4",
-				Port:     3478,
-			}},
-			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
-			}},
-			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "echo-server-cluster",
-				Type:      "STATIC",
-				Endpoints: []string{"1.2.3.5:1-6677"},
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
 			}},

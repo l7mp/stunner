@@ -109,15 +109,9 @@ servers:
 clusters:
   - name: open-udp
     protocol: UDP
-    endpoints:
-      - "0.0.0.0/0"
-      - "::/0"
     addresses: ["$STUNNER_ADDR"]
   - name: open-tcp
     protocol: TCP
-    endpoints:
-      - "0.0.0.0/0"
-      - "::/0"
     addresses: ["$STUNNER_ADDR"]
 ```
 

@@ -97,7 +97,7 @@ Note that STUNner can also be deployed as a STUN server without enabling the TUR
 
 ### Plain listeners
 
-A listener feeding an `l4` server (plain listeners, used by the [tunnel mode](cmd/stunnerd.md#tunnel-mode)) relays raw client flows to its preconfigured peer with *no authentication whatsoever*: raw flows carry no credentials, so anyone who can reach the listener socket can relay traffic to the peer. An open plain listener is therefore unauthenticated open ingress to the pinned peer, limited only to the endpoints of the server's clusters, with no per-user quota and no rate limiting. This is why the Kubernetes gateway operator never renders plain listeners: they are meant for static dataplane configs and the tunnel CLI, where opening one is a deliberate act. Keep plain listeners on loopback or otherwise firewalled addresses unless the peer service is meant to be publicly reachable.
+A listener feeding an `L4` server (plain listeners, used by the [tunnel mode](cmd/stunnerd.md#tunnel-mode)) relays raw client flows to its preconfigured peer with *no authentication whatsoever*: raw flows carry no credentials, so anyone who can reach the listener socket can relay traffic to the peer. An open plain listener is therefore unauthenticated open ingress to the pinned peer, limited only to the endpoints of the server's clusters, with no per-user quota and no rate limiting. This is why the Kubernetes gateway operator never renders plain listeners: they are meant for static dataplane configs and the tunnel CLI, where opening one is a deliberate act. Keep plain listeners on loopback or otherwise firewalled addresses unless the peer service is meant to be publicly reachable.
 
 ## Access control
 
@@ -118,7 +118,7 @@ spec:
           namespace: media-plane
 ```
 
-STUNner admits backends by IP address and does not enforce the `port` and `endPort` of a backend reference: a client allowed to reach a backend can reach every port on it. To restrict the ports, use a NetworkPolicy as below.
+STUNner admits a backend by IP address and enforces the `port` and `endPort` of a backend reference: a client allowed to reach a backend reaches only those ports of it (see [Filters](#filters) below). For a second line of defense, use a NetworkPolicy as below.
 
 For hardened deployments, it is possible to add a second level of isolation between STUNner and the rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will essentially implement a firewall, blocking all access from the source to the target workload except the services explicitly whitelisted by the user. The below example allows access from STUNner to *any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port range `[10000:20000]`, but nothing else.
 
@@ -150,6 +150,12 @@ spec:
 ```
 
 Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/network-policy) before exposing STUNner publicly; e.g., the [tunnel mode of `stunnerd`](cmd/stunnerd.md#tunnel-mode) can be used conveniently for this [purpose](examples/simple-tunnel/README.md).
+
+### Filters
+
+Inside `stunnerd`, access control is done by filters: named, ordered lists of `ALLOW` and `DENY` rules on address blocks and ports, where the first matching rule decides. A listener's filters admit clients by their source address. A TURN server's permission filters admit the peer of every permission by IP address. A cluster's filters admit its peers by address and port. The gateway operator renders the filters from the routes: every TURN server gets a filter allowing the backends of its routes and denying everything else, and the ports of the backend references become cluster filters. See the [`stunnerd` configuration](cmd/stunnerd.md#configuration) for the syntax.
+
+Updates to filter rules affect new connections only.
 
 ## Exposing internal IP addresses
 

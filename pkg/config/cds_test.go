@@ -1203,7 +1203,7 @@ func TestServerUpdate(t *testing.T) {
 
 	// add another config
 	tcpC := &stnrv2.StunnerConfig{}
-	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/tcp-gateway","loglevel":"all:INFO"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name":"stunner/tcp-gateway/tcp-listener","protocol":"TCP","port":3478,"servers":["stunner/tcp-gateway/tcp-listener"]}],"servers":[{"name":"stunner/tcp-gateway/tcp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane","type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`), tcpC)
+	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/tcp-gateway","loglevel":"all:INFO"},"auths":[{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}}],"listeners":[{"name":"stunner/tcp-gateway/tcp-listener","protocol":"TCP","port":3478,"servers":["stunner/tcp-gateway/tcp-listener"]}],"servers":[{"name":"stunner/tcp-gateway/tcp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane","type":"STATIC","protocol":"UDP"}]}`), tcpC)
 	assert.NoError(t, tcpC.Validate(), "validate")
 	assert.NoError(t, err, "parse")
 
@@ -1228,7 +1228,7 @@ func TestServerUpdate(t *testing.T) {
 
 	// add a cluster
 	newC := &stnrv2.StunnerConfig{}
-	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/udp-gateway","loglevel":"all:INFO"},"auth":{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}},"listeners":[{"name":"stunner/udp-gateway/udp-listener","protocol":"UDP","port":3478,"servers":["stunner/udp-gateway/udp-listener"]}],"servers":[{"name":"stunner/udp-gateway/udp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane","type":"STATIC","protocol":"UDP","endpoints":["0.0.0.0/0"]}]}`), newC)
+	err = json.Unmarshal([]byte(`{"version":"v2","admin":{"name":"stunner/udp-gateway","loglevel":"all:INFO"},"auths":[{"realm":"stunner.l7mp.io","type":"static","credentials":{"username":"a","password":"b"}}],"listeners":[{"name":"stunner/udp-gateway/udp-listener","protocol":"UDP","port":3478,"servers":["stunner/udp-gateway/udp-listener"]}],"servers":[{"name":"stunner/udp-gateway/udp-listener","type":"turn","clusters":["stunner/media-plane"]}],"clusters":[{"name":"stunner/media-plane","type":"STATIC","protocol":"UDP"}]}`), newC)
 	assert.NoError(t, err, "parse 1")
 	assert.NoError(t, newC.Validate(), "validate")
 	assert.False(t, oldC.DeepEqual(newC), "deepeq")
@@ -1496,7 +1496,7 @@ func patchConfig(t *testing.T, id, realm string) server.Config {
 	c.Listeners = []stnrv2.ListenerConfig{{Name: "l1", Protocol: "UDP", Port: 3478,
 		Servers: []string{"turn"}}}
 	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
-	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.0/8"},
+	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.1"},
 		Protocol: "UDP", Addrs: []string{"$" + stnrv2.DefaultEnvVarNodeAddr}}}
 	require.NoError(t, c.Validate())
 	namespace, name, _ := server.NamespacedName(id)
@@ -1792,7 +1792,7 @@ func testConfigListener(id, realm string) server.Config {
 		{Name: "l2", Protocol: "UDP", Port: 3479, Servers: []string{"turn"}},
 	}
 	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
-	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.0/8"},
+	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.1"},
 		Protocol: "UDP", Addrs: []string{"1.1.1.1"}}}
 	_ = c.Validate() // make sure deepeq works
 	namespace, name, _ := server.NamespacedName(id)

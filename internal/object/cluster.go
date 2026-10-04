@@ -28,8 +28,9 @@ type Cluster struct {
 	dialer     atomic.Pointer[api.Dialer]
 	registered []string // the domains registered with the resolver
 
-	rt  *runtime.Runtime
-	log logging.LeveledLogger
+	rt    *runtime.Runtime
+	log   logging.LeveledLogger
+	scope string // of the logger
 }
 
 var (
@@ -47,10 +48,11 @@ func NewCluster(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error)
 		return nil, err
 	}
 	c := &Cluster{
-		name: req.Name,
-		rt:   rt,
-		log:  rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", req.Name)),
+		name:  req.Name,
+		rt:    rt,
+		scope: fmt.Sprintf("cluster-%s", req.Name),
 	}
+	c.log = rt.Logger.NewLogger(c.scope)
 	if err := c.Reconcile(req); err != nil {
 		return nil, err
 	}
@@ -60,8 +62,9 @@ func NewCluster(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error)
 func (c *Cluster) Name() string             { return c.name }
 func (c *Cluster) Type() runtime.ObjectType { return runtime.TypeCluster }
 
-// Inspect restarts on a dialer change; the router and the addresses reconcile in place.
-func (c *Cluster) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
+// Inspect restarts on a dialer change; the router, the addresses and the filters reconcile in
+// place.
+func (c *Cluster) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv2.ClusterConfig)
 	if !ok {
 		return runtime.ActionNone, stnrv2.ErrInvalidConf
@@ -70,6 +73,13 @@ func (c *Cluster) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runt
 		return runtime.ActionNone, err
 	}
 	cur := old.(*stnrv2.ClusterConfig)
+	if full != nil {
+		for _, name := range req.Filters {
+			if _, err := full.GetFilterConfig(name); err != nil {
+				c.log.Warnf("cluster %s: no filter %q: it admits every peer", c.name, name)
+			}
+		}
+	}
 	if cur.DeepEqual(req) {
 		return runtime.ActionNone, nil
 	}
@@ -130,7 +140,7 @@ func (c *Cluster) GetConfig() stnrv2.Config {
 
 // Start runs the dialer and registers the domains with the resolver.
 func (c *Cluster) Start() error {
-	d, err := dialer.New(c.conf.Load(), c.rt)
+	d, err := dialer.New(c.conf.Load(), c.rt, c.admits)
 	if err != nil {
 		return err
 	}
@@ -190,9 +200,26 @@ func (c *Cluster) Listen(network string, port int) (net.Listener, net.Addr, erro
 	return nil, nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
 }
 
-// domains returns the domain endpoints of a config, whatever its type.
+// admits lets through the traffic of the peers the filters of the cluster admit, as they stand at
+// the moment.
+func (c *Cluster) admits(peer net.Addr) bool {
+	names := c.conf.Load().Filters
+	if len(names) == 0 {
+		return true
+	}
+	ok := c.rt.Admits(names, peer)
+	if !ok && c.rt.Tracing(c.scope) {
+		c.log.Tracef("cluster %s: filters drop peer %s", c.name, peer.String())
+	}
+	return ok
+}
+
+// domains returns the domain endpoints a config resolves; only a load-balancing cluster has any.
 func domains(conf *stnrv2.ClusterConfig) []string {
 	ret := []string{}
+	if conf.RoutingPolicy != stnrv2.RoutingPolicyRoundRobin.String() {
+		return ret
+	}
 	for _, ep := range conf.Endpoints {
 		if e, err := stnrv2.ParseEndpoint(ep); err == nil && e.Domain != "" {
 			ret = append(ret, e.Domain)

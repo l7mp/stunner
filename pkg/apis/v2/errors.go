@@ -11,6 +11,7 @@ var (
 	ErrNoSuchListener = errors.New("no such listener")
 	ErrNoSuchServer   = errors.New("no such server")
 	ErrNoSuchCluster  = errors.New("no such cluster")
+	ErrNoSuchFilter   = errors.New("no such filter")
 	ErrNoSuchAuth     = errors.New("no such authentication policy")
 )
 

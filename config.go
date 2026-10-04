@@ -104,10 +104,9 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			Clusters: []string{"allow-any"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0", "::/0"},
-			Protocol:  "UDP",
-			Addrs:     []string{u.Host},
+			Name:     "allow-any",
+			Protocol: "UDP",
+			Addrs:    []string{u.Host},
 		}},
 	}
 

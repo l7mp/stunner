@@ -97,10 +97,9 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Clusters: []string{"allow-any"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-			Protocol:  "UDP",
-			Addrs:     []string{tn.host},
+			Name:     "allow-any",
+			Protocol: "UDP",
+			Addrs:    []string{tn.host},
 		}},
 	}), "upstream server started")
 
@@ -137,9 +136,8 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Clusters: []string{"turn-relay"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "turn-relay",
-			Endpoints: []string{"0.0.0.0/0", "::/0"},
-			Protocol:  "UDP",
+			Name:     "turn-relay",
+			Protocol: "UDP",
 			Tunnel: &stnrv2.TunnelConfig{
 				URL:  "turn:" + net.JoinHostPort(tn.host, "23479") + "?transport=" + strings.ToLower(upstreamProto),
 				Auth: "upstream",
@@ -204,10 +202,9 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 			Name: "downstream", Type: "turn", Clusters: []string{"turn-relay"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "turn-relay",
-			Endpoints: []string{"0.0.0.0/0", "::/0"},
-			Protocol:  "TCP",
-			Tunnel:    &stnrv2.TunnelConfig{URL: "turn:127.0.0.1:23479?transport=tcp", Auth: "upstream"},
+			Name:     "turn-relay",
+			Protocol: "TCP",
+			Tunnel:   &stnrv2.TunnelConfig{URL: "turn:127.0.0.1:23479?transport=tcp", Auth: "upstream"},
 		}},
 	}), "downstream server started")
 	defer closeStunner(downstream)

@@ -63,7 +63,7 @@ func startListener(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ListenerConfi
 	t.Helper()
 	require.NoError(t, conf.Validate())
 	accepted := make(chan api.Conn, 256)
-	l, err := New(conf, rt, func(c api.Conn) {
+	l, err := New(conf, rt, func(net.Addr) bool { return true }, func(c api.Conn) {
 		accepted <- c
 		go func() {
 			buf := make([]byte, 2048)

@@ -39,7 +39,7 @@ servers:
 clusters:
   - name: ns/media
     type: STATIC
-    endpoints: ["10.0.0.0/8"]
+    endpoints: ["10.0.0.1"]
     protocol: UDP
 `
 
@@ -65,7 +65,8 @@ func TestParseRaw(t *testing.T) {
 		assert.Equal(t, stnrv2.ServerTypeTURN.String(), s.Type, "server type")
 		r, err := c.GetClusterConfig("ns/media")
 		require.NoError(t, err)
-		assert.Equal(t, []string{"10.0.0.0/8"}, r.Endpoints, "cluster endpoints")
+		assert.Empty(t, r.Endpoints, "a cluster with a prefix routes every peer")
+		assert.Equal(t, []string{"ns/gw1/udp"}, s.PermissionFilters, "the prefix is the server's filter")
 	})
 
 	t.Run("v2 parses", func(t *testing.T) {
@@ -83,7 +84,7 @@ func TestParseRaw(t *testing.T) {
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "ns/media",
 				Type:      "STATIC",
-				Endpoints: []string{"10.0.0.0/8"},
+				Endpoints: []string{"10.0.0.1"},
 				Protocol:  "UDP",
 			}},
 		}), "parsed: %s", c.String())

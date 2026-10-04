@@ -79,6 +79,13 @@ type Router interface {
 	Route(dst netip.AddrPort) (netip.AddrPort, bool, error)
 }
 
+// Filter admits or drops traffic by the address and port of its client or peer: Match returns the
+// verdict of its first rule matching the address, matched is false when none does.
+type Filter interface {
+	Named
+	Match(a netip.AddrPort) (allow, matched bool)
+}
+
 // Listener emits client conns.
 type Listener interface {
 	Named

@@ -22,29 +22,24 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, log logging.LeveledLog
 		return nil, err
 	}
 	b := base{name: conf.Name, rt: rt}
+	// ORIGINAL_DST has nothing to choose
+	if policy != stnrv2.RoutingPolicyRoundRobin {
+		return &OriginalDst{base: b}, nil
+	}
 	for _, raw := range conf.Endpoints {
 		ep, err := stnrv2.ParseEndpoint(raw)
 		if err != nil {
 			log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
 			continue
 		}
-		_, dialable := ep.HostPort()
-		switch {
-		case policy == stnrv2.RoutingPolicyFilter && ep.RestrictsPort():
-			log.Warnf("cluster %s: the port of endpoint %q is not enforced: a %s cluster admits "+
-				"peers by IP", conf.Name, raw, policy.String())
-		case policy != stnrv2.RoutingPolicyFilter && !dialable:
-			log.Warnf("cluster %s: skipping endpoint %q: a %s cluster needs a single address "+
-				"or domain with a single port", conf.Name, raw, policy.String())
+		if ep.Port == 0 {
+			log.Warnf("cluster %s: skipping endpoint %q: a %s cluster dials an endpoint at its "+
+				"port", conf.Name, raw, policy.String())
 			continue
 		}
 		b.endpoints = append(b.endpoints, ep)
 	}
-
-	if policy == stnrv2.RoutingPolicyRoundRobin {
-		return &RoundRobin{base: b}, nil
-	}
-	return &Filter{base: b}, nil
+	return &RoundRobin{base: b}, nil
 }
 
 type base struct {
@@ -58,7 +53,7 @@ func (b *base) Name() string { return b.name }
 // addrs returns the IPs of an endpoint, resolving a domain.
 func (b *base) addrs(ep *stnrv2.Endpoint) []net.IP {
 	if ep.Domain == "" {
-		return []net.IP{ep.Prefix.IP}
+		return []net.IP{ep.Addr.AsSlice()}
 	}
 	hosts, err := b.rt.Resolver.Lookup(ep.Domain)
 	if err != nil {
@@ -67,31 +62,17 @@ func (b *base) addrs(ep *stnrv2.Endpoint) []net.IP {
 	return hosts
 }
 
-// Filter admits the destinations an endpoint contains, ports ignored.
-type Filter struct {
+// OriginalDst routes to the destination the client names; the filters decide what is reachable.
+type OriginalDst struct {
 	base
 }
 
-func (f *Filter) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
+func (f *OriginalDst) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
 	if !dst.IsValid() {
 		return dst, false, fmt.Errorf("cluster %s: a %s cluster needs a destination", f.name,
-			stnrv2.RoutingPolicyFilter.String())
+			stnrv2.RoutingPolicyOriginalDst.String())
 	}
-	ip := net.IP(dst.Addr().Unmap().AsSlice())
-	for _, ep := range f.endpoints {
-		if ep.Domain == "" {
-			if ep.Contains(ip) {
-				return dst, true, nil
-			}
-			continue
-		}
-		for _, h := range f.addrs(ep) {
-			if h.Equal(ip) {
-				return dst, true, nil
-			}
-		}
-	}
-	return dst, false, nil
+	return dst, true, nil
 }
 
 // RoundRobin chooses the resolved endpoints in turn.

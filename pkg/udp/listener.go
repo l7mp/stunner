@@ -42,6 +42,9 @@ type ListenConfig struct {
 	// ConnectBack connects a socket back to every client so the kernel demuxes; it needs
 	// reuse-port, so only the OS network can do it.
 	ConnectBack bool
+	// Admit, if set, decides on the first datagram of a source whether it gets a conn; the
+	// datagrams of a source it refuses are dropped.
+	Admit func(src net.Addr) bool
 }
 
 // DefaultListenConfig is the config the dataplane listens with.
@@ -66,6 +69,7 @@ func (lc ListenConfig) Listen(network, address string) (net.Listener, error) {
 	l := &listener{
 		socks:       socks,
 		connectBack: reuse && lc.ConnectBack,
+		admit:       lc.Admit,
 		demuxed:     map[string]*conn{},
 		connected:   lru.New(connectedTableSize),
 		acceptQueue: make(chan *conn, backlog),
@@ -87,6 +91,7 @@ func (lc ListenConfig) Listen(network, address string) (net.Listener, error) {
 type listener struct {
 	socks       []net.PacketConn
 	connectBack bool
+	admit       func(net.Addr) bool
 
 	mu        sync.Mutex
 	demuxed   map[string]*conn // the demuxed conns, by client address
@@ -167,6 +172,10 @@ func (l *listener) intake(sock net.PacketConn, src net.Addr, p []byte) {
 		if v, found := l.connected.Get(key); found {
 			c, ok = v.(*conn), true
 		}
+	}
+	if !ok && l.admit != nil && !l.admit(src) {
+		l.mu.Unlock()
+		return
 	}
 	if !ok {
 		c = l.newConn(sock, src)

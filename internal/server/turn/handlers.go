@@ -135,7 +135,8 @@ func (q *Quota) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, re
 	}
 }
 
-// permissionHandler grants a permission when a cluster of the server routes the peer IP.
+// permissionHandler grants a permission when the permission filters admit the peer IP and a
+// cluster routes it.
 func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
 	ip, ok := netip.AddrFromSlice(peer)
 	if !ok {
@@ -144,6 +145,11 @@ func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
 	dst := netip.AddrPortFrom(ip.Unmap(), 0)
 	conf := s.rt.ServerConfig(s.name)
 	if conf == nil {
+		return false
+	}
+	if !s.rt.Admits(conf.PermissionFilters, net.UDPAddrFromAddrPort(dst)) {
+		s.log.Infof("permission denied on server %q for client %q to peer %s: filtered",
+			s.name, src.String(), peer.String())
 		return false
 	}
 	for _, name := range conf.Clusters {
@@ -225,10 +231,15 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 			if !found {
 				return
 			}
-			if conf := s.rt.ClusterConfig(rc.Name()); conf == nil || conf.Tunnel != nil {
+			conf := s.rt.ClusterConfig(rc.Name())
+			if conf == nil || conf.Tunnel != nil {
 				return
 			}
 			if _, isUDP := peer.(*net.UDPAddr); !isUDP {
+				return
+			}
+			// the kernel path skips the cluster's filters: offload only a peer they admit
+			if !s.rt.Admits(conf.Filters, peer) {
 				return
 			}
 			pair := offloadPair{

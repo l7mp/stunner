@@ -107,7 +107,7 @@ func newTestServer(t *testing.T, c setup) *testServer {
 	conf := &stnrv2.ListenerConfig{Name: "plain", Protocol: c.listener, Addr: "127.0.0.1",
 		Port: port, Servers: []string{"l4"}}
 	require.NoError(t, conf.Validate())
-	l, err := listener.New(conf, rt, func(conn api.Conn) {
+	l, err := listener.New(conf, rt, func(net.Addr) bool { return true }, func(conn api.Conn) {
 		if _, _, err := s.Serve(conn); err != nil {
 			_ = conn.Close()
 		}
@@ -262,11 +262,11 @@ func TestFlowTCPPeerRelay(t *testing.T) {
 	assert.Equal(t, 1, s.Sessions())
 }
 
-// TestFlowNoTarget verifies that without a dialable endpoint no flow is created: a cluster of
-// prefixes is a TURN filter, not a set of L4 targets.
+// TestFlowNoTarget verifies that without a dialable endpoint no flow is created: an address
+// without a port is no L4 target.
 func TestFlowNoTarget(t *testing.T) {
 	s := newTestServer(t, setup{listener: "UDP", proto: "UDP",
-		endpoints: []string{"127.0.0.0/8"}})
+		endpoints: []string{"127.0.0.1"}})
 	noEcho(t, s.dial(t, "udp"), "hello")
 	assert.Equal(t, 0, s.Sessions(), "no flow registered")
 }
@@ -293,7 +293,7 @@ func TestFlowLoadBalancing(t *testing.T) {
 
 	// both peers got a flow: the echo peers answer from their own address, and the flows are
 	// pinned to theirs, so both echoes arriving means both endpoints were used
-	s.setEndpoints(t, []string{"127.0.0.0/8"})
+	s.setEndpoints(t, []string{"127.0.0.1"})
 	echo(t, c1, "still one")
 	echo(t, c2, "still two")
 	noEcho(t, s.dial(t, "udp"), "new flows find no target")

@@ -39,13 +39,15 @@ var newTLSConfig = func(_ *runtime.Runtime, conf *stnrv2.ListenerConfig, cert tl
 }
 
 // Listener accepts the client conns of one listener config and hands them, tagged and accounted,
-// to its sink: a TLS or DTLS conn once its handshake has completed.
+// to its sink: a TLS or DTLS conn once its handshake has completed. A client its admit function
+// refuses gets no conn: a UDP source's datagrams are dropped, an accepted stream is closed.
 type Listener struct {
-	conf stnrv2.ListenerConfig
-	tag  api.Tag
-	rt   *runtime.Runtime
-	log  logging.LeveledLogger
-	sink Sink
+	conf  stnrv2.ListenerConfig
+	tag   api.Tag
+	rt    *runtime.Runtime
+	log   logging.LeveledLogger
+	sink  Sink
+	admit func(net.Addr) bool
 
 	listen func() (net.Listener, error)
 	// secure wraps an accepted conn in TLS or DTLS, nil for plain listeners.
@@ -58,8 +60,9 @@ type Listener struct {
 
 var _ api.Listener = &Listener{}
 
-// New creates the listener of a listener config, with the TLS certificate and key in PEM.
-func New(conf *stnrv2.ListenerConfig, rt *runtime.Runtime, sink Sink) (*Listener, error) {
+// New creates the listener of a listener config, with the TLS certificate and key in PEM, that
+// hands the clients admit lets in to sink.
+func New(conf *stnrv2.ListenerConfig, rt *runtime.Runtime, admit func(net.Addr) bool, sink Sink) (*Listener, error) {
 	proto, err := stnrv2.NewListenerProtocol(conf.Protocol)
 	if err != nil {
 		return nil, err
@@ -70,13 +73,14 @@ func New(conf *stnrv2.ListenerConfig, rt *runtime.Runtime, sink Sink) (*Listener
 		rt:     rt,
 		log:    rt.Logger.NewLogger(fmt.Sprintf("listener-%s", conf.Name)),
 		sink:   sink,
+		admit:  admit,
 		closed: make(chan struct{}),
 	}
 
 	addr := net.JoinHostPort(conf.Addr, strconv.Itoa(conf.Port))
 	listenUDP := func() (net.Listener, error) {
 		lc := udp.DefaultListenConfig
-		lc.Net = rt.Net
+		lc.Net, lc.Admit = rt.Net, admit
 		return lc.Listen("udp", addr)
 	}
 	listenTCP := func() (net.Listener, error) {
@@ -153,6 +157,12 @@ func (l *Listener) accept() {
 		c, err := l.ln.Accept()
 		if err != nil {
 			return
+		}
+		// a UDP listener admits its sources before it makes a conn
+		if l.tag.Proto != stnrv2.ProtocolUDP && l.tag.Proto != stnrv2.ProtocolDTLS &&
+			!l.admit(c.RemoteAddr()) {
+			_ = c.Close()
+			continue
 		}
 		if l.secure == nil {
 			l.sink(l.emit(c))

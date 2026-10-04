@@ -30,7 +30,7 @@ func validConfig() *StunnerConfig {
 		},
 		Clusters: []ClusterConfig{{
 			Name:      "media-pods",
-			Endpoints: []string{"10.1.0.0/16", "10.2.3.4:5000-5100"},
+			Endpoints: []string{"10.1.0.7", "10.2.3.4:5000"},
 			Protocol:  "UDP",
 			Addrs:     []string{"10.0.0.1,fd00::1"},
 		}, {
@@ -49,7 +49,7 @@ func TestStunnerConfigValidate(t *testing.T) {
 	// defaults are injected, addresses normalized
 	assert.Equal(t, "", c.Listeners[0].Addr, "a listener binds every address by default")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type)
-	assert.Equal(t, "FILTER", c.Clusters[0].RoutingPolicy)
+	assert.Equal(t, "ORIGINAL_DST", c.Clusters[0].RoutingPolicy)
 	assert.Equal(t, []string{"10.0.0.1", "fd00::1"}, c.Clusters[0].Addrs)
 	assert.Equal(t, DefaultStunnerName, c.Admin.Name)
 
@@ -150,6 +150,7 @@ func TestDeepCopyIsExact(t *testing.T) {
 	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
+	full.Servers[0].PermissionFilters = []string{"peers"}
 	validated := validConfig()
 	require.NoError(t, validated.Validate())
 

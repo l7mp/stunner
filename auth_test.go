@@ -73,10 +73,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) { return "user1", "passwd1" },
@@ -108,10 +107,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) { return "user1", "passwd1" },
@@ -142,10 +140,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -179,10 +176,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -218,10 +214,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {
@@ -257,10 +252,9 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		auth: func() (string, string) {

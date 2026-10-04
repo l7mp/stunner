@@ -49,6 +49,9 @@ func (s *Stunner) GetConfig() stnrv2.Config {
 	for _, c := range s.rt.GetConfigs(runtime.TypeCluster) {
 		out.Clusters = append(out.Clusters, *(c.(*stnrv2.ClusterConfig)))
 	}
+	for _, c := range s.rt.GetConfigs(runtime.TypeFilter) {
+		out.Filters = append(out.Filters, *(c.(*stnrv2.FilterConfig)))
+	}
 
 	return out
 }
@@ -78,6 +81,10 @@ func (s *Stunner) Status() stnrv2.Status {
 	status.Clusters = []*stnrv2.ClusterStatus{}
 	for _, st := range s.rt.GetStatuses(runtime.TypeCluster) {
 		status.Clusters = append(status.Clusters, st.(*stnrv2.ClusterStatus))
+	}
+	status.Filters = []*stnrv2.FilterStatus{}
+	for _, st := range s.rt.GetStatuses(runtime.TypeFilter) {
+		status.Filters = append(status.Filters, st.(*stnrv2.FilterStatus))
 	}
 	return status
 }

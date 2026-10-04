@@ -3,6 +3,7 @@ package object
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"sync/atomic"
 
 	"github.com/pion/logging"
@@ -20,7 +21,8 @@ type Listener struct {
 
 	conf atomic.Pointer[stnrv2.ListenerConfig]
 
-	listener api.Listener
+	listener *listener.Listener
+	scope    string // of the logger
 
 	rt  *runtime.Runtime
 	log logging.LeveledLogger
@@ -36,10 +38,11 @@ func NewListener(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error
 		return nil, err
 	}
 	l := &Listener{
-		name: req.Name,
-		rt:   rt,
-		log:  rt.Logger.NewLogger(fmt.Sprintf("listener-%s", req.Name)),
+		name:  req.Name,
+		rt:    rt,
+		scope: fmt.Sprintf("listener-%s", req.Name),
 	}
+	l.log = rt.Logger.NewLogger(l.scope)
 	if err := l.Reconcile(req); err != nil {
 		return nil, err
 	}
@@ -49,8 +52,8 @@ func NewListener(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error
 func (l *Listener) Name() string             { return l.name }
 func (l *Listener) Type() runtime.ObjectType { return runtime.TypeListener }
 
-// Inspect restarts on a socket change; servers and public addresses reconcile in place.
-func (l *Listener) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.Action, error) {
+// Inspect restarts on a socket change; servers, public addresses and filters reconcile in place.
+func (l *Listener) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, ok := new.(*stnrv2.ListenerConfig)
 	if !ok {
 		return runtime.ActionNone, stnrv2.ErrInvalidConf
@@ -59,6 +62,13 @@ func (l *Listener) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (run
 		return runtime.ActionNone, err
 	}
 	cur := old.(*stnrv2.ListenerConfig)
+	if full != nil {
+		for _, name := range req.Filters {
+			if _, err := full.GetFilterConfig(name); err != nil {
+				l.log.Warnf("listener %s: no filter %q: it admits every client", l.name, name)
+			}
+		}
+	}
 	if cur.DeepEqual(req) {
 		return runtime.ActionNone, nil
 	}
@@ -86,6 +96,19 @@ func (l *Listener) Reconcile(conf stnrv2.Config) error {
 	return nil
 }
 
+// admits lets in the clients the filters of the listener admit, as they stand at the moment.
+func (l *Listener) admits(client net.Addr) bool {
+	names := l.conf.Load().Filters
+	if len(names) == 0 {
+		return true
+	}
+	ok := l.rt.Admits(names, client)
+	if !ok && l.rt.Tracing(l.scope) {
+		l.log.Tracef("listener %s: filters drop client %s", l.name, client.String())
+	}
+	return ok
+}
+
 func (l *Listener) GetConfig() stnrv2.Config {
 	cp := &stnrv2.ListenerConfig{Name: l.name}
 	if c := l.conf.Load(); c != nil {
@@ -110,7 +133,7 @@ func (l *Listener) Start() error {
 	}
 	decoded.Cert, decoded.Key = string(cert), string(key)
 
-	ln, err := listener.New(decoded, l.rt, l.serve)
+	ln, err := listener.New(decoded, l.rt, l.admits, l.serve)
 	if err != nil {
 		return err
 	}

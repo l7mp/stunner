@@ -12,13 +12,13 @@ import (
 type ServerConfig struct {
 	// Name of the server.
 	Name string `json:"name"`
-	// Type is the behavior of the server: "turn" serves TURN, admitting the peers its clusters'
-	// endpoints contain and relaying through the first cluster that can make the relay
-	// transport, "l4" forwards every client flow to an endpoint of the first cluster that
-	// yields one. Default is "turn".
+	// Type is TURN (default) or L4, in any case; SIP and RTP are reserved.
 	Type string `json:"type,omitempty"`
 	// Clusters lists the names of the clusters the server uses, in order.
 	Clusters []string `json:"clusters,omitempty"`
+	// PermissionFilters name the filters a TURN server checks the peer IP of a permission against;
+	// rules with ports never match there.
+	PermissionFilters []string `json:"permission_filters,omitempty"`
 	// Auth names the authentication policy of the server: a TURN server authenticates its clients
 	// by it (default: "default").
 	Auth string `json:"auth,omitempty"`
@@ -39,6 +39,9 @@ func (req *ServerConfig) Validate() error {
 	req.Type = t.String()
 	if req.Clusters == nil {
 		req.Clusters = []string{}
+	}
+	if req.PermissionFilters == nil {
+		req.PermissionFilters = []string{}
 	}
 	if req.Auth == "" && t == ServerTypeTURN {
 		req.Auth = DefaultAuthName
@@ -61,6 +64,7 @@ func (req *ServerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*ServerConfig)
 	*ret = *req
 	ret.Clusters = slices.Clone(req.Clusters)
+	ret.PermissionFilters = slices.Clone(req.PermissionFilters)
 }
 
 // String stringifies the configuration.
@@ -70,6 +74,9 @@ func (req *ServerConfig) String() string {
 		n = req.Name
 	}
 	opts := ""
+	if len(req.PermissionFilters) > 0 {
+		opts += ",permission_filters=[" + strings.Join(req.PermissionFilters, ",") + "]"
+	}
 	if req.Auth != "" {
 		opts += ",auth=" + req.Auth
 	}

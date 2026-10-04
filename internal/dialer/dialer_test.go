@@ -111,7 +111,7 @@ func newDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ClusterConfig) ap
 	t.Helper()
 	require.NoError(t, conf.Validate())
 	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeCluster, conf: conf}, nil))
-	cl, err := New(conf, rt)
+	cl, err := New(conf, rt, func(net.Addr) bool { return true })
 	require.NoError(t, err)
 	require.NoError(t, cl.Start())
 	return cl

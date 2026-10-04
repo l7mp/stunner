@@ -1,9 +1,13 @@
 package runtime
 
 import (
+	"net"
+	"net/netip"
+
 	"github.com/l7mp/stunner/v2/internal/api"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
+	"github.com/pion/logging"
 )
 
 var defaultSingletonNames = map[ObjectType]string{
@@ -148,6 +152,46 @@ func (rt *Runtime) reconcilable(objType ObjectType, name string) Reconcilable {
 		return nil
 	}
 	return r
+}
+
+// Filter returns the filter of a name.
+func (rt *Runtime) Filter(name string) (api.Filter, bool) {
+	o, ok := rt.Registry.Get(TypeFilter, name)
+	if !ok {
+		return nil, false
+	}
+	return o.(api.Filter), true
+}
+
+// Admits runs the filters of the names, in order, on the traffic of an address: the first rule
+// that matches it decides, and traffic no rule matches passes. A missing filter has no rules.
+func (rt *Runtime) Admits(names []string, addr net.Addr) bool {
+	var a netip.AddrPort
+	switch addr := addr.(type) {
+	case *net.UDPAddr:
+		a = addr.AddrPort()
+	case *net.TCPAddr:
+		a = addr.AddrPort()
+	default:
+		a, _ = netip.ParseAddrPort(addr.String())
+	}
+	a = netip.AddrPortFrom(a.Addr().Unmap(), a.Port())
+	for _, name := range names {
+		f, ok := rt.Filter(name)
+		if !ok {
+			continue
+		}
+		if allow, matched := f.Match(a); matched {
+			return allow
+		}
+	}
+	return true
+}
+
+// Tracing tells whether the logger of a scope logs at the trace level: a hot path builds a trace
+// message only then.
+func (rt *Runtime) Tracing(scope string) bool {
+	return rt.Logger.GetLevel(scope) == logging.LogLevelTrace.String()
 }
 
 // AuthConfig returns the live config of the authentication policy of a name, nil if there is none.

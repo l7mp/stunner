@@ -19,6 +19,8 @@ type StunnerConfig struct {
 	Servers []ServerConfig `json:"servers,omitempty"`
 	// Clusters are the peer endpoint sets the servers reach and the transports that reach them.
 	Clusters []ClusterConfig `json:"clusters,omitempty"`
+	// Filters are the rules listeners and clusters admit traffic by.
+	Filters []FilterConfig `json:"filters,omitempty"`
 }
 
 // Validate checks that a configuration is well-formed and injects defaults. It checks syntax only:
@@ -40,6 +42,9 @@ func (req *StunnerConfig) Validate() error {
 	}
 	if req.Clusters == nil {
 		req.Clusters = []ClusterConfig{}
+	}
+	if req.Filters == nil {
+		req.Filters = []FilterConfig{}
 	}
 	if req.Auths == nil {
 		req.Auths = []AuthConfig{}
@@ -77,6 +82,14 @@ func (req *StunnerConfig) Validate() error {
 			return err
 		}
 	}
+	for i := range req.Filters {
+		if err := req.Filters[i].Validate(); err != nil {
+			return err
+		}
+		if err := checkName("filter", req.Filters[i].Name); err != nil {
+			return err
+		}
+	}
 	for i := range req.Auths {
 		if req.Auths[i].Name == "" {
 			req.Auths[i].Name = DefaultAuthName
@@ -105,7 +118,8 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 	}
 	if req.ApiVersion != b.ApiVersion || !req.Admin.DeepEqual(&b.Admin) ||
 		len(req.Auths) != len(b.Auths) || len(req.Listeners) != len(b.Listeners) ||
-		len(req.Servers) != len(b.Servers) || len(req.Clusters) != len(b.Clusters) {
+		len(req.Servers) != len(b.Servers) || len(req.Clusters) != len(b.Clusters) ||
+		len(req.Filters) != len(b.Filters) {
 		return false
 	}
 	for i := range req.Listeners {
@@ -123,6 +137,11 @@ func (req *StunnerConfig) DeepEqual(conf Config) bool {
 			return false
 		}
 	}
+	for i := range req.Filters {
+		if !req.Filters[i].DeepEqual(&b.Filters[i]) {
+			return false
+		}
+	}
 	for i := range req.Auths {
 		if !req.Auths[i].DeepEqual(&b.Auths[i]) {
 			return false
@@ -136,7 +155,7 @@ func (req *StunnerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*StunnerConfig)
 	ret.ApiVersion = req.ApiVersion
 	req.Admin.DeepCopyInto(&ret.Admin)
-	ret.Listeners, ret.Servers, ret.Clusters, ret.Auths = nil, nil, nil, nil
+	ret.Listeners, ret.Servers, ret.Clusters, ret.Filters, ret.Auths = nil, nil, nil, nil, nil
 	if req.Auths != nil {
 		ret.Auths = make([]AuthConfig, len(req.Auths))
 		for i := range req.Auths {
@@ -159,6 +178,12 @@ func (req *StunnerConfig) DeepCopyInto(dst Config) {
 		ret.Clusters = make([]ClusterConfig, len(req.Clusters))
 		for i := range req.Clusters {
 			req.Clusters[i].DeepCopyInto(&ret.Clusters[i])
+		}
+	}
+	if req.Filters != nil {
+		ret.Filters = make([]FilterConfig, len(req.Filters))
+		for i := range req.Filters {
+			req.Filters[i].DeepCopyInto(&ret.Filters[i])
 		}
 	}
 }
@@ -210,6 +235,16 @@ func (req *StunnerConfig) GetAuthConfig(name string) (AuthConfig, error) {
 	return AuthConfig{}, ErrNoSuchAuth
 }
 
+// GetFilterConfig finds a filter by name.
+func (req *StunnerConfig) GetFilterConfig(name string) (FilterConfig, error) {
+	for _, f := range req.Filters {
+		if f.Name == name {
+			return f, nil
+		}
+	}
+	return FilterConfig{}, ErrNoSuchFilter
+}
+
 // String stringifies the configuration.
 func (req *StunnerConfig) String() string {
 	as := []string{}
@@ -233,6 +268,13 @@ func (req *StunnerConfig) String() string {
 		cs = append(cs, c.String())
 	}
 	status = append(status, fmt.Sprintf("clusters=[%s]", strings.Join(cs, ",")))
+	if len(req.Filters) > 0 {
+		fs := []string{}
+		for _, f := range req.Filters {
+			fs = append(fs, f.String())
+		}
+		status = append(status, fmt.Sprintf("filters=[%s]", strings.Join(fs, ",")))
+	}
 	return fmt.Sprintf("{%s}", strings.Join(status, ","))
 }
 
@@ -305,6 +347,7 @@ type StunnerStatus struct {
 	Listeners       []*ListenerStatus `json:"listeners"`
 	Servers         []*ServerStatus   `json:"servers"`
 	Clusters        []*ClusterStatus  `json:"clusters"`
+	Filters         []*FilterStatus   `json:"filters,omitempty"`
 	AllocationCount int               `json:"allocationCount"`
 	Status          string            `json:"status"`
 }

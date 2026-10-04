@@ -243,29 +243,29 @@ func (t ClusterType) String() string {
 	}
 }
 
-// RoutingPolicy is how a cluster routes traffic: it filters the destinations its clients name,
-// or it chooses one with a load-balancing policy, named as in Envoy.
+// RoutingPolicy is how a cluster picks a destination: the one the client names, or an endpoint
+// chosen by a load balancer.
 type RoutingPolicy int
 
 const (
 	// RoutingPolicyUnknown is an invalid policy.
 	RoutingPolicyUnknown RoutingPolicy = iota
-	// RoutingPolicyFilter admits the destinations the endpoints contain.
-	RoutingPolicyFilter
+	// RoutingPolicyOriginalDst sends to the destination the client names.
+	RoutingPolicyOriginalDst
 	// RoutingPolicyRoundRobin chooses the endpoints in turn.
 	RoutingPolicyRoundRobin
 )
 
 const (
-	routingPolicyFilterStr     = "FILTER"
-	routingPolicyRoundRobinStr = "ROUND_ROBIN"
+	routingPolicyOriginalDstStr = "ORIGINAL_DST"
+	routingPolicyRoundRobinStr  = "ROUND_ROBIN"
 )
 
 // NewRoutingPolicy parses a routing policy.
 func NewRoutingPolicy(raw string) (RoutingPolicy, error) {
 	switch strings.ToUpper(raw) {
-	case routingPolicyFilterStr:
-		return RoutingPolicyFilter, nil
+	case routingPolicyOriginalDstStr:
+		return RoutingPolicyOriginalDst, nil
 	case routingPolicyRoundRobinStr:
 		return RoutingPolicyRoundRobin, nil
 	default:
@@ -276,10 +276,51 @@ func NewRoutingPolicy(raw string) (RoutingPolicy, error) {
 // String returns the name of the routing policy.
 func (p RoutingPolicy) String() string {
 	switch p {
-	case RoutingPolicyFilter:
-		return routingPolicyFilterStr
+	case RoutingPolicyOriginalDst:
+		return routingPolicyOriginalDstStr
 	case RoutingPolicyRoundRobin:
 		return routingPolicyRoundRobinStr
+	default:
+		return "<unknown>"
+	}
+}
+
+// FilterAction is what a filter rule does with the traffic it matches.
+type FilterAction int
+
+const (
+	// FilterActionUnknown is an invalid action.
+	FilterActionUnknown FilterAction = iota
+	// FilterActionAllow admits the traffic.
+	FilterActionAllow
+	// FilterActionDeny drops the traffic.
+	FilterActionDeny
+)
+
+const (
+	filterActionAllowStr = "ALLOW"
+	filterActionDenyStr  = "DENY"
+)
+
+// NewFilterAction parses a filter action.
+func NewFilterAction(raw string) (FilterAction, error) {
+	switch strings.ToUpper(raw) {
+	case filterActionAllowStr:
+		return FilterActionAllow, nil
+	case filterActionDenyStr:
+		return FilterActionDeny, nil
+	default:
+		return FilterActionUnknown, fmt.Errorf("unknown filter action: %q", raw)
+	}
+}
+
+// String returns the name of the filter action.
+func (a FilterAction) String() string {
+	switch a {
+	case FilterActionAllow:
+		return filterActionAllowStr
+	case FilterActionDeny:
+		return filterActionDenyStr
 	default:
 		return "<unknown>"
 	}

@@ -75,6 +75,7 @@ type testServer struct {
 	*turn.Server
 	rt      *runtime.Runtime
 	cluster *object.Cluster
+	conf    *stnrv2.ServerConfig
 	offload *fakeOffload
 	ports   map[string]int
 }
@@ -82,7 +83,7 @@ type testServer struct {
 const realm = "stunner.test"
 
 // newTestServer starts a TURN server behind a UDP and a TCP listener, relaying to the peers of
-// 127.0.0.0/8 through the plain UDP cluster it names. The server resolves the cluster by name
+// 127.0.0.1 through the plain UDP cluster it names. The server resolves the cluster by name
 // through the registry, so it is registered as a real object, and its own config as a stub.
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
@@ -106,7 +107,7 @@ func newTestServer(t *testing.T) *testServer {
 	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeAdmin, conf: admin}, nil))
 
 	cl, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "loopback",
-		Endpoints: []string{"127.0.0.0/8"}, Protocol: "UDP", Addrs: []string{"127.0.0.1"}}, rt)
+		Endpoints: []string{"127.0.0.1"}, Protocol: "UDP", Addrs: []string{"127.0.0.1"}}, rt)
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(cl, nil))
 	require.NoError(t, cl.Start())
@@ -118,13 +119,14 @@ func newTestServer(t *testing.T) *testServer {
 	require.NoError(t, s.Start())
 	t.Cleanup(func() { _ = s.Close(true) })
 
-	ts := &testServer{Server: s, rt: rt, cluster: cl.(*object.Cluster), offload: fo, ports: map[string]int{}}
+	ts := &testServer{Server: s, rt: rt, cluster: cl.(*object.Cluster), conf: conf, offload: fo,
+		ports: map[string]int{}}
 	for _, proto := range []string{"UDP", "TCP"} {
 		port := freePort(t, proto)
 		conf := &stnrv2.ListenerConfig{Name: proto, Protocol: proto, Addr: "127.0.0.1",
 			Port: port, Servers: []string{"turn"}}
 		require.NoError(t, conf.Validate())
-		l, err := listener.New(conf, rt, func(c api.Conn) {
+		l, err := listener.New(conf, rt, func(net.Addr) bool { return true }, func(c api.Conn) {
 			if _, _, err := s.Serve(c); err != nil {
 				_ = c.Close()
 			}
@@ -225,20 +227,25 @@ func TestTURNServerRelays(t *testing.T) {
 
 func TestTURNServerPermissions(t *testing.T) {
 	ts := newTestServer(t)
-	require.NoError(t, ts.cluster.Reconcile(&stnrv2.ClusterConfig{Name: "loopback",
-		Endpoints: []string{"10.0.0.0/8"}, Protocol: "UDP", Addrs: []string{"127.0.0.1"}}))
+	rules := func(allow string) []stnrv2.FilterRule {
+		return []stnrv2.FilterRule{{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: allow}},
+			{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}}}
+	}
+	filter, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: rules("10.0.0.1/32")})
+	require.NoError(t, err)
+	require.NoError(t, ts.rt.Registry.Add(filter, nil))
+	ts.conf.PermissionFilters = []string{"peers"}
 	peer := udpEcho(t)
 
 	c := ts.allocate(t, stnrv2.ProtocolTURNUDP, ts.ports["UDP"])
 	_, _ = c.WriteTo([]byte("x"), peer.LocalAddr())
 	require.NoError(t, c.SetReadDeadline(time.Now().Add(500*time.Millisecond)))
 	buf := make([]byte, 16)
-	_, _, err := c.ReadFrom(buf)
-	assert.Error(t, err, "a peer outside the cluster is not reachable")
+	_, _, err = c.ReadFrom(buf)
+	assert.Error(t, err, "a peer the server's permission filters deny is not reachable")
 
-	// a cluster change applies to running allocations' new permissions
-	require.NoError(t, ts.cluster.Reconcile(&stnrv2.ClusterConfig{Name: "loopback",
-		Endpoints: []string{"127.0.0.1"}, Protocol: "UDP", Addrs: []string{"127.0.0.1"}}))
+	// a filter change applies to the new permissions of running allocations
+	require.NoError(t, filter.Reconcile(&stnrv2.FilterConfig{Name: "peers", Rules: rules("127.0.0.1/32")}))
 	c2 := ts.allocate(t, stnrv2.ProtocolTURNUDP, ts.ports["UDP"])
 	relay(t, c2, peer.LocalAddr(), "admitted")
 }

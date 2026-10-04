@@ -44,13 +44,12 @@ func (t *TunnelConfig) DeepCopy() *TunnelConfig {
 type ClusterConfig struct {
 	// Name of the cluster.
 	Name string `json:"name"`
-	// Type is STATIC (addresses and prefixes) or STRICT_DNS (domains). Default is STATIC.
+	// Type is STATIC (addresses) or STRICT_DNS (domains). Default is STATIC.
 	Type string `json:"type,omitempty"`
-	// Endpoints are addresses, prefixes or domains with an optional port or port range, for
-	// example "10.1.0.0/16", "10.1.0.7:5000" or "media.default.svc:5000". See ParseEndpoint.
+	// Endpoints are addresses or domains with an optional port, such as "10.1.0.7:5000" (see
+	// ParseEndpoint). They never filter.
 	Endpoints []string `json:"endpoints,omitempty"`
-	// RoutingPolicy is FILTER (admit the destinations the endpoints contain) or a load-balancing
-	// policy choosing an endpoint, ROUND_ROBIN. Default is FILTER.
+	// RoutingPolicy is ORIGINAL_DST (the destination the client names, the default) or ROUND_ROBIN.
 	RoutingPolicy string `json:"routing_policy,omitempty"`
 	// Protocol is the network the peers are reached over, UDP or TCP. Mandatory.
 	Protocol string `json:"protocol"`
@@ -58,6 +57,8 @@ type ClusterConfig struct {
 	Tunnel *TunnelConfig `json:"tunnel,omitempty"`
 	// Addrs are the relay addresses, at most one per family; the operator sets status.podIPs.
 	Addrs []string `json:"addresses,omitempty"`
+	// Filters name the filters checking the cluster's peers, at dial time and on every relayed packet.
+	Filters []string `json:"filters,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -136,6 +137,7 @@ func (req *ClusterConfig) DeepCopyInto(dst Config) {
 	*ret = *req
 	ret.Endpoints = slices.Clone(req.Endpoints)
 	ret.Addrs = slices.Clone(req.Addrs)
+	ret.Filters = slices.Clone(req.Filters)
 	if req.Tunnel != nil {
 		ret.Tunnel = req.Tunnel.DeepCopy()
 	}
@@ -161,6 +163,9 @@ func (req *ClusterConfig) String() string {
 	}
 	if len(req.Addrs) > 0 {
 		status = append(status, fmt.Sprintf("addresses=[%s]", strings.Join(req.Addrs, ",")))
+	}
+	if len(req.Filters) > 0 {
+		status = append(status, fmt.Sprintf("filters=[%s]", strings.Join(req.Filters, ",")))
 	}
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }

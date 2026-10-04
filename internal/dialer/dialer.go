@@ -4,11 +4,13 @@ package dialer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
+	"github.com/pion/logging"
 	"github.com/pion/transport/v5/reuseport"
 
 	"github.com/l7mp/stunner/v2/internal/api"
@@ -19,8 +21,8 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// New creates the dialer of a cluster config.
-func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime) (api.Dialer, error) {
+// New creates the dialer of a cluster config; admit applies the cluster's filters to a peer.
+func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) bool) (api.Dialer, error) {
 	proto, err := stnrv2.NewClusterProtocol(conf.Protocol)
 	if err != nil {
 		return nil, err
@@ -30,6 +32,8 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime) (api.Dialer, error) {
 		proto: proto,
 		tag:   api.Tag{Name: conf.Name, Proto: proto},
 		rt:    rt,
+		admit: admit,
+		log:   rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", conf.Name)),
 	}
 
 	if conf.Tunnel != nil {
@@ -50,6 +54,8 @@ type base struct {
 	proto stnrv2.Protocol
 	tag   api.Tag
 	rt    *runtime.Runtime
+	admit func(net.Addr) bool
+	log   logging.LeveledLogger
 	// tunnel is the upstream TURN server, nil for a direct dialer; transport is its transport.
 	tunnel    *stnrv2.TunnelConfig
 	transport stnrv2.Protocol
@@ -99,13 +105,23 @@ func (cl *udpDialer) Dial(ctx context.Context, _ net.Addr, addr string) (api.Con
 		if err != nil {
 			return nil, err
 		}
+		if err := cl.checkPeer(peer); err != nil {
+			return nil, err
+		}
 		session, err := cl.allocate(ctx)
 		if err != nil {
 			return nil, err
 		}
 		return cl.wrap(&peerConn{PacketConn: session, peer: peer}, session), nil
 	}
-	c, err := cl.rt.Net.Dial("udp", addr)
+	peer, err := cl.rt.Net.ResolveUDPAddr("udp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if err := cl.checkPeer(peer); err != nil {
+		return nil, err
+	}
+	c, err := cl.rt.Net.Dial("udp", peer.String())
 	if err != nil {
 		return nil, err
 	}
@@ -118,15 +134,15 @@ func (cl *udpDialer) ListenPacket(network string, port int) (net.PacketConn, net
 		if err != nil {
 			return nil, nil, err
 		}
-		return account.PacketConn(cl.rt.Telemetry, session, cl.name, telemetry.ClusterType),
-			session.LocalAddr(), nil
+		return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, session, cl.name,
+			telemetry.ClusterType), admit: cl.admit}, session.LocalAddr(), nil
 	}
 	sock, err := cl.rt.Net.ListenPacket(network, net.JoinHostPort("", strconv.Itoa(sanitizePort(port))))
 	if err != nil {
 		return nil, nil, err
 	}
-	return account.PacketConn(cl.rt.Telemetry, sock, cl.name, telemetry.ClusterType),
-		cl.advertise(network, sock.LocalAddr()), nil
+	return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, sock, cl.name,
+		telemetry.ClusterType), admit: cl.admit}, cl.advertise(network, sock.LocalAddr()), nil
 }
 
 func (cl *udpDialer) Listen(string, int) (net.Listener, net.Addr, error) {
@@ -146,18 +162,32 @@ func (cl *tcpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api
 			return nil, fmt.Errorf("dialer %s cannot reach a TCP peer over a %s tunnel: RFC 6062 "+
 				"needs a stream transport", cl.name, t.String())
 		}
+		peer, err := net.ResolveTCPAddr("tcp", addr)
+		if err != nil {
+			return nil, err
+		}
+		if err := cl.checkPeer(peer); err != nil {
+			return nil, err
+		}
 		td, err := cl.client()
 		if err != nil {
 			return nil, err
 		}
-		c, err := td.DialContext(ctx, "tcp", addr)
+		c, err := td.DialContext(ctx, "tcp", peer.String())
 		if err != nil {
 			return nil, err
 		}
 		return cl.wrap(c, c), nil
 	}
+	peer, err := cl.rt.Net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if err := cl.checkPeer(peer); err != nil {
+		return nil, err
+	}
 	nd := cl.rt.Net.CreateDialer(&net.Dialer{LocalAddr: local, Control: reuseport.Control})
-	c, err := nd.Dial("tcp", addr)
+	c, err := nd.Dial("tcp", peer.String())
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +214,58 @@ func (cl *tcpDialer) Listen(network string, port int) (net.Listener, net.Addr, e
 	if cl.tunnel != nil {
 		l = rejectListener{l}
 	}
-	return account.Listener(cl.rt.Telemetry, l, cl.name, telemetry.ClusterType),
-		cl.advertise(network, l.Addr()), nil
+	return &filteredListener{Listener: account.Listener(cl.rt.Telemetry, l, cl.name,
+		telemetry.ClusterType), admit: cl.admit}, cl.advertise(network, l.Addr()), nil
+}
+
+// checkPeer fails the dial of a peer the cluster's filters refuse.
+func (b *base) checkPeer(peer net.Addr) error {
+	if b.admit(peer) {
+		return nil
+	}
+	b.log.Infof("cluster %s: filters refuse peer %s", b.name, peer.String())
+	return fmt.Errorf("cluster %s: %w: %s", b.name, errRefused, peer.String())
+}
+
+var errRefused = errors.New("peer refused by the filters")
+
+// filteredPacketConn drops the datagrams to and from the peers the cluster's filters refuse.
+type filteredPacketConn struct {
+	net.PacketConn
+	admit func(net.Addr) bool
+}
+
+// WriteTo drops a datagram to a refused peer silently, as the network would.
+func (c *filteredPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
+	if !c.admit(addr) {
+		return len(p), nil
+	}
+	return c.PacketConn.WriteTo(p, addr)
+}
+
+func (c *filteredPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	for {
+		n, from, err := c.PacketConn.ReadFrom(p)
+		if err != nil || c.admit(from) {
+			return n, from, err
+		}
+	}
+}
+
+// filteredListener closes the conns of the peers the cluster's filters refuse.
+type filteredListener struct {
+	net.Listener
+	admit func(net.Addr) bool
+}
+
+func (l *filteredListener) Accept() (net.Conn, error) {
+	for {
+		c, err := l.Listener.Accept()
+		if err != nil || l.admit(c.RemoteAddr()) {
+			return c, err
+		}
+		_ = c.Close()
+	}
 }
 
 func sanitizePort(p int) int {

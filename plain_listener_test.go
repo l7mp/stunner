@@ -325,8 +325,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 
 			// the peer: a UDP echo server, or a TCP one for the tcp-tcp tunnel
 			peerAddr, peerProto := net.JoinHostPort(tn.peerHost, "25680"), "UDP"
-			upstreamCluster := stnrv2.ClusterConfig{Name: "allow-any", Protocol: "UDP",
-				Endpoints: []string{"0.0.0.0/0"}}
+			upstreamCluster := stnrv2.ClusterConfig{Name: "allow-any", Protocol: "UDP"}
 			if tc.tcpPeer {
 				peerAddr, peerProto = "127.0.0.1:25681", "TCP"
 				upstreamCluster = stnrv2.ClusterConfig{Name: "tcp-echo", Protocol: "TCP",

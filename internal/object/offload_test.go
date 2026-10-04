@@ -220,7 +220,7 @@ func TestOffloadMatrix(t *testing.T) {
 
 				// a TURN server admits the loopback peers, an L4 server forwards to the
 				// peer of the cluster's network
-				eps := []string{"127.0.0.0/8"}
+				eps := []string{"127.0.0.1"}
 				if row.server == stnrv2.ServerTypeL4 {
 					eps = []string{udpPeer.LocalAddr().String()}
 					if row.cluster == stnrv2.ProtocolTCP {
@@ -237,7 +237,7 @@ func TestOffloadMatrix(t *testing.T) {
 					// the upstream TURN server of the tunnel relays to the peers through a
 					// UDP cluster
 					upCluster, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "upstream-peer",
-						Endpoints: []string{"127.0.0.0/8"}, Protocol: "UDP",
+						Endpoints: []string{"127.0.0.1"}, Protocol: "UDP",
 						Addrs: []string{"127.0.0.1"}}, env.rt)
 					require.NoError(t, err)
 					env.start(t, upCluster, nil)

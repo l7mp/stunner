@@ -67,9 +67,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -117,8 +116,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			// the server uses the open cluster
 		},
@@ -147,9 +145,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -180,9 +177,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -211,9 +207,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -240,9 +235,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -274,9 +268,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -338,9 +331,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -375,9 +367,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -426,8 +417,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -455,9 +445,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -505,8 +494,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -535,9 +523,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -592,8 +579,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	/// auth
@@ -622,9 +608,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -671,8 +656,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -700,9 +684,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -749,8 +732,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -778,9 +760,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -833,8 +814,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	/// listener
@@ -864,9 +844,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -902,8 +881,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -931,9 +909,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -977,9 +954,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1007,8 +983,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -1037,9 +1012,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1083,9 +1057,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1107,8 +1080,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			// the server uses the old cluster
 
@@ -1162,9 +1134,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1192,8 +1163,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			// the server uses the old cluster
 
@@ -1247,9 +1217,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"none", "dummy"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1277,8 +1246,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			// the server uses the old cluster
 
@@ -1322,9 +1290,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1348,8 +1315,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	{
@@ -1368,9 +1334,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1414,7 +1379,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
-				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}},
 		},
@@ -1429,7 +1394,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1457,9 +1422,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"renamed-cluster"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "renamed-cluster",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "renamed-cluster",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1471,8 +1435,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "renamed cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1506,7 +1469,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}},
 		},
@@ -1524,7 +1487,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1553,7 +1516,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1:1-2", "2.2.2.2/8:3-4"},
+				Endpoints: []string{"1.1.1.1:2", "2.2.2.2:4"},
 				Protocol:  "UDP",
 			}},
 		},
@@ -1570,8 +1533,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:1-2", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8:3-4", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:2", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2:4", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1600,12 +1563,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}, {
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1617,8 +1579,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
@@ -1626,7 +1587,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1655,12 +1616,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1", "2.2.2.2/8"},
+				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}, {
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1673,8 +1633,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
@@ -1682,7 +1641,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1711,12 +1670,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
-				Endpoints: []string{"1.1.1.1:1-2", "2.2.2.2/8:3-4"},
+				Endpoints: []string{"1.1.1.1:2", "2.2.2.2:4"},
 				Protocol:  "UDP",
 			}, {
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1729,16 +1687,15 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "0.0.0.0/0", "cluster endpoint ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
 			assert.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
-			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:1-2", "cluster endpoint ok")
-			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2/8:3-4", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[0], "1.1.1.1:2", "cluster endpoint ok")
+			assert.Equal(t, clusterEndpoints(t, c)[1], "2.2.2.2:4", "cluster endpoint ok")
 		},
 	},
 	{
@@ -1892,7 +1849,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "tcp-cluster",
 				Type:      stnrv2.ClusterTypeStatic.String(),
-				Endpoints: []string{"1.1.1.1", "2.2.2.0/24"},
+				Endpoints: []string{"1.1.1.1", "2.2.2.1"},
 				Protocol:  stnrv2.ProtocolTCP.String(),
 			}, {
 				Name:      "udp-cluster",
@@ -1938,9 +1895,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -1977,9 +1933,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2014,9 +1969,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2068,7 +2022,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 	},
 	// IPv6: prefix in cluster endpoints.
 	{
-		name: "reconcile-test: IPv6 cluster endpoint (prefix)",
+		name: "reconcile-test: cluster without endpoints",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
@@ -2087,17 +2041,15 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-some"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-some",
-				Endpoints: []string{"2001:db8::/32"},
-				Protocol:  "UDP",
+				Name:     "allow-some",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, "reconcile")
 			c := s.GetCluster("allow-some")
 			require.NotNil(t, c, "cluster found")
-			require.Len(t, clusterEndpoints(t, c), 1, "cluster endpoint count ok")
-			assert.Equal(t, "2001:db8::/32", clusterEndpoints(t, c)[0], "cluster IPv6 prefix ok")
+			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
 		},
 	},
 	// IPv6: mixed IPv4/IPv6 endpoints in a single cluster; routing must match each family.
@@ -2122,7 +2074,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
-				Endpoints: []string{"1.1.1.1", "2001:db8::/32"},
+				Endpoints: []string{"1.1.1.1", "2001:db8::1"},
 				Protocol:  "UDP",
 			}},
 		},
@@ -2132,7 +2084,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			require.NotNil(t, c, "cluster found")
 			require.Len(t, clusterEndpoints(t, c), 2, "cluster endpoint count ok")
 			assert.Equal(t, "1.1.1.1", clusterEndpoints(t, c)[0], "cluster IPv4 endpoint ok")
-			assert.Equal(t, "2001:db8::/32", clusterEndpoints(t, c)[1], "cluster IPv6 prefix ok")
+			assert.Equal(t, "2001:db8::1", clusterEndpoints(t, c)[1], "cluster IPv6 endpoint ok")
 		},
 	},
 	{
@@ -2164,9 +2116,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
+				Name:     "allow-any",
+				Protocol: "UDP",
 			}},
 		},
 		tester: func(t *testing.T, s *Stunner, err error) {
@@ -2203,9 +2154,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 						Clusters: clusters,
 					}},
 					Clusters: []stnrv2.ClusterConfig{{
-						Name:      "allow-any",
-						Endpoints: []string{"0.0.0.0/0"},
-						Protocol:  "UDP",
+						Name:     "allow-any",
+						Protocol: "UDP",
 					}},
 				}
 			}
@@ -2995,7 +2945,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		testName: "removing working cluster",
+		testName: "removing working cluster: the remaining one routes every peer",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -3040,7 +2990,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		restart:         false,
 		bindSuccess:     true,
 		allocateSuccess: true,
-		echoResult:      false,
+		echoResult:      true,
 	},
 	{
 		testName: "reintroducing good cluster to the wrong IP",
@@ -3258,7 +3208,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		testName: "adding port range to cluster ok",
+		testName: "adding a port to the endpoint ok: ports are not enforced",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -3296,7 +3246,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		testName: "extensing port range still ok",
+		testName: "changing the port of the endpoint still ok: ports are not enforced",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
@@ -3322,7 +3272,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
-				Endpoints: []string{"1.2.3.5:1-10000"},
+				Endpoints: []string{"1.2.3.5:1"},
 				Protocol:  "UDP",
 				Addrs:     []string{"1.2.3.4"},
 			}},
@@ -3397,10 +3347,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Clusters: []string{"open-cluster"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "open-cluster",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"1.2.3.4"},
+				Name:     "open-cluster",
+				Protocol: "UDP",
+				Addrs:    []string{"1.2.3.4"},
 			}},
 		},
 		echoServerAddr:  "1.2.3.5:6678",
@@ -3410,7 +3359,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 		echoResult:      true,
 	},
 	{
-		// a cluster with no endpoints still makes relay sockets but admits no peer
+		// a server whose filters deny every peer still makes relay sockets but admits no peer
 		testName: "closing open cluster",
 		config: stnrv2.StunnerConfig{
 			ApiVersion: stnrv2.ApiVersion,
@@ -3431,15 +3380,19 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"open-cluster"},
+				Name:              "udp-ok",
+				Type:              "turn",
+				Clusters:          []string{"open-cluster"},
+				PermissionFilters: []string{"deny-all"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "open-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
+			Filters: []stnrv2.FilterConfig{{Name: "deny-all", Rules: []stnrv2.FilterRule{
+				{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}},
+			}}},
 		},
 		echoServerAddr:  "1.2.3.5:6678",
 		restart:         false,
@@ -3763,11 +3716,10 @@ func makeRaceConfig(realm string) stnrv2.StunnerConfig {
 			Clusters: []string{"allow-any"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "allow-any",
-			Type:      stnrv2.ClusterTypeStatic.String(),
-			Endpoints: []string{"0.0.0.0/0"},
-			Protocol:  stnrv2.ProtocolUDP.String(),
-			Addrs:     []string{"127.0.0.1"},
+			Name:     "allow-any",
+			Type:     stnrv2.ClusterTypeStatic.String(),
+			Protocol: stnrv2.ProtocolUDP.String(),
+			Addrs:    []string{"127.0.0.1"},
 		}},
 	}
 }

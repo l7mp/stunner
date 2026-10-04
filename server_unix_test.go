@@ -44,10 +44,9 @@ var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 				Clusters: []string{"allow-any"},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
-				Endpoints: []string{"0.0.0.0/0"},
-				Protocol:  "UDP",
-				Addrs:     []string{"127.0.0.1"},
+				Name:     "allow-any",
+				Protocol: "UDP",
+				Addrs:    []string{"127.0.0.1"},
 			}},
 		},
 		uri: "turn:1.2.3.4:3478?transport=udp",
@@ -102,10 +101,9 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Clusters: []string{"allow-any"},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:      "allow-any",
-			Endpoints: []string{"0.0.0.0/0"},
-			Protocol:  "UDP",
-			Addrs:     []string{"127.0.0.1"},
+			Name:     "allow-any",
+			Protocol: "UDP",
+			Addrs:    []string{"127.0.0.1"},
 		}},
 	})
 

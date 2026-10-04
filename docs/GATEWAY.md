@@ -314,8 +314,8 @@ Backend reference configuration is as follows:
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
 | `namespace` | `string` | Namespace of the backend Service or StaticService. | No |
-| `port` | `int` | Port of the backend. Not enforced: STUNner admits every port on the backend, see [Access control](SECURITY.md#access-control) for restricting ports. Default: empty.| No |
-| `endPort` | `int` | End of the port range of the backend, if port is also specified. Not enforced, like `port`. Default: empty.| No |
+| `port` | `int` | Port of the backend: the dataplane drops traffic to other ports of the backend. Default: empty (every port).| No |
+| `endPort` | `int` | End of the port range of the backend, if port is also specified. Default: empty.| No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
