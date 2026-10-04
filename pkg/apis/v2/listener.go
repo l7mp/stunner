@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"maps"
 	"net"
 	"reflect"
 	"slices"
@@ -42,6 +43,9 @@ type ListenerConfig struct {
 	PQCMode string `json:"pqc_mode,omitempty"`
 	// Filters name the filters checking a client's source before a conn is made for it.
 	Filters []string `json:"filters,omitempty"`
+	// Labels are key-value pairs every conn of the listener carries in its tag, telling the
+	// servers what the conn is for.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // Validate checks a configuration and injects defaults.
@@ -88,6 +92,9 @@ func (req *ListenerConfig) Validate() error {
 	if req.Filters == nil {
 		req.Filters = []string{}
 	}
+	if req.Labels == nil {
+		req.Labels = map[string]string{}
+	}
 
 	return nil
 }
@@ -117,6 +124,7 @@ func (req *ListenerConfig) DeepCopyInto(dst Config) {
 	ret.Servers = slices.Clone(req.Servers)
 	ret.PublicAddrs = slices.Clone(req.PublicAddrs)
 	ret.Filters = slices.Clone(req.Filters)
+	ret.Labels = maps.Clone(req.Labels)
 }
 
 // String stringifies the configuration.
@@ -158,6 +166,13 @@ func (req *ListenerConfig) String() string {
 	}
 	if len(req.Filters) > 0 {
 		status = append(status, fmt.Sprintf("filters=[%s]", strings.Join(req.Filters, ",")))
+	}
+	if len(req.Labels) > 0 {
+		labels := []string{}
+		for _, k := range slices.Sorted(maps.Keys(req.Labels)) {
+			labels = append(labels, k+"="+req.Labels[k])
+		}
+		status = append(status, fmt.Sprintf("labels={%s}", strings.Join(labels, ",")))
 	}
 
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))

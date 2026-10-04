@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"maps"
 	"net"
 	"strconv"
 	"sync"
@@ -75,6 +76,9 @@ func New(conf *stnrv2.ListenerConfig, rt *runtime.Runtime, admit func(net.Addr) 
 		sink:   sink,
 		admit:  admit,
 		closed: make(chan struct{}),
+	}
+	if len(conf.Labels) > 0 {
+		l.tag.Labels = maps.Clone(conf.Labels)
 	}
 
 	addr := net.JoinHostPort(conf.Addr, strconv.Itoa(conf.Port))

@@ -18,10 +18,12 @@ type Named interface {
 	Name() string
 }
 
-// Tag names the listener or cluster that created a conn, and its protocol.
+// Tag names the listener or cluster that created a conn, and its protocol. Labels are the labels
+// of the listener, nil for none.
 type Tag struct {
-	Name  string
-	Proto stnrv2.Protocol
+	Name   string
+	Proto  stnrv2.Protocol
+	Labels map[string]string
 }
 
 // Conn is a connected transport with its tag and the wire facts the offload engine needs.

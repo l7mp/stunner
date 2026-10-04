@@ -3,6 +3,7 @@ package object
 import (
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net"
 	"sync/atomic"
 
@@ -73,7 +74,8 @@ func (l *Listener) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (
 		return runtime.ActionNone, nil
 	}
 	if cur.Protocol != req.Protocol || cur.Addr != req.Addr || cur.Port != req.Port ||
-		cur.Cert != req.Cert || cur.Key != req.Key || cur.PQCMode != req.PQCMode {
+		cur.Cert != req.Cert || cur.Key != req.Key || cur.PQCMode != req.PQCMode ||
+		!maps.Equal(cur.Labels, req.Labels) {
 		return runtime.ActionRestart, nil
 	}
 	return runtime.ActionReconcile, nil

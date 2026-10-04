@@ -151,6 +151,7 @@ func TestDeepCopyIsExact(t *testing.T) {
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
 	full.Servers[0].PermissionFilters = []string{"peers"}
+	full.Listeners[0].Labels = map[string]string{"role": "control"}
 	validated := validConfig()
 	require.NoError(t, validated.Validate())
 
@@ -168,6 +169,16 @@ func TestDeepCopyIsExact(t *testing.T) {
 		for i := range cp.Auths {
 			for k := range cp.Auths[i].Credentials {
 				cp.Auths[i].Credentials[k] = "changed"
+			}
+		}
+		for i := range cp.Listeners {
+			for k := range cp.Listeners[i].Labels {
+				cp.Listeners[i].Labels[k] = "changed"
+			}
+		}
+		for i := range cp.Servers {
+			for j := range cp.Servers[i].PermissionFilters {
+				cp.Servers[i].PermissionFilters[j] = "changed"
 			}
 		}
 		for i := range cp.Clusters {

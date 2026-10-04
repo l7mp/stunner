@@ -118,12 +118,13 @@ func TestListeners(t *testing.T) {
 	t.Run("TCP", func(t *testing.T) {
 		port := freePort(t, "tcp")
 		accepted := startListener(t, rt, &stnrv2.ListenerConfig{Name: "tcp", Protocol: "TCP",
-			Port: port, Servers: []string{"s"}})
+			Port: port, Servers: []string{"s"}, Labels: map[string]string{"role": "control"}})
 		c, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port))) //nolint:noctx
 		require.NoError(t, err)
 		defer c.Close() //nolint:errcheck
 		roundTrip(t, c, "hello")
-		assert.Equal(t, api.Tag{Name: "tcp", Proto: stnrv2.ProtocolTCP}, (<-accepted).Tag())
+		assert.Equal(t, api.Tag{Name: "tcp", Proto: stnrv2.ProtocolTCP,
+			Labels: map[string]string{"role": "control"}}, (<-accepted).Tag(), "the conn carries the labels")
 	})
 
 	t.Run("TLS", func(t *testing.T) {
