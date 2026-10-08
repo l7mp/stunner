@@ -68,9 +68,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -102,9 +100,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -135,9 +131,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -171,9 +165,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -209,9 +201,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -247,9 +237,7 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",

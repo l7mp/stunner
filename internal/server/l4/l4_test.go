@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/l7mp/stunner/v2/internal/api"
-	"github.com/l7mp/stunner/v2/internal/listener"
 	"github.com/l7mp/stunner/v2/internal/object"
 	quotapkg "github.com/l7mp/stunner/v2/internal/quota"
 	"github.com/l7mp/stunner/v2/internal/resolver"
@@ -63,7 +61,7 @@ type setup struct {
 }
 
 type testServer struct {
-	*object.Server
+	*l4.Server
 	cluster *object.Cluster
 	port    int
 }
@@ -97,24 +95,21 @@ func newTestServer(t *testing.T, c setup) *testServer {
 		start(cl)
 		ts.cluster = cl.(*object.Cluster)
 	}
-	srv, err := object.NewServer(&stnrv2.ServerConfig{Name: "l4", Type: "l4",
-		Clusters: []string{"peers"}}, rt)
+	srv, err := object.NewServer(&stnrv2.ServerConfig{
+		ServerSpec: stnrv2.ServerSpec{Name: "l4", Type: "l4", Clusters: []string{"peers"}},
+	}, rt)
 	require.NoError(t, err)
 	start(srv)
-	s := srv.(*object.Server)
+	s := srv.(*l4.Server)
 
 	port := freePort(t, c.listener)
 	conf := &stnrv2.ListenerConfig{Name: "plain", Protocol: c.listener, Addr: "127.0.0.1",
 		Port: port, Servers: []string{"l4"}}
 	require.NoError(t, conf.Validate())
-	l, err := listener.New(conf, rt, func(net.Addr) bool { return true }, func(conn api.Conn) {
-		if _, _, err := s.Serve(conn); err != nil {
-			_ = conn.Close()
-		}
-	})
+	l, err := object.NewListener(conf, rt)
 	require.NoError(t, err)
 	require.NoError(t, l.Start())
-	t.Cleanup(func() { _ = l.Close() })
+	t.Cleanup(func() { _ = l.Close(false) })
 	ts.Server, ts.port = s, port
 	return ts
 }

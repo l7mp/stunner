@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -541,9 +542,7 @@ func TestStunnerConfigPatcher(t *testing.T) {
 					Servers:  []string{"default-server"},
 				}},
 				Servers: []stnrv2.ServerConfig{{
-					Name:     "default-server",
-					Type:     "turn",
-					Clusters: []string{"allow-any"},
+					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 				}},
 				Clusters: []stnrv2.ClusterConfig{{
 					Name:     "allow-any",
@@ -644,4 +643,24 @@ func checkEchoServerConfig(t *testing.T, c *stnrv2.StunnerConfig) {
 	assert.Equal(t, "echo-server-cluster", c.Clusters[0].Name, "cluster name")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
 	assert.Equal(t, []string{"1.2.3.5"}, c.Clusters[0].Endpoints, "cluster endpoints")
+}
+
+// TestSampleConfigs keeps the sample configs in deploy/config parsing, valid, and free of unknown
+// fields.
+func TestSampleConfigs(t *testing.T) {
+	files, err := filepath.Glob("deploy/config/*.yaml")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "sample configs")
+	t.Setenv("STUNNER_ADDR", "10.0.0.1")
+	t.Setenv("UPSTREAM_ADDR", "10.0.0.2")
+	t.Setenv("SIP_BACKEND", "10.0.0.3")
+	t.Setenv("BACKEND", "10.0.0.4")
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		require.NoError(t, err)
+		require.NoError(t, yaml.UnmarshalStrict(raw, &stnrv2.StunnerConfig{}), "%s: no unknown fields", f)
+		c, err := cdsclient.ParseConfig(raw)
+		require.NoError(t, err, f)
+		require.NoError(t, c.Validate(), f)
+	}
 }

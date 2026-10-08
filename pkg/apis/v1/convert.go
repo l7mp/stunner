@@ -90,7 +90,7 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 			}
 		}
 		filter.Rules = append(filter.Rules, stnrv2.FilterRule{Action: stnrv2.FilterActionDeny.String()})
-		server.PermissionFilters = []string{filter.Name}
+		server.TURN = &stnrv2.TURNServerConfig{PermissionFilters: []string{filter.Name}}
 		ret.Filters = append(ret.Filters, filter)
 	}
 
@@ -131,9 +131,7 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 		Key:         l.Key,
 		PQCMode:     l.PQCMode,
 	}, stnrv2.ServerConfig{
-		Name:     l.Name,
-		Type:     serverType.String(),
-		Clusters: l.Routes,
+		ServerSpec: stnrv2.ServerSpec{Name: l.Name, Type: serverType.String(), Clusters: l.Routes},
 	}
 }
 

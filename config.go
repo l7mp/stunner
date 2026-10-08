@@ -99,9 +99,10 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			Servers:  []string{"default-server"},
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "default-server",
-			Type:     stnrv2.ServerTypeTURN.String(),
-			Clusters: []string{"allow-any"},
+			ServerSpec: stnrv2.ServerSpec{
+				Name:     "default-server",
+				Type:     stnrv2.ServerTypeTURN.String(),
+				Clusters: []string{"allow-any"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "allow-any",

@@ -66,7 +66,7 @@ func TestParseRaw(t *testing.T) {
 		r, err := c.GetClusterConfig("ns/media")
 		require.NoError(t, err)
 		assert.Empty(t, r.Endpoints, "a cluster with a prefix routes every peer")
-		assert.Equal(t, []string{"ns/gw1/udp"}, s.PermissionFilters, "the prefix is the server's filter")
+		assert.Equal(t, []string{"ns/gw1/udp"}, s.TURN.PermissionFilters, "the prefix is the server's filter")
 	})
 
 	t.Run("v2 parses", func(t *testing.T) {
@@ -79,8 +79,9 @@ func TestParseRaw(t *testing.T) {
 				Credentials: map[string]string{"username": "user", "password": "pass"}}},
 			Listeners: []stnrv2.ListenerConfig{{Name: "ns/gw2/tcp", Protocol: "TCP",
 				Servers: []string{"ns/gw2/tcp"}, Addr: "1.2.3.5", Port: 3478}},
-			Servers: []stnrv2.ServerConfig{{Name: "ns/gw2/tcp", Type: "turn",
-				Clusters: []string{"ns/media"}}},
+			Servers: []stnrv2.ServerConfig{{
+				ServerSpec: stnrv2.ServerSpec{Name: "ns/gw2/tcp", Type: "turn", Clusters: []string{"ns/media"}},
+			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "ns/media",
 				Type:      "STATIC",

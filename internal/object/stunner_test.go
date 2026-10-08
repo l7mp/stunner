@@ -56,9 +56,7 @@ func TestStunnerObjectSemantics(t *testing.T) {
 			mustAdd(t, env, cluster)
 
 			server, err := object.NewServer(&stnrv2.ServerConfig{
-				Name:     "server-a",
-				Type:     stnrv2.ServerTypeTURN.String(),
-				Clusters: []string{"cluster-a"},
+				ServerSpec: stnrv2.ServerSpec{Name: "server-a", Type: stnrv2.ServerTypeTURN.String(), Clusters: []string{"cluster-a"}},
 			}, env.rt)
 			require.NoError(t, err)
 			mustAdd(t, env, server)
@@ -106,8 +104,9 @@ func TestStunnerStatus(t *testing.T) {
 		Endpoints: []string{"1.2.3.4"}, Protocol: "UDP"}, env.rt)
 	require.NoError(t, err)
 	mustAdd(t, env, cluster)
-	server, err := object.NewServer(&stnrv2.ServerConfig{Name: "server-a",
-		Clusters: []string{"cluster-a"}}, env.rt)
+	server, err := object.NewServer(&stnrv2.ServerConfig{
+		ServerSpec: stnrv2.ServerSpec{Name: "server-a", Clusters: []string{"cluster-a"}},
+	}, env.rt)
 	require.NoError(t, err)
 	mustAdd(t, env, server)
 	listener, err := object.NewListener(&stnrv2.ListenerConfig{Name: "listener-a",

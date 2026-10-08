@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/pion/transport/v5/reuseport"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/fifo"
 	"github.com/l7mp/stunner/v2/internal/netconn"
 	"github.com/l7mp/stunner/v2/internal/netconn/account"
 	"github.com/l7mp/stunner/v2/internal/runtime"
@@ -34,6 +36,7 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) b
 		rt:    rt,
 		admit: admit,
 		log:   rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", conf.Name)),
+		addrs: slices.Clone(conf.Addrs),
 	}
 
 	if conf.Tunnel != nil {
@@ -43,8 +46,11 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) b
 		}
 		b.tunnel, b.transport = conf.Tunnel.DeepCopy(), u.Protocol
 	}
-	if proto == stnrv2.ProtocolTCP {
+	switch proto {
+	case stnrv2.ProtocolTCP:
 		return &tcpDialer{base: b}, nil
+	case stnrv2.ProtocolFIFO:
+		return &fifoDialer{base: b, fifo: conf.Addrs[0]}, nil
 	}
 	return &udpDialer{base: b}, nil
 }
@@ -56,6 +62,7 @@ type base struct {
 	rt    *runtime.Runtime
 	admit func(net.Addr) bool
 	log   logging.LeveledLogger
+	addrs []string // the addresses of the cluster, advertised for its relays
 	// tunnel is the upstream TURN server, nil for a direct dialer; transport is its transport.
 	tunnel    *stnrv2.TunnelConfig
 	transport stnrv2.Protocol
@@ -75,11 +82,7 @@ func (b *base) wrap(c net.Conn, w netconn.Wire) api.Conn {
 // advertise returns local's port at the cluster's address of the family, else local itself.
 func (b *base) advertise(network string, local net.Addr) net.Addr {
 	wantV6 := strings.HasSuffix(network, "6")
-	var addrs []string
-	if conf := b.rt.ClusterConfig(b.name); conf != nil {
-		addrs = conf.Addrs
-	}
-	for _, a := range addrs {
+	for _, a := range b.addrs {
 		ip := net.ParseIP(a)
 		if ip == nil || (ip.To4() == nil) != wantV6 {
 			continue
@@ -216,6 +219,28 @@ func (cl *tcpDialer) Listen(network string, port int) (net.Listener, net.Addr, e
 	}
 	return &filteredListener{Listener: account.Listener(cl.rt.Telemetry, l, cl.name,
 		telemetry.ClusterType), admit: cl.admit}, cl.advertise(network, l.Addr()), nil
+}
+
+// fifoDialer opens the fifo the first address of its cluster names, whatever it is asked to dial.
+type fifoDialer struct {
+	base
+	fifo string
+}
+
+func (cl *fifoDialer) Dial(ctx context.Context, _ net.Addr, _ string) (api.Conn, error) {
+	c, err := cl.rt.Fifos.DialContext(ctx, fifo.Network, cl.fifo)
+	if err != nil {
+		return nil, err
+	}
+	return cl.wrap(c, nil), nil
+}
+
+func (cl *fifoDialer) ListenPacket(string, int) (net.PacketConn, net.Addr, error) {
+	return nil, nil, api.ErrNotSupported
+}
+
+func (cl *fifoDialer) Listen(string, int) (net.Listener, net.Addr, error) {
+	return nil, nil, api.ErrNotSupported
 }
 
 // checkPeer fails the dial of a peer the cluster's filters refuse.

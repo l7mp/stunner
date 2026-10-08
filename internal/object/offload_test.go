@@ -241,8 +241,9 @@ func TestOffloadMatrix(t *testing.T) {
 						Addrs: []string{"127.0.0.1"}}, env.rt)
 					require.NoError(t, err)
 					env.start(t, upCluster, nil)
-					upServer, err := object.NewServer(&stnrv2.ServerConfig{Name: "upstream",
-						Clusters: []string{"upstream-peer"}}, env.rt)
+					upServer, err := object.NewServer(&stnrv2.ServerConfig{
+						ServerSpec: stnrv2.ServerSpec{Name: "upstream", Clusters: []string{"upstream-peer"}},
+					}, env.rt)
 					require.NoError(t, err)
 					env.start(t, upServer, nil)
 					addr := listen(t, env, upServer, "upstream", up)
@@ -257,8 +258,9 @@ func TestOffloadMatrix(t *testing.T) {
 				require.NoError(t, err)
 				env.start(t, cl, nil)
 
-				srv, err := object.NewServer(&stnrv2.ServerConfig{Name: "server",
-					Type: row.server.String(), Clusters: []string{"peer"}}, env.rt)
+				srv, err := object.NewServer(&stnrv2.ServerConfig{
+					ServerSpec: stnrv2.ServerSpec{Name: "server", Type: row.server.String(), Clusters: []string{"peer"}},
+				}, env.rt)
 				require.NoError(t, err)
 				env.start(t, srv, nil)
 				addr := listen(t, env, srv, "client", client)

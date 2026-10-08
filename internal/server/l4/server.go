@@ -29,9 +29,9 @@ var (
 	errNoEndpoint    = errors.New("no endpoint to forward to")
 )
 
-// Server is an L4 server.
+// Server is an L4 server object.
 type Server struct {
-	name    string
+	server.Base
 	rt      *objruntime.Runtime
 	log     logging.LeveledLogger
 	idle    time.Duration
@@ -40,17 +40,23 @@ type Server struct {
 	events  EventHandler
 	offload *OffloadHandler
 
-	mu          sync.Mutex
+	mu          sync.RWMutex
+	auth        string              // the policy whose realm scopes the quota of the flows
 	acceptQueue *server.AcceptQueue // nil while stopped
 	conntrack   *server.Conntrack
 }
 
-func NewServer(name string, rt *objruntime.Runtime) *Server {
-	log := rt.Logger.NewLogger(fmt.Sprintf("server-%s", name))
+var (
+	_ api.Server        = &Server{}
+	_ objruntime.Object = &Server{}
+)
+
+// New creates the L4 server of a validated config.
+func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
+	log := rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name))
 	// the quota machinery is shared with the TURN server
 	q := turnsrv.NewQuotaHandler(rt)
-	return &Server{
-		name:    name,
+	s := &Server{
 		rt:      rt,
 		log:     log,
 		idle:    FlowTimeout,
@@ -59,9 +65,36 @@ func NewServer(name string, rt *objruntime.Runtime) *Server {
 		events:  NewEventHandler(rt, log, q),
 		offload: NewOffloadHandler(rt, log),
 	}
+	s.Init(conf)
+	if err := s.Reconcile(conf); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
-func (s *Server) Name() string { return s.name }
+// Reconcile applies the spec and the policy to the next flows.
+func (s *Server) Reconcile(conf stnrv2.Config) error {
+	if err := s.Base.Reconcile(conf); err != nil {
+		return err
+	}
+	req, _ := s.Desired(conf)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.auth = req.L4.Auth
+	return nil
+}
+
+func (s *Server) GetConfig() stnrv2.Config {
+	c := s.Base.GetConfig().(*stnrv2.ServerConfig)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c.L4 = &stnrv2.L4ServerConfig{Auth: s.auth}
+	return c
+}
+
+func (s *Server) Status() stnrv2.Status {
+	return &stnrv2.ServerStatus{ServerConfig: s.GetConfig().(*stnrv2.ServerConfig), Sessions: s.Sessions()}
+}
 
 // Start runs the accept loop.
 func (s *Server) Start() error {
@@ -70,7 +103,7 @@ func (s *Server) Start() error {
 	s.acceptQueue, s.conntrack = q, server.NewConntrack(s.idle)
 	s.mu.Unlock()
 	go s.accept(q)
-	s.log.Infof("server %s: L4 server running", s.name)
+	s.log.Infof("server %s: L4 server running", s.Name())
 	return nil
 }
 
@@ -110,9 +143,9 @@ func (s *Server) Close(_ bool) error {
 
 // Sessions returns the number of live flows.
 func (s *Server) Sessions() int {
-	s.mu.Lock()
+	s.mu.RLock()
 	ct := s.conntrack
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if ct == nil {
 		return 0
 	}
@@ -121,9 +154,9 @@ func (s *Server) Sessions() int {
 
 // Serve queues a client conn for the accept loop.
 func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
-	s.mu.Lock()
+	s.mu.RLock()
 	q := s.acceptQueue
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if q == nil {
 		return nil, api.Consumed, server.ErrNotServing
 	}
@@ -135,18 +168,14 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 
 // target picks the target of a new flow from the first cluster that routes one.
 func (s *Server) target() (addr string, d api.Dialer, err error) {
-	conf := s.rt.ServerConfig(s.name)
-	if conf == nil {
-		return "", nil, errNoEndpoint
-	}
-	for _, name := range conf.Clusters {
+	for _, name := range s.Clusters() {
 		r, found := s.rt.Router(name)
 		if !found {
 			continue
 		}
 		dst, ok, err := r.Route(netip.AddrPort{})
 		if err != nil {
-			s.log.Warnf("server %q: skipping cluster %q: %s", s.name, name, err.Error())
+			s.log.Warnf("server %q: skipping cluster %q: %s", s.Name(), name, err.Error())
 			continue
 		}
 		if d, found := s.rt.Dialer(name); ok && found {
@@ -164,7 +193,7 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 	}
 
 	// the gate reserves the quota: every later failure path must release it
-	user, realm := flowIdentity(s.rt, s.name, client.RemoteAddr())
+	user, realm := s.flowIdentity(client.RemoteAddr())
 	if !s.gate(user, realm, client.RemoteAddr()) {
 		return nil, errQuotaExceeded
 	}
@@ -216,9 +245,9 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 			s.events.OnFlowDeleted(f.Event)
 		},
 	}
-	s.mu.Lock()
+	s.mu.RLock()
 	ct := s.conntrack
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if !ct.Add(&f.Entry) {
 		quotaRelease()
 		_ = leg.Close()

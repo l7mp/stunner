@@ -10,6 +10,7 @@ import (
 
 	"github.com/pion/transport/v5"
 
+	"github.com/l7mp/stunner/v2/internal/fifo"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
@@ -30,6 +31,8 @@ type Config struct {
 	License       licensecfg.ConfigManager
 	OffloadEngine offload.Engine
 	Net           transport.Net
+	// Fifos are the in-process fifos the FIFO listeners bind and the FIFO clusters dial.
+	Fifos *fifo.Fifos
 }
 
 // Runtime is the single cross-object access point: process-wide dependencies, the object
@@ -56,6 +59,9 @@ func New(deps Config) *Runtime {
 			License:   deps.License,
 			Log:       deps.Logger.NewLogger("offload"),
 		})
+	}
+	if deps.Fifos == nil {
+		deps.Fifos = fifo.New()
 	}
 	return &Runtime{Config: deps, Registry: NewRegistry()}
 }

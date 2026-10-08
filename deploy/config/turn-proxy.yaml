@@ -1,0 +1,31 @@
+# A TURN proxy: a TURN server whose relay transports are allocated on an upstream TURN server.
+version: v2
+admin:
+  name: turn-proxy
+  loglevel: all:INFO
+auths:
+  - name: default
+    type: static
+    credentials:
+      username: user-1
+      password: pass-1
+  - name: upstream
+    type: static
+    credentials:
+      username: upstream-user
+      password: upstream-pass
+listeners:
+  - name: udp
+    protocol: UDP
+    port: 3478
+    servers: [turn]
+servers:
+  - name: turn
+    type: TURN
+    clusters: [upstream]
+clusters:
+  - name: upstream
+    protocol: UDP
+    tunnel:
+      url: "turn:$UPSTREAM_ADDR:3478?transport=udp"
+      auth: upstream

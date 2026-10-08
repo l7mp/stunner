@@ -22,7 +22,7 @@ type JSONLoggerFactory struct {
 // pion/logging's slog-based JSON backend.
 func NewJSONLoggerFactory(levelSpec string) LoggerFactory {
 	f := &JSONLoggerFactory{
-		Writer:       os.Stdout,
+		Writer:       os.Stderr,
 		scopedLevels: newScopedLevels(),
 	}
 	f.SetLevel(levelSpec)

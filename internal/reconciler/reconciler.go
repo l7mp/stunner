@@ -123,8 +123,16 @@ func (r *Reconciler) run(req *stnrv2.StunnerConfig, dryRun bool) error {
 		}
 	}
 
-	// Phase 5: register the constructed objects with the registry (parents-first).
+	// Phase 5: register the constructed objects with the registry (parents-first), a restarted
+	// one in place of the object it replaces.
 	for _, cr := range created {
+		if cr.replaces != nil {
+			r.log.Debugf("reconciliation: replace %s/%s", cr.obj.Type(), cr.obj.Name())
+			if err := r.rt.Registry.Replace(cr.replaces, cr.obj); err != nil {
+				return fmt.Errorf("replace %s/%s in registry: %w", cr.obj.Type(), cr.obj.Name(), err)
+			}
+			continue
+		}
 		r.log.Debugf("reconciliation: add %s/%s", cr.obj.Type(), cr.obj.Name())
 		if err := r.rt.Registry.Add(cr.obj, cr.parent); err != nil {
 			return fmt.Errorf("add %s/%s to registry: %w", cr.obj.Type(), cr.obj.Name(), err)
@@ -197,7 +205,7 @@ func (r *Reconciler) construct(ops *ops) ([]constructedRef, error) {
 		}
 
 		built[string(cp.typ)+"/"+name] = obj
-		out = append(out, constructedRef{obj: obj, parent: parent})
+		out = append(out, constructedRef{obj: obj, parent: parent, replaces: cp.replaces})
 		ops.addStart(obj)
 	}
 
@@ -254,10 +262,20 @@ func (r *Reconciler) prepareKind(parent runtime.Runnable, parentType runtime.Obj
 			case runtime.ActionReconcile:
 				ops.reconcile = append(ops.reconcile, reconcileRef{Object: reconcilable, Config: conf})
 			case runtime.ActionRestart:
-				ops.reconcile = append(ops.reconcile, reconcileRef{Object: reconcilable, Config: conf})
-				// Make sure all children restart.
-				r.collectRestartStops(obj, ops)
-				r.collectRestartStarts(obj, ops)
+				// a restart replaces the object: the old one closes, a new one is built from
+				// the config; only leaves restart
+				if len(spec.Children) > 0 {
+					return fmt.Errorf("object %s/%s with children cannot restart", obj.Type(),
+						obj.Name())
+				}
+				ops.create = append(ops.create, createPlan{
+					typ:        spec.Type,
+					config:     conf,
+					parentType: parentType,
+					parentName: parentName,
+					replaces:   obj,
+				})
+				ops.addStop(obj)
 				ops.restartedNames = append(ops.restartedNames,
 					fmt.Sprintf("%s: %s", obj.Type(), obj.Name()))
 			default:
@@ -318,28 +336,6 @@ func (r *Reconciler) childTypes(obj runtime.Runnable) []runtime.ObjectType {
 		return nil
 	}
 	return spec.Children
-}
-
-// collectRestartStops records the whole subtree of a restarting object in the stop class,
-// children-first.
-func (r *Reconciler) collectRestartStops(obj runtime.Runnable, ops *ops) {
-	for _, childType := range r.childTypes(obj) {
-		for _, child := range r.rt.Registry.ChildrenOf(obj, childType) {
-			r.collectRestartStops(child, ops)
-		}
-	}
-	ops.addStop(obj)
-}
-
-// collectRestartStarts records the whole subtree of a restarting object in the start class,
-// parents-first.
-func (r *Reconciler) collectRestartStarts(obj runtime.Runnable, ops *ops) {
-	ops.addStart(obj)
-	for _, childType := range r.childTypes(obj) {
-		for _, child := range r.rt.Registry.ChildrenOf(obj, childType) {
-			r.collectRestartStarts(child, ops)
-		}
-	}
 }
 
 // collectDeleteSubtree records an object and all its descendants for stop+delete,

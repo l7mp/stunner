@@ -20,10 +20,10 @@ func TestPermissionHandler(t *testing.T) {
 	log := logger.NewLoggerFactory("all:ERROR")
 	rt := runtime.New(runtime.Config{Logger: log,
 		Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
-	conf := &stnrv2.ServerConfig{Name: "turn", Type: "turn", Clusters: []string{"media"}}
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"media"}}}
 	require.NoError(t, conf.Validate())
-	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeServer, conf: conf}, nil))
-	s := turn.NewServer("turn", rt)
+	s, err := turn.New(conf, rt)
+	require.NoError(t, err)
 	client := &net.UDPAddr{IP: net.ParseIP("192.0.2.1"), Port: 1234}
 	permits := func(ip string) bool { return s.PermissionHandler(client, net.ParseIP(ip)) }
 
@@ -46,14 +46,16 @@ func TestPermissionHandler(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(filter, nil))
-	conf.PermissionFilters = []string{"peers"}
+	conf.TURN.PermissionFilters = []string{"peers"}
+	require.NoError(t, s.Reconcile(conf))
 	assert.True(t, permits("10.1.2.3"), "the exception of the first DENY")
 	assert.False(t, permits("10.1.2.4"), "the first DENY")
 	assert.True(t, permits("10.9.0.1"), "a rule with ports never matches: the ALLOW decides")
 	assert.False(t, permits("192.168.0.1"), "the last DENY")
 
 	// a config change applies to the next permission
-	conf.PermissionFilters = nil
+	conf.TURN.PermissionFilters = nil
+	require.NoError(t, s.Reconcile(conf))
 	assert.True(t, permits("192.168.0.1"), "no filters admit every peer")
 }
 
@@ -70,9 +72,12 @@ func TestAuthHandlerWithoutCredentials(t *testing.T) {
 		auth.Name = stnrv2.DefaultAuthName
 		rt := runtime.New(runtime.Config{Logger: log})
 		require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeAuth, conf: auth}, nil))
-		require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeServer,
-			conf: &stnrv2.ServerConfig{Name: "turn", Type: "TURN", Auth: auth.Name}}, nil))
-		h := turn.NewAuthHandler(rt, "turn", log.NewLogger("auth"))
+		conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "TURN"},
+			TURN: &stnrv2.TURNServerConfig{Auth: auth.Name}}
+		require.NoError(t, conf.Validate())
+		s, err := turn.New(conf, rt)
+		require.NoError(t, err)
+		h := s.AuthHandler()
 		require.NotNil(t, h, auth.Type)
 		for _, user := range []string{"", "user", "1700000000:user"} {
 			_, _, ok := h(&pion.RequestAttributes{Username: user, Realm: auth.Realm,

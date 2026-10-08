@@ -48,11 +48,16 @@ func TestServerObjectSemantics(t *testing.T) {
 				Realm: realm, Credentials: map[string]string{"username": "u", "password": "p"}}}}
 		}
 		withAuth := func(c *stnrv2.ServerConfig, auth string) *stnrv2.ServerConfig {
-			c.Auth = auth
+			if c.TURN != nil {
+				c.TURN.Auth = auth
+			}
+			if c.L4 != nil {
+				c.L4.Auth = auth
+			}
 			return c
 		}
 		server := func(typ stnrv2.ServerType, clusters ...string) *stnrv2.ServerConfig {
-			c := &stnrv2.ServerConfig{Name: "server-a", Type: typ.String(), Clusters: clusters}
+			c := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "server-a", Type: typ.String(), Clusters: clusters}}
 			require.NoError(t, c.Validate())
 			return c
 		}
@@ -92,31 +97,34 @@ func TestServerObjectSemantics(t *testing.T) {
 // keeps its name and config but runs a server of the new kind.
 func TestServerTypeChange(t *testing.T) {
 	env := newLiveEnv(t, nil)
-	obj, err := object.NewServer(&stnrv2.ServerConfig{Name: "server-a",
-		Type: stnrv2.ServerTypeTURN.String()}, env.rt)
+	obj, err := object.NewServer(&stnrv2.ServerConfig{
+		ServerSpec: stnrv2.ServerSpec{Name: "server-a", Type: stnrv2.ServerTypeTURN.String()},
+	}, env.rt)
 	require.NoError(t, err)
 	env.start(t, obj, nil)
 
-	// a type change is a restart: close, reconcile, start
-	require.NoError(t, obj.Close(false))
-	l4 := &stnrv2.ServerConfig{Name: "server-a", Type: stnrv2.ServerTypeL4.String()}
-	require.NoError(t, obj.Reconcile(l4))
-	require.NoError(t, obj.Start())
-	assert.True(t, obj.GetConfig().DeepEqual(l4), "config round trip")
-	status := obj.Status().(*stnrv2.ServerStatus)
-	assert.Equal(t, stnrv2.ServerTypeL4.String(), status.Type)
-	assert.Zero(t, status.Sessions)
+	// a type change is a restart, which replaces the object: it never reconciles in place
+	l4 := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "server-a", Type: stnrv2.ServerTypeL4.String()}}
+	require.NoError(t, l4.Validate())
+	action, err := obj.Inspect(obj.GetConfig(), l4, nil)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.ActionRestart, action)
+	assert.Error(t, obj.Reconcile(l4), "no type change in place")
+	replaced, err := object.NewServer(l4, env.rt)
+	require.NoError(t, err)
+	assert.True(t, replaced.GetConfig().DeepEqual(l4), "the replacement is of the new type")
 
 	// renaming is not a reconcile
-	require.Error(t, obj.Reconcile(&stnrv2.ServerConfig{Name: "server-b"}))
+	require.Error(t, obj.Reconcile(&stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "server-b"}}))
 }
 
 // TestServerServesByName pins that a server object is found by name through the runtime and
 // takes conns only while it runs.
 func TestServerServesByName(t *testing.T) {
 	env := newLiveEnv(t, nil)
-	obj, err := object.NewServer(&stnrv2.ServerConfig{Name: "server-a",
-		Type: stnrv2.ServerTypeL4.String()}, env.rt)
+	obj, err := object.NewServer(&stnrv2.ServerConfig{
+		ServerSpec: stnrv2.ServerSpec{Name: "server-a", Type: stnrv2.ServerTypeL4.String()},
+	}, env.rt)
 	require.NoError(t, err)
 	require.NoError(t, env.rt.Registry.Add(obj, nil))
 

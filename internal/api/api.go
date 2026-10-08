@@ -87,10 +87,3 @@ type Filter interface {
 	Named
 	Match(a netip.AddrPort) (allow, matched bool)
 }
-
-// Listener emits client conns.
-type Listener interface {
-	Named
-	Start() error
-	Close() error
-}

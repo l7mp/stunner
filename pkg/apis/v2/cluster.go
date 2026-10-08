@@ -51,11 +51,12 @@ type ClusterConfig struct {
 	Endpoints []string `json:"endpoints,omitempty"`
 	// RoutingPolicy is ORIGINAL_DST (the destination the client names, the default) or ROUND_ROBIN.
 	RoutingPolicy string `json:"routing_policy,omitempty"`
-	// Protocol is the network the peers are reached over, UDP or TCP. Mandatory.
+	// Protocol is the network the peers are reached over: UDP, TCP, or FIFO. Mandatory.
 	Protocol string `json:"protocol"`
 	// Tunnel is the upstream TURN server the peers are reached through, nil for direct.
 	Tunnel *TunnelConfig `json:"tunnel,omitempty"`
-	// Addrs are the relay addresses, at most one per family; the operator sets status.podIPs.
+	// Addrs are the relay addresses, at most one per family; the operator sets status.podIPs
+	// and FIFOs use custom strings.
 	Addrs []string `json:"addresses,omitempty"`
 	// Filters name the filters checking the cluster's peers, at dial time and on every relayed packet.
 	Filters []string `json:"filters,omitempty"`
@@ -104,6 +105,14 @@ func (req *ClusterConfig) Validate() error {
 		if err := req.Tunnel.Validate(); err != nil {
 			return fmt.Errorf("%w in cluster configuration: %s", err, req.String())
 		}
+	}
+
+	if req.Filters == nil {
+		req.Filters = []string{}
+	}
+
+	if p == ProtocolFIFO && (len(req.Addrs) == 0 || req.Addrs[0] == "") {
+		return fmt.Errorf("FIFO cluster %q names no fifo in its address", req.Name)
 	}
 
 	// Addrs may arrive comma-separated (the k8s downward API renders status.podIPs as

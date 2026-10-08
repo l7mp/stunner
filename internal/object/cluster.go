@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"reflect"
 	"slices"
-	"sync/atomic"
+	"sync"
 
 	"github.com/pion/logging"
 
@@ -19,32 +19,38 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// Cluster is a cluster config, the router over its endpoints and the dialer that reaches them.
+// Cluster is a cluster object: the router over its endpoints and the dialer that reaches them.
+// Reconcile writes the fields under mu, the data path reads them.
 type Cluster struct {
-	name string
-
-	conf       atomic.Pointer[stnrv2.ClusterConfig]
-	router     atomic.Pointer[api.Router]
-	dialer     atomic.Pointer[api.Dialer]
-	registered []string // the domains registered with the resolver
-
+	name  string
 	rt    *runtime.Runtime
 	log   logging.LeveledLogger
 	scope string // of the logger
+
+	mu            sync.RWMutex
+	typ           string
+	endpoints     []string
+	routingPolicy string
+	protocol      stnrv2.Protocol
+	tunnel        *stnrv2.TunnelConfig
+	addrs         []string
+	filters       []string
+	router        api.Router
+	dialer        api.Dialer
+	running       bool
+	registered    []string // the domains registered with the resolver
 }
 
 var (
-	_ api.Router = &Cluster{}
-	_ api.Dialer = &Cluster{}
+	_ api.Router     = &Cluster{}
+	_ api.Dialer     = &Cluster{}
+	_ runtime.Object = &Cluster{}
 )
 
 // NewCluster creates a cluster object.
 func NewCluster(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) {
-	req, ok := conf.(*stnrv2.ClusterConfig)
-	if !ok {
-		return nil, stnrv2.ErrInvalidConf
-	}
-	if err := req.Validate(); err != nil {
+	req, err := desiredCluster(conf)
+	if err != nil {
 		return nil, err
 	}
 	c := &Cluster{
@@ -59,20 +65,28 @@ func NewCluster(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error)
 	return c, nil
 }
 
+// desiredCluster returns the validated cluster config of a New, an Inspect or a Reconcile.
+func desiredCluster(conf stnrv2.Config) (*stnrv2.ClusterConfig, error) {
+	req, ok := conf.(*stnrv2.ClusterConfig)
+	if !ok {
+		return nil, stnrv2.ErrInvalidConf
+	}
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
+
 func (c *Cluster) Name() string             { return c.name }
 func (c *Cluster) Type() runtime.ObjectType { return runtime.TypeCluster }
 
-// Inspect restarts on a dialer change; the router, the addresses and the filters reconcile in
-// place.
+// Inspect reconciles every change in place: a dialer change swaps the dialer, live conns keep
+// theirs.
 func (c *Cluster) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (runtime.Action, error) {
-	req, ok := new.(*stnrv2.ClusterConfig)
-	if !ok {
-		return runtime.ActionNone, stnrv2.ErrInvalidConf
-	}
-	if err := req.Validate(); err != nil {
+	req, err := desiredCluster(new)
+	if err != nil {
 		return runtime.ActionNone, err
 	}
-	cur := old.(*stnrv2.ClusterConfig)
 	if full != nil {
 		for _, name := range req.Filters {
 			if _, err := full.GetFilterConfig(name); err != nil {
@@ -80,39 +94,56 @@ func (c *Cluster) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (r
 			}
 		}
 	}
-	if cur.DeepEqual(req) {
+	if old.(*stnrv2.ClusterConfig).DeepEqual(req) {
 		return runtime.ActionNone, nil
-	}
-	if cur.Protocol != req.Protocol || !reflect.DeepEqual(cur.Tunnel, req.Tunnel) {
-		return runtime.ActionRestart, nil
 	}
 	return runtime.ActionReconcile, nil
 }
 
-// Reconcile rebuilds the router, and moves the resolver registrations of a running cluster to
-// the new domains.
+// Reconcile rebuilds the router, swaps the dialer on a change of its protocol, tunnel or addresses,
+// and moves the resolver registrations of a running cluster to the new domains.
 func (c *Cluster) Reconcile(conf stnrv2.Config) error {
-	req, ok := conf.(*stnrv2.ClusterConfig)
-	if !ok {
-		return stnrv2.ErrInvalidConf
-	}
-	if err := req.Validate(); err != nil {
-		return err
-	}
-	cp := &stnrv2.ClusterConfig{}
-	req.DeepCopyInto(cp)
-
-	r, err := router.New(cp, c.rt, c.log)
+	req, err := desiredCluster(conf)
 	if err != nil {
 		return err
 	}
-	if c.dialer.Load() != nil {
-		if err := c.register(domains(cp)); err != nil {
+	if req.Name != c.name {
+		return fmt.Errorf("cannot rename cluster %q to %q", c.name, req.Name)
+	}
+	proto, _ := stnrv2.NewClusterProtocol(req.Protocol)
+	r, err := router.New(req, c.rt, c.log)
+	if err != nil {
+		return err
+	}
+
+	old, d := c.dialer, c.dialer
+	if old == nil || c.protocol != proto || !reflect.DeepEqual(c.tunnel, req.Tunnel) ||
+		!slices.Equal(c.addrs, req.Addrs) {
+		if d, err = dialer.New(req, c.rt, c.admits); err != nil {
 			return err
 		}
+		if c.running {
+			if err := d.Start(); err != nil {
+				return err
+			}
+		}
 	}
-	c.conf.Store(cp)
-	c.router.Store(&r)
+
+	var tunnel *stnrv2.TunnelConfig
+	if req.Tunnel != nil {
+		tunnel = req.Tunnel.DeepCopy()
+	}
+	c.mu.Lock()
+	c.typ, c.endpoints, c.routingPolicy = req.Type, slices.Clone(req.Endpoints), req.RoutingPolicy
+	c.protocol, c.tunnel, c.addrs = proto, tunnel, slices.Clone(req.Addrs)
+	c.filters, c.router, c.dialer = slices.Clone(req.Filters), r, d
+	c.mu.Unlock()
+	if old != nil && old != d {
+		_ = old.Close(false)
+	}
+	if c.running {
+		return c.register(c.domains())
+	}
 	return nil
 }
 
@@ -131,33 +162,42 @@ func (c *Cluster) register(ds []string) error {
 }
 
 func (c *Cluster) GetConfig() stnrv2.Config {
-	cp := &stnrv2.ClusterConfig{Name: c.name}
-	if conf := c.conf.Load(); conf != nil {
-		conf.DeepCopyInto(cp)
+	c.mu.RLock()
+	conf := &stnrv2.ClusterConfig{
+		Name:          c.name,
+		Type:          c.typ,
+		Endpoints:     slices.Clone(c.endpoints),
+		RoutingPolicy: c.routingPolicy,
+		Protocol:      c.protocol.String(),
+		Addrs:         slices.Clone(c.addrs),
+		Filters:       slices.Clone(c.filters),
 	}
-	return cp
+	if c.tunnel != nil {
+		conf.Tunnel = c.tunnel.DeepCopy()
+	}
+	c.mu.RUnlock()
+	_ = conf.Validate()
+	return conf
 }
 
 // Start runs the dialer and registers the domains with the resolver.
 func (c *Cluster) Start() error {
-	d, err := dialer.New(c.conf.Load(), c.rt, c.admits)
-	if err != nil {
+	if err := c.dialer.Start(); err != nil {
 		return err
 	}
-	if err := d.Start(); err != nil {
-		return err
-	}
-	c.dialer.Store(&d)
-	return c.register(domains(c.conf.Load()))
+	c.mu.Lock()
+	c.running = true
+	c.mu.Unlock()
+	return c.register(c.domains())
 }
 
 // Close unregisters the domains and stops the dialer. Dialed conns stay up.
 func (c *Cluster) Close(shutdown bool) error {
 	_ = c.register(nil)
-	if old := c.dialer.Swap(nil); old != nil {
-		return (*old).Close(shutdown)
-	}
-	return nil
+	c.mu.Lock()
+	c.running = false
+	c.mu.Unlock()
+	return c.dialer.Close(shutdown)
 }
 
 func (c *Cluster) Status() stnrv2.Status {
@@ -169,58 +209,77 @@ func (c *Cluster) Status() stnrv2.Status {
 }
 
 func (c *Cluster) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
-	return (*c.router.Load()).Route(dst)
+	c.mu.RLock()
+	r := c.router
+	c.mu.RUnlock()
+	return r.Route(dst)
 }
 
 func (c *Cluster) Protocol() stnrv2.Protocol {
-	p, _ := stnrv2.NewClusterProtocol(c.conf.Load().Protocol)
-	return p
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.protocol
 }
 
 var errNotRunning = errors.New("cluster is not running")
 
-func (c *Cluster) Dial(ctx context.Context, local net.Addr, addr string) (api.Conn, error) {
-	if d := c.dialer.Load(); d != nil {
-		return (*d).Dial(ctx, local, addr)
+// runningDialer returns the dialer of a running cluster.
+func (c *Cluster) runningDialer() (api.Dialer, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if !c.running {
+		return nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
 	}
-	return nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
+	return c.dialer, nil
+}
+
+func (c *Cluster) Dial(ctx context.Context, local net.Addr, addr string) (api.Conn, error) {
+	d, err := c.runningDialer()
+	if err != nil {
+		return nil, err
+	}
+	return d.Dial(ctx, local, addr)
 }
 
 func (c *Cluster) ListenPacket(network string, port int) (net.PacketConn, net.Addr, error) {
-	if d := c.dialer.Load(); d != nil {
-		return (*d).ListenPacket(network, port)
+	d, err := c.runningDialer()
+	if err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
+	return d.ListenPacket(network, port)
 }
 
 func (c *Cluster) Listen(network string, port int) (net.Listener, net.Addr, error) {
-	if d := c.dialer.Load(); d != nil {
-		return (*d).Listen(network, port)
+	d, err := c.runningDialer()
+	if err != nil {
+		return nil, nil, err
 	}
-	return nil, nil, fmt.Errorf("%s: %w", c.name, errNotRunning)
+	return d.Listen(network, port)
 }
 
 // admits lets through the traffic of the peers the filters of the cluster admit, as they stand at
 // the moment.
 func (c *Cluster) admits(peer net.Addr) bool {
-	names := c.conf.Load().Filters
-	if len(names) == 0 {
+	c.mu.RLock()
+	filters := c.filters
+	c.mu.RUnlock()
+	if len(filters) == 0 {
 		return true
 	}
-	ok := c.rt.Admits(names, peer)
+	ok := c.rt.Admits(filters, peer)
 	if !ok && c.rt.Tracing(c.scope) {
 		c.log.Tracef("cluster %s: filters drop peer %s", c.name, peer.String())
 	}
 	return ok
 }
 
-// domains returns the domain endpoints a config resolves; only a load-balancing cluster has any.
-func domains(conf *stnrv2.ClusterConfig) []string {
+// domains returns the domain endpoints the cluster resolves; only a load-balancing cluster has any.
+func (c *Cluster) domains() []string {
 	ret := []string{}
-	if conf.RoutingPolicy != stnrv2.RoutingPolicyRoundRobin.String() {
+	if c.routingPolicy != stnrv2.RoutingPolicyRoundRobin.String() {
 		return ret
 	}
-	for _, ep := range conf.Endpoints {
+	for _, ep := range c.endpoints {
 		if e, err := stnrv2.ParseEndpoint(ep); err == nil && e.Domain != "" {
 			ret = append(ret, e.Domain)
 		}

@@ -83,10 +83,10 @@ func TestClusterObjectSemantics(t *testing.T) {
 				c.Endpoints = []string{"10.0.0.2:5000"}
 				return c
 			}(), want: runtime.ActionReconcile},
-			{name: "tunnel-change-restart", conf: transport(stnrv2.ProtocolUDP, tunnel("3479"),
-				"10.0.0.1"), want: runtime.ActionRestart},
-			{name: "protocol-change-restart", conf: transport(stnrv2.ProtocolTCP, nil, "10.0.0.1"),
-				want: runtime.ActionRestart},
+			{name: "tunnel-change-reconcile", conf: transport(stnrv2.ProtocolUDP, tunnel("3479"),
+				"10.0.0.1"), want: runtime.ActionReconcile},
+			{name: "protocol-change-reconcile", conf: transport(stnrv2.ProtocolTCP, nil, "10.0.0.1"),
+				want: runtime.ActionReconcile},
 			{name: "addresses-change-reconcile", conf: transport(stnrv2.ProtocolUDP, tunnel("3478"),
 				"10.0.0.2"), want: runtime.ActionReconcile},
 			{name: "routing-policy-change-reconcile", conf: func() *stnrv2.ClusterConfig {

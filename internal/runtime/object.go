@@ -39,8 +39,8 @@ const (
 	ActionNone Action = iota
 	// ActionReconcile means object-local state changes but no restart is required.
 	ActionReconcile
-	// ActionRestart means object-local state changes and the object (plus its subtree) must
-	// be closed, reconciled and started again.
+	// ActionRestart means the object must be replaced: the reconciler closes it and starts a new
+	// one built from the desired config.
 	ActionRestart
 )
 
@@ -66,8 +66,8 @@ type Reconcilable interface {
 	// desired StunnerConfig (full) and reports the object-local decision. Recursion into
 	// children is handled by the reconciler walk, not Inspect.
 	Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (Action, error)
-	// Reconcile applies a new config to the Object. The Object must already be Closed if
-	// the previous Inspect call returned ActionRestart.
+	// Reconcile applies a new config to the Object in place; a restart replaces the Object
+	// instead.
 	Reconcile(conf stnrv2.Config) error
 	// Status returns the live status of the Object.
 	Status() stnrv2.Status

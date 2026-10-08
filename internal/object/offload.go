@@ -173,7 +173,7 @@ func (o *Offload) Reconcile(conf stnrv2.Config) error {
 // Start (re-)pins the process-wide offload engine with the current config. The reconciler calls it
 // only on object create/restart, i.e. on an actual offload-config change.
 func (o *Offload) Start() error {
-	conf := o.GetConfig().(*OffloadConfig)
+	conf := o.conf.Load()
 	return o.rt.OffloadEngine.Start(conf.Engine, conf.Interfaces)
 }
 

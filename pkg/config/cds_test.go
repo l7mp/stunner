@@ -1495,7 +1495,7 @@ func patchConfig(t *testing.T, id, realm string) server.Config {
 	c.Auths[0].Credentials["password"] = "pass-$" + stnrv2.DefaultEnvVarNodeAddr
 	c.Listeners = []stnrv2.ListenerConfig{{Name: "l1", Protocol: "UDP", Port: 3478,
 		Servers: []string{"turn"}}}
-	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
+	c.Servers = []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}}
 	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.1"},
 		Protocol: "UDP", Addrs: []string{"$" + stnrv2.DefaultEnvVarNodeAddr}}}
 	require.NoError(t, c.Validate())
@@ -1791,7 +1791,7 @@ func testConfigListener(id, realm string) server.Config {
 		{Name: "l1", Protocol: "TCP", Port: 3478, Servers: []string{"turn"}},
 		{Name: "l2", Protocol: "UDP", Port: 3479, Servers: []string{"turn"}},
 	}
-	c.Servers = []stnrv2.ServerConfig{{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}
+	c.Servers = []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}}
 	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.1"},
 		Protocol: "UDP", Addrs: []string{"1.1.1.1"}}}
 	_ = c.Validate() // make sure deepeq works

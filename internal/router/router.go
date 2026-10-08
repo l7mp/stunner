@@ -22,24 +22,26 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, log logging.LeveledLog
 		return nil, err
 	}
 	b := base{name: conf.Name, rt: rt}
-	// ORIGINAL_DST has nothing to choose
-	if policy != stnrv2.RoutingPolicyRoundRobin {
+	switch policy {
+	case stnrv2.RoutingPolicyOriginalDst:
 		return &OriginalDst{base: b}, nil
-	}
-	for _, raw := range conf.Endpoints {
-		ep, err := stnrv2.ParseEndpoint(raw)
-		if err != nil {
-			log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
-			continue
+	case stnrv2.RoutingPolicyRoundRobin:
+		for _, raw := range conf.Endpoints {
+			ep, err := stnrv2.ParseEndpoint(raw)
+			if err != nil {
+				log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
+				continue
+			}
+			if ep.Port == 0 {
+				log.Warnf("cluster %s: skipping endpoint %q: a %s cluster dials an endpoint at "+
+					"its port", conf.Name, raw, policy.String())
+				continue
+			}
+			b.endpoints = append(b.endpoints, ep)
 		}
-		if ep.Port == 0 {
-			log.Warnf("cluster %s: skipping endpoint %q: a %s cluster dials an endpoint at its "+
-				"port", conf.Name, raw, policy.String())
-			continue
-		}
-		b.endpoints = append(b.endpoints, ep)
+		return &RoundRobin{base: b}, nil
 	}
-	return &RoundRobin{base: b}, nil
+	return nil, fmt.Errorf("cluster %s: unsupported routing policy %q", conf.Name, policy.String())
 }
 
 type base struct {

@@ -11,6 +11,7 @@ import (
 	"github.com/pion/transport/v5/stdnet"
 	"golang.org/x/time/rate"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/quota"
@@ -250,7 +251,7 @@ func (s *Stunner) SetLogLevel(levelSpec string) { s.logger.SetLevel(levelSpec) }
 func (s *Stunner) AllocationCount() int {
 	n := 0
 	for _, srv := range s.GetServers() {
-		n += srv.Sessions()
+		n += srv.(api.Server).Sessions()
 	}
 	return n
 }
@@ -335,22 +336,22 @@ func (s *Stunner) GetListener(name string) *object.Listener {
 }
 
 // GetServers returns every Server in stable order.
-func (s *Stunner) GetServers() []*object.Server {
+func (s *Stunner) GetServers() []runtime.Object {
 	objs := s.rt.Registry.List(runtime.TypeServer)
-	out := make([]*object.Server, 0, len(objs))
+	out := make([]runtime.Object, 0, len(objs))
 	for _, o := range objs {
-		out = append(out, o.(*object.Server))
+		out = append(out, o.(runtime.Object))
 	}
 	return out
 }
 
 // GetServer returns a Server by name, or nil if not found.
-func (s *Stunner) GetServer(name string) *object.Server {
+func (s *Stunner) GetServer(name string) runtime.Object {
 	o, ok := s.rt.Registry.Get(runtime.TypeServer, name)
 	if !ok {
 		return nil
 	}
-	return o.(*object.Server)
+	return o.(runtime.Object)
 }
 
 // GetCluster returns a Cluster by name, or nil if not found.

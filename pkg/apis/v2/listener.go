@@ -15,14 +15,14 @@ import (
 type ListenerConfig struct {
 	// Name of the listener.
 	Name string `json:"name,omitempty"`
-	// Protocol is the transport the listener accepts clients over: UDP, TCP, TLS, DTLS or
-	// STDIN. Default is UDP.
+	// Protocol is the transport the listener accepts clients over: UDP, TCP, TLS, DTLS, STDIN,
+	// or FIFO.
 	Protocol string `json:"protocol,omitempty"`
 	// Servers is the chain of servers the listener feeds, in order: each server either consumes
 	// a conn or passes it on to the next one.
 	Servers []string `json:"servers"`
-	// Addr is the IP address the listener binds. Default (empty) is every address of the host,
-	// both families on a dual-stack host.
+	// Addr is the IP address the listener binds or a plain string for FIFOs. Default (empty)
+	// is every address of the host, both families on a dual-stack host.
 	Addr string `json:"address,omitempty"`
 	// Port is the port the listener binds. Default is 3478.
 	Port int `json:"port,omitempty"`
@@ -62,9 +62,12 @@ func (req *ListenerConfig) Validate() error {
 	}
 	req.Protocol = proto.String()
 
-	// A STDIN listener serves the process stdio pair: it has no socket, so it ignores the
-	// port, and gets no default for it.
-	if proto != ProtocolSTDIN && req.Port == 0 {
+	// A STDIN listener serves the process stdio pair and a FIFO listener a named fifo: neither
+	// has a socket, so they ignore the port and get no default for it.
+	if proto == ProtocolFIFO && req.Addr == "" {
+		return fmt.Errorf("FIFO listener %q names no fifo in its address", req.Name)
+	}
+	if proto != ProtocolSTDIN && proto != ProtocolFIFO && req.Port == 0 {
 		req.Port = DefaultPort
 	}
 	if req.Port < 0 || req.Port > 65535 {
@@ -140,8 +143,12 @@ func (req *ListenerConfig) String() string {
 	if req.Addr != "" && req.Addr != "$STUNNER_ADDR" {
 		addr = req.Addr
 	}
-	status = append(status, fmt.Sprintf("%s://%s", strings.ToLower(req.Protocol),
-		net.JoinHostPort(addr, strconv.Itoa(req.Port))))
+	if req.Protocol == ProtocolFIFO.String() {
+		status = append(status, "fifo://"+req.Addr)
+	} else {
+		status = append(status, fmt.Sprintf("%s://%s", strings.ToLower(req.Protocol),
+			net.JoinHostPort(addr, strconv.Itoa(req.Port))))
+	}
 	status = append(status, fmt.Sprintf("servers=[%s]", strings.Join(req.Servers, ",")))
 
 	a, p := "-", "-"

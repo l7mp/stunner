@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -118,23 +119,7 @@ func main() {
 		logLevel = *level
 	}
 
-	// Three positional arguments select tunnel mode, with turncat's argument shape. The
-	// tunnel is a pipe-friendly CLI: quiet by default, unless a log level is set.
-	if flag.NArg() == 3 {
-		if !*verbose && *level == "" {
-			logLevel = "all:WARN"
-		}
-		runTunnel(flag.Arg(0), flag.Arg(1), flag.Arg(2), tunnelOptions{
-			sni:       *sni,
-			insecure:  *insecure,
-			logLevel:  logLevel,
-			logFormat: *logFormat,
-			license:   license,
-			offload:   *offload,
-		})
-		return
-	}
-	if flag.NArg() > 1 {
+	if flag.NArg() == 2 || flag.NArg() > 3 {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -188,6 +173,16 @@ func main() {
 			os.Exit(1)
 		}
 
+		conf <- c
+
+	} else if flag.NArg() == 3 {
+		log.Infof("starting %s in tunnel mode: %s -> %s -> %s", os.Args[0], flag.Arg(0),
+			flag.Arg(1), flag.Arg(2))
+		c, err := tunnelConfig(flag.Arg(0), flag.Arg(1), flag.Arg(2), *sni, *insecure)
+		if err != nil {
+			log.Errorf("invalid tunnel: %s", err.Error())
+			os.Exit(1)
+		}
 		conf <- c
 
 	} else if !*watch {
@@ -312,4 +307,123 @@ func main() {
 			log.Trace("reconciliation ready")
 		}
 	}
+}
+
+// tunnelConfig renders the tunnel-mode stunnerd config from the three positional arguments:
+// one plain (or stdin) listener feeding an L4 server, whose single cluster holds the peer and
+// reaches it over the peer URI's transport through a tunnel to the TURN server.
+func tunnelConfig(clientArg, serverArg, peerArg, sni string, insecure bool) (*stnrv2.StunnerConfig, error) {
+	tunnel, auth, proto, err := tunnelServer(serverArg)
+	if err != nil {
+		return nil, err
+	}
+	tunnel.Insecure = insecure
+	if sni != "" {
+		if proto != stnrv2.ProtocolTURNTLS && proto != stnrv2.ProtocolTURNDTLS {
+			return nil, fmt.Errorf("--sni is valid only for the TLS/DTLS transports, "+
+				"server transport is %q", proto.String())
+		}
+		tunnel.SNI = sni
+	}
+
+	listener := stnrv2.ListenerConfig{
+		Name:    "tunnel-listener",
+		Servers: []string{"tunnel-server"},
+	}
+	if clientArg == "-" {
+		listener.Protocol = stnrv2.ProtocolSTDIN.String()
+	} else {
+		u, err := stnrv2.ParseURI(clientArg)
+		if err != nil {
+			return nil, fmt.Errorf("invalid client address %q: %w", clientArg, err)
+		}
+		if p := u.Protocol; p != stnrv2.ProtocolUDP && p != stnrv2.ProtocolTCP {
+			return nil, fmt.Errorf("invalid client address %q: expecting udp:// or "+
+				"tcp:// (or \"-\" for stdin)", clientArg)
+		}
+		listener.Protocol = u.Protocol.String()
+		listener.Addr = u.Host
+		listener.Port = u.Port
+	}
+
+	// The peer URI's scheme names the transport the cluster reaches the peer over, and its host
+	// and port make the cluster's only endpoint: the host may be a DNS name resolvable only where
+	// the tunnel runs.
+	scheme, hostport, _ := strings.Cut(peerArg, "://")
+	peerProto, err := stnrv2.NewClusterProtocol(scheme)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer address %q: expecting "+
+			"<udp|tcp>://<host>:<port>", peerArg)
+	}
+	peer, err := stnrv2.ParseEndpoint(hostport)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer address %q: %w", peerArg, err)
+	}
+	if _, dialable := peer.HostPort(); !dialable {
+		return nil, fmt.Errorf("invalid peer address %q: expecting a single host and port",
+			peerArg)
+	}
+	clusterType := stnrv2.ClusterTypeStatic
+	if peer.Domain != "" {
+		clusterType = stnrv2.ClusterTypeStrictDNS
+	}
+
+	noHealthCheck := ""
+	c := &stnrv2.StunnerConfig{
+		ApiVersion: stnrv2.ApiVersion,
+		Admin: stnrv2.AdminConfig{
+			Name:                "tunnel",
+			HealthCheckEndpoint: &noHealthCheck,
+		},
+		// the plain listener authenticates nobody; the tunnel presents the upstream credentials
+		Listeners: []stnrv2.ListenerConfig{listener},
+		Servers: []stnrv2.ServerConfig{{
+			ServerSpec: stnrv2.ServerSpec{
+				Name:     "tunnel-server",
+				Type:     stnrv2.ServerTypeL4.String(),
+				Clusters: []string{"tunnel-cluster"}},
+		}},
+		Clusters: []stnrv2.ClusterConfig{{
+			Name:          "tunnel-cluster",
+			Type:          clusterType.String(),
+			Endpoints:     []string{hostport},
+			RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String(),
+			Protocol:      peerProto.String(),
+			Tunnel:        tunnel,
+		}},
+	}
+	if auth != nil {
+		auth.Name, tunnel.Auth = "upstream", "upstream"
+		c.Auths = []stnrv2.AuthConfig{*auth}
+	}
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// tunnelServer parses the TURN server URI into the tunnel to reach the peer through, the
+// authentication policy the tunnel presents (nil for none) and the transport of the tunnel.
+func tunnelServer(arg string) (*stnrv2.TunnelConfig, *stnrv2.AuthConfig, stnrv2.Protocol, error) {
+	u, err := stnrv2.ParseURI(arg)
+	if err != nil {
+		return nil, nil, stnrv2.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: %w", arg, err)
+	}
+	if !u.Protocol.IsTURN() {
+		return nil, nil, stnrv2.ProtocolUnknown, fmt.Errorf("invalid TURN server URI %q: "+
+			"not a TURN transport", arg)
+	}
+
+	// the URL renders without the credentials
+	var auth *stnrv2.AuthConfig
+	switch {
+	case u.Username != "" && u.Password != "":
+		auth = &stnrv2.AuthConfig{Type: "static", Credentials: map[string]string{
+			"username": u.Username, "password": u.Password}}
+	case u.Username != "":
+		// a bare secret mints per-allocation time-windowed credentials
+		auth = &stnrv2.AuthConfig{Type: "ephemeral", Credentials: map[string]string{
+			"secret": u.Username}}
+	}
+	return &stnrv2.TunnelConfig{URL: u.String()}, auth, u.Protocol, nil
 }

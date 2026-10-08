@@ -39,9 +39,7 @@ var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -96,9 +94,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Key:      keyPem64,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "default-server",
-			Type:     "turn",
-			Clusters: []string{"allow-any"},
+			ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "allow-any",
@@ -168,9 +164,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Port:     25000,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "tunnel",
-			Type:     "l4",
-			Clusters: []string{"sink"},
+			ServerSpec: stnrv2.ServerSpec{Name: "tunnel", Type: "l4", Clusters: []string{"sink"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:          "sink",

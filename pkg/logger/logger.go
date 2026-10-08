@@ -33,6 +33,6 @@ type Options struct {
 	// If non-positive, the caller should use its own default burst size.
 	Burst int
 	// Writer is the log output stream. If nil, the caller should use its own default
-	// (os.Stdout). Set it to os.Stderr when stdout carries payload (stdin/stdout tunnels).
+	// (os.Stderr).
 	Writer io.Writer
 }

@@ -81,12 +81,13 @@ func NewEventHandler(rt *objruntime.Runtime, log logging.LeveledLogger, q *turns
 // flowIdentity mints the quota identity of a flow: the L4 analog of the TURN username is the
 // client's source IP (raw flows carry no credentials, so the quota principal is the client
 // endpoint), under the realm of the authentication policy the server names, if any.
-func flowIdentity(rt *objruntime.Runtime, server string, srcAddr net.Addr) (username, realm string) {
+func (s *Server) flowIdentity(srcAddr net.Addr) (username, realm string) {
+	s.mu.RLock()
+	name := s.auth
+	s.mu.RUnlock()
 	realm = stnrv2.DefaultRealm
-	if conf := rt.ServerConfig(server); conf != nil {
-		if auth := rt.AuthConfig(conf.Auth); auth != nil {
-			realm = auth.Realm
-		}
+	if auth := s.rt.AuthConfig(name); auth != nil {
+		realm = auth.Realm
 	}
 	switch a := srcAddr.(type) {
 	case *net.UDPAddr:

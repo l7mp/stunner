@@ -2,16 +2,7 @@
 
 The `stunnerd` daemon implements the STUNner gateway dataplane.
 
-The daemon supports two basic modes. For quick tests `stunnerd` can be configured as a TURN server
-by specifying a TURN network URI on the command line. For more complex scenarios, and especially
-for use in a Kubernetes cluster, `stunnerd` can take configuration from a config origin, which can
-either be a config file or from a remote server reached over WebSocket. In addition, `stunnerd`
-implements a watch-mode, so that it can actively monitor the config origin for updates and
-automatically reconcile the TURN server to any new configuration. This mode is intended for use
-with the [STUNner Kubernetes gateway operator](https://github.com/l7mp/stunner-gateway-operator):
-the operator watches the Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io) resources,
-renders the active control plane configuration per each `stunnerd` pod and dynamically updates the
-dataplane using STUNner's config discovery service.
+The daemon supports two basic modes. For quick tests `stunnerd` can be configured as a TURN server by specifying a TURN network URI on the command line. For more complex scenarios, and especially for use in a Kubernetes cluster, `stunnerd` can take configuration from a config origin, which can either be a config file or from a remote Config Discovery Service (CDS) server reached over WebSocket. In addition, `stunnerd` implements a watch-mode, so that it can actively monitor the config origin for updates and automatically reconcile the TURN server to any new configuration. This mode is intended for use with the [STUNner Kubernetes gateway operator](https://github.com/l7mp/stunner-gateway-operator): the operator watches the Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io) resources, renders the active control plane configuration per each `stunnerd` pod and dynamically updates the dataplane using STUNner's config discovery service.
 
 ## Features
 
@@ -29,101 +20,36 @@ dataplane using STUNner's config discovery service.
 
 ## Getting Started
 
-### Installation
-
-As easy as with any Go program.
+Installation is As easy as with any Go program.
 
 ```console
 cd stunner
 go build -o stunnerd cmd/stunnerd/main.go
 ```
 
-### Usage
+## Usage
 
-The below command will open a `stunnerd` UDP listener at `127.0.0.1:5000`, set `static` authentication using the username/password pair `user1/passwrd1`, and raise the debug level to the maximum and set the logging format to JSON.
+To quickly fire up a TURN server or a TURN proxy, use `stunnerd` via the command line configuration interface.  The number of positional arguments selects the operation mode: a single TURN URI runs a standalone TURN server with the default configuration and three arguments enable the tunnel mode. 
+
+In the TURN server mode, provide on single TURN URI:
+
+```console
+stunnerd [options] <turn-URI>
+```
+
+The below command will open a TURN server listener at `127.0.0.1:5000` over UDP, set `static` authentication using the username/password pair `user1/passwrd1`, and set the maximum debug level JSON logging format.
 
 ```console
 ./stunnerd --log=all:TRACE --log-format=json turn://user1:passwd1@127.0.0.1:5000
 ```
 
-Alternatively, run `stunnerd` in verbose mode with the config file taken from `cmd/stunnerd/stunnerd.conf`. Adding the flag `-w` will enable watch mode.
+The tunnel mode tunnels a local client socket through a TURN server to a remote peer. Tunnel mode is the successor of the retired `turncat` utility. The general CLI shape for the tunnel mode invocation is as below:
 
 ```console
-./stunnerd -v -w -c file://cmd/stunnerd/stunnerd.conf
+stunnerd [options] <client-addr> <turn-URI> <peer-addr>
 ```
 
-A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON `licensegen -o json` writes (`{"license_config":{"key":"...","hmac":"..."}}`) or just the inner `{"key":"...","hmac":"..."}`, and `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`) on every interface. On SIGTERM, `stunnerd` fails its readiness check and waits for the live sessions to end; `--no-graceful-shutdown` makes it close them and exit at once.
-
-```console
-./stunnerd -c file://cmd/stunnerd/stunnerd.conf --license '{"key":"...","hmac":"..."}' --offload tc
-```
-
-Type `./stunnerd -h` to get a short description of the supported command line arguments.
-
-In practice, you'll rarely need to run `stunnerd` directly: just fire up the [prebuilt container image](https://hub.docker.com/repository/docker/l7mp/stunnerd) in Kubernetes and you should be good to go. Or better yet, [install](/docs/INSTALL.md) the STUNner Kubernetes gateway operator that will readily manage the `stunnerd` pods for each Gateway you create.
-
-## Configuration
-
-A `stunnerd` configuration (API version `v2`) is built from three kinds of objects: a **listener** accepts client connections on a transport (`UDP`, `TCP`, `TLS`, `DTLS`, or `STDIN`) and hands every accepted connection down the chain of servers, a **server** processes a client connection (`turn`, `l4`) and hands it to one of a set of clusters, and a **cluster** is a named set of peer `endpoints`, the `routing_policy` over them, and the transport that reaches them. The routing policy is `FILTER` (the default) for a cluster behind a `turn` server, which admits the peers the endpoints contain, and a load-balancing policy, `ROUND_ROBIN`, for a cluster behind an `l4` server, which dials the single-port endpoints in turn; a server skips a cluster of the other kind.
-
-Using the below configuration, `stunnerd` opens 4 listeners: two for unencrypted connections at UDP/3478 and TCP/3478 and two for encrypted connections at TLS/3479 and DTLS/3479, all served by the same TURN server. The daemon uses `ephemeral` authentication, with the shared secret taken from the environment variable `$STUNNER_SHARED_SECRET` during initialization, and it relays to any peer, over UDP and TCP (for [RFC 6062](https://tools.ietf.org/html/rfc6062) TCP allocations). The listeners bind every interface, and the relay address the clusters advertise is taken from the `$STUNNER_ADDR` environment variable.
-
-``` yaml
-version: v2
-admin:
-  name: my-stunnerd
-  loglevel: all:DEBUG
-auths:
-  - name: default
-    type: ephemeral
-    realm: "my-realm.example.com"
-    credentials:
-      secret: $STUNNER_SHARED_SECRET
-listeners:
-  - name: stunnerd-udp
-    protocol: UDP
-    port: 3478
-    servers: [turn-server]
-  - name: stunnerd-tcp
-    protocol: TCP
-    port: 3478
-    servers: [turn-server]
-  - name: stunnerd-tls
-    protocol: TLS
-    port: 3479
-    cert: "<base64 PEM certificate>"
-    key: "<base64 PEM key>"
-    servers: [turn-server]
-  - name: stunnerd-dtls
-    protocol: DTLS
-    port: 3479
-    cert: "<base64 PEM certificate>"
-    key: "<base64 PEM key>"
-    servers: [turn-server]
-servers:
-  - name: turn-server
-    type: TURN
-    clusters:
-      - open-udp
-      - open-tcp
-clusters:
-  - name: open-udp
-    protocol: UDP
-    addresses: ["$STUNNER_ADDR"]
-  - name: open-tcp
-    protocol: TCP
-    addresses: ["$STUNNER_ADDR"]
-```
-
-## Tunnel mode
-
-The positional argument count selects `stunnerd`'s mode: no arguments run the dataplane daemon from the config origin (`-c`), a single TURN listener URI runs a standalone TURN server with a default configuration, and three arguments select tunnel mode, which tunnels a local client socket, or the stdin/stdout pair, through a TURN server to a fixed peer. Tunnel mode is the successor of the retired `turncat` utility and keeps its command line shape:
-
-```console
-stunnerd [options] <client-addr> <turn-server-addr> <peer-addr>
-```
-
-where `client-addr` is `udp://<addr>:<port>`, `tcp://<addr>:<port>`, or `-` for a stdin/stdout tunnel; `turn-server-addr` is a TURN URI (`turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls]`, the `<auth>` userinfo being a `username:password` pair for static authentication or a bare shared secret for ephemeral credentials); and `peer-addr` is `udp://<addr>:<port>` or `tcp://<addr>:<port>`, the transport the tunnel reaches the peer over (the address may be a domain name, resolved where the tunnel runs).
+Here, `client-addr` configures the client socket (e.g., `udp://<addr>:<port>`, `tcp://<addr>:<port>`, or `-` for a stdin/stdout tunnel), `turn-URI` is a TURN server URI (`turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls]`, where the `<auth>` is a `username:password` pair for static authentication or a bare shared secret for ephemeral credentials); and `peer-addr` is the remote peer to connect to via the TURN tunnel (e.g., `udp://<addr>:<port>` or `tcp://<addr>:<port>`).
 
 The below opens a local UDP tunnel endpoint at port 5000 that relays through the TURN server at `1.2.3.4:3478` to a media server at `10.0.0.1:9000`:
 
@@ -132,6 +58,28 @@ stunnerd udp://127.0.0.1:5000 turn://user:pass@1.2.3.4:3478 udp://10.0.0.1:9000
 ```
 
 The `--sni` and `--insecure` flags apply to the TLS/DTLS transports (note that `--insecure` has no `-i` shorthand, which belongs to `--id`). A tunnel is quiet by default (`all:WARN`) unless a log level is set. Internally, tunnel mode renders a `UDP`, `TCP` or `STDIN` listener feeding an `L4` server, a single cluster holding the peer and tunnelled through the TURN server, presenting the credentials of an authentication policy named `upstream`, and runs the normal reconcile machinery on the result: there is no separate tunnel datapath. Logs go to stderr, so a stdin/stdout tunnel composes cleanly in shell pipelines; the process exits when the stdin flow ends.
+
+Type `./stunnerd -h` to get a short description of the supported command line arguments.
+
+## Configuration
+
+Alternatively, configure `stunnerd` with a config file. For instance, the below reads the config file from `cmd/stunnerd/stunnerd.conf` and selects verbose mode, while adding the flag `-w` will enable watch mode.
+
+```console
+./stunnerd -v -w -c file://cmd/stunnerd/stunnerd.conf
+```
+
+Configuration files for `stunnerd`, now at API version `v2`, are built from five config objects:
+
+- Listeners accept client connections (`UDP`, `TCP`, `TLS`, `DTLS`, `STDIN` or `FIFO`) and hand them to a chain of servers for processing.
+- Servers (`TURN`, `L4`, `SIP` or `RTP`) serve connections through a set of clusters.
+- Clusters define the endpoints reachable via the cluster (addresses or domains, with an optional port) plus a routing policy and the transport protocol to reach them.
+- Filters are ordered list of allow/deny rules on addresses and ports. Filters can be invoked at various points in the processing pipeline: listener filters are applied at the ingress, cluster filters at the egress, etc. The first matching rule decides and unmatched traffic passes; a rule without an `ip_block` matches every address, so end an allow-list with a bare `- action: DENY`.
+- Auth configs are named authentication policies (`static`, `ephemeral` or `none`).
+
+A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON (e.g., `{"key":"...","hmac":"..."}`); `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`) on every interface; and `--no-graceful-shutdown` disables graceful shutdowns: normally on being closed `stunnerd` waits for live sessions to end, which minimizes disruptions to clients but may take minutes or hours, which this flag disables and lets `stunnerd` to close immediately.
+
+In practice, you'll rarely need to run `stunnerd` directly: just fire up the [prebuilt container image](https://hub.docker.com/repository/docker/l7mp/stunnerd) in Kubernetes and you should be good to go. Or better yet, [install](/docs/INSTALL.md) the STUNner Kubernetes gateway operator that will readily manage the `stunnerd` pods for each Gateway you create.
 
 ## License
 

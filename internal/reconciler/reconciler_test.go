@@ -300,6 +300,7 @@ func TestReconcileFlow(t *testing.T) {
 	env.addObject(testItemType, &fakeConfig{Name: "reconcile"})
 	env.addObject(testItemType, &fakeConfig{Name: "restart"})
 	env.addObject(testItemType, &fakeConfig{Name: "delete"})
+	before, _ := env.rt.Registry.Get(testItemType, "restart")
 
 	env.setDesired(testItemType,
 		&fakeConfig{Name: "reconcile", Decision: runtime.ActionReconcile},
@@ -317,16 +318,20 @@ func TestReconcileFlow(t *testing.T) {
 	_, foundNew := env.rt.Registry.Get(testItemType, "new")
 	require.True(t, foundNew)
 
+	// a restart replaces the object: a new one is built, the old one closes, the new one starts
+	after, _ := env.rt.Registry.Get(testItemType, "restart")
+	require.NotSame(t, before, after, "the restarted object is replaced")
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{
+		"factory:test-item/restart",
 		"factory:test-item/new",
 		"close:test-item/restart:false",
 		"close:test-item/delete:false",
 		"reconcile:test-item/reconcile",
-		"reconcile:test-item/restart",
 		"start:test-item/restart",
 		"start:test-item/new",
 	})
+	assertNoPrefix(t, events, "reconcile:test-item/restart")
 }
 
 func TestDryRun(t *testing.T) {
@@ -362,9 +367,10 @@ func TestDryRun(t *testing.T) {
 
 	events := env.rec.snapshot()
 	assertOrderedSubsequence(t, events, []string{
+		"factory:test-item/old",
 		"factory:test-item/new",
-		"reconcile:test-item/old",
 	})
+	assertNoPrefix(t, events, "reconcile:")
 	assertNoPrefix(t, events, "close:")
 	assertNoPrefix(t, events, "start:")
 }

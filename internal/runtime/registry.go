@@ -76,6 +76,19 @@ func (r *Registry) Add(o Runnable, parent Runnable) error {
 	return nil
 }
 
+// Replace puts a node in place of the node of the same type and name, keeping its parent edge.
+func (r *Registry) Replace(old, o Runnable) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	k := keyOf(o)
+	n, ok := r.items[k]
+	if !ok || keyOf(old) != k || n.obj != old {
+		return fmt.Errorf("registry: no node (type:%s/name:%s) to replace", k.typ, k.name)
+	}
+	n.obj = o
+	return nil
+}
+
 // Remove unregisters a node.
 func (r *Registry) Remove(o Runnable) error {
 	r.mu.Lock()

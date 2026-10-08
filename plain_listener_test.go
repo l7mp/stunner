@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/server/l4"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
@@ -38,9 +39,7 @@ func plainListenerConfig(proto, host string, port int, endpoints ...string) *stn
 			Port:     port,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "plain",
-			Type:     "l4",
-			Clusters: []string{"peer"},
+			ServerSpec: stnrv2.ServerSpec{Name: "plain", Type: "l4", Clusters: []string{"peer"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:          "peer",
@@ -104,7 +103,7 @@ func TestStunnerPlainListener(t *testing.T) {
 		require.NoError(t, err, "echo")
 		assert.Equal(t, "Hello", string(buf[:n]), "echo payload")
 
-		srv := s.GetServer("plain")
+		srv := s.GetServer("plain").(api.Server)
 		require.NotNil(t, srv, "server")
 		assert.Equal(t, 1, srv.Sessions(), "flow counted as allocation")
 	})
@@ -134,7 +133,7 @@ func TestStunnerPlainListener(t *testing.T) {
 			assert.Equal(t, msg, string(buf[:n]), "echo payload")
 		}
 
-		srv := s.GetServer("plain")
+		srv := s.GetServer("plain").(api.Server)
 		require.NotNil(t, srv, "server")
 		assert.Equal(t, 1, srv.Sessions(), "flow counted as allocation")
 
@@ -166,7 +165,7 @@ func TestStunnerPlainListener(t *testing.T) {
 		_, err = client.Read(buf)
 		assert.Error(t, err, "no echo without a dialable endpoint")
 
-		srv := s.GetServer("plain")
+		srv := s.GetServer("plain").(api.Server)
 		require.NotNil(t, srv, "server")
 		assert.Equal(t, 0, srv.Sessions(), "no flow registered")
 	})
@@ -224,7 +223,7 @@ func TestStunnerPlainListener(t *testing.T) {
 		defer client2.Close() //nolint:errcheck
 		echo(client2, "B:Hello")
 
-		srv := s.GetServer("plain")
+		srv := s.GetServer("plain").(api.Server)
 		require.NotNil(t, srv, "server")
 		assert.Equal(t, 2, srv.Sessions(), "both flows live")
 	})
@@ -256,7 +255,7 @@ func TestStunnerPlainListener(t *testing.T) {
 			require.NoError(t, err, "echo")
 		}
 
-		srv := s.GetServer("plain")
+		srv := s.GetServer("plain").(api.Server)
 		require.NotNil(t, srv, "server")
 
 		echo()
@@ -379,9 +378,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 					Name: "upstream", Protocol: tc.upstreamProto, Servers: []string{"upstream"},
 					Addr: tn.host, Port: 23479,
 				}},
-				Servers: []stnrv2.ServerConfig{{
-					Name: "upstream", Type: "turn", Clusters: []string{upstreamCluster.Name},
-				}},
+				Servers:  []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{upstreamCluster.Name}}}},
 				Clusters: []stnrv2.ClusterConfig{upstreamCluster},
 			}), "upstream server started")
 
@@ -396,9 +393,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 					Name: "downstream", Protocol: tc.clientProto, Servers: []string{"downstream"},
 					Addr: tn.host, Port: 23478,
 				}},
-				Servers: []stnrv2.ServerConfig{{
-					Name: "downstream", Type: "l4", Clusters: []string{"peer"},
-				}},
+				Servers: []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "downstream", Type: "l4", Clusters: []string{"peer"}}}},
 				Clusters: []stnrv2.ClusterConfig{{
 					Name:          "peer",
 					Endpoints:     []string{peerAddr},
@@ -457,10 +452,10 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			}
 
 			// the flow rides an upstream allocation and counts as a downstream flow
-			us := upstream.GetServer("upstream")
+			us := upstream.GetServer("upstream").(api.Server)
 			require.NotNil(t, us, "upstream server")
 			assert.Equal(t, 1, us.Sessions(), "upstream allocation count")
-			ds := downstream.GetServer("downstream")
+			ds := downstream.GetServer("downstream").(api.Server)
 			require.NotNil(t, ds, "downstream server")
 			assert.Equal(t, 1, ds.Sessions(), "downstream flow count")
 		})

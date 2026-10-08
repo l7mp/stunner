@@ -77,7 +77,7 @@ Below is a reference of the most important fields of the GatewayConfig [`spec`](
 
 At least a valid username/password pair *must* be supplied for `static` authentication, or a `sharedSecret` for the `ephemeral` mode, either via an external Secret or inline in the GatewayConfig. External authentication settings override inline settings. Missing both is an error.
 
-Except the TURN authentication realm, all GatewayConfig resources are safe for modification. That is, the `stunnerd` daemons know how to reconcile a change in the GatewayConfig without restarting listeners/TURN servers. Changing the realm, however, induces a *full* dataplane restart.
+Except the TURN authentication realm, all GatewayConfig resources are safe for modification. That is, the `stunnerd` daemon knows how to reconcile a change in the GatewayConfig without restarting listeners/TURN servers. Changing the realm, however, restarts the TURN servers that use the auth config, terminating all active client sessions.
 
 ## Gateway
 
@@ -151,8 +151,8 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 >
 > Gateway resources are *not* safe for modification. This means that certain changes to a Gateway will restart the underlying TURN server listener, causing all active client sessions to terminate.  The particular rules are as follows:
 > - adding or removing a listener will start/stop *only* the TURN listener being created/removed, without affecting the rest of the listeners on the same Gateway;
-> - changing the transport protocol, port or TLS keys/certs of an *existing* listener will restart the TURN listener but leave the rest of the listeners intact;
-> - changing the TURN authentication realm will restart *all* TURN listeners.
+> - changing the transport protocol or port of an *existing* listener will restart the listener but leave the rest of the listeners intact; TLS keys and certificates apply to future connections without a restart;
+> - changing the TURN authentication realm will restart *all* TURN servers.
 
 Manually hinted public address describes an address that can be bound to a Gateway. It is defined by an address type, which can be either `IPAddress` (default) or `Hostname`, and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will enforce the use of that address all over STUNner as a public address for the gateway. If the address type specifies an IP address then that address will also be used in the Service created by STUNner to expose the Gateway as a [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array).
 

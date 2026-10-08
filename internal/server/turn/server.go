@@ -5,6 +5,7 @@ package turn
 import (
 	"fmt"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -20,14 +21,21 @@ import (
 // PreAllocationTimeout is how long a datagram conn may live without an allocation.
 var PreAllocationTimeout = 30 * time.Second
 
-// Server is a TURN server.
+// Server is a TURN server object. Reconcile and the lifecycle write its fields, the data path (the
+// pion handlers, Serve) reads them, under mu.
 type Server struct {
-	name  string
+	server.Base
 	rt    *objruntime.Runtime
 	log   logging.LeveledLogger
 	quota *Quota
 
-	mu    sync.Mutex
+	mu                sync.RWMutex
+	auth              string
+	permissionFilters []string
+	// realm is the realm the running pion instance was built with, and stun whether its policy
+	// was of type none, which makes a pure STUN server
+	realm string
+	stun  bool
 	pion  *turn.Server
 	queue *server.AcceptQueue // the listener pion accepts from
 	// conntrack tracks the served conns for the offload bookkeeping, and to close and reap the
@@ -36,30 +44,88 @@ type Server struct {
 	offloads  sync.Map // offload key -> offloadPair
 }
 
-func NewServer(name string, rt *objruntime.Runtime) *Server {
-	return &Server{
-		name:  name,
+var (
+	_ api.Server        = &Server{}
+	_ objruntime.Object = &Server{}
+)
+
+// New creates the TURN server of a validated config.
+func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
+	s := &Server{
 		rt:    rt,
-		log:   rt.Logger.NewLogger(fmt.Sprintf("server-%s", name)),
+		log:   rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name)),
 		quota: NewQuotaHandler(rt),
 	}
+	s.Init(conf)
+	if err := s.Reconcile(conf); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
-func (s *Server) Name() string { return s.name }
-
-// Start builds the pion instance.
-func (s *Server) Start() error {
-	realm := stnrv2.DefaultRealm
-	if conf := s.rt.ServerConfig(s.name); conf != nil {
-		if auth := s.rt.AuthConfig(conf.Auth); auth != nil {
-			realm = auth.Realm
+// Inspect adds to the base what pion bakes into its instance: a change of the realm of the policy,
+// or of whether the policy is of type none, restarts.
+func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (objruntime.Action, error) {
+	action, err := s.Base.Inspect(old, new, full)
+	if err != nil || action == objruntime.ActionRestart {
+		return action, err
+	}
+	req, _ := s.Desired(new)
+	s.mu.RLock()
+	realm, stun := s.realm, s.stun
+	s.mu.RUnlock()
+	// a missing policy is not none
+	if full != nil && realm != "" {
+		auth, err := full.GetAuthConfig(req.TURN.Auth)
+		if err == nil && auth.Realm != realm {
+			return objruntime.ActionRestart, nil
+		}
+		t, _ := stnrv2.NewAuthType(auth.Type)
+		if (err == nil && t == stnrv2.AuthTypeNone) != stun {
+			return objruntime.ActionRestart, nil
 		}
 	}
-	// the handlers of a pion instance use its own conntrack: they outlive a restart
+	return action, nil
+}
+
+// Reconcile applies the spec, the policy and the permission filters to the next requests.
+func (s *Server) Reconcile(conf stnrv2.Config) error {
+	if err := s.Base.Reconcile(conf); err != nil {
+		return err
+	}
+	req, _ := s.Desired(conf)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.auth, s.permissionFilters = req.TURN.Auth, slices.Clone(req.TURN.PermissionFilters)
+	return nil
+}
+
+func (s *Server) GetConfig() stnrv2.Config {
+	c := s.Base.GetConfig().(*stnrv2.ServerConfig)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c.TURN = &stnrv2.TURNServerConfig{Auth: s.auth, PermissionFilters: slices.Clone(s.permissionFilters)}
+	return c
+}
+
+func (s *Server) Status() stnrv2.Status {
+	return &stnrv2.ServerStatus{ServerConfig: s.GetConfig().(*stnrv2.ServerConfig), Sessions: s.Sessions()}
+}
+
+// Start builds the pion instance, in the realm of the policy.
+func (s *Server) Start() error {
+	s.mu.RLock()
+	name := s.auth
+	s.mu.RUnlock()
+	realm, stun := stnrv2.DefaultRealm, false
+	if auth := s.rt.AuthConfig(name); auth != nil {
+		t, _ := stnrv2.NewAuthType(auth.Type)
+		realm, stun = auth.Realm, t == stnrv2.AuthTypeNone
+	}
 	queue, ct := server.NewAcceptQueue(server.Backlog), server.NewConntrack(PreAllocationTimeout)
 	pion, err := turn.NewServer(turn.ServerConfig{
 		Realm:        realm,
-		AuthHandler:  NewAuthHandler(s.rt, s.name, s.log),
+		AuthHandler:  s.AuthHandler(),
 		EventHandler: s.eventHandler(ct),
 		QuotaHandler: s.quota.QuotaHandler(),
 		ListenerConfigs: []turn.ListenerConfig{{
@@ -70,12 +136,12 @@ func (s *Server) Start() error {
 		LoggerFactory: s.rt.Logger,
 	})
 	if err != nil {
-		return fmt.Errorf("cannot set up TURN server %s: %w", s.name, err)
+		return fmt.Errorf("cannot set up TURN server %s: %w", s.Name(), err)
 	}
 	s.mu.Lock()
-	s.pion, s.queue, s.conntrack = pion, queue, ct
+	s.pion, s.queue, s.conntrack, s.realm, s.stun = pion, queue, ct, realm, stun
 	s.mu.Unlock()
-	s.log.Infof("server %s: TURN server running", s.name)
+	s.log.Infof("server %s: TURN server running", s.Name())
 	return nil
 }
 
@@ -83,7 +149,7 @@ func (s *Server) Start() error {
 func (s *Server) Close(_ bool) error {
 	s.mu.Lock()
 	pion, ct := s.pion, s.conntrack
-	s.pion, s.queue = nil, nil
+	s.pion, s.queue, s.realm = nil, nil, ""
 	s.mu.Unlock()
 
 	var err error
@@ -97,8 +163,8 @@ func (s *Server) Close(_ bool) error {
 }
 
 func (s *Server) Sessions() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if s.pion == nil {
 		return 0
 	}
@@ -108,9 +174,9 @@ func (s *Server) Sessions() int {
 // Serve hands a client conn to pion's accept loop. Stream conns get STUN framing here, outermost,
 // where RFC 6062 ConnectionBind finds the stream underneath.
 func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
-	s.mu.Lock()
+	s.mu.RLock()
 	queue, ct := s.queue, s.conntrack
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	if queue == nil {
 		return nil, api.Consumed, server.ErrNotServing
 	}
@@ -128,7 +194,7 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 		conn = turn.NewSTUNStreamConn(c)
 	case stnrv2.ProtocolUDP, stnrv2.ProtocolDTLS:
 	default:
-		s.log.Warnf("server %s: serving a %s client conn from listener %s as TURN", s.name,
+		s.log.Warnf("server %s: serving a %s client conn from listener %s as TURN", s.Name(),
 			c.Tag().Proto.String(), c.Tag().Name)
 	}
 	if err := queue.Push(conn); err != nil {
@@ -138,14 +204,11 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 	return nil, api.Consumed, nil
 }
 
-// dialers returns the dialers of the clusters the server's config names, skipping missing ones.
+// dialers returns the dialers of the clusters the server uses, skipping missing ones.
 func (s *Server) dialers() []api.Dialer {
-	conf := s.rt.ServerConfig(s.name)
-	if conf == nil {
-		return nil
-	}
-	ret := make([]api.Dialer, 0, len(conf.Clusters))
-	for _, name := range conf.Clusters {
+	clusters := s.Clusters()
+	ret := make([]api.Dialer, 0, len(clusters))
+	for _, name := range clusters {
 		if d, ok := s.rt.Dialer(name); ok {
 			ret = append(ret, d)
 		}

@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/l7mp/stunner/v2/internal/api"
-	"github.com/l7mp/stunner/v2/internal/listener"
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/quota"
@@ -83,8 +81,8 @@ type testServer struct {
 const realm = "stunner.test"
 
 // newTestServer starts a TURN server behind a UDP and a TCP listener, relaying to the peers of
-// 127.0.0.1 through the plain UDP cluster it names. The server resolves the cluster by name
-// through the registry, so it is registered as a real object, and its own config as a stub.
+// 127.0.0.1 through the plain UDP cluster it names. The listeners and the server resolve each
+// other by name through the registry.
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	log := logger.NewLoggerFactory("all:ERROR")
@@ -111,11 +109,11 @@ func newTestServer(t *testing.T) *testServer {
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(cl, nil))
 	require.NoError(t, cl.Start())
-	conf := &stnrv2.ServerConfig{Name: "turn", Type: "turn", Clusters: []string{"loopback"}}
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"loopback"}}}
 	require.NoError(t, conf.Validate())
-	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeServer, conf: conf}, nil))
-
-	s := turn.NewServer("turn", rt)
+	s, err := turn.New(conf, rt)
+	require.NoError(t, err)
+	require.NoError(t, rt.Registry.Add(s, nil))
 	require.NoError(t, s.Start())
 	t.Cleanup(func() { _ = s.Close(true) })
 
@@ -126,14 +124,10 @@ func newTestServer(t *testing.T) *testServer {
 		conf := &stnrv2.ListenerConfig{Name: proto, Protocol: proto, Addr: "127.0.0.1",
 			Port: port, Servers: []string{"turn"}}
 		require.NoError(t, conf.Validate())
-		l, err := listener.New(conf, rt, func(net.Addr) bool { return true }, func(c api.Conn) {
-			if _, _, err := s.Serve(c); err != nil {
-				_ = c.Close()
-			}
-		})
+		l, err := object.NewListener(conf, rt)
 		require.NoError(t, err)
 		require.NoError(t, l.Start())
-		t.Cleanup(func() { _ = l.Close() })
+		t.Cleanup(func() { _ = l.Close(false) })
 		ts.ports[proto] = port
 	}
 	return ts
@@ -234,7 +228,8 @@ func TestTURNServerPermissions(t *testing.T) {
 	filter, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: rules("10.0.0.1/32")})
 	require.NoError(t, err)
 	require.NoError(t, ts.rt.Registry.Add(filter, nil))
-	ts.conf.PermissionFilters = []string{"peers"}
+	ts.conf.TURN.PermissionFilters = []string{"peers"}
+	require.NoError(t, ts.Reconcile(ts.conf))
 	peer := udpEcho(t)
 
 	c := ts.allocate(t, stnrv2.ProtocolTURNUDP, ts.ports["UDP"])

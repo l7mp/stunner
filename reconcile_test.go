@@ -62,9 +62,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -140,9 +138,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -172,9 +168,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -202,9 +196,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -263,9 +255,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{""},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -296,9 +286,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -326,9 +314,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "",
@@ -362,9 +348,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -440,9 +424,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -518,9 +500,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -603,9 +583,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -679,9 +657,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -755,9 +731,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -839,9 +813,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     12345,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -904,9 +876,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"renamed-listener"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "renamed-listener",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "renamed-listener", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -949,9 +919,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "newlistener",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1007,9 +975,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "newlistener",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1048,13 +1014,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}, {
-				Name:     "newlistener",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1125,13 +1087,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}, {
-				Name:     "newlistener",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1208,13 +1166,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}, {
-				Name:     "newlistener",
-				Type:     "turn",
-				Clusters: []string{"none", "dummy"},
+				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1285,9 +1239,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1373,9 +1325,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-any",
@@ -1417,9 +1367,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"renamed-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"renamed-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "renamed-cluster",
@@ -1463,9 +1411,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1510,9 +1456,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1557,9 +1501,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1610,9 +1552,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"newcluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"newcluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1664,9 +1604,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"newcluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"newcluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1718,9 +1656,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -1842,9 +1778,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "tcp",
-				Type:     "turn",
-				Clusters: []string{"tcp-cluster", "udp-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"tcp-cluster", "udp-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "tcp-cluster",
@@ -1890,9 +1824,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1928,9 +1860,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -1964,9 +1894,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -2001,9 +1929,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-some"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-some"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
@@ -2036,9 +1962,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-some"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-some"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-some",
@@ -2068,9 +1992,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-some"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-some"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "allow-some",
@@ -2111,9 +2033,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PQCMode:  "Preferred",
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{"allow-any"},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "allow-any",
@@ -2149,9 +2069,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 						PQCMode:  mode,
 					}},
 					Servers: []stnrv2.ServerConfig{{
-						Name:     "default-server",
-						Type:     "turn",
-						Clusters: clusters,
+						ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: clusters},
 					}},
 					Clusters: []stnrv2.ClusterConfig{{
 						Name:     "allow-any",
@@ -2160,11 +2078,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				}
 			}
 
-			// a mode change restarts the listener, and only the listener
-			err = s.Reconcile(tlsConf("enforced", "allow-any"))
-			e, ok = err.(stnrv2.ErrRestarted)
-			require.True(t, ok, "mode change: restarted status")
-			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "mode change: restarted object")
+			// a mode change reconciles in place: the next handshake uses it
+			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any")), "mode change: no restart")
 			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "mode change applied")
 
 			// the same mode with a cluster change reconciles in place
@@ -2172,11 +2087,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "cluster change: mode kept")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "cluster change applied")
 
-			// back to the default mode: a restart, and the default is the empty string
-			err = s.Reconcile(tlsConf("Default", "allow-any", "dummy"))
-			e, ok = err.(stnrv2.ErrRestarted)
-			require.True(t, ok, "default mode: restarted status")
-			assert.Equal(t, []string{"listener: default-listener"}, e.Objects, "default mode: restarted object")
+			// back to the default mode, in place: the default is the empty string
+			assert.NoError(t, s.Reconcile(tlsConf("Default", "allow-any", "dummy")), "default mode: no restart")
 			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode normalized to empty")
 			assert.NotContains(t, l.Status().String(), "pqc=", "default mode absent from status")
 
@@ -2193,6 +2105,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			udp.Listeners[0].Protocol, udp.Listeners[0].Cert, udp.Listeners[0].Key = "UDP", "", ""
 			_, ok = s.Reconcile(udp).(stnrv2.ErrRestarted)
 			assert.True(t, ok, "a mode on a UDP listener: restarted for the protocol change")
+			// a restart replaces the listener object
+			l = s.GetListener("default-listener")
 			assert.Equal(t, stnrv2.ProtocolUDP.String(), listenerConf(t, l).Protocol, "protocol change applied")
 		},
 	},
@@ -2441,9 +2355,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "default-server",
-				Type:     "turn",
-				Clusters: []string{},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -2497,9 +2409,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3480,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -2530,9 +2440,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3480,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2574,13 +2482,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3480,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2622,13 +2526,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2671,13 +2571,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2719,13 +2615,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2768,13 +2660,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2817,13 +2705,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2868,13 +2752,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2918,13 +2798,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -2971,13 +2847,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "dummy-cluster",
@@ -3019,13 +2891,9 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3479,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}, {
-				Name:     "udp",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3066,9 +2934,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3109,9 +2975,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3152,9 +3016,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3190,9 +3052,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3228,9 +3088,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3266,9 +3124,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3304,9 +3160,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"echo-server-cluster", "dummy-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"echo-server-cluster", "dummy-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -3342,9 +3196,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"open-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"open-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "open-cluster",
@@ -3380,10 +3232,8 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:              "udp-ok",
-				Type:              "turn",
-				Clusters:          []string{"open-cluster"},
-				PermissionFilters: []string{"deny-all"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"open-cluster"}},
+				TURN:       &stnrv2.TURNServerConfig{PermissionFilters: []string{"deny-all"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "open-cluster",
@@ -3422,9 +3272,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				Name:     "udp-ok",
-				Type:     "turn",
-				Clusters: []string{"open-cluster"},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"open-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -3543,9 +3391,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					Port:     3478,
 				}},
 				Servers: []stnrv2.ServerConfig{{
-					Name:     "default-server",
-					Type:     "turn",
-					Clusters: []string{"echo-server-cluster"},
+					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 				}},
 				Clusters: []stnrv2.ClusterConfig{{
 					Name:      "echo-server-cluster",
@@ -3585,9 +3431,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					Cert:     "ZHVtbXkK",
 				}},
 				Servers: []stnrv2.ServerConfig{{
-					Name:     "default-server",
-					Type:     "turn",
-					Clusters: []string{"echo-server-cluster"},
+					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"echo-server-cluster"}},
 				}},
 				Clusters: []stnrv2.ClusterConfig{{
 					Name:      "echo-server-cluster",
@@ -3617,7 +3461,7 @@ func TestStunnerReconcileWithVNetRollback(t *testing.T) {
 }
 
 func newAuthHandler(s *Stunner) a12n.AuthHandler {
-	return objectturn.NewAuthHandler(s.rt, "default-server", s.log)
+	return s.GetServer("default-server").(*objectturn.Server).AuthHandler()
 }
 
 func callAuthHandler(t *testing.T, h a12n.AuthHandler, ra *turn.RequestAttributes) (string, []byte, bool) {
@@ -3666,7 +3510,7 @@ func listenerConf(t *testing.T, l *object.Listener) *stnrv2.ListenerConfig {
 }
 
 // serverConf returns a server's reconciled config via its public snapshot.
-func serverConf(t *testing.T, srv *object.Server) *stnrv2.ServerConfig {
+func serverConf(t *testing.T, srv runtime.Object) *stnrv2.ServerConfig {
 	t.Helper()
 	require.NotNil(t, srv, "server found")
 	conf, ok := srv.GetConfig().(*stnrv2.ServerConfig)
@@ -3711,9 +3555,7 @@ func makeRaceConfig(realm string) stnrv2.StunnerConfig {
 			Port:     3478,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "default-server",
-			Type:     "turn",
-			Clusters: []string{"allow-any"},
+			ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "allow-any",

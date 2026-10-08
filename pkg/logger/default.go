@@ -32,7 +32,7 @@ type LeveledLoggerFactory struct {
 // NewLoggerFactory sets up a scoped logger for STUNner.
 func NewLoggerFactory(levelSpec string) LoggerFactory {
 	f := &LeveledLoggerFactory{
-		Writer:       os.Stdout,
+		Writer:       os.Stderr,
 		scopedLevels: newScopedLevels(),
 	}
 	f.SetLevel(levelSpec)

@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/netip"
 
-	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/api"
@@ -16,19 +15,20 @@ import (
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
-// NewAuthHandler returns the authentication handler callback of a TURN server, which authenticates
-// by the policy its config names, looked up on every request. A policy of type none makes a pure
-// STUN server (a nil handler); a missing one refuses every client.
-func NewAuthHandler(rt *objruntime.Runtime, server string, log logging.LeveledLogger) a12n.AuthHandler {
+// AuthHandler returns the authentication handler callback of the server, which authenticates by
+// the policy the server names, looked up on every request. A policy of type none makes a pure STUN
+// server (a nil handler); a missing one refuses every client.
+func (s *Server) AuthHandler() a12n.AuthHandler {
+	log := s.log
 	policy := func() *stnrv2.AuthConfig {
-		if conf := rt.ServerConfig(server); conf != nil {
-			return rt.AuthConfig(conf.Auth)
-		}
-		return nil
+		s.mu.RLock()
+		name := s.auth
+		s.mu.RUnlock()
+		return s.rt.AuthConfig(name)
 	}
 	if a := policy(); a == nil {
 		log.Warnf("auth handler: server %s names no authentication policy: every client is refused",
-			server)
+			s.Name())
 	} else if typeVal, err := stnrv2.NewAuthType(a.Type); err == nil && typeVal == stnrv2.AuthTypeNone {
 		// a nil handler switches pure STUN on
 		return nil
@@ -143,33 +143,32 @@ func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
 		return false
 	}
 	dst := netip.AddrPortFrom(ip.Unmap(), 0)
-	conf := s.rt.ServerConfig(s.name)
-	if conf == nil {
-		return false
-	}
-	if !s.rt.Admits(conf.PermissionFilters, net.UDPAddrFromAddrPort(dst)) {
+	s.mu.RLock()
+	filters := s.permissionFilters
+	s.mu.RUnlock()
+	if !s.rt.Admits(filters, net.UDPAddrFromAddrPort(dst)) {
 		s.log.Infof("permission denied on server %q for client %q to peer %s: filtered",
-			s.name, src.String(), peer.String())
+			s.Name(), src.String(), peer.String())
 		return false
 	}
-	for _, name := range conf.Clusters {
+	for _, name := range s.Clusters() {
 		r, found := s.rt.Router(name)
 		if !found {
 			continue
 		}
 		_, ok, err := r.Route(dst)
 		if err != nil {
-			s.log.Warnf("server %q: skipping cluster %q: %s", s.name, name, err.Error())
+			s.log.Warnf("server %q: skipping cluster %q: %s", s.Name(), name, err.Error())
 			continue
 		}
 		if ok {
 			s.log.Debugf("permission granted on server %q for client %q to peer %s via cluster %q",
-				s.name, src.String(), peer.String(), name)
+				s.Name(), src.String(), peer.String(), name)
 			return true
 		}
 	}
 	s.log.Infof("permission denied on server %q for client %q to peer %s: no cluster routes it",
-		s.name, src.String(), peer.String())
+		s.Name(), src.String(), peer.String())
 	return false
 }
 
@@ -215,7 +214,7 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 		},
 		OnChannelCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr, peer net.Addr, chanNum uint16) {
 			s.log.Debugf("channel created: server=%s, client=%s, relay-addr=%s, peer=%s, channel-num=%d",
-				s.name, dumpClient(src, dst, proto, username, realm), relayAddr.String(),
+				s.Name(), dumpClient(src, dst, proto, username, realm), relayAddr.String(),
 				peer.String(), chanNum)
 
 			// Only a plain UDP client conn relaying through a local UDP socket is offloadable.

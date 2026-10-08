@@ -151,12 +151,6 @@ spec:
 
 Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/network-policy) before exposing STUNner publicly; e.g., the [tunnel mode of `stunnerd`](cmd/stunnerd.md#tunnel-mode) can be used conveniently for this [purpose](examples/simple-tunnel/README.md).
 
-### Filters
-
-Inside `stunnerd`, access control is done by filters: named, ordered lists of `ALLOW` and `DENY` rules on address blocks and ports, where the first matching rule decides. A listener's filters admit clients by their source address. A TURN server's permission filters admit the peer of every permission by IP address. A cluster's filters admit its peers by address and port. The gateway operator renders the filters from the routes: every TURN server gets a filter allowing the backends of its routes and denying everything else, and the ports of the backend references become cluster filters. See the [`stunnerd` configuration](cmd/stunnerd.md#configuration) for the syntax.
-
-Updates to filter rules affect new connections only.
-
 ## Exposing internal IP addresses
 
 The trick in STUNner is that both the TURN relay transport address and the media server address are internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model) without the involvement of a NAT. This makes it possible to host the entire WebRTC infrastructure over the private internal pod network and still allow external clients to make connections to the media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP addresses are now exposed to the WebRTC clients in ICE candidates.

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -133,6 +134,6 @@ func TestClusterFilter(t *testing.T) {
 		require.NoError(t, client.SetReadDeadline(time.Now().Add(300*time.Millisecond)))
 		_, err = client.Read(buf)
 		assert.Error(t, err, "the refused peer is never dialed")
-		assert.Equal(t, 0, s.GetServer("plain").Sessions(), "no flow")
+		assert.Equal(t, 0, s.GetServer("plain").(api.Server).Sessions(), "no flow")
 	})
 }

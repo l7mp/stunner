@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/api"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -50,7 +51,7 @@ func TestStunnerTURNRelayChain(t *testing.T) {
 			relayChainEchoTest(t, log, tn, true)
 
 			// the upstream leg carries the flow: exactly one upstream allocation
-			srv := upstream.GetServer("upstream")
+			srv := upstream.GetServer("upstream").(api.Server)
 			require.NotNil(t, srv, "upstream server")
 			assert.Equal(t, 1, srv.Sessions(), "upstream allocation count")
 		})
@@ -92,9 +93,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Port:     23479,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "upstream",
-			Type:     "turn",
-			Clusters: []string{"allow-any"},
+			ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{"allow-any"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "allow-any",
@@ -131,9 +130,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Port:     23478,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			Name:     "downstream",
-			Type:     "turn",
-			Clusters: []string{"turn-relay"},
+			ServerSpec: stnrv2.ServerSpec{Name: "downstream", Type: "turn", Clusters: []string{"turn-relay"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "turn-relay",
@@ -175,9 +172,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 		Listeners: []stnrv2.ListenerConfig{{
 			Name: "upstream", Protocol: "TCP", Servers: []string{"upstream"}, Addr: "127.0.0.1", Port: 23479,
 		}},
-		Servers: []stnrv2.ServerConfig{{
-			Name: "upstream", Type: "turn", Clusters: []string{"tcp-echo"},
-		}},
+		Servers: []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{"tcp-echo"}}}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:      "tcp-echo",
 			Endpoints: []string{"127.0.0.1"},
@@ -198,9 +193,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 		Listeners: []stnrv2.ListenerConfig{{
 			Name: "downstream", Protocol: "TCP", Servers: []string{"downstream"}, Addr: "127.0.0.1", Port: 23478,
 		}},
-		Servers: []stnrv2.ServerConfig{{
-			Name: "downstream", Type: "turn", Clusters: []string{"turn-relay"},
-		}},
+		Servers: []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "downstream", Type: "turn", Clusters: []string{"turn-relay"}}}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "turn-relay",
 			Protocol: "TCP",

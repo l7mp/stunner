@@ -110,7 +110,7 @@ func TestConvertToV2(t *testing.T) {
 	for _, name := range []string{"ns/gw/udp", "ns/gw/tls"} {
 		s, err := v2.GetServerConfig(name)
 		require.NoError(t, err)
-		assert.Equal(t, []string{name}, s.PermissionFilters, name)
+		assert.Equal(t, []string{name}, s.TURN.PermissionFilters, name)
 		f, err := v2.GetFilterConfig(name)
 		require.NoError(t, err)
 		assert.Equal(t, permissions, f.Rules, name)
@@ -118,7 +118,7 @@ func TestConvertToV2(t *testing.T) {
 	// the same filter for a TURN-* cluster: it admits every peer
 	s, err = v2.GetServerConfig("ns/gw/proxy")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"ns/gw/proxy"}, s.PermissionFilters)
+	assert.Equal(t, []string{"ns/gw/proxy"}, s.TURN.PermissionFilters)
 	f, err := v2.GetFilterConfig("ns/gw/proxy")
 	require.NoError(t, err)
 	assert.Equal(t, []stnrv2.FilterRule{
@@ -202,7 +202,7 @@ func TestConvertListener(t *testing.T) {
 		Port: 3478, PublicAddr: "1.2.3.4", Routes: []string{"media"}})
 	assert.Equal(t, stnrv2.ListenerConfig{Name: "ns/gw/udp", Protocol: "UDP", Port: 3478,
 		PublicAddr: "1.2.3.4", Servers: []string{"ns/gw/udp"}}, l, "the address moves to the clusters")
-	assert.Equal(t, stnrv2.ServerConfig{Name: "ns/gw/udp", Type: "TURN", Clusters: []string{"media"}}, s)
+	assert.Equal(t, stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "ns/gw/udp", Type: "TURN", Clusters: []string{"media"}}}, s)
 
 	l, s = ConvertListener(ListenerConfig{Name: "plain", Protocol: "TCP", Port: 5000})
 	assert.Equal(t, "TCP", l.Protocol)

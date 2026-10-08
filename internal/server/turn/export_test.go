@@ -14,9 +14,9 @@ func (s *Server) PermissionHandler(src net.Addr, peer net.IP) bool {
 
 // Conn exposes the index of served conns to the external tests.
 func (s *Server) Conn(remote, local net.Addr) (api.Conn, bool) {
-	s.mu.Lock()
+	s.mu.RLock()
 	ct := s.conntrack
-	s.mu.Unlock()
+	s.mu.RUnlock()
 	e, ok := ct.Get(server.Key(remote, local))
 	if !ok {
 		return nil, false

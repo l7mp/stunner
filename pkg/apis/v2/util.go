@@ -116,6 +116,7 @@ const (
 	ProtocolTURNTLS
 	ProtocolTURNDTLS
 	ProtocolSTDIN
+	ProtocolFIFO
 )
 
 const (
@@ -128,6 +129,7 @@ const (
 	protocolTURNTLSStr  = "TURN-TLS"
 	protocolTURNDTLSStr = "TURN-DTLS"
 	protocolSTDINStr    = "STDIN"
+	protocolFIFOStr     = "FIFO"
 )
 
 // NewProtocol parses a protocol name into a Protocol. It is permissive: it accepts any known
@@ -152,6 +154,8 @@ func NewProtocol(raw string) (Protocol, error) {
 		return ProtocolTURNDTLS, nil
 	case protocolSTDINStr:
 		return ProtocolSTDIN, nil
+	case protocolFIFOStr:
+		return ProtocolFIFO, nil
 	default:
 		return ProtocolUnknown, fmt.Errorf("unknown protocol: \"%s\"", raw)
 	}
@@ -178,25 +182,29 @@ func (p Protocol) String() string {
 		return protocolTURNDTLSStr
 	case ProtocolSTDIN:
 		return protocolSTDINStr
+	case ProtocolFIFO:
+		return protocolFIFOStr
 	default:
 		return "<unknown>"
 	}
 }
 
-// NewListenerProtocol parses a listener protocol: UDP, TCP, TLS, DTLS or STDIN.
+// NewListenerProtocol parses a listener protocol: UDP, TCP, TLS, DTLS, STDIN or FIFO.
 func NewListenerProtocol(raw string) (Protocol, error) {
 	if p, err := NewProtocol(raw); err == nil {
 		switch p {
-		case ProtocolUDP, ProtocolTCP, ProtocolTLS, ProtocolDTLS, ProtocolSTDIN:
+		case ProtocolUDP, ProtocolTCP, ProtocolTLS, ProtocolDTLS, ProtocolSTDIN, ProtocolFIFO:
 			return p, nil
 		}
 	}
 	return ProtocolUnknown, fmt.Errorf("unknown listener protocol: %q", raw)
 }
 
-// NewClusterProtocol parses a cluster protocol: UDP or TCP, the network the peers are reached over.
+// NewClusterProtocol parses a cluster protocol: UDP, TCP or FIFO, the network the peers are
+// reached over.
 func NewClusterProtocol(raw string) (Protocol, error) {
-	if p, err := NewProtocol(raw); err == nil && (p == ProtocolUDP || p == ProtocolTCP) {
+	if p, err := NewProtocol(raw); err == nil &&
+		(p == ProtocolUDP || p == ProtocolTCP || p == ProtocolFIFO) {
 		return p, nil
 	}
 	return ProtocolUnknown, fmt.Errorf("unknown cluster protocol: %q", raw)
@@ -336,9 +344,9 @@ const (
 	ServerTypeTURN
 	// ServerTypeL4 forwards every client flow to an endpoint load-balanced over its clusters.
 	ServerTypeL4
-	// ServerTypeSIP is reserved for the SIP proxy of the SIP gateway.
+	// ServerTypeSIP is a stateful SIP proxy that hands the SDP of every call to a media proxy.
 	ServerTypeSIP
-	// ServerTypeRTP is reserved for the media proxy of the SIP gateway.
+	// ServerTypeRTP is a media proxy relaying the RTP and RTCP of the calls a SIP proxy sets up.
 	ServerTypeRTP
 )
 

@@ -6,19 +6,22 @@ import (
 )
 
 // createPlan is a deferred construction: the plan walk records what to build (kind, config, and
-// parent identity), and the construct phase calls New parents-first once the walk is complete.
+// parent identity), and the construct phase calls New parents-first once the walk is complete. A
+// restart is a construction that replaces the running object of the same name.
 type createPlan struct {
 	typ        runtime.ObjectType
 	config     stnrv2.Config
 	parentType runtime.ObjectType
 	parentName string
+	replaces   runtime.Runnable
 }
 
 // constructedRef is an object built by the construct phase, awaiting registration. Registration
 // is deferred until after reconcile so a reconcile failure leaves the registry untouched.
 type constructedRef struct {
-	obj    runtime.Runnable
-	parent runtime.Runnable
+	obj      runtime.Runnable
+	parent   runtime.Runnable
+	replaces runtime.Runnable
 }
 
 type reconcileRef struct {

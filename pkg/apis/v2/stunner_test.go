@@ -25,8 +25,8 @@ func validConfig() *StunnerConfig {
 			{Name: "tunnel", Protocol: "UDP", Port: 10000, Servers: []string{"rtp-tunnel"}},
 		},
 		Servers: []ServerConfig{
-			{Name: "media-gw", Type: "turn", Clusters: []string{"media-pods"}},
-			{Name: "rtp-tunnel", Type: "l4", Clusters: []string{"media-lb"}},
+			{ServerSpec: ServerSpec{Name: "media-gw", Type: "turn", Clusters: []string{"media-pods"}}},
+			{ServerSpec: ServerSpec{Name: "rtp-tunnel", Type: "l4", Clusters: []string{"media-lb"}}},
 		},
 		Clusters: []ClusterConfig{{
 			Name:      "media-pods",
@@ -95,6 +95,9 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"missing cluster protocol", func(c *StunnerConfig) { c.Clusters[0].Protocol = "" }},
 		{"unknown cluster protocol", func(c *StunnerConfig) { c.Clusters[0].Protocol = "SCTP" }},
 		{"TURN cluster protocol", func(c *StunnerConfig) { c.Clusters[0].Protocol = "TURN-UDP" }},
+		{"FIFO listener without a fifo name", func(c *StunnerConfig) {
+			c.Listeners[0].Protocol, c.Listeners[0].Addr = "FIFO", ""
+		}},
 		{"tunnel URL not a TURN URL", func(c *StunnerConfig) {
 			c.Clusters[1].Tunnel.URL = "udp://turn.example.com:3478"
 		}},
@@ -150,7 +153,7 @@ func TestDeepCopyIsExact(t *testing.T) {
 	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
-	full.Servers[0].PermissionFilters = []string{"peers"}
+	full.Servers[0].TURN = &TURNServerConfig{PermissionFilters: []string{"peers"}}
 	full.Listeners[0].Labels = map[string]string{"role": "control"}
 	validated := validConfig()
 	require.NoError(t, validated.Validate())
@@ -177,8 +180,10 @@ func TestDeepCopyIsExact(t *testing.T) {
 			}
 		}
 		for i := range cp.Servers {
-			for j := range cp.Servers[i].PermissionFilters {
-				cp.Servers[i].PermissionFilters[j] = "changed"
+			if t := cp.Servers[i].TURN; t != nil {
+				for j := range t.PermissionFilters {
+					t.PermissionFilters[j] = "changed"
+				}
 			}
 		}
 		for i := range cp.Clusters {
@@ -207,4 +212,37 @@ func TestValidateIsIdempotent(t *testing.T) {
 		require.NoError(t, c.Validate(), name)
 		assert.True(t, reflect.DeepEqual(once, c), "%s: a second validation changes nothing", name)
 	}
+}
+
+// TestFifoConfig pins what a FIFO listener and a FIFO cluster take: any string names the fifo, in
+// the address of both, and neither has a port.
+func TestFifoConfig(t *testing.T) {
+	c := validConfig()
+	c.Listeners[0].Protocol, c.Listeners[0].Addr, c.Listeners[0].Port = "FIFO", "rtp control", 0
+	c.Clusters[0].Protocol, c.Clusters[0].Endpoints = "FIFO", nil
+	c.Clusters[0].Addrs = []string{"rtp control"}
+	require.NoError(t, c.Validate())
+	assert.Equal(t, 0, c.Listeners[0].Port, "a FIFO listener gets no default port")
+	assert.Contains(t, c.Listeners[0].String(), "fifo://rtp control")
+	assert.Equal(t, []string{"rtp control"}, c.Clusters[0].Addrs, "fifo names are kept verbatim")
+
+	c.Clusters[0].Addrs = nil
+	assert.Error(t, c.Validate(), "a FIFO cluster names its fifo")
+}
+
+// TestServerTypeBlocks pins that Validate fills in the block of the server's own type and leaves
+// the others alone.
+func TestServerTypeBlocks(t *testing.T) {
+	for _, typ := range []string{"turn", "l4", "sip", "rtp"} {
+		s := ServerConfig{ServerSpec: ServerSpec{Name: "s", Type: typ}}
+		require.NoError(t, s.Validate(), typ)
+		blocks := map[string]bool{"TURN": s.TURN != nil, "L4": s.L4 != nil, "SIP": s.SIP != nil,
+			"RTP": s.RTP != nil}
+		for name, set := range blocks {
+			assert.Equal(t, name == s.Type, set, "type %s: block %s", typ, name)
+		}
+	}
+	s := ServerConfig{ServerSpec: ServerSpec{Name: "s"}}
+	require.NoError(t, s.Validate())
+	assert.Equal(t, DefaultAuthName, s.TURN.Auth, "a TURN server defaults to the default policy")
 }

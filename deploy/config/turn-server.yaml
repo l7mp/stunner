@@ -1,0 +1,51 @@
+# A TURN server on UDP, TCP, TLS and DTLS, relaying to the peers in 10.0.0.0/8.
+version: v2
+admin:
+  name: turn-server
+  loglevel: all:INFO
+auths:
+  - name: default
+    type: ephemeral
+    realm: stunner.l7mp.io
+    credentials:
+      secret: my-shared-secret
+listeners:
+  - name: udp
+    protocol: UDP
+    port: 3478
+    servers: [turn]
+  - name: tcp
+    protocol: TCP
+    port: 3478
+    servers: [turn]
+  - name: tls
+    protocol: TLS
+    port: 3479
+    cert: "$STUNNER_TLS_CERT"
+    key: "$STUNNER_TLS_KEY"
+    servers: [turn]
+  - name: dtls
+    protocol: DTLS
+    port: 3479
+    cert: "$STUNNER_TLS_CERT"
+    key: "$STUNNER_TLS_KEY"
+    servers: [turn]
+servers:
+  - name: turn
+    type: TURN
+    clusters: [relay-udp, relay-tcp]
+    turn:
+      permission_filters: [peers]
+clusters:
+  - name: relay-udp
+    protocol: UDP
+    addresses: ["$STUNNER_ADDR"]
+  - name: relay-tcp
+    protocol: TCP
+    addresses: ["$STUNNER_ADDR"]
+filters:
+  - name: peers
+    rules:
+      - action: ALLOW
+        ip_block: {cidr: 10.0.0.0/8}
+      - action: DENY

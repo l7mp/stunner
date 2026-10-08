@@ -231,9 +231,9 @@ High-availability operator mode is available in your tier if the `HAOperator` fe
 
 **Feature:** `PQC`. **Availability:** member and enterprise tiers.
 
-A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses a weak encryption that a large enough quantum computer could break, exposing anything recorded today to be decrypted later. The PQC feature allows for STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
+A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows for STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
 
-The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TURN-TLS listeners of a Gateway. There are three modes: `default` (or a missing annotation) serves the standard "weak" TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
+The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TURN-TLS listeners of a Gateway. There are three modes: `default` (or a missing annotation) serves the standard TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
 
 Below is the set of steps to enable post-quantum TLS:
 
@@ -244,8 +244,6 @@ Below is the set of steps to enable post-quantum TLS:
    ```console
    kubectl annotate --overwrite gateway <your-stunner-gateway> stunner.l7mp.io/pqc-mode="enforced"
    ```
-
-   The operator renders the mode into the `pqc_mode` field of every TURN-TLS listener of the Gateway; listeners of any other protocol are left alone. Removing the annotation, or setting it to `default`, restarts the listeners with the standard TLS settings. 
 
 2. Check whether the mode reached the dataplane.
 
