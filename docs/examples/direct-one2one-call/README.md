@@ -214,12 +214,14 @@ You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to d
 ``` console
 bin/stunnerctl -n stunner config udp-gateway
 Gateway: stunner/udp-gateway (loglevel: "all:INFO")
-Authentication type: static, username/password: user-1/pass-1
+Authentication default: static, username/password: user-1/pass-1
 Listeners:
   - Name: stunner/udp-gateway/udp-listener
-    Protocol: TURN-UDP
+    Protocol: UDP
+    Server: stunner/udp-gateway/udp-listener (TURN)
+    Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Routes: [stunner/stunner-headless]
+    Clusters: [stunner/stunner-headless/udp]
     Endpoints: ...
 ```
 

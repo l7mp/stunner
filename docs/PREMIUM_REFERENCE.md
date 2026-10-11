@@ -77,7 +77,7 @@ spec:
 This will disable STUNner's authentication engine, prohibiting clients from creating TURN allocations all together:
 
 ```console
-bin/stunnerctl -n <gateway-namespace> status <gateway-name> -o jsonpath='{.auth.type}'
+bin/stunnerctl -n <gateway-namespace> status <gateway-name> -o jsonpath='{.auths[*].type}'
 none
 ```
 
@@ -145,10 +145,10 @@ Below is the set of steps to enable relay address discovery:
 
 3. Check whether STUNner has successfully discovered the node's public IP.
 
-   As usual, the [`stunnerctl`](/docs/cmd/stunnerctl.md) tool comes in handy. The below will load the dataplane configuration for the gateway `<gateway-namespace>/<gateway-name>` with respect to the node `<node-name>` and print the relay address of each TURN listener:
+   As usual, the [`stunnerctl`](/docs/cmd/stunnerctl.md) tool comes in handy. The below will load the dataplane configuration for the gateway `<gateway-namespace>/<gateway-name>` with respect to the node `<node-name>` and print the relay address of each cluster:
 
    ```console
-   stunnerctl -n <gateway-namespace> config <gateway-name> --node=<node-name> -o jsonpath='{.listeners[*].address}'
+   stunnerctl -n <gateway-namespace> config <gateway-name> --node=<node-name> -o jsonpath='{.clusters[*].addresses}'
    <relay-address>
    ...
    ```
@@ -159,9 +159,9 @@ Below is the set of steps to enable relay address discovery:
    stunnerctl -n <gateway-namespace> status <gateway-name>
    <gateway-namespace>/<gateway-pod>:
    admin: ...
-   auth: ...
-   listeners: <listener-name>:{turn://<relay-address>:<port>?transport=TURN-UDP...}
-   clusters: ...
+   auths: ...
+   listeners: ...
+   clusters: "<cluster-name>":{...,addresses=[<relay-address>]}
    ```
 
    Note that depending on your Kubernetes provider's platform your nodes may run without a public IP, or host-networking may not be available at all. Symmetric ICE mode is still be usable as a fallback in such cases.

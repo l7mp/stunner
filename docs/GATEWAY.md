@@ -319,6 +319,9 @@ Backend reference configuration is as follows:
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
+> [!NOTE]
+> Port ranges are ambiguous on a Gateway listener with several routes attached: the port range of the first route applies to every peer of the listener, so the peers of the other routes are reachable only on the ports the first route admits. 
+
 ## TCPRoute
 
 TCPRoute is the TCP counterpart of the UDPRoute: same spec, same backend kinds, but the relay leg towards the backend is a TCP connection instead of a UDP flow. Use it when the backend service speaks TCP.
@@ -383,7 +386,7 @@ spec:
           name: static-svc
 ```
 
-The StaticService `spec.prefixes` must be a list of proper IPv4 or IPv6 prefixes: any IP address in any of the listed prefixes will be whitelisted. Note that a prefix admits only peers of its own address family, so use the prefix `0.0.0.0/0` to provide wildcard access via an UDPRoute, and add `::/0` next to it on an IPv6-only or dual-stack cluster.
+The StaticService `spec.prefixes` must be a list of proper IPv4 or IPv6 prefixes: any IP address in any of the listed prefixes will be whitelisted. An entry may restrict the ports of the prefix with a port range, written as `<prefix>:<min-max>` (e.g., `192.0.2.0/24:<10000-20000>`), which overrides the `port`/`endPort` of the backend reference. Note that a prefix admits only peers of its own address family, so use the prefix `0.0.0.0/0` to provide wildcard access via an UDPRoute, and add `::/0` next to it on an IPv6-only or dual-stack cluster.
 
 > [!WARNING]
 >

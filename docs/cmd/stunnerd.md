@@ -57,9 +57,7 @@ The below opens a local UDP tunnel endpoint at port 5000 that relays through the
 stunnerd udp://127.0.0.1:5000 turn://user:pass@1.2.3.4:3478 udp://10.0.0.1:9000
 ```
 
-The `--sni` and `--insecure` flags apply to the TLS/DTLS transports (note that `--insecure` has no `-i` shorthand, which belongs to `--id`). A tunnel is quiet by default (`all:WARN`) unless a log level is set. Internally, tunnel mode renders a `UDP`, `TCP` or `STDIN` listener feeding an `L4` server, a single cluster holding the peer and tunnelled through the TURN server, presenting the credentials of an authentication policy named `upstream`, and runs the normal reconcile machinery on the result: there is no separate tunnel datapath. Logs go to stderr, so a stdin/stdout tunnel composes cleanly in shell pipelines; the process exits when the stdin flow ends.
-
-Type `./stunnerd -h` to get a short description of the supported command line arguments.
+The `--sni` and `--insecure` flags apply to the TLS/DTLS transports. Type `./stunnerd -h` to get a short description of the supported command line arguments.
 
 ## Configuration
 
