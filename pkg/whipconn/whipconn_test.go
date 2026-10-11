@@ -14,6 +14,7 @@ import (
 	"github.com/pion/logging"
 	"github.com/pion/webrtc/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	slogger "github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -57,7 +58,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
@@ -89,7 +90,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
@@ -110,7 +111,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(dialerCtx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")
@@ -130,7 +131,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(serverCtx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Eventually(t, func() bool { return l.ConnCount() == 1 }, timeout, interval)
 
@@ -152,7 +153,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(clientCtx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			assert.Eventually(t, func() bool { return l.ConnCount() == 1 }, timeout, interval)
 
@@ -227,7 +228,7 @@ var testerTestCases = []struct {
 
 			log.Debug("dialing")
 			clientConn, err := d.DialContext(ctx, addr)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			log.Debug("echo test round 1")
 			echoTest(t, clientConn, "test1")

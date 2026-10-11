@@ -155,6 +155,8 @@ func (d *Dialer) DialContext(ctx context.Context, addr string) (net.Conn, error)
 		return nil, fmt.Errorf("unexpected error building HTTP request: %w", err)
 	}
 
+	// a WHIP session is one POST and one DELETE: keep no idle conn the server may have closed
+	req.Close = true
 	req.Header.Add("Content-Type", "application/sdp")
 	if d.config.BearerToken != "" {
 		req.Header.Add("Authorization", "Bearer "+d.config.BearerToken)
@@ -234,14 +236,17 @@ func (c *DialerConn) Close() error {
 			c.closeErr = fmt.Errorf("unexpected error building http request: %w", err)
 			return
 		}
+		req.Close = true
 		if c.dialer.config.BearerToken != "" {
 			req.Header.Add("Authorization", "Bearer "+c.dialer.config.BearerToken)
 		}
 
-		if _, err = http.DefaultClient.Do(req); err != nil {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
 			c.closeErr = fmt.Errorf("failed WHIP DELETE request: %w", err)
 			return
 		}
+		resp.Body.Close() //nolint
 
 		if err := c.peerConn.Close(); err != nil {
 			c.closeErr = fmt.Errorf("failed to close PeerConnection: %w", err)
