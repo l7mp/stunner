@@ -75,7 +75,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 		SuppressRollback: true,
 	})
-	require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
+	require.NoError(t, upstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin: stnrv2.AdminConfig{
 			LogLevel:            stunnerTestLoglevel,
@@ -100,7 +100,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Protocol: "UDP",
 			Addrs:    []string{tn.host},
 		}},
-	}), "upstream server started")
+	})), "upstream server started")
 
 	downstream := NewStunner(Options{
 		Name:             "downstream",
@@ -108,7 +108,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 		LogOptions:       LogOptions{Level: stunnerTestLoglevel},
 		SuppressRollback: true,
 	})
-	require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
+	require.NoError(t, downstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin: stnrv2.AdminConfig{
 			LogLevel:            stunnerTestLoglevel,
@@ -140,7 +140,7 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 				Auth: "upstream",
 			},
 		}},
-	}), "downstream server started")
+	})), "downstream server started")
 
 	return upstream, downstream
 }
@@ -165,7 +165,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 	// upstream: a TURN server behind a TCP listener with a TCP (RFC 6062) cluster that dials the
 	// peer directly
 	upstream := NewStunner(Options{Name: "upstream", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
-	require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
+	require.NoError(t, upstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
 		Auths:      []stnrv2.AuthConfig{{Type: "static", Credentials: map[string]string{"username": "user2", "password": "passwd2"}}},
@@ -179,13 +179,13 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 			Protocol:  "TCP",
 			Addrs:     []string{"127.0.0.1"},
 		}},
-	}), "upstream server started")
+	})), "upstream server started")
 	defer closeStunner(upstream)
 
 	// downstream: a TURN server behind a TCP listener, served by a TCP cluster tunnelled over
 	// TURN-TCP through the upstream
 	downstream := NewStunner(Options{Name: "downstream", LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
-	require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
+	require.NoError(t, downstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
 		Auths: []stnrv2.AuthConfig{{Type: "static", Credentials: map[string]string{"username": "user1", "password": "passwd1"}},
@@ -199,7 +199,7 @@ func TestStunnerTURNRelayChainTCP(t *testing.T) {
 			Protocol: "TCP",
 			Tunnel:   &stnrv2.TunnelConfig{URL: "turn:127.0.0.1:23479?transport=tcp", Auth: "upstream"},
 		}},
-	}), "downstream server started")
+	})), "downstream server started")
 	defer closeStunner(downstream)
 
 	// TCP echo peer

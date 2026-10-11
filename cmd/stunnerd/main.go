@@ -384,12 +384,11 @@ func tunnelConfig(clientArg, serverArg, peerArg, sni string, insecure bool) (*st
 				Clusters: []string{"tunnel-cluster"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:          "tunnel-cluster",
-			Type:          clusterType.String(),
-			Endpoints:     []string{hostport},
-			RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String(),
-			Protocol:      peerProto.String(),
-			Tunnel:        tunnel,
+			Name:      "tunnel-cluster",
+			Type:      clusterType.String(),
+			Endpoints: []string{hostport},
+			Protocol:  peerProto.String(),
+			Tunnel:    tunnel,
 		}},
 	}
 	if auth != nil {

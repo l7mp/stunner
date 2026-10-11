@@ -98,7 +98,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			require.NoError(t, stunner.Reconcile(c), "starting server")
+			require.NoError(t, stunner.Reconcile(allowPeers(c)), "starting server")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -486,7 +486,7 @@ func TestStunnerConfigPatcher(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case c := <-confChan:
-				if err := stunner.Reconcile(c); err != nil {
+				if err := stunner.Reconcile(allowPeers(c)); err != nil {
 					var restarted stnrv2.ErrRestarted
 					assert.True(t, errors.As(err, &restarted), "reconcile: %v", err)
 				}

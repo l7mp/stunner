@@ -56,7 +56,7 @@ func TestClusterFilter(t *testing.T) {
 		defer closeStunner(s)
 		rest := stnrv2.FilterRule{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.5"}}
 		conf := filterTURNConfig(only6678, rest)
-		require.NoError(t, s.Reconcile(conf))
+		require.NoError(t, s.Reconcile(allowPeers(conf)))
 
 		lconn, err := tn.client.ListenPacket("udp4", "0.0.0.0:0")
 		require.NoError(t, err)
@@ -94,20 +94,20 @@ func TestClusterFilter(t *testing.T) {
 		// the rules change in place, on the live relay: a rule before the final DENY admits
 		conf.Filters[0].Rules = []stnrv2.FilterRule{only6678, {Action: "ALLOW",
 			IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.5"}, Ports: []stnrv2.FilterPort{{Port: 6679}}}, rest}
-		require.NoError(t, s.Reconcile(conf))
+		require.NoError(t, s.Reconcile(allowPeers(conf)))
 		assert.True(t, echo(refused), "a new rule admits the port")
 
 		// the first matching rule decides: an exception before the ALLOW
 		conf.Filters[0].Rules = append([]stnrv2.FilterRule{{Action: "DENY",
 			IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.0/24"}, Ports: []stnrv2.FilterPort{{Port: 6678}}}},
 			conf.Filters[0].Rules...)
-		require.NoError(t, s.Reconcile(conf))
+		require.NoError(t, s.Reconcile(allowPeers(conf)))
 		assert.False(t, echo(allowed), "the earlier DENY decides")
 		assert.True(t, echo(refused))
 
 		// a missing filter has no rules: everything passes
 		conf.Filters = nil
-		require.NoError(t, s.Reconcile(conf))
+		require.NoError(t, s.Reconcile(allowPeers(conf)))
 		assert.True(t, echo(allowed), "a missing filter admits")
 	})
 
@@ -123,7 +123,7 @@ func TestClusterFilter(t *testing.T) {
 		conf.Filters = []stnrv2.FilterConfig{{Name: "no-echo", Rules: []stnrv2.FilterRule{
 			{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.5"},
 				Ports: []stnrv2.FilterPort{{Port: 25680}}}}}}
-		require.NoError(t, s.Reconcile(conf))
+		require.NoError(t, s.Reconcile(allowPeers(conf)))
 
 		client, err := tn.client.Dial("udp", "1.2.3.4:23478")
 		require.NoError(t, err)

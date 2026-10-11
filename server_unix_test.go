@@ -72,7 +72,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 	defer stunner.Close()
 
 	log.Debug("starting stunnerd")
-	err := stunner.Reconcile(&stnrv2.StunnerConfig{
+	err := stunner.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin: stnrv2.AdminConfig{
 			LogLevel: stunnerTestLoglevel,
@@ -101,7 +101,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Protocol: "UDP",
 			Addrs:    []string{"127.0.0.1"},
 		}},
-	})
+	}))
 
 	if err != nil {
 		b.Fatalf("Failed to start stunnerd: %s", err)
@@ -148,7 +148,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 		SuppressRollback: true,
 	})
 	defer tunnel.Close()
-	if err := tunnel.Reconcile(&stnrv2.StunnerConfig{
+	if err := tunnel.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin: stnrv2.AdminConfig{
 			LogLevel:            stunnerTestLoglevel,
@@ -167,17 +167,16 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			ServerSpec: stnrv2.ServerSpec{Name: "tunnel", Type: "l4", Clusters: []string{"sink"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:          "sink",
-			Endpoints:     []string{"127.0.0.1:65432"},
-			RoutingPolicy: "ROUND_ROBIN",
-			Protocol:      "UDP",
+			Name:      "sink",
+			Endpoints: []string{"127.0.0.1:65432"},
+			Protocol:  "UDP",
 			Tunnel: &stnrv2.TunnelConfig{
 				URL:      (&stnrv2.URI{Protocol: tunnelProto, Host: "127.0.0.1", Port: 23478}).String(),
 				Auth:     "upstream",
 				Insecure: true,
 			},
 		}},
-	}); err != nil {
+	})); err != nil {
 		b.Fatalf("Failed to create tunnel client: %s", err)
 	}
 

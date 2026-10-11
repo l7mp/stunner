@@ -62,6 +62,7 @@ type setup struct {
 
 type testServer struct {
 	*l4.Server
+	rt      *objruntime.Runtime
 	cluster *object.Cluster
 	port    int
 }
@@ -87,10 +88,10 @@ func newTestServer(t *testing.T, c setup) *testServer {
 		require.NoError(t, o.Start())
 		t.Cleanup(func() { _ = o.Close(true) })
 	}
-	ts := &testServer{}
+	ts := &testServer{rt: rt}
 	if c.proto != "" {
 		cl, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "peers", Endpoints: c.endpoints,
-			Protocol: c.proto, RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}, rt)
+			Protocol: c.proto}, rt)
 		require.NoError(t, err)
 		start(cl)
 		ts.cluster = cl.(*object.Cluster)
@@ -118,8 +119,7 @@ func newTestServer(t *testing.T, c setup) *testServer {
 func (s *testServer) setEndpoints(t *testing.T, endpoints []string) {
 	t.Helper()
 	require.NoError(t, s.cluster.Reconcile(&stnrv2.ClusterConfig{Name: "peers",
-		Endpoints: endpoints, Protocol: s.cluster.Protocol().String(),
-		RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}))
+		Endpoints: endpoints, Protocol: s.cluster.Protocol().String()}))
 }
 
 func (s *testServer) dial(t *testing.T, network string) net.Conn {
@@ -292,6 +292,33 @@ func TestFlowLoadBalancing(t *testing.T) {
 	echo(t, c1, "still one")
 	echo(t, c2, "still two")
 	noEcho(t, s.dial(t, "udp"), "new flows find no target")
+}
+
+// TestFlowLoadBalancingAcrossClusters verifies that the round robin steps through the endpoints
+// of every cluster of the server, not only the first cluster's.
+func TestFlowLoadBalancingAcrossClusters(t *testing.T) {
+	// the first cluster's endpoint is a closed port, the second's an echo peer
+	dead, err := net.ListenPacket("udp", "127.0.0.1:0") //nolint:noctx
+	require.NoError(t, err)
+	deadAddr := dead.LocalAddr().String()
+	require.NoError(t, dead.Close())
+	peer := udpEcho(t)
+	s := newTestServer(t, setup{listener: "UDP", proto: "UDP", endpoints: []string{deadAddr}})
+
+	cl, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "more", Endpoints: []string{peer.String()},
+		Protocol: "UDP"}, s.rt)
+	require.NoError(t, err)
+	require.NoError(t, s.rt.Registry.Add(cl, nil))
+	require.NoError(t, cl.Start())
+	t.Cleanup(func() { _ = cl.Close(true) })
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "l4", Type: "l4",
+		Clusters: []string{"peers", "more"}}}
+	require.NoError(t, conf.Validate())
+	require.NoError(t, s.Reconcile(conf))
+
+	// the first flow goes to the first cluster, the second to the second one
+	noEcho(t, s.dial(t, "udp"), "first cluster")
+	echo(t, s.dial(t, "udp"), "second cluster")
 }
 
 // TestFlowIdleExpiry verifies the activity-driven idle teardown and that fresh traffic from the

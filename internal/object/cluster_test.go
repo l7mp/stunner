@@ -134,15 +134,14 @@ func (r *recordingResolver) domains() []string {
 
 // TestClusterDomains pins the resolver side of a STRICT_DNS cluster: Start registers each domain
 // once, a reconcile of a running cluster moves the registrations to the new domains, Close
-// unregisters exactly those, and a STATIC or an ORIGINAL_DST cluster registers nothing.
+// unregisters exactly those, and a STATIC cluster registers nothing.
 func TestClusterDomains(t *testing.T) {
 	env := newTestEnv()
 	res := &recordingResolver{}
 	env.rt.Resolver = res
-	rr := stnrv2.RoutingPolicyRoundRobin.String()
 
 	c, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
-		Type: stnrv2.ClusterTypeStrictDNS.String(), RoutingPolicy: rr,
+		Type:      stnrv2.ClusterTypeStrictDNS.String(),
 		Endpoints: []string{"media.example.com:5000", "media.example.com:5001", "turn.example.com"},
 	}, env.rt)
 	require.NoError(t, err)
@@ -151,7 +150,7 @@ func TestClusterDomains(t *testing.T) {
 	assert.Equal(t, []string{"media.example.com", "turn.example.com"}, res.domains())
 
 	require.NoError(t, c.Reconcile(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
-		Type: stnrv2.ClusterTypeStrictDNS.String(), RoutingPolicy: rr,
+		Type:      stnrv2.ClusterTypeStrictDNS.String(),
 		Endpoints: []string{"media.example.com:6000", "media.example.org"},
 	}))
 	assert.Equal(t, []string{"media.example.com", "media.example.org"}, res.domains())
@@ -161,7 +160,7 @@ func TestClusterDomains(t *testing.T) {
 
 	// a reconcile of a stopped cluster registers nothing until Start
 	require.NoError(t, c.Reconcile(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
-		Type: stnrv2.ClusterTypeStrictDNS.String(), RoutingPolicy: rr, Endpoints: []string{"turn.example.com"}}))
+		Type: stnrv2.ClusterTypeStrictDNS.String(), Endpoints: []string{"turn.example.com"}}))
 	assert.Empty(t, res.domains())
 	require.NoError(t, c.Start())
 	assert.Equal(t, []string{"turn.example.com"}, res.domains())
@@ -175,25 +174,16 @@ func TestClusterDomains(t *testing.T) {
 	assert.Empty(t, res.domains())
 	require.NoError(t, s.Close(false))
 
-	// an ORIGINAL_DST cluster chooses nothing from its endpoints: it resolves no domain
-	o, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "cluster-c", Protocol: "UDP",
-		Type: stnrv2.ClusterTypeStrictDNS.String(), Endpoints: []string{"media.example.com"}}, env.rt)
-	require.NoError(t, err)
-	require.NoError(t, o.Start())
-	assert.Empty(t, res.domains())
-	require.NoError(t, o.Close(false))
 }
 
-// TestClusterRoute pins what a cluster found by name routes: a FILTER cluster admits the IPs an
-// endpoint contains (a prefix or a resolved domain, ports ignored), a ROUND_ROBIN cluster chooses
-// the single-port endpoints in turn, and each refuses the other kind of request. A reconcile
-// applies to the next request.
-func TestClusterRoute(t *testing.T) {
+// TestClusterTargets pins the destinations of a cluster found by name: its endpoints with a port,
+// a domain resolved (IPv4 preferred). A reconcile applies to the next request.
+func TestClusterTargets(t *testing.T) {
 	env := newTestEnv()
 	env.rt.Resolver = &recordingResolver{zone: map[string][]net.IP{
 		"media.example.com": {net.ParseIP("10.2.0.1"), net.ParseIP("fd00::1"), net.ParseIP("10.2.0.2")},
 	}}
-	endpoints := []string{"10.0.0.1:5000", "10.1.0.5:6000", "media.example.com:7000"}
+	endpoints := []string{"10.0.0.1:5000", "10.1.0.5:6000", "media.example.com:7000", "10.0.0.9"}
 	c, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
 		Endpoints: endpoints}, env.rt)
 	require.NoError(t, err)
@@ -202,37 +192,14 @@ func TestClusterRoute(t *testing.T) {
 
 	r, ok := env.rt.Router("cluster-a")
 	require.True(t, ok, "found by name")
-	// ORIGINAL_DST routes every destination as it is: endpoints are for load balancers to choose
-	// from, what a client may reach is the business of the filters
-	for _, ip := range []string{"10.0.0.1", "10.9.9.9", "10.2.0.3", "fd00::7"} {
-		dst := netip.AddrPortFrom(netip.MustParseAddr(ip), 1234)
-		got, ok, err := r.Route(dst)
-		require.NoError(t, err)
-		assert.True(t, ok, ip)
-		assert.Equal(t, dst, got, "ORIGINAL_DST routes to the destination itself")
-	}
-	_, _, err = r.Route(netip.AddrPort{})
-	assert.Error(t, err, "ORIGINAL_DST needs a destination")
+	want := []netip.AddrPort{netip.MustParseAddrPort("10.0.0.1:5000"),
+		netip.MustParseAddrPort("10.1.0.5:6000"), netip.MustParseAddrPort("10.2.0.1:7000"),
+		netip.MustParseAddrPort("10.2.0.2:7000")}
+	assert.ElementsMatch(t, want, r.Targets(), "targets")
 
 	require.NoError(t, c.Reconcile(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
-		Endpoints: endpoints, RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}))
-	picked := map[string]bool{}
-	for range 8 {
-		dst, ok, err := r.Route(netip.AddrPort{})
-		require.NoError(t, err)
-		require.True(t, ok)
-		picked[dst.String()] = true
-	}
-	assert.Equal(t, map[string]bool{"10.0.0.1:5000": true, "10.1.0.5:6000": true, "10.2.0.1:7000": true,
-		"10.2.0.2:7000": true}, picked, "round robin over the resolved endpoints, IPv4 preferred")
-	_, _, err = r.Route(netip.MustParseAddrPort("10.0.0.1:5000"))
-	assert.Error(t, err, "a load balancer chooses its own destination")
-
-	require.NoError(t, c.Reconcile(&stnrv2.ClusterConfig{Name: "cluster-a", Protocol: "UDP",
-		Endpoints: []string{"192.0.2.1"}, RoutingPolicy: stnrv2.RoutingPolicyRoundRobin.String()}))
-	_, ok, err = r.Route(netip.AddrPort{})
-	require.NoError(t, err)
-	assert.False(t, ok, "an endpoint without a port is nothing to dial")
+		Endpoints: []string{"192.0.2.1"}}))
+	assert.Empty(t, r.Targets(), "an endpoint without a port is nothing to dial")
 	require.NoError(t, c.Close(false))
 }
 

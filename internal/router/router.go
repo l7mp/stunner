@@ -1,12 +1,10 @@
-// Package router implements the routing policies of a cluster over its endpoints.
+// Package router implements the destinations of a cluster: its endpoints, resolved.
 package router
 
 import (
-	"fmt"
 	"net"
 	"net/netip"
 	"slices"
-	"sync/atomic"
 
 	"github.com/pion/logging"
 
@@ -15,85 +13,49 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// New creates the router of a cluster config, skipping the endpoints its policy cannot use.
-func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, log logging.LeveledLogger) (api.Router, error) {
-	policy, err := stnrv2.NewRoutingPolicy(conf.RoutingPolicy)
-	if err != nil {
-		return nil, err
-	}
-	b := base{name: conf.Name, rt: rt}
-	switch policy {
-	case stnrv2.RoutingPolicyOriginalDst:
-		return &OriginalDst{base: b}, nil
-	case stnrv2.RoutingPolicyRoundRobin:
-		for _, raw := range conf.Endpoints {
-			ep, err := stnrv2.ParseEndpoint(raw)
-			if err != nil {
-				log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
-				continue
-			}
-			if ep.Port == 0 {
-				log.Warnf("cluster %s: skipping endpoint %q: a %s cluster dials an endpoint at "+
-					"its port", conf.Name, raw, policy.String())
-				continue
-			}
-			b.endpoints = append(b.endpoints, ep)
-		}
-		return &RoundRobin{base: b}, nil
-	}
-	return nil, fmt.Errorf("cluster %s: unsupported routing policy %q", conf.Name, policy.String())
-}
-
-type base struct {
+// Router lists the destinations of a cluster: its endpoints that carry a port, domains resolved.
+type Router struct {
 	name      string
 	endpoints []*stnrv2.Endpoint
 	rt        *runtime.Runtime
 }
 
-func (b *base) Name() string { return b.name }
+var _ api.Router = &Router{}
 
-// addrs returns the IPs of an endpoint, resolving a domain.
-func (b *base) addrs(ep *stnrv2.Endpoint) []net.IP {
-	if ep.Domain == "" {
-		return []net.IP{ep.Addr.AsSlice()}
+// New creates the router of a cluster config, skipping the endpoints that do not parse.
+func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, log logging.LeveledLogger) (api.Router, error) {
+	r := &Router{name: conf.Name, rt: rt}
+	for _, raw := range conf.Endpoints {
+		ep, err := stnrv2.ParseEndpoint(raw)
+		if err != nil {
+			log.Warnf("cluster %s: skipping endpoint %q: %s", conf.Name, raw, err.Error())
+			continue
+		}
+		r.endpoints = append(r.endpoints, ep)
 	}
-	hosts, err := b.rt.Resolver.Lookup(ep.Domain)
-	if err != nil {
-		return nil
-	}
-	return hosts
+	return r, nil
 }
 
-// OriginalDst routes to the destination the client names; the filters decide what is reachable.
-type OriginalDst struct {
-	base
-}
+func (r *Router) Name() string { return r.name }
 
-func (f *OriginalDst) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
-	if !dst.IsValid() {
-		return dst, false, fmt.Errorf("cluster %s: a %s cluster needs a destination", f.name,
-			stnrv2.RoutingPolicyOriginalDst.String())
-	}
-	return dst, true, nil
-}
-
-// RoundRobin chooses the resolved endpoints in turn.
-type RoundRobin struct {
-	base
-	next atomic.Uint64
-}
-
-func (r *RoundRobin) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
-	if dst.IsValid() {
-		return dst, false, fmt.Errorf("cluster %s: a %s cluster chooses its own destination",
-			r.name, stnrv2.RoutingPolicyRoundRobin.String())
-	}
+// Targets returns the endpoints that carry a port, a domain resolved to its addresses.
+func (r *Router) Targets() []netip.AddrPort {
 	targets := []netip.AddrPort{}
 	for _, ep := range r.endpoints {
-		// a domain resolving to both families yields its IPv4 addresses, as Envoy's V4_PREFERRED
-		hosts := r.addrs(ep)
-		if slices.ContainsFunc(hosts, func(h net.IP) bool { return h.To4() != nil }) {
-			hosts = slices.DeleteFunc(hosts, func(h net.IP) bool { return h.To4() == nil })
+		if ep.Port == 0 {
+			continue
+		}
+		hosts := []net.IP{ep.Addr.AsSlice()}
+		if ep.Domain != "" {
+			var err error
+			if hosts, err = r.rt.Resolver.Lookup(ep.Domain); err != nil {
+				continue
+			}
+			// a domain resolving to both families yields its IPv4 addresses, as Envoy's
+			// V4_PREFERRED
+			if slices.ContainsFunc(hosts, func(h net.IP) bool { return h.To4() != nil }) {
+				hosts = slices.DeleteFunc(hosts, func(h net.IP) bool { return h.To4() == nil })
+			}
 		}
 		for _, h := range hosts {
 			if a, ok := netip.AddrFromSlice(h); ok {
@@ -101,8 +63,5 @@ func (r *RoundRobin) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
 			}
 		}
 	}
-	if len(targets) == 0 {
-		return dst, false, nil
-	}
-	return targets[int((r.next.Add(1)-1)%uint64(len(targets)))], true, nil
+	return targets
 }

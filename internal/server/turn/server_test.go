@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/netconn"
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/quota"
@@ -109,7 +111,13 @@ func newTestServer(t *testing.T) *testServer {
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(cl, nil))
 	require.NoError(t, cl.Start())
-	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"loopback"}}}
+	// a permission is granted only by a matching ALLOW rule
+	all, err := object.NewFilter(&stnrv2.FilterConfig{Name: "all", Rules: []stnrv2.FilterRule{
+		{Action: "ALLOW"}}})
+	require.NoError(t, err)
+	require.NoError(t, rt.Registry.Add(all, nil))
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"loopback"}},
+		TURN: &stnrv2.TURNServerConfig{PermissionFilters: []string{"all"}}}
 	require.NoError(t, conf.Validate())
 	s, err := turn.New(conf, rt)
 	require.NoError(t, err)
@@ -217,6 +225,17 @@ func TestTURNServerRelays(t *testing.T) {
 	// closing the allocation deletes it
 	require.NoError(t, udp.Close())
 	require.Eventually(t, func() bool { return ts.Sessions() == 1 }, 5*time.Second, 20*time.Millisecond)
+}
+
+// TestTURNServerRefusesStreamlessConns pins that a TURN server refuses a conn of a protocol it
+// cannot serve, from a STDIN listener here, with an error.
+func TestTURNServerRefusesStreamlessConns(t *testing.T) {
+	ts := newTestServer(t)
+	c1, c2 := net.Pipe()
+	t.Cleanup(func() { _ = c1.Close(); _ = c2.Close() })
+	_, _, err := ts.Serve(netconn.NewConn(c1, api.Tag{Name: "stdin", Proto: stnrv2.ProtocolSTDIN}, nil))
+	assert.ErrorContains(t, err, "cannot serve a STDIN conn")
+	assert.Equal(t, 0, ts.Sessions(), "nothing tracked")
 }
 
 func TestTURNServerPermissions(t *testing.T) {

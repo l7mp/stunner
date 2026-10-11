@@ -1,5 +1,5 @@
 # An L4 proxy terminating TLS and DTLS: TLS/443 is relayed as TCP and DTLS/443 as UDP to a
-# backend, load-balanced over the endpoints.
+# backend, round-robin over the endpoints.
 version: v2
 admin:
   name: l4-proxy
@@ -27,9 +27,7 @@ servers:
 clusters:
   - name: backend-tcp
     protocol: TCP
-    routing_policy: ROUND_ROBIN
     endpoints: ["10.0.0.1:8080"]
   - name: backend-udp
     protocol: UDP
-    routing_policy: ROUND_ROBIN
     endpoints: ["10.0.0.2:8080"]

@@ -73,12 +73,12 @@ type Dialer interface {
 	Listen(network string, port int) (net.Listener, net.Addr, error)
 }
 
-// Router decides where the traffic of a cluster goes.
+// Router lists the destinations of a cluster.
 type Router interface {
 	Named
-	// Route returns the destination of traffic towards dst, or chooses one when dst is the zero
-	// value. ok is false when there is none, err when the router cannot route the request.
-	Route(dst netip.AddrPort) (netip.AddrPort, bool, error)
+	// Targets returns the endpoints of the cluster that carry a port, resolved: the destinations
+	// a server dialing a peer of its own choice chooses from.
+	Targets() []netip.AddrPort
 }
 
 // Filter admits or drops traffic by the address and port of its client or peer: Match returns the

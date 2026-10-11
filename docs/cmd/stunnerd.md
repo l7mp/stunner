@@ -71,7 +71,7 @@ Configuration files for `stunnerd`, now at API version `v2`, are built from five
 
 - Listeners accept client connections (`UDP`, `TCP`, `TLS`, `DTLS`, `STDIN` or `FIFO`) and hand them to a chain of servers for processing.
 - Servers (`TURN`, `L4`, `SIP` or `RTP`) serve connections through a set of clusters.
-- Clusters define the endpoints reachable via the cluster (addresses or domains, with an optional port) plus a routing policy and the transport protocol to reach them.
+- Clusters define the endpoints reachable via the cluster (addresses or domains, with an optional port) plus the transport protocol to reach them.
 - Filters are ordered list of allow/deny rules on addresses and ports. Filters can be invoked at various points in the processing pipeline: listener filters are applied at the ingress, cluster filters at the egress, etc. The first matching rule decides and unmatched traffic passes; a rule without an `ip_block` matches every address, so end an allow-list with a bare `- action: DENY`.
 - Auth configs are named authentication policies (`static`, `ephemeral` or `none`).
 

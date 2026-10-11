@@ -120,7 +120,7 @@ Listeners:
     Server: stunner/udp-gateway/udp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/iperf-server/udp]
+    Clusters: [stunner/iperf-server/turn/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
@@ -136,7 +136,7 @@ Listeners:
     Server: stunner/tcp-gateway/tcp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.116.180.89:3478
-    Clusters: [stunner/iperf-server/udp]
+    Clusters: [stunner/iperf-server/turn/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 

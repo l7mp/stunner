@@ -194,8 +194,9 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 		conn = turn.NewSTUNStreamConn(c)
 	case stnrv2.ProtocolUDP, stnrv2.ProtocolDTLS:
 	default:
-		s.log.Warnf("server %s: serving a %s client conn from listener %s as TURN", s.Name(),
-			c.Tag().Proto.String(), c.Tag().Name)
+		ct.Remove(server.Key(c.RemoteAddr(), c.LocalAddr()))
+		return nil, api.Consumed, fmt.Errorf("server %s: cannot serve a %s conn of listener %s "+
+			"as TURN", s.Name(), c.Tag().Proto.String(), c.Tag().Name)
 	}
 	if err := queue.Push(conn); err != nil {
 		ct.Remove(server.Key(c.RemoteAddr(), c.LocalAddr()))

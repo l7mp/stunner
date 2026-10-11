@@ -42,10 +42,9 @@ func plainListenerConfig(proto, host string, port int, endpoints ...string) *stn
 			ServerSpec: stnrv2.ServerSpec{Name: "plain", Type: "l4", Clusters: []string{"peer"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:          "peer",
-			Endpoints:     endpoints,
-			RoutingPolicy: "ROUND_ROBIN",
-			Protocol:      "UDP",
+			Name:      "peer",
+			Endpoints: endpoints,
+			Protocol:  "UDP",
 		}},
 	}
 }
@@ -370,7 +369,7 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 			noHealthCheck := ""
 			upstream := NewStunner(Options{Name: "upstream", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 			defer closeStunner(upstream)
-			require.NoError(t, upstream.Reconcile(&stnrv2.StunnerConfig{
+			require.NoError(t, upstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 				ApiVersion: stnrv2.ApiVersion,
 				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
 				Auths:      []stnrv2.AuthConfig{upstreamAuth},
@@ -380,11 +379,11 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 				}},
 				Servers:  []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{upstreamCluster.Name}}}},
 				Clusters: []stnrv2.ClusterConfig{upstreamCluster},
-			}), "upstream server started")
+			})), "upstream server started")
 
 			downstream := NewStunner(Options{Name: "downstream", Net: tn.pod, LogOptions: LogOptions{Level: stunnerTestLoglevel}, SuppressRollback: true})
 			defer closeStunner(downstream)
-			require.NoError(t, downstream.Reconcile(&stnrv2.StunnerConfig{
+			require.NoError(t, downstream.Reconcile(allowPeers(&stnrv2.StunnerConfig{
 				ApiVersion: stnrv2.ApiVersion,
 				Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, HealthCheckEndpoint: &noHealthCheck},
 				Auths: []stnrv2.AuthConfig{{Type: "none"},
@@ -395,13 +394,12 @@ func TestStunnerPlainTunnelChain(t *testing.T) {
 				}},
 				Servers: []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "downstream", Type: "l4", Clusters: []string{"peer"}}}},
 				Clusters: []stnrv2.ClusterConfig{{
-					Name:          "peer",
-					Endpoints:     []string{peerAddr},
-					RoutingPolicy: "ROUND_ROBIN",
-					Protocol:      peerProto,
-					Tunnel:        &stnrv2.TunnelConfig{URL: tunnelURL, Auth: "upstream"},
+					Name:      "peer",
+					Endpoints: []string{peerAddr},
+					Protocol:  peerProto,
+					Tunnel:    &stnrv2.TunnelConfig{URL: tunnelURL, Auth: "upstream"},
 				}},
-			}), "downstream server started")
+			})), "downstream server started")
 
 			buf := make([]byte, 1600)
 			if tc.clientProto == "UDP" {

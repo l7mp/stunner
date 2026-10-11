@@ -36,8 +36,7 @@ type TURNServerConfig struct {
 	// Auth names the authentication policy the server authenticates its clients by. Default is
 	// "default".
 	Auth string `json:"auth,omitempty"`
-	// PermissionFilters name the filters the peer IP of a permission must pass; rules with ports
-	// never match there.
+	// PermissionFilters name the filters checking the peer IP of a permission.
 	PermissionFilters []string `json:"permission_filters,omitempty"`
 }
 

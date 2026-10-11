@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"sync"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/api"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
+	"github.com/l7mp/stunner/v2/internal/server/balancer"
 	turnsrv "github.com/l7mp/stunner/v2/internal/server/turn"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
@@ -40,6 +40,8 @@ type Server struct {
 	events  EventHandler
 	offload *OffloadHandler
 
+	lb balancer.Balancer // chooses the peer of a new flow among the targets of the clusters
+
 	mu          sync.RWMutex
 	auth        string              // the policy whose realm scopes the quota of the flows
 	acceptQueue *server.AcceptQueue // nil while stopped
@@ -56,7 +58,12 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	log := rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name))
 	// the quota machinery is shared with the TURN server
 	q := turnsrv.NewQuotaHandler(rt)
+	lb, err := balancer.New(stnrv2.RoutingPolicyRoundRobin)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
+		lb:      lb,
 		rt:      rt,
 		log:     log,
 		idle:    FlowTimeout,
@@ -166,30 +173,15 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 	return nil, api.Consumed, nil
 }
 
-// target picks the target of a new flow from the first cluster that routes one.
-func (s *Server) target() (addr string, d api.Dialer, err error) {
-	for _, name := range s.Clusters() {
-		r, found := s.rt.Router(name)
-		if !found {
-			continue
-		}
-		dst, ok, err := r.Route(netip.AddrPort{})
-		if err != nil {
-			s.log.Warnf("server %q: skipping cluster %q: %s", s.Name(), name, err.Error())
-			continue
-		}
-		if d, found := s.rt.Dialer(name); ok && found {
-			return dst.String(), d, nil
-		}
-	}
-	return "", nil, errNoEndpoint
-}
-
 // newFlow picks the target, gates the quota, dials the leg and registers the flow.
 func (s *Server) newFlow(client api.Conn) (*Flow, error) {
-	addr, d, err := s.target()
-	if err != nil {
-		return nil, err
+	cluster, dst, ok := s.lb.Next(s.rt, s.Clusters())
+	if !ok {
+		return nil, errNoEndpoint
+	}
+	d, ok := s.rt.Dialer(cluster)
+	if !ok {
+		return nil, errNoEndpoint
 	}
 
 	// the gate reserves the quota: every later failure path must release it
@@ -202,14 +194,14 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 			user, realm, turnsrv.AllocationDeleted)
 	}
 
-	leg, err := d.Dial(context.Background(), nil, addr)
+	leg, err := d.Dial(context.Background(), nil, dst.String())
 	if err != nil {
 		quotaRelease()
 		return nil, err
 	}
 
 	tunnel := stnrv2.ProtocolUnknown
-	if conf := s.rt.ClusterConfig(d.Name()); conf != nil && conf.Tunnel != nil {
+	if conf := s.rt.ClusterConfig(cluster); conf != nil && conf.Tunnel != nil {
 		if u, err := stnrv2.ParseURI(conf.Tunnel.URL); err == nil {
 			tunnel = u.Protocol
 		}
@@ -222,7 +214,7 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		Protocol:     client.Tag().Proto,
 		Peer:         leg.RemoteAddr(),
 		PeerProtocol: leg.Tag().Proto,
-		Cluster:      d.Name(),
+		Cluster:      cluster,
 		Tunnel:       tunnel,
 		Username:     user,
 		Realm:        realm,

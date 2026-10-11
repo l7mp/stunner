@@ -306,7 +306,8 @@ func (l *Listener) Close(_ bool) error {
 	return nil
 }
 
-// admits lets in the clients the filters of the listener admit, as they stand at the moment.
+// admits lets in the clients the filters of the listener admit, as they stand at the moment; a
+// client no rule matches passes.
 func (l *Listener) admits(client net.Addr) bool {
 	l.mu.RLock()
 	filters := l.filters
@@ -314,7 +315,8 @@ func (l *Listener) admits(client net.Addr) bool {
 	if len(filters) == 0 {
 		return true
 	}
-	ok := l.rt.Admits(filters, client)
+	allow, matched := l.rt.Match(filters, client)
+	ok := allow || !matched
 	if !ok && l.rt.Tracing(l.scope) {
 		l.log.Tracef("listener %s: filters drop client %s", l.Name(), client.String())
 	}

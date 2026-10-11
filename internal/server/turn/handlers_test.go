@@ -27,13 +27,20 @@ func TestPermissionHandler(t *testing.T) {
 	client := &net.UDPAddr{IP: net.ParseIP("192.0.2.1"), Port: 1234}
 	permits := func(ip string) bool { return s.PermissionHandler(client, net.ParseIP(ip)) }
 
-	assert.False(t, permits("10.1.2.3"), "no cluster routes nothing")
-
-	// the cluster routes every peer: its endpoints are no filter
+	// only a matching ALLOW rule grants a permission: no filter matches no peer
+	allowAll, err := object.NewFilter(&stnrv2.FilterConfig{Name: "all", Rules: []stnrv2.FilterRule{
+		{Action: "ALLOW"}}})
+	require.NoError(t, err)
+	require.NoError(t, rt.Registry.Add(allowAll, nil))
 	c, err := object.NewCluster(&stnrv2.ClusterConfig{Name: "media", Endpoints: []string{"10.1.2.3:5000"},
 		Protocol: "UDP"}, rt)
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(c, nil))
+	assert.False(t, permits("10.1.2.3"), "no filters deny every peer")
+
+	// the filters decide alone: the endpoints of the clusters are no filter
+	conf.TURN.PermissionFilters = []string{"all"}
+	require.NoError(t, s.Reconcile(conf))
 	assert.True(t, permits("10.1.2.3"), "an endpoint")
 	assert.True(t, permits("192.168.0.1"), "not an endpoint: endpoints do not filter")
 
@@ -53,10 +60,16 @@ func TestPermissionHandler(t *testing.T) {
 	assert.True(t, permits("10.9.0.1"), "a rule with ports never matches: the ALLOW decides")
 	assert.False(t, permits("192.168.0.1"), "the last DENY")
 
-	// a config change applies to the next permission
+	// a peer no rule matches is denied, and a config change applies to the next permission
+	peers, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: []stnrv2.FilterRule{
+		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.0/8"}}}})
+	require.NoError(t, err)
+	require.NoError(t, rt.Registry.Replace(filter, peers))
+	assert.True(t, permits("10.1.2.4"), "a matching ALLOW")
+	assert.False(t, permits("192.168.0.1"), "no rule matches")
 	conf.TURN.PermissionFilters = nil
 	require.NoError(t, s.Reconcile(conf))
-	assert.True(t, permits("192.168.0.1"), "no filters admit every peer")
+	assert.False(t, permits("10.1.2.4"), "no filters deny every peer")
 }
 
 // TestAuthHandlerWithoutCredentials pins that a TURN server whose auth carries no credentials

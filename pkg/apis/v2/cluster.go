@@ -49,7 +49,8 @@ type ClusterConfig struct {
 	// Endpoints are addresses or domains with an optional port, such as "10.1.0.7:5000" (see
 	// ParseEndpoint). They never filter.
 	Endpoints []string `json:"endpoints,omitempty"`
-	// RoutingPolicy is ORIGINAL_DST (the destination the client names, the default) or ROUND_ROBIN.
+	// RoutingPolicy is ORIGINAL_DST (the default) or ROUND_ROBIN. Reserved: the dataplane does not
+	// act on it, the servers decide what to do with the endpoints.
 	RoutingPolicy string `json:"routing_policy,omitempty"`
 	// Protocol is the network the peers are reached over: UDP, TCP, or FIFO. Mandatory.
 	Protocol string `json:"protocol"`

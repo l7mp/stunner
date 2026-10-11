@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"sync"
 
 	// "strconv"
@@ -2145,7 +2144,7 @@ func TestStunnerReconcile(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, s.Reconcile(conf), "starting server")
+			assert.NoError(t, s.Reconcile(allowPeers(conf)), "starting server")
 
 			runningConf := s.GetConfig()
 			require.NotNil(t, runningConf, "default stunner get config ok")
@@ -2168,7 +2167,7 @@ func TestStunnerReconcile(t *testing.T) {
 
 			require.True(t, conf.DeepEqual(runningConf), "default stunner config ok")
 
-			err = s.Reconcile(&c.config)
+			err = s.Reconcile(allowPeers(&c.config))
 			c.tester(t, s, err)
 
 			s.Close()
@@ -2217,10 +2216,10 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 					})
 				}
 
-				// the cluster endpoints the TURN permission handlers read, while
-				// reconciliation swaps them
+				// the cluster endpoints the L4 servers read, while reconciliation swaps
+				// them
 				if r := s.GetCluster("allow-any"); r != nil {
-					_, _, _ = r.Route(netip.MustParseAddrPort("10.0.0.1:1"))
+					_ = r.Targets()
 				}
 			}
 		}()
@@ -2297,14 +2296,14 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 	})
 
 	log.Debug("starting stunnerd")
-	assert.NoError(t, s.Reconcile(conf), "starting server")
+	assert.NoError(t, s.Reconcile(allowPeers(conf)), "starting server")
 
 	for _, c := range testcases {
 		t.Run(c.testName, func(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", c.testName)
 
 			log.Debug("reconciling server")
-			err := s.Reconcile(&c.config)
+			err := s.Reconcile(allowPeers(&c.config))
 			if c.errContains != "" {
 				assert.ErrorContains(t, err, c.errContains, "starting server")
 			} else if c.restart {
@@ -3568,7 +3567,7 @@ func makeRaceConfig(realm string) stnrv2.StunnerConfig {
 
 func reconcileAllowRestart(t *testing.T, s *Stunner, c *stnrv2.StunnerConfig) {
 	t.Helper()
-	err := s.Reconcile(c)
+	err := s.Reconcile(allowPeers(c))
 	if err == nil {
 		return
 	}

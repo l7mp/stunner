@@ -135,40 +135,24 @@ func (q *Quota) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, re
 	}
 }
 
-// permissionHandler grants a permission when the permission filters admit the peer IP and a
-// cluster routes it.
+// permissionHandler grants a permission when a rule of the permission filters allows the peer IP;
+// a peer no rule matches is denied.
 func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
 	ip, ok := netip.AddrFromSlice(peer)
 	if !ok {
 		return false
 	}
-	dst := netip.AddrPortFrom(ip.Unmap(), 0)
 	s.mu.RLock()
 	filters := s.permissionFilters
 	s.mu.RUnlock()
-	if !s.rt.Admits(filters, net.UDPAddrFromAddrPort(dst)) {
-		s.log.Infof("permission denied on server %q for client %q to peer %s: filtered",
-			s.Name(), src.String(), peer.String())
-		return false
+	allow, matched := s.rt.Match(filters, net.UDPAddrFromAddrPort(netip.AddrPortFrom(ip.Unmap(), 0)))
+	if matched && allow {
+		s.log.Debugf("permission granted on server %q for client %q to peer %s", s.Name(),
+			src.String(), peer.String())
+		return true
 	}
-	for _, name := range s.Clusters() {
-		r, found := s.rt.Router(name)
-		if !found {
-			continue
-		}
-		_, ok, err := r.Route(dst)
-		if err != nil {
-			s.log.Warnf("server %q: skipping cluster %q: %s", s.Name(), name, err.Error())
-			continue
-		}
-		if ok {
-			s.log.Debugf("permission granted on server %q for client %q to peer %s via cluster %q",
-				s.Name(), src.String(), peer.String(), name)
-			return true
-		}
-	}
-	s.log.Infof("permission denied on server %q for client %q to peer %s: no cluster routes it",
-		s.Name(), src.String(), peer.String())
+	s.log.Infof("permission denied on server %q for client %q to peer %s", s.Name(),
+		src.String(), peer.String())
 	return false
 }
 
@@ -238,7 +222,7 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 				return
 			}
 			// the kernel path skips the cluster's filters: offload only a peer they admit
-			if !s.rt.Admits(conf.Filters, peer) {
+			if allow, matched := s.rt.Match(conf.Filters, peer); matched && !allow {
 				return
 			}
 			pair := offloadPair{

@@ -41,7 +41,6 @@ servers:
 clusters:
   - name: sip-backend
     protocol: UDP
-    routing_policy: ROUND_ROBIN
     endpoints: ["$SIP_BACKEND:5060"]
   - name: media-peers
     protocol: UDP

@@ -15,7 +15,8 @@ import (
 var portRangeMatcher = regexp.MustCompile("^(.*):<([0-9]+)-([0-9]+)>$")
 
 // ConvertToV2 converts a v1 config into a v2 config. Every TURN server gets a permission filter
-// allowing its clusters' endpoints (every address for TURN-*) and denying the rest.
+// allowing its clusters' endpoints (every address for TURN-*); a permission no rule allows is
+// denied.
 func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 	c := req.DeepCopy()
 	if err := c.Validate(); err != nil {
@@ -75,21 +76,17 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 			if !slices.Contains(l.Routes, cl.Name) {
 				continue
 			}
-			if i := slices.IndexFunc(ret.Clusters, func(r stnrv2.ClusterConfig) bool {
-				return r.Name == cl.Name
-			}); ret.Clusters[i].RoutingPolicy != stnrv2.RoutingPolicyOriginalDst.String() {
-				continue
-			}
 			if p, _ := NewClusterProtocol(cl.Protocol); p.IsTURN() {
 				allow(nil)
 				continue
 			}
+			// a domain endpoint of a cluster an L4 listener routes to first is no address block
 			for _, ep := range cl.Endpoints {
-				e, _ := convertEndpoint(ep)
-				allow(&stnrv2.IPBlock{CIDR: e.block.String()})
+				if e, _ := convertEndpoint(ep); e.block.IsValid() {
+					allow(&stnrv2.IPBlock{CIDR: e.block.String()})
+				}
 			}
 		}
-		filter.Rules = append(filter.Rules, stnrv2.FilterRule{Action: stnrv2.FilterActionDeny.String()})
 		server.TURN = &stnrv2.TURNServerConfig{PermissionFilters: []string{filter.Name}}
 		ret.Filters = append(ret.Filters, filter)
 	}
@@ -136,8 +133,8 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 }
 
 // ConvertCluster converts a v1 cluster, given the v1 listeners of its config, and returns the
-// filter of its endpoint ports, nil for none. The listeners routing to it give its relay addresses
-// and routing policy.
+// filter of its endpoint ports, nil for none. The listeners routing to it give its relay addresses,
+// and the first of them whether its endpoints are dial targets or TURN peers.
 func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.ClusterConfig, *stnrv2.FilterConfig, error) {
 	proto, _ := NewClusterProtocol(cl.Protocol)
 
@@ -152,16 +149,17 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 	// routing to the cluster, and every other address once, as it is (an environment variable
 	// such as $STUNNER_ADDR, resolved where the config is loaded, or the operator's node address
 	// placeholder); an unspecified address advertises nothing
+	// the first listener routing to the cluster tells whether its endpoints are dial targets (an
+	// L4 listener) or TURN peers
 	v4, v6 := false, false
+	l4, routed := false, false
 	for _, l := range listeners {
 		if !slices.Contains(l.Routes, cl.Name) {
 			continue
 		}
-		if cluster.RoutingPolicy == "" {
-			cluster.RoutingPolicy = stnrv2.RoutingPolicyRoundRobin.String()
-			if _, server := ConvertListener(l); server.Type == stnrv2.ServerTypeTURN.String() {
-				cluster.RoutingPolicy = stnrv2.RoutingPolicyOriginalDst.String()
-			}
+		if !routed {
+			_, server := ConvertListener(l)
+			l4, routed = server.Type != stnrv2.ServerTypeTURN.String(), true
 		}
 		addrs := l.Addrs
 		if len(addrs) == 0 && l.Addr != "" {
@@ -180,7 +178,6 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 			}
 		}
 	}
-	roundRobin := cluster.RoutingPolicy == stnrv2.RoutingPolicyRoundRobin.String()
 
 	// prefixes live in the permission filter only; endpoint ports become a cluster filter
 	filter := &stnrv2.FilterConfig{Name: cl.Name}
@@ -190,8 +187,8 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 		if err != nil {
 			return stnrv2.ClusterConfig{}, nil, fmt.Errorf("cluster %q: %w", cl.Name, err)
 		}
-		if roundRobin {
-			// a load balancer dials an address or domain at a single port
+		if l4 {
+			// an L4 server dials an address or domain at a single port
 			switch {
 			case e.prefix:
 			case e.port != 0 && e.port == e.endPort:

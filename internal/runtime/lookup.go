@@ -163,9 +163,10 @@ func (rt *Runtime) Filter(name string) (api.Filter, bool) {
 	return o.(api.Filter), true
 }
 
-// Admits runs the filters of the names, in order, on the traffic of an address: the first rule
-// that matches it decides, and traffic no rule matches passes. A missing filter has no rules.
-func (rt *Runtime) Admits(names []string, addr net.Addr) bool {
+// Match runs the filters of the names, in order, on the traffic of an address: allow is the
+// verdict of the first rule that matches it, matched is false when no rule does, and what that
+// means is up to the caller. A missing filter has no rules.
+func (rt *Runtime) Match(names []string, addr net.Addr) (allow, matched bool) {
 	var a netip.AddrPort
 	switch addr := addr.(type) {
 	case *net.UDPAddr:
@@ -182,10 +183,10 @@ func (rt *Runtime) Admits(names []string, addr net.Addr) bool {
 			continue
 		}
 		if allow, matched := f.Match(a); matched {
-			return allow
+			return allow, true
 		}
 	}
-	return true
+	return false, false
 }
 
 // Tracing tells whether the logger of a scope logs at the trace level: a hot path builds a trace

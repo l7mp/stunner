@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -105,6 +106,31 @@ func addrFamilySuffix(hostport string) string {
 		return "6"
 	}
 	return "4"
+}
+
+// allowPeers gives every TURN server of a config that names no permission filter one admitting
+// every peer, since a permission no rule allows is denied, and returns the config.
+func allowPeers(c *stnrv2.StunnerConfig) *stnrv2.StunnerConfig {
+	const name = "allow-peers"
+	added := false
+	for i := range c.Servers {
+		s := &c.Servers[i]
+		if t, err := stnrv2.NewServerType(s.Type); s.Type != "" && (err != nil || t != stnrv2.ServerTypeTURN) {
+			continue
+		}
+		if s.TURN == nil {
+			s.TURN = &stnrv2.TURNServerConfig{}
+		}
+		if len(s.TURN.PermissionFilters) == 0 {
+			s.TURN.PermissionFilters = []string{name}
+			added = true
+		}
+	}
+	if added && !slices.ContainsFunc(c.Filters, func(f stnrv2.FilterConfig) bool { return f.Name == name }) {
+		c.Filters = append(c.Filters, stnrv2.FilterConfig{Name: name,
+			Rules: []stnrv2.FilterRule{{Action: stnrv2.FilterActionAllow.String()}}})
+	}
+	return c
 }
 
 func stunnerEchoTest(conf echoTestConfig) {
@@ -1079,7 +1105,7 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 			assert.False(t, stunner.IsReady(), "lifecycle 1: not-ready")
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(&c), "starting server")
+			assert.NoError(t, stunner.Reconcile(allowPeers(&c)), "starting server")
 
 			assert.False(t, stunner.rt.IsShutdown(), "lifecycle 2: alive")
 			assert.True(t, stunner.rt.IsReady(), "lifecycle 2: ready")
@@ -1669,7 +1695,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
+			assert.NoError(t, stunner.Reconcile(allowPeers(&c.config)), "starting server")
 
 			auth := c.config.Auths[0].Type
 			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
@@ -2055,7 +2081,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 			defer stunner.Close()
 
 			log.Debug("starting stunnerd")
-			assert.NoError(t, stunner.Reconcile(&c.config), "starting server")
+			assert.NoError(t, stunner.Reconcile(allowPeers(&c.config)), "starting server")
 
 			auth := c.config.Auths[0].Type
 			u, p := getTestCredentials(t, auth, "user1", "passwd1", "my-secret")
@@ -2339,7 +2365,7 @@ func TestStunnerLifecycle(t *testing.T) {
 	}
 
 	log.Debug("reconciling empty server")
-	err = s.Reconcile(&conf)
+	err = s.Reconcile(allowPeers(&conf))
 	assert.NoError(t, err, "reconcile empty server")
 
 	status, err := doLivenessCheck("http://127.0.0.1:8086")
@@ -2510,7 +2536,7 @@ func TestStunnerMetrics(t *testing.T) {
 	}
 
 	log.Debug("reconciling empty server")
-	err := s.Reconcile(&conf)
+	err := s.Reconcile(allowPeers(&conf))
 	assert.NoError(t, err, "reconcile empty server")
 
 	assert.True(t, s.IsReady(), "server ready")

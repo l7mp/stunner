@@ -208,11 +208,11 @@ func (c *Cluster) Status() stnrv2.Status {
 	return status
 }
 
-func (c *Cluster) Route(dst netip.AddrPort) (netip.AddrPort, bool, error) {
+func (c *Cluster) Targets() []netip.AddrPort {
 	c.mu.RLock()
 	r := c.router
 	c.mu.RUnlock()
-	return r.Route(dst)
+	return r.Targets()
 }
 
 func (c *Cluster) Protocol() stnrv2.Protocol {
@@ -258,7 +258,7 @@ func (c *Cluster) Listen(network string, port int) (net.Listener, net.Addr, erro
 }
 
 // admits lets through the traffic of the peers the filters of the cluster admit, as they stand at
-// the moment.
+// the moment: a peer no rule matches passes.
 func (c *Cluster) admits(peer net.Addr) bool {
 	c.mu.RLock()
 	filters := c.filters
@@ -266,19 +266,17 @@ func (c *Cluster) admits(peer net.Addr) bool {
 	if len(filters) == 0 {
 		return true
 	}
-	ok := c.rt.Admits(filters, peer)
+	allow, matched := c.rt.Match(filters, peer)
+	ok := allow || !matched
 	if !ok && c.rt.Tracing(c.scope) {
 		c.log.Tracef("cluster %s: filters drop peer %s", c.name, peer.String())
 	}
 	return ok
 }
 
-// domains returns the domain endpoints the cluster resolves; only a load-balancing cluster has any.
+// domains returns the domain endpoints the cluster resolves.
 func (c *Cluster) domains() []string {
 	ret := []string{}
-	if c.routingPolicy != stnrv2.RoutingPolicyRoundRobin.String() {
-		return ret
-	}
 	for _, ep := range c.endpoints {
 		if e, err := stnrv2.ParseEndpoint(ep); err == nil && e.Domain != "" {
 			ret = append(ret, e.Domain)
