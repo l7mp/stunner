@@ -59,7 +59,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
@@ -118,7 +118,7 @@ Listeners:
     Server: stunner/udp-gateway/udp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/iperf-server/turn/udp]
+    Clusters: [stunner/iperf-server/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 

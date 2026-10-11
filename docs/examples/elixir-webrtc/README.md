@@ -49,7 +49,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 3478
-      protocol: UDP
+      protocol: TURN-UDP
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute

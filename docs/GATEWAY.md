@@ -144,7 +144,7 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `gatewayClassName` | `string` | The name of the GatewayClass that provides the root of the hierarchy the Gateway is attached to. | Yes |
-| `listeners` | `list` | The list of TURN listeners. | Yes |
+| `listeners` | `list` | The list of listeners. | Yes |
 | `addresses` | `list` | The list of manually hinted public addresses (only the first one is used).                                   | No |
 
 > [!WARNING]
@@ -167,21 +167,21 @@ Manually hinted public address describes an address that can be bound to a Gatew
 
 ### Listener configuration
 
-Each TURN `listener` is defined by a unique name, a transport protocol and a port. In addition, a `tls` configuration is required for TURN-TLS and TURN-DTLS listeners. Per-listener configuration is as follows.
+Each `listener` is defined by a unique name, a protocol and a port. The protocol decides what the listener serves: a TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS listener is a TURN server over the respective transport, while a plain UDP, TCP, TLS or DTLS listener is an L4 proxy that relays each client connection to a backend of its routes, choosing the backends in turn. In addition, a `tls` configuration is required for TLS and DTLS listeners of both kinds. Per-listener configuration is as follows.
 
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
-| `name` | `string` | Name of the TURN listener. Must be unique per Gateway. | Yes |
-| `port` | `int` | Network port for the TURN listener. | Yes |
-| `protocol` | `string` | Transport protocol for the TURN listener. Either TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS. | Yes |
-| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TURN-TLS/TURN-DTLS) |
+| `name` | `string` | Name of the listener. Must be unique per Gateway. | Yes |
+| `port` | `int` | Network port for the listener. | Yes |
+| `protocol` | `string` | Protocol of the listener: TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS for a TURN listener, UDP, TCP, TLS or DTLS for an L4 listener. | Yes |
+| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TLS/DTLS listeners) |
 | `allowedRoutes.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes), either `All`, `Selector`, or `Same`. Default: `Same`. | No |
 
-For TURN-TLS/TURN-DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (`Passthrough` does not make sense for TURN), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key.
+For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key. The certificate may come from anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with `--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`.
 
 ### Load balancer configuration
 
-STUNner will automatically generate a Kubernetes LoadBalancer Service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. TURN over UDP and TURN over DTLS listeners are exposed as UDP services, TURN-TCP and TURN-TLS listeners are exposed as TCP.
+STUNner will automatically generate a Kubernetes LoadBalancer Service to expose each Gateway to clients. All TURN listeners specified in the Gateway are wrapped by a single Service and will be assigned a single externally reachable IP address. If you want multiple TURN listeners on different public IPs, create multiple Gateways. UDP and DTLS listeners (TURN or L4) are exposed as UDP services, TCP and TLS listeners as TCP.
 
 STUNner implements several ways to customize the automatically created Service, each involving certain pre-defined [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations).  First, you can add global annotations to the `loadBalancerServiceAnnotations` field of the [GatewayConfig spec](#gatewayconfig), which affect the Service created for each Gateway that links to the GatewayConfig (via the GatewayClass `parametersRef`). To customize annotations on a per-gateway status, you can also add specific annotations to the Gateway itself. Gateway annotations override the global annotations on conflict. Finally, you can also add custom labels/annotations to the automatically created STUNner Services manually, these are retained on Service update (unless there is a conflict). Note that labels/annotations added via the Gateway and the GatewayConfig are also propagated to the corresponding `stunnerd` Deployments.
 
@@ -314,8 +314,8 @@ Backend reference configuration is as follows:
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
 | `namespace` | `string` | Namespace of the backend Service or StaticService. | No |
-| `port` | `int` | Port of the backend: the dataplane drops traffic to other ports of the backend. Default: empty (every port).| No |
-| `endPort` | `int` | End of the port range of the backend, if port is also specified. Default: empty.| No |
+| `port` | `int` | The port an L4 listener dials the backend at: without it an L4 listener has nothing to dial. Also the start of the port range of the backend, effective only with `endPort`: a `port` alone restricts nothing. Default: empty (every port).| No (Yes for L4 listeners) |
+| `endPort` | `int` | End of the port range of the backend, if `port` is also specified: the dataplane drops traffic to the ports of the backend outside the range. Default: empty.| No |
 
 UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
 

@@ -221,7 +221,7 @@ Listeners:
     Server: stunner/udp-gateway/udp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/stunner-headless/turn/udp]
+    Clusters: [stunner/stunner-headless/udp]
     Endpoints: ...
 ```
 

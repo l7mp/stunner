@@ -34,7 +34,7 @@ spec:
   listeners:
     - name: udp-listener
       port: 9001
-      protocol: UDP
+      protocol: TURN-UDP
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
