@@ -49,9 +49,6 @@ type ClusterConfig struct {
 	// Endpoints are addresses or domains with an optional port, such as "10.1.0.7:5000" (see
 	// ParseEndpoint). They never filter.
 	Endpoints []string `json:"endpoints,omitempty"`
-	// RoutingPolicy is ORIGINAL_DST (the default) or ROUND_ROBIN. Reserved: the dataplane does not
-	// act on it, the servers decide what to do with the endpoints.
-	RoutingPolicy string `json:"routing_policy,omitempty"`
 	// Protocol is the network the peers are reached over: UDP, TCP, or FIFO. Mandatory.
 	Protocol string `json:"protocol"`
 	// Tunnel is the upstream TURN server the peers are reached through, nil for direct.
@@ -86,15 +83,6 @@ func (req *ClusterConfig) Validate() error {
 		}
 	}
 	sort.Strings(req.Endpoints)
-
-	if req.RoutingPolicy == "" {
-		req.RoutingPolicy = DefaultRoutingPolicy
-	}
-	rp, err := NewRoutingPolicy(req.RoutingPolicy)
-	if err != nil {
-		return err
-	}
-	req.RoutingPolicy = rp.String()
 
 	p, err := NewClusterProtocol(req.Protocol)
 	if err != nil {
@@ -161,7 +149,7 @@ func (req *ClusterConfig) String() string {
 	}
 	status := []string{fmt.Sprintf("type=%q", req.Type),
 		fmt.Sprintf("endpoints=[%s]", strings.Join(req.Endpoints, ",")),
-		fmt.Sprintf("routing_policy=%q", req.RoutingPolicy), fmt.Sprintf("protocol=%q", req.Protocol)}
+		fmt.Sprintf("protocol=%q", req.Protocol)}
 	if req.Tunnel != nil {
 		status = append(status, fmt.Sprintf("tunnel=%q", req.Tunnel.URL))
 		if req.Tunnel.SNI != "" {

@@ -40,10 +40,10 @@ type Server struct {
 	events  EventHandler
 	offload *OffloadHandler
 
-	lb balancer.Balancer // chooses the peer of a new flow among the targets of the clusters
-
 	mu          sync.RWMutex
 	auth        string              // the policy whose realm scopes the quota of the flows
+	lbPolicy    stnrv2.LBPolicy     // the load-balancing policy of lb
+	lb          balancer.Balancer   // chooses the peer of a new flow among the targets of the clusters
 	acceptQueue *server.AcceptQueue // nil while stopped
 	conntrack   *server.Conntrack
 }
@@ -58,12 +58,7 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	log := rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name))
 	// the quota machinery is shared with the TURN server
 	q := turnsrv.NewQuotaHandler(rt)
-	lb, err := balancer.New(stnrv2.RoutingPolicyRoundRobin)
-	if err != nil {
-		return nil, err
-	}
 	s := &Server{
-		lb:      lb,
 		rt:      rt,
 		log:     log,
 		idle:    FlowTimeout,
@@ -85,8 +80,19 @@ func (s *Server) Reconcile(conf stnrv2.Config) error {
 		return err
 	}
 	req, _ := s.Desired(conf)
+	policy, err := stnrv2.NewLBPolicy(req.L4.LBPolicy)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if policy != s.lbPolicy {
+		lb, err := balancer.New(policy)
+		if err != nil {
+			return err
+		}
+		s.lb, s.lbPolicy = lb, policy
+	}
 	s.auth = req.L4.Auth
 	return nil
 }
@@ -95,7 +101,7 @@ func (s *Server) GetConfig() stnrv2.Config {
 	c := s.Base.GetConfig().(*stnrv2.ServerConfig)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	c.L4 = &stnrv2.L4ServerConfig{Auth: s.auth}
+	c.L4 = &stnrv2.L4ServerConfig{Auth: s.auth, LBPolicy: s.lbPolicy.String()}
 	return c
 }
 
@@ -175,7 +181,10 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 
 // newFlow picks the target, gates the quota, dials the leg and registers the flow.
 func (s *Server) newFlow(client api.Conn) (*Flow, error) {
-	cluster, dst, ok := s.lb.Next(s.rt, s.Clusters())
+	s.mu.RLock()
+	lb := s.lb
+	s.mu.RUnlock()
+	cluster, dst, ok := lb.Next(s.rt, s.Clusters())
 	if !ok {
 		return nil, errNoEndpoint
 	}

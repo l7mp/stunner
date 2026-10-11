@@ -89,11 +89,6 @@ func TestClusterObjectSemantics(t *testing.T) {
 				want: runtime.ActionReconcile},
 			{name: "addresses-change-reconcile", conf: transport(stnrv2.ProtocolUDP, tunnel("3478"),
 				"10.0.0.2"), want: runtime.ActionReconcile},
-			{name: "routing-policy-change-reconcile", conf: func() *stnrv2.ClusterConfig {
-				c := transport(stnrv2.ProtocolUDP, tunnel("3478"), "10.0.0.1")
-				c.RoutingPolicy = stnrv2.RoutingPolicyRoundRobin.String()
-				return c
-			}(), want: runtime.ActionReconcile},
 		},
 	})
 }

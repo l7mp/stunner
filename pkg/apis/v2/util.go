@@ -251,43 +251,35 @@ func (t ClusterType) String() string {
 	}
 }
 
-// RoutingPolicy is how a cluster picks a destination: the one the client names, or an endpoint
-// chosen by a load balancer.
-type RoutingPolicy int
+// LBPolicy is how a server chooses the peer of a new session among the targets of its clusters.
+type LBPolicy int
 
 const (
-	// RoutingPolicyUnknown is an invalid policy.
-	RoutingPolicyUnknown RoutingPolicy = iota
-	// RoutingPolicyOriginalDst sends to the destination the client names.
-	RoutingPolicyOriginalDst
-	// RoutingPolicyRoundRobin chooses the endpoints in turn.
-	RoutingPolicyRoundRobin
+	// LBPolicyUnknown is an invalid policy.
+	LBPolicyUnknown LBPolicy = iota
+	// LBPolicyRoundRobin chooses the targets in turn.
+	LBPolicyRoundRobin
 )
 
 const (
-	routingPolicyOriginalDstStr = "ORIGINAL_DST"
-	routingPolicyRoundRobinStr  = "ROUND_ROBIN"
+	lbPolicyRoundRobinStr = "ROUND_ROBIN"
 )
 
-// NewRoutingPolicy parses a routing policy.
-func NewRoutingPolicy(raw string) (RoutingPolicy, error) {
+// NewLBPolicy parses a load-balancing policy.
+func NewLBPolicy(raw string) (LBPolicy, error) {
 	switch strings.ToUpper(raw) {
-	case routingPolicyOriginalDstStr:
-		return RoutingPolicyOriginalDst, nil
-	case routingPolicyRoundRobinStr:
-		return RoutingPolicyRoundRobin, nil
+	case lbPolicyRoundRobinStr:
+		return LBPolicyRoundRobin, nil
 	default:
-		return RoutingPolicyUnknown, fmt.Errorf("unknown routing policy: %q", raw)
+		return LBPolicyUnknown, fmt.Errorf("unknown load-balancing policy: %q", raw)
 	}
 }
 
-// String returns the name of the routing policy.
-func (p RoutingPolicy) String() string {
+// String returns the name of the load-balancing policy.
+func (p LBPolicy) String() string {
 	switch p {
-	case RoutingPolicyOriginalDst:
-		return routingPolicyOriginalDstStr
-	case RoutingPolicyRoundRobin:
-		return routingPolicyRoundRobinStr
+	case LBPolicyRoundRobin:
+		return lbPolicyRoundRobinStr
 	default:
 		return "<unknown>"
 	}

@@ -25,9 +25,9 @@ type target struct {
 }
 
 // New creates the balancer of a load-balancing policy.
-func New(policy stnrv2.RoutingPolicy) (Balancer, error) {
+func New(policy stnrv2.LBPolicy) (Balancer, error) {
 	switch policy {
-	case stnrv2.RoutingPolicyRoundRobin:
+	case stnrv2.LBPolicyRoundRobin:
 		return &roundRobin{}, nil
 	}
 	return nil, fmt.Errorf("unsupported load-balancing policy %q", policy.String())

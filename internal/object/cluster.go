@@ -27,18 +27,17 @@ type Cluster struct {
 	log   logging.LeveledLogger
 	scope string // of the logger
 
-	mu            sync.RWMutex
-	typ           string
-	endpoints     []string
-	routingPolicy string
-	protocol      stnrv2.Protocol
-	tunnel        *stnrv2.TunnelConfig
-	addrs         []string
-	filters       []string
-	router        api.Router
-	dialer        api.Dialer
-	running       bool
-	registered    []string // the domains registered with the resolver
+	mu         sync.RWMutex
+	typ        string
+	endpoints  []string
+	protocol   stnrv2.Protocol
+	tunnel     *stnrv2.TunnelConfig
+	addrs      []string
+	filters    []string
+	router     api.Router
+	dialer     api.Dialer
+	running    bool
+	registered []string // the domains registered with the resolver
 }
 
 var (
@@ -134,7 +133,7 @@ func (c *Cluster) Reconcile(conf stnrv2.Config) error {
 		tunnel = req.Tunnel.DeepCopy()
 	}
 	c.mu.Lock()
-	c.typ, c.endpoints, c.routingPolicy = req.Type, slices.Clone(req.Endpoints), req.RoutingPolicy
+	c.typ, c.endpoints = req.Type, slices.Clone(req.Endpoints)
 	c.protocol, c.tunnel, c.addrs = proto, tunnel, slices.Clone(req.Addrs)
 	c.filters, c.router, c.dialer = slices.Clone(req.Filters), r, d
 	c.mu.Unlock()
@@ -164,13 +163,12 @@ func (c *Cluster) register(ds []string) error {
 func (c *Cluster) GetConfig() stnrv2.Config {
 	c.mu.RLock()
 	conf := &stnrv2.ClusterConfig{
-		Name:          c.name,
-		Type:          c.typ,
-		Endpoints:     slices.Clone(c.endpoints),
-		RoutingPolicy: c.routingPolicy,
-		Protocol:      c.protocol.String(),
-		Addrs:         slices.Clone(c.addrs),
-		Filters:       slices.Clone(c.filters),
+		Name:      c.name,
+		Type:      c.typ,
+		Endpoints: slices.Clone(c.endpoints),
+		Protocol:  c.protocol.String(),
+		Addrs:     slices.Clone(c.addrs),
+		Filters:   slices.Clone(c.filters),
 	}
 	if c.tunnel != nil {
 		conf.Tunnel = c.tunnel.DeepCopy()

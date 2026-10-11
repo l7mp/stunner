@@ -14,11 +14,11 @@ import (
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
-// TestNew pins the policies with a balancer: ORIGINAL_DST balances nothing.
+// TestNew pins the policies with a balancer.
 func TestNew(t *testing.T) {
-	_, err := balancer.New(stnrv2.RoutingPolicyOriginalDst)
-	assert.Error(t, err, "ORIGINAL_DST balances nothing")
-	_, err = balancer.New(stnrv2.RoutingPolicyRoundRobin)
+	_, err := balancer.New(stnrv2.LBPolicyUnknown)
+	assert.Error(t, err, "an unknown policy balances nothing")
+	_, err = balancer.New(stnrv2.LBPolicyRoundRobin)
 	assert.NoError(t, err)
 }
 
@@ -37,7 +37,7 @@ func TestRoundRobin(t *testing.T) {
 		t.Cleanup(func() { _ = c.Close(true) })
 	}
 
-	b, err := balancer.New(stnrv2.RoutingPolicyRoundRobin)
+	b, err := balancer.New(stnrv2.LBPolicyRoundRobin)
 	require.NoError(t, err)
 	_, _, ok := b.Next(rt, []string{"missing"})
 	assert.False(t, ok, "no cluster, no target")

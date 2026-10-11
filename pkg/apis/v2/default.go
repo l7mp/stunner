@@ -16,7 +16,7 @@ const (
 	DefaultMinRelayPort           int    = 1
 	DefaultMaxRelayPort           int    = 1<<16 - 1
 	DefaultClusterType                   = "STATIC"
-	DefaultRoutingPolicy                 = "ORIGINAL_DST"
+	DefaultLBPolicy                      = "ROUND_ROBIN"
 	DefaultAdminName                     = "default-admin-config"
 	DefaultAuthName                      = "default"
 	DefaultHealthName                    = "default-health"

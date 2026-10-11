@@ -45,6 +45,9 @@ type L4ServerConfig struct {
 	// Auth names the authentication policy of the server; only its realm is used, to scope the
 	// quota of the flows.
 	Auth string `json:"auth,omitempty"`
+	// LBPolicy is how the server chooses the peer of a new flow among the targets of its
+	// clusters: ROUND_ROBIN (the default).
+	LBPolicy string `json:"lb_policy,omitempty"`
 }
 
 // SIPServerConfig holds the options of a SIP server: a stateful SIP proxy of the calls the
@@ -111,6 +114,14 @@ func (req *ServerConfig) Validate() error {
 		if req.L4 == nil {
 			req.L4 = &L4ServerConfig{}
 		}
+		if req.L4.LBPolicy == "" {
+			req.L4.LBPolicy = DefaultLBPolicy
+		}
+		p, err := NewLBPolicy(req.L4.LBPolicy)
+		if err != nil {
+			return err
+		}
+		req.L4.LBPolicy = p.String()
 	case ServerTypeSIP:
 		if req.SIP == nil {
 			req.SIP = &SIPServerConfig{}
@@ -172,8 +183,11 @@ func (req *ServerConfig) String() string {
 			opts += ",auth=" + t.Auth
 		}
 	}
-	if l := req.L4; l != nil && l.Auth != "" {
-		opts += ",auth=" + l.Auth
+	if l := req.L4; l != nil {
+		if l.Auth != "" {
+			opts += ",auth=" + l.Auth
+		}
+		opts += ",lb_policy=" + l.LBPolicy
 	}
 	if sip := req.SIP; sip != nil {
 		if sip.Auth != "" {

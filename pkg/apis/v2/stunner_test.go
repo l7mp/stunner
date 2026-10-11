@@ -49,7 +49,7 @@ func TestStunnerConfigValidate(t *testing.T) {
 	// defaults are injected, addresses normalized
 	assert.Equal(t, "", c.Listeners[0].Addr, "a listener binds every address by default")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type)
-	assert.Equal(t, "ORIGINAL_DST", c.Clusters[0].RoutingPolicy)
+	assert.Equal(t, "ROUND_ROBIN", c.Servers[1].L4.LBPolicy, "an L4 server round-robins by default")
 	assert.Equal(t, []string{"10.0.0.1", "fd00::1"}, c.Clusters[0].Addrs)
 	assert.Equal(t, DefaultStunnerName, c.Admin.Name)
 
@@ -101,7 +101,9 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"tunnel URL not a TURN URL", func(c *StunnerConfig) {
 			c.Clusters[1].Tunnel.URL = "udp://turn.example.com:3478"
 		}},
-		{"unknown routing policy", func(c *StunnerConfig) { c.Clusters[0].RoutingPolicy = "RANDOM" }},
+		{"unknown load-balancing policy", func(c *StunnerConfig) {
+			c.Servers[1].L4 = &L4ServerConfig{LBPolicy: "RANDOM"}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := validConfig()
@@ -127,9 +129,6 @@ func TestStunnerConfigValidateAccepts(t *testing.T) {
 		{"TCP cluster tunnelled over UDP", func(c *StunnerConfig) {
 			c.Clusters[1].Protocol = "TCP"
 			c.Clusters[1].Tunnel.URL = "turn:turn.example.com:3478?transport=udp"
-		}},
-		{"load-balancing cluster on a TURN server", func(c *StunnerConfig) {
-			c.Clusters[0].RoutingPolicy = "ROUND_ROBIN"
 		}},
 		{"STDIN listener on a TURN server", func(c *StunnerConfig) {
 			c.Listeners[0] = ListenerConfig{Name: "stdin", Protocol: "STDIN", Servers: []string{"media-gw"}}
