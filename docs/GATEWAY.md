@@ -6,6 +6,8 @@ The [STUNner gateway operator](https://github.com/l7mp/stunner-gateway-operator)
 1. [GatewayConfig](#gatewayconfig)
 1. [Gateway](#gateway)
 1. [UDPRoute](#udproute)
+1. [TCPRoute](#tcproute)
+1. [TURNRoute](#turnroute)
 1. [StaticService](#staticservice)
 1. [Dataplane](#dataplane)
 
@@ -349,6 +351,57 @@ There is no protocol conversion anywhere in STUNner: the protocol of the relay l
 > Rendering a TCPRoute into a dataplane cluster is a [premium feature](PREMIUM_REFERENCE.md#tcp-routes). Without a license the operator still accepts your TCPRoutes and maintains their status, but no cluster is rendered for them and the `ResolvedRefs` status condition reports the reason.
 
 TCPRoute resources are safe for modification, exactly like UDPRoutes.
+
+## TURNRoute
+
+TURNRoute routes the clients of a Gateway listener to their peers through an upstream TURN server, for instance another STUNner or a public TURN service. On a TURN listener the allocations of the clients are relayed through the upstream TURN server, and every peer is admitted: the upstream TURN server decides what its clients may reach. On a plain (L4) listener each client connection is relayed to a backend of the route through the upstream TURN server.
+
+The below TURNRoute relays the allocations made at the `udp-listener` of the Gateway `udp-gateway` through the upstream TURN server `turn.example.com`, authenticating with the credentials in the Secret `upstream-auth`.
+
+```yaml
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: TURNRoute
+metadata:
+  name: upstream-route
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: udp-gateway
+      sectionName: udp-listener
+  tunnel:
+    uri: "turns:turn.example.com:443?transport=tcp"
+    authRef:
+      name: upstream-auth
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upstream-auth
+  namespace: stunner
+type: Opaque
+stringData:
+  type: static
+  username: my-user
+  password: my-password
+```
+
+Below is a reference of the TURNRoute `spec`.
+
+| Field | Type | Description | Required |
+| :--- | :---: | :--- | :---: |
+| `parentRefs` | `list` | Name/namespace of the Gateways to attach the route to, as for UDPRoutes. | Yes |
+| `rules.backendRefs` | `list` | The backends (Services or StaticServices) a plain (L4) listener dials through the upstream TURN server, at the `port` of the backend reference. A TURN listener does not use them. | No |
+| `tunnel.uri` | `string` | The upstream TURN server as an [RFC 7065](https://datatracker.ietf.org/doc/html/rfc7065) TURN URI, e.g., `turn:turn.example.com:3478?transport=udp`. | Yes |
+| `tunnel.authRef` | `object` | Reference to the Secret holding the credentials presented to the upstream TURN server, possibly in another namespace. Default: no authentication. | No |
+| `tunnel.insecure` | `bool` | Skip the verification of the certificate of the upstream TURN server over TLS and DTLS. Default: `false`. | No |
+| `tunnel.sni` | `string` | The server name the certificate of the upstream TURN server is verified against. Default: the host of the URI. | No |
+
+The Secret referenced by `tunnel.authRef` holds the key `type`, either `static` (the default) or `ephemeral`, the optional keys `realm` and `lifetime` (the validity of the generated ephemeral credentials, e.g., `1h`), and the credentials: `username` and `password` for static, `secret` for ephemeral authentication.
+
+> [!NOTE]
+> A TURNRoute is best the only route of its TURN listener: with other routes attached, the first route of the listener makes the relay sockets of every client, and the operator logs a warning.
+
+The TURNRoute CRD is optional: the operator runs without it and ignores TURNRoutes until the CRD is installed (and lists TURNRoute among the supported route kinds of a listener only then). A new Helm install installs the CRD, but `helm upgrade` never updates CRDs: to use TURNRoutes on an upgraded install, apply the STUNner CRDs of the chart by hand and restart the operator.
 
 ## StaticService
 
