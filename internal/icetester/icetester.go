@@ -178,17 +178,6 @@ func (t *iceTester) Start(ctx context.Context) error {
 	}
 	t.DynamicClient = cs
 
-	// log.Infof("checking basic connectivity")
-	// apiGroupList := &unstructured.Unstructured{}
-	// apiGroupList.SetGroupVersionKind(schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "APIGroup"})
-	// if _, err := t.get(ctx, apiGroupList, metav1.GetOptions{}); err != nil {
-	// 	return t.sendEventComplete(EventInit,
-	// 		fmt.Errorf("failed to query API server: %w", err),
-	// 		diagK8sClientError,
-	// 		nil,
-	// 	)
-	// }
-
 	log.Infof("creating a namespace for testing")
 	ns := newICETesterNamespace(t.namespace)
 	if _, err := t.get(ctx, ns, metav1.GetOptions{}); err == nil {
@@ -299,7 +288,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	iceTesterPod := newICETesterBackendPod(t.namespace, t.iceTesterImage)
 	if err := eventually(ctx, t.podStatusChecker(iceTesterPod, metav1.GetOptions{}), 30*time.Second, 250*time.Millisecond); err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
-			fmt.Errorf("iCE tester backend %s/%s not running or ready: %w",
+			fmt.Errorf("ICE tester backend %s/%s not running or ready: %w",
 				iceTesterPod.GetNamespace(), iceTesterPod.GetName(), err),
 			diagFailedToQueryOrCreateArtifacts,
 			nil,

@@ -65,7 +65,7 @@ func TestParseRaw(t *testing.T) {
 		assert.Equal(t, stnrv2.ServerTypeTURN.String(), s.Type, "server type")
 		r, err := c.GetClusterConfig("ns/media")
 		require.NoError(t, err)
-		assert.Empty(t, r.Endpoints, "a cluster with a prefix routes every peer")
+		assert.Empty(t, r.Endpoints, "the prefix leaves the cluster with no endpoints")
 		assert.Equal(t, []string{"ns/gw1/udp"}, s.TURN.PermissionFilters, "the prefix is the server's filter")
 	})
 

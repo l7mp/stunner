@@ -16,7 +16,7 @@ import (
 )
 
 // list all configs: stunnerctl get config --all-namespaces
-// watch all configs in namesapce stunner: stunnerctl -n stunner get config --watch
+// watch all configs in namespace stunner: stunnerctl -n stunner get config --watch
 // get short-form config for stunner/udp-gateway: stunnerctl -n stunner get config udp-gateway
 // get config for stunner/udp-gateway in yaml format: stunnerctl -n stunner get config udp-gateway --output yaml
 
@@ -36,12 +36,12 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:               "stunnerctl",
-		Short:             "A command line utility to inspect STUNner dataplane .",
-		Long:              "The stunnerctl tool is a CLI for inspecting, watching and troublehssooting STUNner gateways",
+		Short:             "A command line utility to inspect STUNner dataplanes.",
+		Long:              "The stunnerctl tool is a CLI for inspecting, watching and troubleshooting STUNner gateways",
 		DisableAutoGenTag: true,
 		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			if verbose {
-				loglevel = "all:TRACE"
+				loglevel = "all:DEBUG"
 			}
 
 			loggerFactory = logger.NewLoggerFactory(loglevel)
@@ -80,7 +80,7 @@ var (
 	authCmd = &cobra.Command{
 		Use:               "auth",
 		Aliases:           []string{"get-credential"},
-		Short:             "Obtain authenticaction credentials for a gateway",
+		Short:             "Obtain authentication credentials for a gateway",
 		Args:              cobra.RangeArgs(0, 1),
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -105,7 +105,7 @@ var (
 		Use:               "license",
 		Aliases:           []string{"license-status"},
 		Short:             "Get licensing status",
-		Args:              cobra.RangeArgs(0, 1),
+		Args:              cobra.NoArgs,
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := runLicense(cmd, args); err != nil {

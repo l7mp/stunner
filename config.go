@@ -39,11 +39,11 @@ type Options struct {
 	// check during graceful shutdown. Normally an app should fail the readiness check once it
 	// has entered into the graceful shutdown phase. Unfortunately, this will cause some buggy
 	// kube-proxy implementations to stop delivering UDP packets to the pod after a short
-	// timeout (usually 30 secs). This flag, is set, can be used to workaround such buggy
-	// Kubernetes implementations by forcing the server to pass the liveness probe during
+	// timeout (usually 30 secs). This flag, if set, can be used to workaround such buggy
+	// Kubernetes implementations by forcing the server to pass the readiness probe during
 	// termination.
 	ForceReadyDuringTermination bool
-	// VNet will switch on testing mode, using a vnet.Net instance to run STUNner over an
+	// Net will switch on testing mode, using a vnet.Net instance to run STUNner over an
 	// emulated data-plane.
 	Net transport.Net
 }
@@ -80,8 +80,7 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 	c := &stnrv2.StunnerConfig{
 		ApiVersion: stnrv2.ApiVersion,
 		Admin: stnrv2.AdminConfig{
-			LogLevel: stnrv2.DefaultLogLevel,
-			// MetricsEndpoint: "http://:8088",
+			LogLevel:            stnrv2.DefaultLogLevel,
 			HealthCheckEndpoint: &h,
 		},
 		Auths: []stnrv2.AuthConfig{{

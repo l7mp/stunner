@@ -6,13 +6,8 @@
 package runtime
 
 import (
-	"errors"
-
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
-
-// ErrRestartRequired indicates that an object needs to be restarted for reconciliation.
-var ErrRestartRequired = errors.New("restart required")
 
 // ObjectType identifies a runtime object kind.
 type ObjectType string

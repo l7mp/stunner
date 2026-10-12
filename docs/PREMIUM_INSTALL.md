@@ -113,7 +113,7 @@ This command will connect to the STUNner gateway operator and report the license
 It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/docs/cmd/stunnerctl.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
 
 ```console
-stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.Name}: {.admin.licensing_info}'
+stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.name}: {.admin.licensing_info}'
 {tier=enterprise,unlocked-features=[TURNOffload,UserQuota,DaemonSet,STUNServer,RelayAddressDiscovery],valid-until=...}
 ...
 ```

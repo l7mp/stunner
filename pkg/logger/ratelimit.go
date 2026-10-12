@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"golang.org/x/time/rate"
 )
@@ -35,7 +36,8 @@ func NewRateLimitedLoggerFactory(logger LoggerFactory, limit rate.Limit, burst i
 type RateLimitedWriter struct {
 	io.Writer
 	*RateLimiter
-	Counter       int
+	// Counter counts the events suppressed since the last logged one.
+	Counter       atomic.Int64
 	AddSuppressed bool
 }
 
@@ -46,26 +48,27 @@ func NewRateLimitedWriter(writer io.Writer, limit rate.Limit, burst int, addSupp
 	return &RateLimitedWriter{
 		Writer:        writer,
 		RateLimiter:   NewRateLimiter(limit, burst),
-		Counter:       0,
 		AddSuppressed: addSuppressed,
 	}
 }
 
 // Write fulfills io.Writer.
 func (w *RateLimitedWriter) Write(p []byte) (int, error) {
+	n := len(p)
 	if !w.Allow() {
-		w.Counter++
-		return 0, nil
+		w.Counter.Add(1)
+		return n, nil
 	}
 
-	if w.AddSuppressed && w.Counter > 0 {
-		suffix := fmt.Sprintf(" (suppressed %d log events)\n", w.Counter)
+	if suppressed := w.Counter.Swap(0); w.AddSuppressed && suppressed > 0 {
+		suffix := fmt.Sprintf(" (suppressed %d log events)\n", suppressed)
 		p = append(bytes.TrimRight(p, "\r\n"), suffix...)
 	}
-	n, err := w.Writer.Write(p)
-	w.Counter = 0
+	if _, err := w.Writer.Write(p); err != nil {
+		return 0, err
+	}
 
-	return n, err
+	return n, nil
 }
 
 // RateLimiter is a token bucket that can be disabled.

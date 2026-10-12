@@ -6,7 +6,6 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
-	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 	"github.com/pion/logging"
 )
 
@@ -85,9 +84,6 @@ func (rt *Runtime) ListenerConfig(name string) *stnrv2.ListenerConfig {
 	}
 	return nil
 }
-
-// LicenseManager returns the process license config manager.
-func (rt *Runtime) LicenseManager() licensecfg.ConfigManager { return rt.License }
 
 // GetConfig returns the live config of a node. An empty name resolves to the canonical
 // singleton name of the type. Returns nil if the node is missing or not Reconcilable.

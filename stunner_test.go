@@ -33,9 +33,6 @@ import (
 )
 
 const (
-	// timeout  = 200 * time.Millisecond
-	// interval = 50 * time.Millisecond
-
 	stunnerTestLoglevel string = "all:ERROR"
 	// stunnerTestLoglevel string = stnrv2.DefaultLogLevel
 	// stunnerTestLoglevel string = "all:INFO"
@@ -1035,11 +1032,8 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
-
-	// assert.NoError(t, err, "cannot generate SSL SSL cert/key")
 
 	for _, test := range tests {
 		c := *test.config.DeepCopy()
@@ -2157,15 +2151,11 @@ func stunnerEchoFloodTest(conf echoTestConfig) {
 				return
 			}
 
-			// log.Debugf("laddr: %s", conn.LocalAddr().String())
-
 			log.Debugf("creating echo-server listener socket at: %s", conn.LocalAddr().String())
 			echoConn, err := conf.podnet.ListenPacket("udp4", conf.echoServerAddr)
 			if !assert.NoError(t, err, "creating echo socket") {
 				return
 			}
-
-			// assert.NotNil(t, err, "echo socket not nil")
 
 			go func() {
 				buf := make([]byte, 1600)
@@ -2614,14 +2604,6 @@ func isHostAny(host string) bool {
 	h := strings.TrimSpace(host)
 	return h == "" || h == "0.0.0.0" || h == "::"
 }
-
-// func isAddrAny(addrPort string) bool {
-// 	h, _, err := net.SplitHostPort(addrPort)
-// 	if err != nil {
-// 		return isHostAny(addrPort)
-// 	}
-// 	return isHostAny(h)
-// }
 
 func isHostLocal(host string) bool {
 	h := strings.TrimSpace(host)

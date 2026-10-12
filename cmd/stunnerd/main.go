@@ -62,7 +62,7 @@ func main() {
 	_ = flag.IntP("udp-thread-num", "u", 0, "Number of readloops per UDP listener (deprecated, defaults to GOMAXPROCS)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
 	var noGracefulShutdown = flag.Bool("no-graceful-shutdown", false, "Exit at once on SIGTERM or SIGINT, closing the live sessions, instead of waiting for them to end (default: false)")
-	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the liveness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
+	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the readiness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
 	var sni = flag.String("sni", "", "Server name (SNI) for the TURN/TLS and TURN/DTLS transports (tunnel mode)")
 	var insecure = flag.Bool("insecure", false, "Accept self-signed TURN server TLS certificates (tunnel mode, default: false)")
@@ -209,7 +209,7 @@ func main() {
 
 		conf <- c
 
-	} else if *watch {
+	} else {
 		log.Info("bootstrapping stunnerd with minimal config")
 		z := cdsclient.ZeroConfig(st.GetId())
 		conf <- z
@@ -234,9 +234,6 @@ func main() {
 			log.Errorf("could not run config watcher: %s", err.Error())
 			os.Exit(1)
 		}
-	} else {
-		flag.Usage()
-		os.Exit(1)
 	}
 
 	sigterm := make(chan os.Signal, 1)

@@ -1,4 +1,4 @@
-// Package auth contains variuos routines to generate and check STUNner authentication credentials.
+// Package authentication contains various routines to generate and check STUNner authentication credentials.
 package authentication
 
 import (
@@ -32,7 +32,7 @@ type PermissionHandler = turn.PermissionHandler
 func GenerateTimeWindowedUsername(startTime time.Time, duration time.Duration, userid string) string {
 	endTime := startTime.Add(duration).Unix()
 	timeUsername := strconv.FormatInt(endTime, 10)
-	return timeUsername + ":" + userid
+	return timeUsername + UsernameSeparator + userid
 }
 
 // CheckTimeWindowedUsername checks the validity of an authentication credential. The method mostly
@@ -95,7 +95,7 @@ func GenerateAuthKey(username, realm, password string) []byte {
 // "ephemeral" a time-windowed credential from the shared secret, valid for the configured
 // lifetime. A nil config and an explicit "none" both yield empty credentials, an anonymous
 // session. This is the client-side counterpart of the AuthHandler: everywhere STUNner dials an
-// upstream TURN server (a TURN-* relay cluster), the credentials come from here.
+// upstream TURN server (a cluster with a tunnel), the credentials come from here.
 func GenerateCredentials(auth *stnrv2.AuthConfig) (string, string, error) {
 	if auth == nil {
 		return "", "", nil

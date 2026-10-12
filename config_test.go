@@ -64,7 +64,6 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 
@@ -123,7 +122,6 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 	report := test.CheckRoutines(t)
 	defer report()
 
-	// loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test-roundtrip")
 
@@ -222,9 +220,6 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	assert.NoError(t, err, "seek temp file")
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
-
-	// // wait a bit so that the watcher has time to react
-	// time.Sleep(50 * time.Millisecond)
 
 	c2 := mustReadConfig(t, conf, time.Second)
 	checkDefaultConfig(t, c2, "UDP")
@@ -619,7 +614,7 @@ func checkDefaultConfig(t *testing.T, c *stnrv2.StunnerConfig, proto string) {
 	assert.Equal(t, []string{"allow-any"}, c.Servers[0].Clusters, "server clusters")
 	assert.Len(t, c.Clusters, 1, "clusters len")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
-	assert.Empty(t, c.Clusters[0].Endpoints, "the cluster routes every peer")
+	assert.Empty(t, c.Clusters[0].Endpoints, "cluster has no endpoints")
 	assert.Equal(t, "UDP", c.Clusters[0].Protocol, "cluster proto")
 	assert.Equal(t, []string{"1.2.3.4"}, c.Clusters[0].Addrs, "cluster addresses")
 }

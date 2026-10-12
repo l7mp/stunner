@@ -58,7 +58,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.Server = &http.Server{Addr: s.addr, Handler: s.router}
 	l, err := net.Listen("tcp", s.addr)
 	if err != nil {
-		return fmt.Errorf("cDS server failed to listen: %w", err)
+		return fmt.Errorf("CDS server failed to listen: %w", err)
 	}
 
 	go func() {
@@ -85,7 +85,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 // Close closes the server and drops all active connections.
 func (s *Server) Close() {
-	// close the underlying HTTP server so that we do not get any new connnections
+	// close the underlying HTTP server so that we do not get any new connections
 	s.Server.Close() //nolint:errcheck
 	// kill all active connections
 	for _, conn := range s.conns.Snapshot() {
@@ -132,7 +132,7 @@ func (s *Server) UpsertConfig(id string, c *stnrv2.StunnerConfig) {
 // ignore the delete operation by (1) using client.IsConfigDeleted() to identify whether a config
 // is being deleted and (2) selectively ignoring config delete updates based on the result. This is
 // needed, e.g., in stunnerd, in order to avoid that a client being removed and entering the
-// graceful shutdown cycle receive a zeroconfig and abruprly kill all listeners with all active
+// graceful shutdown cycle receive a zeroconfig and abruptly kill all listeners with all active
 // connections allocated to them.
 func (s *Server) DeleteConfig(id string) {
 	s.log.V(4).Info("deleting config", "config-id", id)

@@ -10,8 +10,7 @@ import (
 // from concurrent write to websocket connection errors.
 type Conn struct {
 	*websocket.Conn
-	readLock, writeLock sync.Mutex // for writemessage
-
+	readLock, writeLock sync.Mutex
 }
 
 // NewConn wraps a WebSocket connection.

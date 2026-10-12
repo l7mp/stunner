@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -30,7 +29,8 @@ func runConfig(_ *cobra.Command, args []string) error {
 		output = "jsonpath"
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// a signal ends a watch: the watcher stops with the context
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	log.Debug("searching for CDS server")
@@ -63,24 +63,15 @@ func runConfig(_ *cobra.Command, args []string) error {
 
 	confChan := make(chan *stnrv2.StunnerConfig, 8)
 	if watch {
-		err := cds.Watch(ctx, confChan, false)
-		if err != nil {
-			close(confChan)
+		if err := cds.Watch(ctx, confChan, false); err != nil {
 			return err
 		}
-
-		go func() {
-			sigs := make(chan os.Signal, 1)
-			signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-			<-sigs
-			close(confChan)
-		}()
 	} else {
 		resp, err := cds.Get(ctx)
 		if err != nil {
-			close(confChan)
 			return err
 		}
+		confChan = make(chan *stnrv2.StunnerConfig, len(resp))
 		for _, c := range resp {
 			confChan <- c
 		}
@@ -88,7 +79,18 @@ func runConfig(_ *cobra.Command, args []string) error {
 		close(confChan)
 	}
 
-	for c := range confChan {
+	for {
+		var c *stnrv2.StunnerConfig
+		select {
+		case <-ctx.Done():
+			return nil
+		case conf, ok := <-confChan:
+			if !ok {
+				return nil
+			}
+			c = conf
+		}
+
 		if cdsclient.IsConfigDeleted(c) {
 			fmt.Printf("Gateway: %s <deleted>\n", c.Admin.Name)
 			continue
@@ -118,6 +120,4 @@ func runConfig(_ *cobra.Command, args []string) error {
 			fmt.Println(c.String())
 		}
 	}
-
-	return nil
 }

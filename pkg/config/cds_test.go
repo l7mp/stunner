@@ -1049,8 +1049,6 @@ func TestServerAPI(t *testing.T) {
 	// we do not know the order
 	assert.True(t, s1.DeepEqual(sc1.Config) || s2.DeepEqual(sc1.Config), "config-deepeq")
 	assert.True(t, client.IsConfigDeleted(s1) || client.IsConfigDeleted(s2), "deleted") // deleted
-	// assert.True(t, s1.DeepEqual(sc1), "deepeq")
-	// assert.True(t, client.IsConfigDeleted(s2), "deepeq") // deleted!
 
 	// no config from client3 watch
 	s = watchConfig(ch3, 50*time.Millisecond)
@@ -1784,29 +1782,12 @@ func testConfig(id, realm string) server.Config {
 	return server.Config{Namespace: namespace, Name: name, Config: c}
 }
 
-// with 2 listeners
-func testConfigListener(id, realm string) server.Config {
-	c := zeroConfig(id, realm)
-	c.Listeners = []stnrv2.ListenerConfig{
-		{Name: "l1", Protocol: "TCP", Port: 3478, Servers: []string{"turn"}},
-		{Name: "l2", Protocol: "UDP", Port: 3479, Servers: []string{"turn"}},
-	}
-	c.Servers = []stnrv2.ServerConfig{{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"c1"}}}}
-	c.Clusters = []stnrv2.ClusterConfig{{Name: "c1", Endpoints: []string{"10.0.0.1"},
-		Protocol: "UDP", Addrs: []string{"1.1.1.1"}}}
-	_ = c.Validate() // make sure deepeq works
-	namespace, name, _ := server.NamespacedName(id)
-	return server.Config{Namespace: namespace, Name: name, Config: c}
-}
-
 // wait for some configurable time for a watch element
 func watchConfig(ch chan *stnrv2.StunnerConfig, d time.Duration) *stnrv2.StunnerConfig {
 	select {
 	case c := <-ch:
-		// fmt.Println("++++++++++++ got config ++++++++++++: ", c.String())
 		return c
 	case <-time.After(d):
-		// fmt.Println("++++++++++++ timeout ++++++++++++")
 		return nil
 	}
 }

@@ -28,8 +28,7 @@ var (
 )
 
 // Client represents a generic config client. Currently supported config providers: http, ws, or
-// file. Configuration obtained through the client are not validated, make sure to validate on the
-// receiver side.
+// file.
 type Client interface {
 	// Load grabs a new configuration from the config client.
 	Load() (*stnrv2.StunnerConfig, error)
@@ -38,7 +37,7 @@ type Client interface {
 	// available watch will retry. If set, the suppressDelete flag instructs the client to
 	// ignore delete config (essentially zero-configs) from the origin.
 	Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
-	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
+	// Poll creates a one-shot config watcher without the retry mechanics of Watch.
 	Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
 	fmt.Stringer
 }

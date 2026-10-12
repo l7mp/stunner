@@ -69,12 +69,12 @@ func ParseEndpoint(ep string) (*Endpoint, error) {
 
 }
 
-// Contains reports whether the endppoint network includes ip.
+// Contains reports whether the endpoint network includes ip.
 func (ep *Endpoint) Contains(ip net.IP) bool {
 	return ep.Match(ip, 0)
 }
 
-// Contains reports whether the endppoint network includes ip and port.  If port is zero then
+// Match reports whether the endpoint network includes ip and port.  If port is zero then
 // port-matching is disabled.
 func (ep *Endpoint) Match(ip net.IP, port int) bool {
 	if !ep.prefix.Contains(ip) {
@@ -85,10 +85,6 @@ func (ep *Endpoint) Match(ip net.IP, port int) bool {
 	} else {
 		return true
 	}
-}
-
-func (ep *Endpoint) Network() string {
-	return ep.prefix.Network()
 }
 
 func (ep *Endpoint) String() string {

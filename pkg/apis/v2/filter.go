@@ -10,7 +10,8 @@ import (
 )
 
 // FilterConfig is a named, ordered list of ALLOW and DENY rules on addresses and ports. The first
-// matching rule decides and unmatched traffic passes.
+// matching rule decides; each caller decides what no match means: listener and cluster filters
+// pass unmatched traffic, TURN permission filters deny it.
 type FilterConfig struct {
 	// Name of the filter.
 	Name string `json:"name"`

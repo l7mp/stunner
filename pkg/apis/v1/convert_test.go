@@ -152,7 +152,7 @@ func TestConvertToV2(t *testing.T) {
 	assert.Equal(t, "STRICT_DNS", r.Type)
 	assert.Equal(t, []string{"media.default.svc"}, r.Endpoints)
 
-	// a TURN-* cluster routes every peer: it has no endpoints
+	// a cluster with a tunnel has no endpoints
 	r, err = v2.GetClusterConfig("upstream")
 	require.NoError(t, err)
 	assert.Empty(t, r.Endpoints)

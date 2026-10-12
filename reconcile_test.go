@@ -74,8 +74,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
-			// make sure we get the right loglevel, we may override this for debugging the tests
-			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
 			auth := s.GetAuth(stnrv2.DefaultAuthName)
@@ -113,9 +111,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
-
-			// the server uses the open cluster
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -362,7 +358,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), "new-name", "stunner name")
-			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
 			auth := s.GetAuth(stnrv2.DefaultAuthName)
@@ -400,7 +395,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -437,7 +432,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.NotNil(t, s.GetAuth(stnrv2.DefaultAuthName), "authManager keys")
 			auth := s.GetAuth(stnrv2.DefaultAuthName)
@@ -475,7 +469,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -517,7 +511,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), "default-stunnerd", "stunner name")
-			// assert.Equal(t, admin.LogLevel, stnrv2.DefaultLogLevel, "stunner loglevel")
 			adminConf := admin.GetConfig().(*stnrv2.AdminConfig)
 			assert.Equal(t, adminConf.MetricsEndpoint, "http://0.0.0.0:8080/metrics",
 				"stunner metrics endpoint")
@@ -558,7 +551,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	/// auth
@@ -613,7 +606,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -633,7 +625,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -687,7 +679,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -707,7 +698,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -767,7 +758,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.GetListeners(), 1, "listenerManager keys")
 
@@ -787,7 +777,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	/// listener
@@ -844,7 +834,6 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, s.GetAdmin(), "adminManager keys")
 			admin := s.GetAdmin()
 			assert.Equal(t, mustAdminName(t, admin), stnrv2.DefaultStunnerName, "stunner name")
-			// assert.Equal(t, admin.LogLevel, "anything", "stunner loglevel")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
@@ -852,7 +841,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -950,7 +939,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -1041,7 +1030,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			// the server uses the old cluster
 
@@ -1120,7 +1109,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			// the server uses the old cluster
 
@@ -1199,7 +1188,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			// the server uses the old cluster
 
@@ -1266,7 +1255,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	{
@@ -1382,7 +1371,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "renamed cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			l := s.GetListener("default-listener")
 			assert.NotNil(t, l, "listener found")
@@ -1520,7 +1509,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
@@ -1572,7 +1561,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
@@ -1624,7 +1613,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 
 			c = s.GetCluster("newcluster")
 			assert.NotNil(t, c, "cluster found")
@@ -1972,7 +1961,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.NoError(t, err, "reconcile")
 			c := s.GetCluster("allow-some")
 			require.NotNil(t, c, "cluster found")
-			assert.Empty(t, clusterEndpoints(t, c), "the cluster routes every peer")
+			assert.Empty(t, clusterEndpoints(t, c), "cluster has no endpoints")
 		},
 	},
 	// IPv6: mixed IPv4/IPv6 endpoints in a single cluster; routing must match each family.

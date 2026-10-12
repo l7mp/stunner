@@ -2,7 +2,7 @@
 
 The `stunnerd` daemon implements the STUNner gateway dataplane.
 
-The daemon supports two basic modes. For quick tests `stunnerd` can be configured as a TURN server by specifying a TURN network URI on the command line. For more complex scenarios, and especially for use in a Kubernetes cluster, `stunnerd` can take configuration from a config origin, which can either be a config file or from a remote Config Discovery Service (CDS) server reached over WebSocket. In addition, `stunnerd` implements a watch-mode, so that it can actively monitor the config origin for updates and automatically reconcile the TURN server to any new configuration. This mode is intended for use with the [STUNner Kubernetes gateway operator](https://github.com/l7mp/stunner-gateway-operator): the operator watches the Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io) resources, renders the active control plane configuration per each `stunnerd` pod and dynamically updates the dataplane using STUNner's config discovery service.
+The daemon supports three basic modes. For quick tests `stunnerd` can be configured as a TURN server by specifying a TURN network URI on the command line, or as a tunnel that relays a local client socket through a TURN server to a remote peer. For more complex scenarios, and especially for use in a Kubernetes cluster, `stunnerd` can take configuration from a config origin, which can either be a config file or from a remote Config Discovery Service (CDS) server reached over WebSocket. In addition, `stunnerd` implements a watch-mode, so that it can actively monitor the config origin for updates and automatically reconcile the TURN server to any new configuration. This mode is intended for use with the [STUNner Kubernetes gateway operator](https://github.com/l7mp/stunner-gateway-operator): the operator watches the Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io) resources, renders the active control plane configuration per each `stunnerd` pod and dynamically updates the dataplane using STUNner's config discovery service.
 
 ## Features
 
@@ -37,13 +37,15 @@ In the TURN server mode, provide on single TURN URI:
 stunnerd [options] <turn-URI>
 ```
 
-The below command will open a TURN server listener at `127.0.0.1:5000` over UDP, set `static` authentication using the username/password pair `user1/passwrd1`, and set the maximum debug level JSON logging format.
+The below command will open a TURN server listener at `127.0.0.1:5000` over UDP, set `static` authentication using the username/password pair `user1/passwd1`, and set the maximum debug level JSON logging format.
 
 ```console
 ./stunnerd --log=all:TRACE --log-format=json turn://user1:passwd1@127.0.0.1:5000
 ```
 
-The tunnel mode tunnels a local client socket through a TURN server to a remote peer. Tunnel mode is the successor of the retired `turncat` utility. The general CLI shape for the tunnel mode invocation is as below:
+### Tunnel mode
+
+The tunnel mode tunnels a local client socket through a TURN server to a remote peer. The general CLI shape for the tunnel mode invocation is as below:
 
 ```console
 stunnerd [options] <client-addr> <turn-URI> <peer-addr>
@@ -72,7 +74,7 @@ Configuration files for `stunnerd`, now at API version `v2`, are built from five
 - Listeners accept client connections (`UDP`, `TCP`, `TLS`, `DTLS`, `STDIN` or `FIFO`) and hand them to a chain of servers for processing.
 - Servers (`TURN`, `L4`, `SIP` or `RTP`) serve connections through a set of clusters.
 - Clusters define the endpoints reachable via the cluster (addresses or domains, with an optional port) plus the transport protocol to reach them.
-- Filters are ordered list of allow/deny rules on addresses and ports. Filters can be invoked at various points in the processing pipeline: listener filters are applied at the ingress, cluster filters at the egress, etc. The first matching rule decides and unmatched traffic passes; a rule without an `ip_block` matches every address, so end an allow-list with a bare `- action: DENY`.
+- Filters are ordered list of allow/deny rules on addresses and ports. Filters can be invoked at various points in the processing pipeline: listener filters are applied at the ingress, cluster filters at the egress, etc. The first matching rule decides, and each caller decides what no match means: listener and cluster filters pass unmatched traffic, TURN permission filters deny it; a rule without an `ip_block` matches every address, so end an allow-list with a bare `- action: DENY`.
 - Auth configs are named authentication policies (`static`, `ephemeral` or `none`).
 
 A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON (e.g., `{"key":"...","hmac":"..."}`); `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`) on every interface; and `--no-graceful-shutdown` disables graceful shutdowns: normally on being closed `stunnerd` waits for live sessions to end, which minimizes disruptions to clients but may take minutes or hours, which this flag disables and lets `stunnerd` to close immediately.

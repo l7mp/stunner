@@ -58,7 +58,6 @@ func TestStunnerMultithreadedUDP(t *testing.T) {
 
 // Benchmark
 func RunBenchmarkServer(b *testing.B, proto string) {
-	//loggerFactory := logger.NewLoggerFactory("all:TRACE")
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
 	initSeq := []byte("init-data")
@@ -124,7 +123,6 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 		for {
 			// Ignore "use of closed network connection" errors
 			if _, _, err := sink.ReadFrom(buf); err != nil {
-				// b.Logf("Failed to receive packet at sink: %s", err)
 				return
 			}
 

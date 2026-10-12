@@ -104,7 +104,7 @@ type udpDialer struct {
 
 func (cl *udpDialer) Dial(ctx context.Context, _ net.Addr, addr string) (api.Conn, error) {
 	if cl.tunnel != nil {
-		peer, err := net.ResolveUDPAddr("udp", addr)
+		peer, err := cl.rt.Net.ResolveUDPAddr("udp", addr)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +165,7 @@ func (cl *tcpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api
 			return nil, fmt.Errorf("dialer %s cannot reach a TCP peer over a %s tunnel: RFC 6062 "+
 				"needs a stream transport", cl.name, t.String())
 		}
-		peer, err := net.ResolveTCPAddr("tcp", addr)
+		peer, err := cl.rt.Net.ResolveTCPAddr("tcp", addr)
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +294,7 @@ func (l *filteredListener) Accept() (net.Conn, error) {
 }
 
 func sanitizePort(p int) int {
-	if p <= 1 || p > 2<<16-1 {
+	if p <= 1 || p > 65535 {
 		return 0
 	}
 	return p

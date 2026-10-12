@@ -140,7 +140,7 @@ type PodInfo struct {
 	Name string
 	// Namespace is the Kubernetes namespace of the pod.
 	Namespace string
-	// Addr is the Kubernetes namespace of the pod.
+	// Addr is the address of the pod.
 	Addr string
 	// Proxy is a boolean telling whether the connection is proxied over a port-forwarder.
 	Proxy bool
@@ -183,7 +183,7 @@ func NewK8sDiscoverer(k8sFlags *cliopt.ConfigFlags, log logging.LeveledLogger) (
 // DiscoverK8sCDSServer discovers the serving CDS server of the gateway operator in a Kubernetes
 // cluster and returns an address that a CDS client can use. If necessary, opens a port-forward
 // connection to a remote cluster. The operator may run multiple replicas that each carry the
-// config discovery label, but only the leader serves config discovery. Policy for looking up the
+// config discovery label, but only the leader serves config discovery. Policy for looking up
 // the leader pod:
 //   - find the operator's Lease and parse the leader pod's name from the holder identity,
 //   - when the Lease is unavailable, (no permission, a custom Lease name, or a holder that is

@@ -36,8 +36,7 @@ var engineConstructor = func(Deps) Engine { return NewNullEngine() }
 
 // New builds the offload engine. The engine is a process-wide singleton with the lifetime of the
 // server: it is created once at startup, Start pins the eBPF maps, and Close unpins them on
-// shutdown. Config changes (engine mode, interfaces) arrive through Reconcile and must not bounce
-// the pinned maps.
+// shutdown.
 func New(deps Deps) Engine { return engineConstructor(deps) }
 
 // Engine provides a general interface for offloading techniques (e.g., XDP). The engine instance
@@ -72,7 +71,7 @@ const (
 	// FlagListener marks a stat as belonging to a listener, otherwise a cluster.
 	FlagListener uint8 = 1 << 0
 	// FlagDirIn marks a stat as inbound (DIR_IN), otherwise outbound (DIR_OUT).
-	FlagDirIn uint8 = 2 << 0
+	FlagDirIn uint8 = 1 << 1
 )
 
 // IsListener reports whether the stat flags mark a listener.

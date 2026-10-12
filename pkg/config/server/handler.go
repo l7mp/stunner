@@ -48,7 +48,7 @@ func (s *Server) ListV1ConfigsNamespace(ctx context.Context, request api.ListV1C
 		}
 	}
 
-	s.log.V(3).Info("listV1ConfigsNamespace API handler: ready", "configlist-len", len(configs))
+	s.log.V(3).Info("listV1ConfigsNamespace API handler: ready", "configlist-len", len(response.Items))
 
 	return api.ListV1ConfigsNamespace200JSONResponse(response), nil
 }

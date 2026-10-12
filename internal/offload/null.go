@@ -26,4 +26,4 @@ func (o *NullEngine) Remove(_, _ Connection) error { return nil }
 func (o *NullEngine) Packets(_, _ Connection) (uint64, bool) { return 0, false }
 
 // Stats returns the last cached offload statistics.
-func (o *NullEngine) Stats() (StatMap, error) { return map[StatKey]StatInfo{}, nil }
+func (o *NullEngine) Stats() (StatMap, error) { return StatMap{}, nil }

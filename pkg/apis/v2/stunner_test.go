@@ -179,9 +179,9 @@ func TestDeepCopyIsExact(t *testing.T) {
 			}
 		}
 		for i := range cp.Servers {
-			if t := cp.Servers[i].TURN; t != nil {
-				for j := range t.PermissionFilters {
-					t.PermissionFilters[j] = "changed"
+			if turn := cp.Servers[i].TURN; turn != nil {
+				for j := range turn.PermissionFilters {
+					turn.PermissionFilters[j] = "changed"
 				}
 			}
 		}

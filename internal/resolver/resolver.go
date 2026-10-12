@@ -10,7 +10,8 @@ import (
 	"github.com/pion/logging"
 )
 
-// STRICT_DNS clusters embed a DnsResolver to resolve domain names in the background
+// Clusters register their domain endpoints with a DnsResolver that resolves them in the
+// background.
 
 const (
 	dnsUpdateInterval = 5 * time.Second
@@ -25,19 +26,18 @@ type DnsResolver interface {
 }
 
 type serviceEntry struct {
-	lock         sync.RWMutex
-	ctx          context.Context
-	cancel       context.CancelFunc
-	refCount     int
-	resolver     net.Resolver
-	domain       string
-	hostNames    []net.IP
-	cname        string
-	lastResolved time.Time
+	lock      sync.RWMutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	refCount  int
+	resolver  net.Resolver
+	domain    string
+	hostNames []net.IP
 }
 
 type dnsResolverImpl struct {
 	ctx      context.Context
+	lock     sync.Mutex // guards register
 	register map[string]*serviceEntry
 	log      logging.LeveledLogger
 }
@@ -58,24 +58,24 @@ func NewDnsResolver(name string, logger logging.LoggerFactory) DnsResolver {
 func (r *dnsResolverImpl) Register(domain string) error {
 	r.log.Tracef("register: %q", domain)
 
+	r.lock.Lock()
 	e, found := r.register[domain]
 	if found {
 		e.refCount += 1
+		r.lock.Unlock()
 		return nil
 	}
 
 	resolverCtx, cancel := context.WithCancel(r.ctx)
 	e = &serviceEntry{
-		lock:         sync.RWMutex{},
-		ctx:          resolverCtx,
-		cancel:       cancel,
-		refCount:     1,
-		resolver:     net.Resolver{PreferGo: true},
-		domain:       domain,
-		cname:        "",
-		lastResolved: time.Time{},
+		ctx:      resolverCtx,
+		cancel:   cancel,
+		refCount: 1,
+		resolver: net.Resolver{PreferGo: true},
+		domain:   domain,
 	}
 	r.register[domain] = e
+	r.lock.Unlock()
 
 	// the first resolution is synchronous: a cluster routes nothing before its domains resolve
 	if err := doResolve(e); err != nil {
@@ -115,36 +115,21 @@ func startResolver(e *serviceEntry, log logging.LeveledLogger) {
 
 // do the heavy lifting
 func doResolve(e *serviceEntry) error {
-	if e.cname == "" {
-		cname, err := e.resolver.LookupCNAME(e.ctx, e.domain)
-		if err != nil {
-			return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
-				e.domain, err.Error())
-		}
-		e.cname = cname
-	}
-
 	hosts, err := e.resolver.LookupHost(e.ctx, e.domain)
 	if err != nil {
-		return fmt.Errorf("failed to resolve CNAME for domain %q: %s",
-			e.domain, err.Error())
+		return fmt.Errorf("failed to resolve domain %q: %s", e.domain, err.Error())
 	}
 
-	e.lastResolved = time.Now()
+	ips := make([]net.IP, 0, len(hosts))
+	for _, h := range hosts {
+		if n := net.ParseIP(h); n != nil {
+			ips = append(ips, n)
+		}
+	}
 
-	// for writing
 	e.lock.Lock()
 	defer e.lock.Unlock()
-
-	e.hostNames = make([]net.IP, len(hosts))
-	for i, h := range hosts {
-		n := net.ParseIP(h)
-		if n == nil {
-			// skip silently
-			continue
-		}
-		e.hostNames[i] = n
-	}
+	e.hostNames = ips
 
 	return nil
 }
@@ -153,9 +138,12 @@ func doResolve(e *serviceEntry) error {
 func (r *dnsResolverImpl) Unregister(domain string) {
 	r.log.Tracef("unregister: %q", domain)
 
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	e, found := r.register[domain]
 	if !found {
-		r.log.Tracef("trying to ungregister resolver for unknown domain: %q", domain)
+		r.log.Tracef("trying to unregister resolver for unknown domain: %q", domain)
 		return
 	}
 
@@ -165,14 +153,16 @@ func (r *dnsResolverImpl) Unregister(domain string) {
 		delete(r.register, domain)
 	}
 
-	r.log.Infof("domain %q succesfully unregistered", domain)
+	r.log.Infof("domain %q successfully unregistered", domain)
 }
 
 // Lookup returns the hostname(s) for a domain
 func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 	r.log.Tracef("lookup domain: %q", domain)
 
+	r.lock.Lock()
 	e, found := r.register[domain]
+	r.lock.Unlock()
 	if !found {
 		return []net.IP{}, fmt.Errorf("unknown domain name: %q", domain)
 	}
@@ -188,23 +178,20 @@ func (r *dnsResolverImpl) Lookup(domain string) ([]net.IP, error) {
 	return ret, nil
 }
 
-// Starts spawns the background resolver thread
+// Start is a no-op: Register spawns the background resolver threads.
 func (r *dnsResolverImpl) Start() {
 	r.log.Debugf("starting")
-	// Register already started the resolver threads
 }
 
 // Close closes the background resolver
 func (r *dnsResolverImpl) Close() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.log.Debugf("closing: active domains: %d", len(r.register))
-	// XXX: if the server Close sequence is OK then this should never happen
-	if len(r.register) > 0 {
-		r.log.Warnf("trying to close DNS resolver with %d active domains",
-			len(r.register))
-		for _, e := range r.register {
-			r.log.Debugf("unregistering active domain %q, refCount: %d",
-				e.domain, e.refCount)
-			r.Unregister(e.domain)
-		}
+	for domain, e := range r.register {
+		r.log.Debugf("stopping resolver for active domain %q, refCount: %d", domain, e.refCount)
+		e.cancel()
+		delete(r.register, domain)
 	}
 }

@@ -1,6 +1,6 @@
 // Package turnclient opens client sessions on a TURN server over any of the TURN transports
-// (TURN-UDP, TURN-TCP, TURN-TLS, TURN-DTLS). It is the TURN-client machinery under the TURN-*
-// protocol relay clusters, and the client the tests and tools use to drive traffic through a
+// (TURN-UDP, TURN-TCP, TURN-TLS, TURN-DTLS). It is the TURN-client machinery under the clusters
+// with a tunnel, and the client the tests and tools use to drive traffic through a
 // STUNner gateway.
 package turnclient
 
@@ -145,12 +145,13 @@ func (d Dialer) ListenPacket(ctx context.Context, _, _ string) (*PacketConn, err
 
 	// the wire runs over UDP for the turn-udp/turn-dtls transports and over TCP otherwise;
 	// resolution succeeded inside dial, so it cannot fail here
+	nw, _ := d.network()
 	var server net.Addr
 	switch d.Protocol {
 	case stnrv2.ProtocolTURNUDP, stnrv2.ProtocolTURNDTLS:
-		server, _ = net.ResolveUDPAddr("udp", d.ServerAddr)
+		server, _ = nw.ResolveUDPAddr("udp", d.ServerAddr)
 	default:
-		server, _ = net.ResolveTCPAddr("tcp", d.ServerAddr)
+		server, _ = nw.ResolveTCPAddr("tcp", d.ServerAddr)
 	}
 
 	return &PacketConn{PacketConn: relay, client: client, transport: tconn, server: server}, nil
@@ -228,7 +229,9 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (*Conn
 			serverConn, err = d.dialTLS(nw)
 		}
 		if err == nil {
-			dataConn, err = alloc.DialWithConn(serverConn, "tcp", address)
+			if dataConn, err = alloc.DialWithConn(serverConn, "tcp", address); err != nil {
+				serverConn.Close() //nolint:errcheck
+			}
 		}
 	}
 	if err != nil {
@@ -252,7 +255,7 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 
 	switch c.Protocol {
 	case stnrv2.ProtocolTURNUDP:
-		udpAddr, err := net.ResolveUDPAddr("udp", c.ServerAddr)
+		udpAddr, err := nw.ResolveUDPAddr("udp", c.ServerAddr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve TURN server address %q: %w",
 				c.ServerAddr, err)
@@ -275,7 +278,7 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 		}
 		turnConn = turn.NewSTUNConn(conn)
 	case stnrv2.ProtocolTURNDTLS:
-		udpAddr, err := net.ResolveUDPAddr("udp", c.ServerAddr)
+		udpAddr, err := nw.ResolveUDPAddr("udp", c.ServerAddr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to resolve TURN server address %q: %w",
 				c.ServerAddr, err)

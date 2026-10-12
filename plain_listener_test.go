@@ -270,10 +270,9 @@ func TestStunnerPlainListener(t *testing.T) {
 	})
 }
 
-// TestStunnerPlainTunnelChain is the tunnel-mode chain matrix, covering the retired
-// turncat's test matrix (client transport x upstream TURN transport x static/ephemeral
-// upstream auth, with UDP peers) plus the tcp-tcp tunnel that turncat never had: a TCP
-// client relayed to a TCP peer over an RFC 6062 upstream allocation. Each case runs a raw
+// TestStunnerPlainTunnelChain is the tunnel-mode chain matrix: client transport x upstream TURN
+// transport x static/ephemeral upstream auth with UDP peers, plus a TCP client relayed to a TCP
+// peer over an RFC 6062 upstream allocation. Each case runs a raw
 // client against an l4 server whose only cluster holds the peer and tunnels through an upstream
 // stunnerd; a successful raw echo plus exactly one upstream allocation proves the traversal.
 func TestStunnerPlainTunnelChain(t *testing.T) {

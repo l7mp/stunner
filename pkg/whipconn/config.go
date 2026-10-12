@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	messageSize  = 2048
 	WhipEndpoint = "/whip"
 )
 

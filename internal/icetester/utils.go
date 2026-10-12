@@ -19,7 +19,7 @@ import (
 	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
 )
 
-var turnURIAddrRegexp = regexp.MustCompile(`:(\d+.\d+.\d+.\d+):`)
+var turnURIAddrRegexp = regexp.MustCompile(`:(\d+\.\d+\.\d+\.\d+):`)
 
 func getGVR(config *rest.Config, obj *unstructured.Unstructured) (schema.GroupVersionResource, error) {
 	dc, err := discovery.NewDiscoveryClientForConfig(config)
@@ -157,7 +157,7 @@ func (t *iceTester) podListStatusChecker(opts metav1.ListOptions) checkerFunc {
 	return func(ctx context.Context) (bool, error) {
 		obj := &unstructured.Unstructured{
 			Object: map[string]any{
-				"apiVersion": "/v1",
+				"apiVersion": "v1",
 				"kind":       "Pod",
 			},
 		}

@@ -138,6 +138,9 @@ func TestOffloadPairShape(t *testing.T) {
 	assert.Zero(t, reg.peer.ChannelID, "no channel on the raw side")
 	assert.Equal(t, "li", reg.listener, "listener attribution")
 	assert.Equal(t, "upstream", reg.cluster, "cluster attribution")
+
+	h.Remove(f)
+	assert.Equal(t, 1, eng.removals(), "removing the flow removes its offload")
 }
 
 // recordingEngine records what the flow engine asks of the offload engine.

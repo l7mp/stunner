@@ -38,10 +38,6 @@ var LogBurst = 3
 // DefaultInstanceId is the default instance id for stunnerd processes.
 var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
 
-// ErrRestartRequired is returned by Reconcile to indicate that some server components have been
-// restarted but otherwise reconciliation occured smoothly. It is safe to ignore this error.
-var ErrRestartRequired = runtime.ErrRestartRequired
-
 // LogOptions configures logging behavior for STUNner.
 type LogOptions = logger.Options
 
@@ -69,7 +65,7 @@ type Stunner struct {
 	logger       logger.LoggerFactory
 }
 
-// NewStunner creates a new STUNner deamon for the specified Options. Call Reconcile to reconcile
+// NewStunner creates a new STUNner daemon for the specified Options. Call Reconcile to reconcile
 // the daemon for a new configuration. The daemon is "alive" once the main object is initialized,
 // and "ready" after the first successful reconciliation.
 func NewStunner(options Options) *Stunner {
@@ -295,7 +291,7 @@ func (s *Stunner) Close() {
 	}
 }
 
-// GetActiveConnections returns the number of active downstream (listener-side) TURN allocations.
+// GetActiveConnections returns the number of live sessions: TURN allocations and L4 flows.
 func (s *Stunner) GetActiveConnections() int64 { return int64(s.AllocationCount()) }
 
 // GetAdmin returns the Admin Object, or nil if not registered.

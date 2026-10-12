@@ -370,8 +370,6 @@ func TestLogger(t *testing.T) {
 
 	for _, c := range loggerTests {
 		t.Run(c.name, func(t *testing.T) {
-			// t.Logf("-------------- Running test: %s -------------", c.name)
-
 			// create
 			loggerFactory := NewLoggerFactory(c.defaultLogLevel).(*LeveledLoggerFactory)
 			loggerFactory.Writer = logBuffer
@@ -551,8 +549,6 @@ func TestRateLimitedLogger(t *testing.T) {
 
 	for _, c := range rateLimitedLoggerTests {
 		t.Run(c.name, func(t *testing.T) {
-			// t.Logf("-------------- Running test: %s -------------", c.name)
-
 			// create: set the target writer before wrapping it with the rate limiter
 			loggerFactory := NewLoggerFactory(c.level)
 			loggerFactory.SetWriter(logBuffer)
@@ -564,19 +560,10 @@ func TestRateLimitedLogger(t *testing.T) {
 				c.prep(loggerFactory)
 			}
 
-			// t.Logf("%#v", loggerFactory)
-			// t.Logf("%#v", loggerFactory.ScopeLevels)
-			// t.Logf("%#v", logger)
-
 			// test
 			c.tester(t, loggerFactory)
 		})
 	}
-}
-
-//nolint:unused
-func loglen() int {
-	return logBuffer.Len()
 }
 
 func loglenr() int {
@@ -585,7 +572,6 @@ func loglenr() int {
 	return l
 }
 
-//nolint:unused
 func logreset() {
 	logBuffer.Reset()
 }

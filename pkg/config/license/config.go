@@ -17,10 +17,6 @@ type Feature interface {
 	fmt.Stringer
 }
 
-type baseFeature struct{} //nolint:unused
-
-func (f baseFeature) String() string { return "N/A" } //nolint:unused
-
 // SubscriptionType is the current subscription type.
 type SubscriptionType interface {
 	fmt.Stringer
@@ -32,12 +28,12 @@ func (f nilSubscriptionType) String() string { return "free" }
 
 func NewNilSubscriptionType() *nilSubscriptionType { return &nilSubscriptionType{} }
 
-// Manager is a genetic API for negotiating licensing status.
+// ConfigManager is a generic API for negotiating licensing status.
 type ConfigManager interface {
-	// GetConfig returns the current config, i.e., the ecrpyted key/passphrase pair.
+	// GetConfig returns the current config, i.e., the encrypted key/passphrase pair.
 	GetConfig() *stnrv2.LicenseConfig
-	// Reconcile updates the the licensing status, i.e., the licensed feature-set and the
-	// subscription type, based in an ecrpyted key/passphrase pair.
+	// Reconcile updates the licensing status, i.e., the licensed feature-set and the
+	// subscription type, based in an encrypted key/passphrase pair.
 	Reconcile(config *stnrv2.LicenseConfig)
 	// Validate checks whether a client is entitled to use a feature.
 	Validate(feature Feature) bool
@@ -47,7 +43,7 @@ type ConfigManager interface {
 	Status() string
 }
 
-// New creares a new license config manager.
+// New creates a new license config manager.
 func New(log logging.LeveledLogger) ConfigManager {
 	return constructor(log)
 }

@@ -22,7 +22,7 @@ func NewMockResolver(zone map[string]([]string), logger logging.LoggerFactory) D
 	}
 }
 
-// Starts spawns the mock DNS resolver
+// Start spawns the mock DNS resolver.
 func (m *MockResolver) Start() {
 	ds := []string{}
 	for d, ips := range m.Zone {

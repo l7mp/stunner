@@ -2,7 +2,7 @@
 // StunnerConfig. The tree shape is fully described by the object catalog (internal/object); the
 // engine walks it recursively, asks each object to Inspect its desired config (constructing
 // missing objects on the fly), and applies the resulting operations in globally ordered phases:
-// prepare -> stop -> reconcile -> register -> delete -> start
+// plan -> construct -> stop -> reconcile -> register -> delete -> start.
 package reconciler
 
 import (

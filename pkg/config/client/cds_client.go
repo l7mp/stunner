@@ -43,7 +43,7 @@ func (p *CDSClient) String() string {
 	return fmt.Sprintf("config discovery client %q%s: using server %s", p.id, labels, p.addr)
 }
 
-// Load grabs a new configuration from the config doscovery server.
+// Load grabs a new configuration from the config discovery server.
 func (p *CDSClient) Load() (*stnrv2.StunnerConfig, error) {
 	configs, err := p.Get(context.Background())
 	if err != nil {

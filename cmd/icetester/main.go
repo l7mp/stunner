@@ -27,7 +27,7 @@ const (
 	// Name of the environment variable specifying the ICE transport policy (either "relay" or "all"), default is "all".
 	EnvVarNameICETransportPolicy = "ICE_TRANSPORT_POLICY"
 
-	// HIP bearer token for authenticating WHIP requests, default is no bearer token.
+	// WHIP bearer token for authenticating WHIP requests, default is no bearer token.
 	EnvVarNameBearerToken = "BEARER_TOKEN"
 
 	// WHIP API endpoint, default is "/whip". Must include the leading slash ("/").
@@ -62,7 +62,7 @@ func main() {
 	}
 
 	loggerFactory = logger.NewLoggerFactory(*level)
-	log = loggerFactory.NewLogger("icester")
+	log = loggerFactory.NewLogger("icetester")
 
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
 	log.Debugf("starting icetester %s", buildInfo.String())
@@ -156,7 +156,7 @@ func runICETesterListener(ctx context.Context, addr string, config whipconn.Conf
 	for _, conn := range l.GetConns() {
 		if err := conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) &&
 			!errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("wHIP connection close error: %s", err.Error())
+			return fmt.Errorf("WHIP connection close error: %s", err.Error())
 		}
 	}
 

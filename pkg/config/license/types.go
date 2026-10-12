@@ -46,12 +46,12 @@ func NewSubscriptionType(f string) SubscriptionType {
 	}
 }
 
-// AllSubscriptionTypesString returns all valid subscription types as a string slice.
+// AllSubscriptionTypes returns all valid subscription types.
 func AllSubscriptionTypes() []SubscriptionType {
 	return []SubscriptionType{SubscriptionTypeFree, SubscriptionTypeMember, SubscriptionTypeEnterprise}
 }
 
-// AllSubscriptionTypesString returns all valid features in a string slice.
+// AllSubscriptionTypesString returns all valid subscription types in a string slice.
 func AllSubscriptionTypesString() []string {
 	return ToStringSlice(AllSubscriptionTypes())
 }

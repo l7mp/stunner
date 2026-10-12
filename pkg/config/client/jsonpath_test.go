@@ -40,13 +40,6 @@ func TestParseJSONPath(t *testing.T) {
 		assert.True(t, matched)
 	})
 
-	// t.Run("should reject invalid jsonpath expressions", func(t *testing.T) {
-	// 	jp := NewJSONPath()
-	// 	_, err := jp.Parse("jsonpath=Hello {invalid..expression}")
-	// 	assert.Error(t, err)
-	// 	assert.Contains(t, err.Error(), "invalid jsonpath query")
-	// })
-
 	t.Run("should correctly identify string and expression segments", func(t *testing.T) {
 		jp := NewJSONPath().(*jsonPath)
 

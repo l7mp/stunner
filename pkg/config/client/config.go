@@ -60,7 +60,7 @@ func IsZeroConfig(req *stnrv2.StunnerConfig) bool {
 // ParseConfig parses a raw buffer holding a configuration, substituting environment variables for
 // placeholders in the configuration. Returns the new configuration or error if parsing fails.
 func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
-	// substitute environtment variables
+	// substitute environment variables
 	// default port: STUNNER_PUBLIC_PORT -> STUNNER_PORT
 	re := regexp.MustCompile(`^[0-9]+$`)
 	port, ok := os.LookupEnv("STUNNER_PORT")
@@ -162,7 +162,7 @@ func IsConfigDeleted(conf *stnrv2.StunnerConfig) bool {
 		return false
 	}
 	zeroConf := ZeroConfig(conf.Admin.Name)
-	// zeroconfs have to be explcitly validated before deepEq (the cds client validates)
+	// zeroconfs have to be explicitly validated before deepEq (the cds client validates)
 	if err := zeroConf.Validate(); err != nil {
 		return false
 	}

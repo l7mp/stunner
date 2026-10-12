@@ -1,4 +1,4 @@
-// Package object implements the STUNner dataplane objects (Admin, Auth, Cluster, Server,
+// Package object implements the STUNner dataplane objects (Admin, Auth, Filter, Cluster, Server,
 // Listener, Health, Metrics, Offload) and the declarative object hierarchy (the catalog).
 package object
 

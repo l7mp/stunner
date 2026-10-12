@@ -18,8 +18,7 @@ type Tester struct {
 	*testing.T
 }
 
-// New creates a new test helper and returns both the helper and a MeterProvider
-// that can be used to initialize the system under test
+// New creates a new test helper reading the metrics of the system under test from reader.
 func New(reader sdkmetric.Reader, t *testing.T) *Tester {
 	return &Tester{Reader: reader, T: t}
 }

@@ -1,6 +1,7 @@
-// Package v2 is the v2 version of the STUNner API. A config is a set of listeners, servers and
-// clusters, referenced by name: a listener names the servers it feeds, a server names the clusters
-// it reaches peers through, in order. The package is self-contained; v1 configs convert into it
+// Package v2 is the v2 version of the STUNner API. A config is a set of listeners, servers,
+// clusters, filters and auths, referenced by name: a listener names the servers it feeds, a server
+// names the clusters it reaches peers through, in order, and listeners, servers and clusters name
+// the filters and auths they apply. The package is self-contained; v1 configs convert into it
 // with v1.ConvertToV2.
 package v2
 

@@ -280,7 +280,7 @@ func (c *DialerConn) String() string {
 	return c.resourceId
 }
 
-// GetPeerConnection returns the PeerConnection underlying the data channnel. Useful for checking ICE candidate status.
+// GetPeerConnection returns the PeerConnection underlying the data channel. Useful for checking ICE candidate status.
 func (c *DialerConn) GetPeerConnection() *webrtc.PeerConnection {
 	return c.peerConn
 }

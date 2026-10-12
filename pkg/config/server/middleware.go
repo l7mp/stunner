@@ -67,7 +67,7 @@ func (s *Server) WSUpgradeMiddleware(next api.StrictHandlerFunc, operationID str
 			return nil, fmt.Errorf("invalid API operation %q", operationID)
 		}
 
-		s.log.V(4).Info("wS upgrade middleware: upgrading connection", "client", r.RemoteAddr)
+		s.log.V(4).Info("WS upgrade middleware: upgrading connection", "client", r.RemoteAddr)
 
 		// upgrade to webSocket
 		upgrader := websocket.Upgrader{

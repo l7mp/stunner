@@ -19,7 +19,7 @@ type ConfigFileClient struct {
 	configFile string
 	// id is the name of the stunnerd instance.
 	id string
-	// log is a leveled logger used to report progress. Either Logger or Log must be specified.
+	// log is a leveled logger used to report progress.
 	log logging.LeveledLogger
 }
 
@@ -115,7 +115,11 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerCo
 
 	w.log.Debugf("initial config file successfully loaded from %q: %s", config, c.String())
 
-	ch <- c.DeepCopy()
+	select {
+	case ch <- c.DeepCopy():
+	case <-ctx.Done():
+		return nil
+	}
 
 	// save deepcopy so that we can filter repeated events
 	prev := stnrv2.StunnerConfig{}
@@ -171,7 +175,11 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerCo
 
 			w.log.Debugf("config file successfully loaded from %q: %s", config, c.String())
 
-			ch <- c.DeepCopy()
+			select {
+			case ch <- c.DeepCopy():
+			case <-ctx.Done():
+				return nil
+			}
 
 			// save deepcopy so that we can filter repeated events
 			c.DeepCopyInto(&prev)

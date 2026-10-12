@@ -1,6 +1,6 @@
 package telemetry
 
-// Direction species whether a conn stat applies in the sender or a receiving direction from the
+// Direction specifies whether a conn stat applies in the sender or a receiving direction from the
 // standpoint of STUNner.
 type Direction int
 
@@ -26,7 +26,7 @@ func (d Direction) String() string {
 	}
 }
 
-// ConnType species whether a conn stat was collected at a listener or a cluster.
+// ConnType specifies whether a conn stat was collected at a listener or a cluster.
 type ConnType int
 
 const (

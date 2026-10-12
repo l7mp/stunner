@@ -93,7 +93,7 @@ By default, STUNner uses a single static username/password pair for all clients 
 
 For production deployments we recommend the `ephemeral` authentication mode, which uses per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for configuring STUNner with `ephemeral` authentication.
 
-Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol (only available in the premium tiers), in which case it needs no authentication. Refer to the [user guide](PREMIUM.md) for the details.
+Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol (only available in the premium tiers), in which case it needs no authentication. Refer to the [user guide](PREMIUM_REFERENCE.md) for the details.
 
 ### Plain listeners
 
@@ -118,7 +118,7 @@ spec:
           namespace: media-plane
 ```
 
-STUNner admits a backend by IP address and enforces the `port` and `endPort` of a backend reference: a client allowed to reach a backend reaches only those ports of it (see [Filters](#filters) below). For a second line of defense, use a NetworkPolicy as below.
+STUNner admits a backend by IP address and enforces the `port` and `endPort` of a backend reference: a client allowed to reach a backend reaches only those ports of it. For a second line of defense, use a NetworkPolicy as below.
 
 For hardened deployments, it is possible to add a second level of isolation between STUNner and the rest of the workload using the Kubernetes NetworkPolicy facility. Creating a NetworkPolicy will essentially implement a firewall, blocking all access from the source to the target workload except the services explicitly whitelisted by the user. The below example allows access from STUNner to *any* media server pod labeled as `app=media-server` in the `default` namespace over the UDP port range `[10000:20000]`, but nothing else.
 
@@ -161,4 +161,4 @@ Nevertheless, if worried about information exposure then STUNner may not be the 
 
 ## User quota (only available in the premium version)
 
-In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM.md) for the details.
+In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM_REFERENCE.md) for the details.

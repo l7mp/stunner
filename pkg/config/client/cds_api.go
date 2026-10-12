@@ -46,7 +46,7 @@ type CdsApi interface {
 	// set, the suppressDelete instructs the API to ignore config delete updates from the
 	// server.
 	Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
-	// Poll creates a one-shot config watcher without the retry mechanincs of Watch.
+	// Poll creates a one-shot config watcher without the retry mechanics of Watch.
 	Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error
 	logging.LeveledLogger
 }
@@ -90,7 +90,7 @@ func (a *AllConfigsAPI) Endpoint() (string, string) {
 }
 
 func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig, error) {
-	a.Debugf("gET: loading all configs from CDS server %s", a.addr)
+	a.Debugf("GET: loading all configs from CDS server %s", a.addr)
 
 	r, err := a.client.ListV1ConfigsWithResponse(ctx, nil)
 	if err != nil {
@@ -99,7 +99,7 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig, error
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv2.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
+		return []*stnrv2.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -107,12 +107,12 @@ func (a *AllConfigsAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig, error
 }
 
 func (a *AllConfigsAPI) Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("wATCH: watching all configs from CDS server %s", a.wsURI)
+	a.Debugf("WATCH: watching all configs from CDS server %s", a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *AllConfigsAPI) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("pOLL: polling all configs from CDS server %s", a.wsURI)
+	a.Debugf("POLL: polling all configs from CDS server %s", a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
 
@@ -154,7 +154,7 @@ func (a *ConfigsNamespaceAPI) Endpoint() (string, string) {
 }
 
 func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig, error) {
-	a.Debugf("gET: loading all configs in namespace %s from CDS server %s",
+	a.Debugf("GET: loading all configs in namespace %s from CDS server %s",
 		a.namespace, a.addr)
 
 	r, err := a.client.ListV1ConfigsNamespaceWithResponse(ctx, a.namespace, nil)
@@ -164,7 +164,7 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig,
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv2.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
+		return []*stnrv2.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -172,13 +172,13 @@ func (a *ConfigsNamespaceAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig,
 }
 
 func (a *ConfigsNamespaceAPI) Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("wATCH: watching all configs in namespace %s from CDS server %s",
+	a.Debugf("WATCH: watching all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *ConfigsNamespaceAPI) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("pOLL: polling all configs in namespace %s from CDS server %s",
+	a.Debugf("POLL: polling all configs in namespace %s from CDS server %s",
 		a.namespace, a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
@@ -223,7 +223,7 @@ func (a *ConfigNamespaceNameAPI) Endpoint() (string, string) {
 }
 
 func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConfig, error) {
-	a.Debugf("gET: loading config for gateway %s/%s from CDS server %s",
+	a.Debugf("GET: loading config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.addr)
 
 	var params *api.GetV1ConfigNamespaceNameParams
@@ -237,7 +237,7 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConf
 
 	if r.HTTPResponse.StatusCode != http.StatusOK {
 		body := strings.TrimSpace(string(r.Body))
-		return []*stnrv2.StunnerConfig{}, fmt.Errorf("hTTP error (status: %s): %s",
+		return []*stnrv2.StunnerConfig{}, fmt.Errorf("HTTP error (status: %s): %s",
 			r.HTTPResponse.Status, body)
 	}
 
@@ -245,13 +245,13 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConf
 }
 
 func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("wATCH: watching config for gateway %s/%s from CDS server %s",
+	a.Debugf("WATCH: watching config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return watch(ctx, a, ch, suppressDelete)
 }
 
 func (a *ConfigNamespaceNameAPI) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	a.Debugf("pOLL: polling config for gateway %s/%s from CDS server %s",
+	a.Debugf("POLL: polling config for gateway %s/%s from CDS server %s",
 		a.namespace, a.name, a.wsURI)
 	return poll(ctx, a, ch, suppressDelete)
 }
@@ -303,7 +303,6 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 
 	pingTicker := time.NewTicker(PingPeriod)
 	closePinger := make(chan any)
-	defer close(closePinger)
 
 	// wait until all threads are closed and we can remove the error channel
 	errCh := make(chan error, 1)
@@ -317,11 +316,13 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 		for {
 			select {
 			case <-pingTicker.C:
-				// p.log.Tracef("++++ PING ++++ for CDS server %q at client %q", location, p.id)
 				conn.SetWriteDeadline(time.Now().Add(WriteWait)) //nolint:errcheck
 				if err := conn.WriteMessage(websocket.PingMessage, []byte("keepalive")); err != nil {
-					errCh <- fmt.Errorf("could not ping CDS server at %q: %w",
-						conn.RemoteAddr(), err)
+					select {
+					case errCh <- fmt.Errorf("could not ping CDS server at %q: %w",
+						conn.RemoteAddr(), err):
+					default:
+					}
 					return
 				}
 			case <-closePinger:
@@ -339,7 +340,6 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 		conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 		// reinit the deadline when we get a pong
 		conn.SetPongHandler(func(string) error {
-			// a.Tracef("got PONG from server %q", url)
 			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 			return nil
 		})
@@ -349,7 +349,10 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 			// the deadline
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
-				errCh <- err
+				select {
+				case errCh <- err:
+				default:
+				}
 				return
 			}
 
@@ -358,8 +361,11 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 			conn.SetReadDeadline(time.Now().Add(PongWait)) //nolint:errcheck
 
 			if msgType != websocket.TextMessage {
-				errCh <- fmt.Errorf("unexpected message type (code: %d) from client %q",
-					msgType, conn.RemoteAddr().String())
+				select {
+				case errCh <- fmt.Errorf("unexpected message type (code: %d) from server %q",
+					msgType, conn.RemoteAddr().String()):
+				default:
+				}
 				return
 			}
 
@@ -387,31 +393,35 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 
 			a.Debugf("new config received from %q: %q", url, c.String())
 
-			ch <- c
+			select {
+			case ch <- c:
+			case <-ctx.Done():
+				return
+			case <-closePinger:
+				return
+			}
 		}
 	}()
 
-	// wait fo cancel
-	for {
-		defer func() {
-			a.Infof("closing connection to server %s", conn.RemoteAddr().String())
-			conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
-			conn.Close()                                        //nolint:errcheck
-			closePinger <- struct{}{}
-			wg.Wait()
-			close(errCh)
-		}()
+	defer func() {
+		a.Infof("closing connection to server %s", conn.RemoteAddr().String())
+		conn.WriteMessage(websocket.CloseMessage, []byte{}) //nolint:errcheck
+		conn.Close()                                        //nolint:errcheck
+		close(closePinger)
+		wg.Wait()
+		close(errCh)
+	}()
 
-		select {
-		case <-ctx.Done():
-			// cancel: normal return
-			return nil
-		case err := <-errCh:
-			// error: return it
-			a.Debugf("error on server connection to %s: %s", conn.RemoteAddr().String(),
-				err.Error())
-			return err
-		}
+	// wait for cancel
+	select {
+	case <-ctx.Done():
+		// cancel: normal return
+		return nil
+	case err := <-errCh:
+		// error: return it
+		a.Debugf("error on server connection to %s: %s", conn.RemoteAddr().String(),
+			err.Error())
+		return err
 	}
 }
 

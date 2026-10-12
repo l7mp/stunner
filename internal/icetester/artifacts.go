@@ -176,7 +176,7 @@ func addGWtoUDPRoute(gw string, u *unstructured.Unstructured) *unstructured.Unst
 func newICETesterBackendPod(namespace, iceTesterImage string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]any{
-			"apiVersion": "/v1",
+			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata": map[string]any{
 				"name":      "icetest-backend",

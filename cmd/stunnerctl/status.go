@@ -41,7 +41,7 @@ func runStatus(_ *cobra.Command, args []string) error {
 		gw = args[0]
 	}
 	if gwNs != "" && gw != "" {
-		extraLog += fmt.Sprintf("for gateway %s", gw)
+		extraLog += fmt.Sprintf(" for gateway %s", gw)
 	}
 
 	log.Debug("searching for dataplane pods " + extraLog)

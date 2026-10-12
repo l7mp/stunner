@@ -24,7 +24,7 @@ func TestFeatureCatalog(t *testing.T) {
 				"FeatureNone and the feature silently disappears", f)
 		assert.Contains(t, AllFeatures(), f, "%s is missing from AllFeatures", f)
 		assert.Contains(t, Features(SubscriptionTypeEnterprise), f,
-			"%s is granted by no tier")
+			"%s is granted by no tier", f)
 	}
 
 	assert.ElementsMatch(t, []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,

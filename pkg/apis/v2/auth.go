@@ -19,7 +19,7 @@ type AuthConfig struct {
 	Type string `json:"type,omitempty"`
 	// Realm defines the STUN/TURN authentication realm.
 	Realm string `json:"realm,omitempty"`
-	// Credentials specifies the authententication credentials: for "static" at least the keys
+	// Credentials specifies the authentication credentials: for "static" at least the keys
 	// "username" and "password" must be set, for "ephemeral" the key "secret" specifying the
 	// shared authentication secret must be set.
 	Credentials map[string]string `json:"credentials"`

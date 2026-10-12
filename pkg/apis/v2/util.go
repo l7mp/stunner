@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// AuthType species the type of the STUN/TURN authentication mechanism used by STUNner.
+// AuthType specifies the type of the STUN/TURN authentication mechanism used by STUNner.
 type AuthType int
 
 const (
@@ -214,7 +214,7 @@ func NewClusterProtocol(raw string) (Protocol, error) {
 type ClusterType int
 
 const (
-	// ClusterTypeStatic endpoints are IP addresses and prefixes.
+	// ClusterTypeStatic endpoints are IP addresses with an optional port.
 	ClusterTypeStatic ClusterType = iota + 1
 	// ClusterTypeStrictDNS endpoints are domain names resolved in the background.
 	ClusterTypeStrictDNS
@@ -332,7 +332,7 @@ type ServerType int
 const (
 	// ServerTypeUnknown is an invalid server type.
 	ServerTypeUnknown ServerType = iota
-	// ServerTypeTURN serves TURN: clusters filter the peers a client may reach.
+	// ServerTypeTURN serves TURN: permission filters grant the peers a client may reach.
 	ServerTypeTURN
 	// ServerTypeL4 forwards every client flow to an endpoint load-balanced over its clusters.
 	ServerTypeL4
@@ -392,7 +392,7 @@ func (p Protocol) IsTURN() bool {
 	}
 }
 
-// OffloadEngine specifies the type of TURN offload mode.
+// OffloadMode specifies the type of TURN offload mode.
 type OffloadMode int
 
 const (
@@ -426,7 +426,7 @@ func NewOffloadEngine(raw string) (OffloadMode, error) {
 	}
 }
 
-// String returns a string representation of a cluster protocol.
+// String returns a string representation of an offload mode.
 func (p OffloadMode) String() string {
 	switch p {
 	case OffloadEngineNone:
@@ -442,7 +442,7 @@ func (p OffloadMode) String() string {
 	}
 }
 
-// OffloadStatMap defines the TX/RX offload statistics for a particular listener or cluster.
+// OffloadDirStat defines the TX/RX offload statistics for a particular listener or cluster.
 type OffloadDirStat struct {
 	Rx OffloadStatInfo `json:"rx"`
 	Tx OffloadStatInfo `json:"tx"`

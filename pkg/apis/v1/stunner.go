@@ -2,11 +2,10 @@ package v1
 
 import (
 	"fmt"
-	// "sort"
 	"strings"
 )
 
-// StunnerConfig specifies the configuration for the STUnner daemon.
+// StunnerConfig specifies the configuration for the STUNner daemon.
 type StunnerConfig struct {
 	// ApiVersion is the version of the STUNner API implemented. Must be set to "v1".
 	ApiVersion string `json:"version"`
@@ -271,7 +270,7 @@ func (req *StunnerConfig) Summary() string {
 	return status
 }
 
-// StunnerStatus represents the status of the STUnner daemon.
+// StunnerStatus represents the status of the STUNner daemon.
 type StunnerStatus struct {
 	ApiVersion      string            `json:"version"`
 	Admin           *AdminStatus      `json:"admin"`

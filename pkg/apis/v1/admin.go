@@ -26,7 +26,7 @@ type AdminConfig struct {
 	// health-checking at `http://:8086`. Set to a pointer to an empty string to disable
 	// health-checking.
 	HealthCheckEndpoint *string `json:"healthcheck_endpoint,omitempty"`
-	// UserQuota defines the number of permitted TURN allocatoins per username. Affects
+	// UserQuota defines the number of permitted TURN allocations per username. Affects
 	// allocation created on any listener. Default is 0, meaning no quota is enforced.
 	UserQuota int `json:"user_quota,omitempty"`
 	// OffloadEngine defines the dataplane offload mode, either "None", "XDP", "TC", or
@@ -68,11 +68,11 @@ func (req *AdminConfig) Validate() error {
 	}
 
 	if req.HealthCheckEndpoint == nil {
-		// No healtchcheck endpoint given: use default URL
+		// No healthcheck endpoint given: use default URL
 		e := fmt.Sprintf("http://:%d", DefaultHealthCheckPort)
 		req.HealthCheckEndpoint = &e
 	} else {
-		// Healtcheck endpoint set: validate. Empty string is valid
+		// Healthcheck endpoint set: validate. Empty string is valid
 		if _, err := url.Parse(*req.HealthCheckEndpoint); err != nil {
 			return fmt.Errorf("invalid health-check server endpoint URL %s: %s",
 				*req.HealthCheckEndpoint, err.Error())
@@ -101,7 +101,7 @@ func (req *AdminConfig) Validate() error {
 	return nil
 }
 
-// Name returns the name of the object to be configured.
+// ConfigName returns the name of the object to be configured.
 func (req *AdminConfig) ConfigName() string {
 	// Singleton!
 	return DefaultAdminName
@@ -152,15 +152,7 @@ func (req *AdminConfig) String() string {
 
 func LicensingStatus(req *LicenseConfig) string {
 	if req != nil {
-		key := "<MISSING>"
-		if req != nil {
-			key = req.Key
-		}
-		pass := "<MISSING>"
-		if req != nil {
-			pass = "<SECRET>"
-		}
-		return fmt.Sprintf("{key=%s,pass=%s}", key, pass)
+		return fmt.Sprintf("{key=%s,pass=<SECRET>}", req.Key)
 	}
 
 	return "<MISSING>"
@@ -177,7 +169,7 @@ type AdminStatus struct {
 	LicensingInfo       string `json:"licensing_info,omitempty"`
 }
 
-// String returns a string reprsentation of the administrative status.
+// String returns a string representation of the administrative status.
 func (a *AdminStatus) String() string {
 	status := []string{fmt.Sprintf("id=%q", a.Name)}
 	if a.LogLevel != "" {

@@ -2,7 +2,7 @@ package quota
 
 import "github.com/l7mp/stunner/v2/internal/runtime"
 
-// The the stub below satisfies the runtime.QuotaHandler interface structurally. New takes the
+// The stub below satisfies the runtime.QuotaHandler interface structurally. New takes the
 // Runtime so a licensed implementation can reach the license manager (rt.License) and re-check
 // entitlement on every call. The open-source stub ignores it and enforces no quota.
 

@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"reflect"
-	"strings"
 	"sync/atomic"
 
 	"github.com/pion/logging"
@@ -26,7 +25,7 @@ type Health struct {
 	mux      *http.ServeMux
 	dryRun   bool
 
-	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
+	// conf is the atomic snapshot GetConfig returns.
 	conf atomic.Pointer[HealthConfig]
 
 	rt  *runtime.Runtime
@@ -221,10 +220,8 @@ func (h *Health) buildMux() *http.ServeMux {
 	return mux
 }
 
-// defaultHealthEndpoint mirrors the historical Admin behaviour: a nil HealthCheckEndpoint pointer
-// (the user not setting the field) maps to the default `http://:8086` endpoint.
+// defaultHealthEndpoint is the endpoint a nil HealthCheckEndpoint pointer (the user not setting
+// the field) maps to: `http://:8086`.
 func defaultHealthEndpoint() string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "http://:%d", stnrv2.DefaultHealthCheckPort)
-	return b.String()
+	return fmt.Sprintf("http://:%d", stnrv2.DefaultHealthCheckPort)
 }

@@ -25,7 +25,7 @@ type Metrics struct {
 	servAddr string
 	dryRun   bool
 
-	// conf is the atomic snapshot read via Admin.GetConfig on the allocation path.
+	// conf is the atomic snapshot GetConfig returns.
 	conf atomic.Pointer[MetricsConfig]
 
 	log logging.LeveledLogger

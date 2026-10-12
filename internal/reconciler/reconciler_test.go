@@ -30,7 +30,6 @@ type fakeErrMode int
 
 const (
 	fakeErrNone fakeErrMode = iota
-	fakeErrRestartRequired
 	fakeErrFatal
 )
 
@@ -107,8 +106,6 @@ func (f *fakeFactory) New(conf stnrv2.Config) (runtime.Runnable, error) {
 	switch cfg.CreateErrMode {
 	case fakeErrFatal:
 		return nil, errCreate
-	case fakeErrRestartRequired:
-		return obj, runtime.ErrRestartRequired
 	default:
 		return obj, nil
 	}
@@ -151,8 +148,6 @@ func (o *fakeObject) Reconcile(conf stnrv2.Config) error {
 	switch cfg.ReconcileErrMode {
 	case fakeErrFatal:
 		return errReconcile
-	case fakeErrRestartRequired:
-		return runtime.ErrRestartRequired
 	default:
 		return nil
 	}
@@ -472,41 +467,46 @@ func TestStartErr(t *testing.T) {
 	})
 }
 
-func TestReconcileRestartRequired(t *testing.T) {
+// TestRestartSignalsErrRestarted pins the restart signal: an object restarting returns
+// ErrRestarted naming it, and is replaced instead of reconciled.
+func TestRestartSignalsErrRestarted(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
 	env.addObject(testItemType, &fakeConfig{Name: "existing"})
 	env.setDesired(testItemType,
-		&fakeConfig{Name: "existing", Decision: runtime.ActionReconcile, ReconcileErrMode: fakeErrRestartRequired},
+		&fakeConfig{Name: "existing", Decision: runtime.ActionRestart},
 	)
 
 	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
-	require.ErrorIs(t, err, runtime.ErrRestartRequired)
+	var restarted stnrv2.ErrRestarted
+	require.ErrorAs(t, err, &restarted)
+	require.Equal(t, []string{fmt.Sprintf("%s: %s", testItemType, "existing")}, restarted.Objects)
 
 	events := env.rec.snapshot()
-	assertOrderedSubsequence(t, events, []string{"reconcile:test-item/existing"})
-	assertNoPrefix(t, events, "close:")
-	assertNoPrefix(t, events, "start:")
+	assertOrderedSubsequence(t, events, []string{
+		"factory:test-item/existing",
+		"close:test-item/existing:false",
+		"start:test-item/existing",
+	})
+	assertNoPrefix(t, events, "reconcile:")
 }
 
-func TestCreateRestartRequired(t *testing.T) {
+// TestCreateSignalsNoRestart pins that creating an object is no restart: the run returns nil.
+func TestCreateSignalsNoRestart(t *testing.T) {
 	env := newTestEnv(t)
 	env.seedBaseTree()
 
-	env.setDesired(testItemType,
-		&fakeConfig{Name: "new", CreateErrMode: fakeErrRestartRequired},
-	)
+	env.setDesired(testItemType, &fakeConfig{Name: "new"})
 
-	err := env.reconciler.run(&stnrv2.StunnerConfig{}, false)
-	require.ErrorIs(t, err, runtime.ErrRestartRequired)
+	require.NoError(t, env.reconciler.run(&stnrv2.StunnerConfig{}, false))
 
 	_, found := env.rt.Registry.Get(testItemType, "new")
-	require.False(t, found)
+	require.True(t, found)
 
 	events := env.rec.snapshot()
-	assertOrderedSubsequence(t, events, []string{"factory:test-item/new"})
-	assertNoPrefix(t, events, "start:")
+	assertOrderedSubsequence(t, events, []string{"factory:test-item/new", "start:test-item/new"})
+	assertNoPrefix(t, events, "close:")
 }
 
 func TestSingletonWrongName(t *testing.T) {

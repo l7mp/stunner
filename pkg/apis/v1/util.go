@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// AuthType species the type of the STUN/TURN authentication mechanism used by STUNner.
+// AuthType specifies the type of the STUN/TURN authentication mechanism used by STUNner.
 type AuthType int
 
 const (
@@ -102,8 +102,8 @@ func (m PQCMode) String() string {
 
 // Protocol specifies a network protocol. A single enum lists every protocol STUNner understands;
 // which subset is valid in a given context (listener, cluster, ...) is enforced at the use site, not
-// by this type. Parse a protocol name with NewProtocol; check context validity with the
-// IsListenerProtocol/IsClusterProtocol predicates.
+// by this type. Parse a protocol name with NewProtocol; parse and check context validity with
+// NewListenerProtocol/NewClusterProtocol.
 type Protocol int
 
 const (
@@ -133,8 +133,7 @@ const (
 
 // NewProtocol parses a protocol name into a Protocol. It is permissive: it accepts any known
 // protocol token and errors only on an unrecognized string. Whether the result is admissible in a
-// particular context is a separate question, answered by the IsListenerProtocol/IsClusterProtocol
-// predicates.
+// particular context is a separate question, answered by NewListenerProtocol/NewClusterProtocol.
 func NewProtocol(raw string) (Protocol, error) {
 	switch strings.ToUpper(raw) {
 	case protocolUDPStr:
