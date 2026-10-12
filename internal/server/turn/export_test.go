@@ -23,3 +23,11 @@ func (s *Server) Conn(remote, local net.Addr) (api.Conn, bool) {
 	}
 	return e.Client, true
 }
+
+// Tracked exposes the number of tracked conns to the external tests.
+func (s *Server) Tracked() int {
+	s.mu.RLock()
+	ct := s.conntrack
+	s.mu.RUnlock()
+	return ct.Len()
+}

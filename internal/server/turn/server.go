@@ -185,13 +185,14 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 	if !ct.Add(e) {
 		return nil, api.Consumed, server.ErrNotServing
 	}
-	var conn net.Conn = c
+	// pion closes the conn when its read loop exits, allocated or not: that untracks it
+	var conn net.Conn = &trackedConn{Conn: c, entry: e}
 	switch c.Tag().Proto {
 	case stnrv2.ProtocolTCP, stnrv2.ProtocolTLS:
 		// streams hang up: no pre-allocation timeout, and RFC 6062 data connections never
 		// allocate
 		e.Disarm()
-		conn = turn.NewSTUNStreamConn(c)
+		conn = turn.NewSTUNStreamConn(conn)
 	case stnrv2.ProtocolUDP, stnrv2.ProtocolDTLS:
 	default:
 		ct.Remove(server.Key(c.RemoteAddr(), c.LocalAddr()))
@@ -203,6 +204,17 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 		return nil, api.Consumed, err
 	}
 	return nil, api.Consumed, nil
+}
+
+// trackedConn closes its conntrack entry, and the client conn with it, when it closes.
+type trackedConn struct {
+	api.Conn
+	entry *server.Entry
+}
+
+func (c *trackedConn) Close() error {
+	c.entry.Close("client conn closed")
+	return nil
 }
 
 // dialers returns the dialers of the clusters the server uses, skipping missing ones.

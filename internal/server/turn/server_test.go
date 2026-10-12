@@ -293,6 +293,29 @@ func TestTURNServerPreAllocationTimeout(t *testing.T) {
 	relay(t, a, udpEcho(t).LocalAddr(), "still here")
 }
 
+// TestTURNServerUntracksClosedStreams pins that a stream conn leaves the conntrack when it closes,
+// whether it allocated or not.
+func TestTURNServerUntracksClosedStreams(t *testing.T) {
+	ts := newTestServer(t)
+
+	// a client that never allocates
+	c, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(ts.ports["TCP"]))) //nolint:noctx
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return ts.Tracked() == 1 }, 5*time.Second, 10*time.Millisecond,
+		"the listener emitted a conn")
+	require.NoError(t, c.Close())
+	require.Eventually(t, func() bool { return ts.Tracked() == 0 }, 5*time.Second, 20*time.Millisecond,
+		"a conn closed without an allocation is untracked")
+
+	// a client that allocates
+	a := ts.allocate(t, stnrv2.ProtocolTURNTCP, ts.ports["TCP"])
+	relay(t, a, udpEcho(t).LocalAddr(), "allocated")
+	require.Equal(t, 1, ts.Tracked())
+	require.NoError(t, a.Close())
+	require.Eventually(t, func() bool { return ts.Tracked() == 0 }, 5*time.Second, 20*time.Millisecond,
+		"a conn closed after an allocation is untracked")
+}
+
 func TestTURNServerRealmRebuild(t *testing.T) {
 	ts := newTestServer(t)
 	peer := udpEcho(t)
