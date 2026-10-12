@@ -56,7 +56,8 @@ func (s *Stunner) GetConfig() stnrv2.Config {
 	return out
 }
 
-// Status aggregates the children's statuses into a StunnerStatus.
+// Status aggregates the children's statuses into a StunnerStatus, with the number of live
+// sessions summed over the servers and the readiness of the runtime.
 func (s *Stunner) Status() stnrv2.Status {
 	status := &stnrv2.StunnerStatus{ApiVersion: stnrv2.ApiVersion}
 	if s.rt == nil {
@@ -76,7 +77,9 @@ func (s *Stunner) Status() stnrv2.Status {
 	}
 	status.Servers = []*stnrv2.ServerStatus{}
 	for _, st := range s.rt.GetStatuses(runtime.TypeServer) {
-		status.Servers = append(status.Servers, st.(*stnrv2.ServerStatus))
+		ss := st.(*stnrv2.ServerStatus)
+		status.Servers = append(status.Servers, ss)
+		status.AllocationCount += ss.Sessions
 	}
 	status.Clusters = []*stnrv2.ClusterStatus{}
 	for _, st := range s.rt.GetStatuses(runtime.TypeCluster) {
@@ -85,6 +88,14 @@ func (s *Stunner) Status() stnrv2.Status {
 	status.Filters = []*stnrv2.FilterStatus{}
 	for _, st := range s.rt.GetStatuses(runtime.TypeFilter) {
 		status.Filters = append(status.Filters, st.(*stnrv2.FilterStatus))
+	}
+	switch {
+	case s.rt.IsShutdown():
+		status.Status = "TERMINATING"
+	case s.rt.IsReady():
+		status.Status = "READY"
+	default:
+		status.Status = "NOT-READY"
 	}
 	return status
 }

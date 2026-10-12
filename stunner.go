@@ -252,19 +252,10 @@ func (s *Stunner) AllocationCount() int {
 	return n
 }
 
-// GetStatus returns the root status. The root Object aggregates from its descendants.
+// GetStatus returns the status of the daemon: the statuses of its objects, the number of live
+// sessions and the readiness. It is the status the /status endpoint of the health check serves.
 func (s *Stunner) GetStatus() stnrv2.Status {
-	status := s.rt.GetStatus(runtime.TypeStunner, "").(*stnrv2.StunnerStatus)
-	status.AllocationCount = s.AllocationCount()
-	stat := "READY"
-	if !s.rt.IsReady() {
-		stat = "NOT-READY"
-	}
-	if s.rt.IsShutdown() {
-		stat = "TERMINATING"
-	}
-	status.Status = stat
-	return status
+	return s.rt.GetStatus(runtime.TypeStunner, "")
 }
 
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections.
