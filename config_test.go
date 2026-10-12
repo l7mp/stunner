@@ -182,6 +182,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}})
+	defer stunner.Close()
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv2.StunnerConfig, 1)
@@ -221,7 +222,8 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	c2 := mustReadConfig(t, conf, time.Second)
+	// the watcher polls for a missing file every retry period: the first config may take that long
+	c2 := mustReadConfig(t, conf, 2*cdsclient.RetryPeriod)
 	checkDefaultConfig(t, c2, "UDP")
 
 	log.Debug("write a wrong config file: WatchConfig validates")
@@ -255,8 +257,6 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 
 	c3 := mustReadConfig(t, conf, time.Second)
 	checkDefaultConfig(t, c3, "TCP")
-
-	stunner.Close()
 }
 
 const (
@@ -285,6 +285,7 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}})
+	defer stunner.Close()
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv2.StunnerConfig, 1)
@@ -314,7 +315,8 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	_, err = f.WriteString(testConfigV1)
 	assert.NoError(t, err, "write config to temp file")
 
-	c2 := mustReadConfig(t, conf, time.Second)
+	// the watcher polls for a missing file every retry period: the first config may take that long
+	c2 := mustReadConfig(t, conf, 2*cdsclient.RetryPeriod)
 
 	checkEchoServerConfig(t, c2)
 
@@ -328,8 +330,6 @@ func TestStunnerConfigFileWatcherMultiVersion(t *testing.T) {
 	c2 = mustReadConfig(t, conf, time.Second)
 
 	checkEchoServerConfig(t, c2)
-
-	stunner.Close()
 }
 
 func TestStunnerConfigPollerMultiVersion(t *testing.T) {
@@ -401,6 +401,7 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 
 	log.Debug("creating a stunnerd")
 	stunner := NewStunner(Options{LogOptions: LogOptions{Level: stunnerTestLoglevel}, Name: "ns1/tester"})
+	defer stunner.Close()
 
 	log.Debug("starting watcher")
 	conf := make(chan *stnrv2.StunnerConfig, 1)
@@ -416,8 +417,6 @@ func TestStunnerConfigPollerMultiVersion(t *testing.T) {
 	c2 = mustReadConfig(t, conf, time.Second)
 
 	checkEchoServerConfig(t, c2)
-
-	stunner.Close()
 }
 
 func TestStunnerConfigPatcher(t *testing.T) {
