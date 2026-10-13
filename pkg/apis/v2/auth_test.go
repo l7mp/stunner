@@ -40,8 +40,12 @@ func TestGenerateCredentials(t *testing.T) {
 		u, p, err := auth.GenerateCredentials("", time.Time{})
 		require.NoError(t, err)
 
-		// the username is the expiry timestamp: in the future, within the lifetime
-		expiry, err := strconv.ParseInt(u, 10, 64)
+		// the username is the expiry timestamp and the default user: in the future, within the
+		// lifetime
+		ts, userid, ok := strings.Cut(u, UsernameSeparator)
+		require.True(t, ok, "username is timestamp:userid")
+		assert.Equal(t, DefaultUserID, userid, "the default user id")
+		expiry, err := strconv.ParseInt(ts, 10, 64)
 		require.NoError(t, err, "username is a unix timestamp")
 		now := time.Now().Unix()
 		assert.Greater(t, expiry, now, "credential expires in the future")
@@ -58,7 +62,8 @@ func TestGenerateCredentials(t *testing.T) {
 		auth := &AuthConfig{Type: "ephemeral", Credentials: map[string]string{"secret": "s"}}
 		u, _, err := auth.GenerateCredentials("", time.Time{})
 		require.NoError(t, err)
-		expiry, err := strconv.ParseInt(u, 10, 64)
+		ts, _, _ := strings.Cut(u, UsernameSeparator)
+		expiry, err := strconv.ParseInt(ts, 10, 64)
 		require.NoError(t, err)
 		assert.Greater(t, expiry, time.Now().Unix()+int64((59*time.Minute).Seconds()),
 			"default lifetime is 1h")

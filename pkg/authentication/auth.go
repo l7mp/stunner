@@ -3,6 +3,7 @@
 package authentication
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,12 +47,13 @@ func CheckTimeWindowedUsername(username string) (string, error) {
 		return "", fmt.Errorf("expired time-windowed username %q", username)
 	}
 
-	// Default format is timestamp:userID
+	// Default format is timestamp:userID; a username without a user id is the default user's
 	userID := username
-	if len(parts) == 2 {
-		if timestampIdx == 0 {
-			userID = parts[1]
-		}
+	switch {
+	case len(parts) == 1:
+		userID = stnrv2.DefaultUserID
+	case len(parts) == 2 && timestampIdx == 0:
+		userID = cmp.Or(parts[1], stnrv2.DefaultUserID)
 	}
 
 	return userID, nil

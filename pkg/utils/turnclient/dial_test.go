@@ -3,7 +3,6 @@ package turnclient
 import (
 	"context"
 	"net"
-	"strconv"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
 func TestNewConfig(t *testing.T) {
@@ -58,8 +58,9 @@ func TestNewConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, stnrv2.ProtocolTURNTLS, c.Protocol)
 		assert.Equal(t, "[2001:db8::1]:3478", c.ServerAddr, "IPv6 host is bracketed")
-		_, err = strconv.ParseInt(c.Username, 10, 64)
+		userid, err := a12n.CheckTimeWindowedUsername(c.Username)
 		assert.NoError(t, err, "time-windowed username")
+		assert.Equal(t, stnrv2.DefaultUserID, userid, "the default user")
 		assert.NotEmpty(t, c.Password)
 	})
 

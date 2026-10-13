@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -18,8 +19,12 @@ func TestCheckTimeWindowedUsername(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "alice", userid)
 
-	_, err = CheckTimeWindowedUsername(stnrv2.GenerateTimeWindowedUsername(time.Now().Add(time.Hour), ""))
-	assert.NoError(t, err, "an anonymous username")
+	expiry := strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)
+	for _, username := range []string{expiry, expiry + stnrv2.UsernameSeparator} {
+		userid, err = CheckTimeWindowedUsername(username)
+		require.NoError(t, err, "a username without a user id: %q", username)
+		assert.Equal(t, stnrv2.DefaultUserID, userid, "the default user: %q", username)
+	}
 
 	_, err = CheckTimeWindowedUsername(
 		stnrv2.GenerateTimeWindowedUsername(time.Now().Add(-time.Minute), "alice"))

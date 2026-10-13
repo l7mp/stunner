@@ -13,6 +13,7 @@ const (
 	DefaultRealm                         = "stunner.l7mp.io"
 	DefaultAuthType                      = "static"
 	DefaultCredentialLifetime            = time.Hour
+	DefaultUserID                        = "anonymous" // the user id of an ephemeral credential minted for nobody
 	DefaultMinRelayPort           int    = 1
 	DefaultMaxRelayPort           int    = 1<<16 - 1
 	DefaultClusterType                   = "STATIC"

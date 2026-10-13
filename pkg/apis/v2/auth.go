@@ -47,8 +47,8 @@ func (req *AuthConfig) CredentialLifetime() time.Duration {
 
 // GenerateCredentials generates the credentials a TURN client of the policy authenticates with,
 // a fresh pair on every call: for "static" the configured username and password, for "ephemeral"
-// a time-windowed credential of the user id from the shared secret, expiring at expiry, or after
-// the configured lifetime for a zero expiry. A nil policy and "none" both yield empty credentials,
+// a time-windowed credential of the user id, DefaultUserID if empty, from the shared secret,
+// expiring at expiry, or after the configured lifetime for a zero expiry. A nil policy and "none" both yield empty credentials,
 // an anonymous session.
 func (req *AuthConfig) GenerateCredentials(userid string, expiry time.Time) (string, string, error) {
 	if req == nil {
@@ -80,6 +80,9 @@ func (req *AuthConfig) GenerateCredentials(userid string, expiry time.Time) (str
 		}
 		if expiry.IsZero() {
 			expiry = time.Now().Add(req.CredentialLifetime())
+		}
+		if userid == "" {
+			userid = DefaultUserID
 		}
 		username := GenerateTimeWindowedUsername(expiry, userid)
 		password, err := GetLongTermCredential(username, secret)
