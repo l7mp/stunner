@@ -62,8 +62,8 @@ jobs:
 
       - name: Start the tunnel
         run: |
-          ./stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener udp://$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"):5001 &>tunnel.log &
-          sleep 1
+          ./stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener k8s://default/iperf-server:iperf-udp &>tunnel.log &
+          for n in {1..30}; do ss -Hlun 'sport = :5000' | grep -q . && break; echo "Waiting for the tunnel"; sleep 1; done
 
       - name: Run iperf client
         run: |
