@@ -69,6 +69,9 @@ func TestStunnerStatus(t *testing.T) {
 	require.NoError(t, err, "allocate")
 	for _, st := range statuses() {
 		assert.Equal(t, 1, st.AllocationCount, "one live allocation")
+		assert.NotZero(t, st.Listeners[0].Stats.Total.Rx.Pkts, "the allocation requests count")
+		assert.NotZero(t, st.Listeners[0].Stats.Total.Tx.Pkts, "the responses count")
+		assert.Zero(t, st.Listeners[0].Stats.Offload, "nothing is offloaded")
 	}
 
 	require.NoError(t, relay.Close(), "deallocate")

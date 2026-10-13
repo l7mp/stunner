@@ -264,8 +264,11 @@ func (l *Listener) GetConfig() stnrv2.Config {
 
 func (l *Listener) Status() stnrv2.Status {
 	status := &stnrv2.ListenerStatus{ListenerConfig: l.GetConfig().(*stnrv2.ListenerConfig)}
+	if l.rt.Telemetry != nil {
+		status.Stats.Total = l.rt.Telemetry.Stats(l.Name(), telemetry.ListenerType)
+	}
 	if offloadStatus, ok := l.rt.GetStatus(runtime.TypeOffload, "").(*stnrv2.OffloadStatus); ok {
-		status.Stats = offloadStatus.Listeners[l.Name()]
+		status.Stats.Offload = offloadStatus.Listeners[l.Name()]
 	}
 	return status
 }

@@ -3,6 +3,8 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/logging"
@@ -11,6 +13,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
+
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 const (
@@ -45,7 +49,32 @@ type Telemetry struct {
 
 	callbacks Callbacks
 
+	// the running traffic totals of the listeners and clusters, which the counters above do
+	// not expose
+	totalsMu sync.Mutex
+	totals   map[totalsKey]*totals
+
 	log logging.LeveledLogger
+}
+
+type totalsKey struct {
+	name string
+	c    ConnType
+}
+
+// totals is the traffic of a listener or cluster since it first appeared.
+type totals struct {
+	rxPkts, rxBytes, txPkts, txBytes atomic.Uint64
+}
+
+func (tt *totals) add(d Direction, pkts, bytes uint64) {
+	if d == Incoming {
+		tt.rxPkts.Add(pkts)
+		tt.rxBytes.Add(bytes)
+	} else {
+		tt.txPkts.Add(pkts)
+		tt.txBytes.Add(bytes)
+	}
 }
 
 func New(callbacks Callbacks, dryRun bool, log logging.LeveledLogger) (*Telemetry, error) {
@@ -81,6 +110,7 @@ func New(callbacks Callbacks, dryRun bool, log logging.LeveledLogger) (*Telemetr
 		meter:     provider.Meter(stunnerInstrumentName),
 		provider:  provider,
 		callbacks: callbacks,
+		totals:    map[totalsKey]*totals{},
 		ctx:       ctx,
 		cancel:    cancel,
 		log:       log,
@@ -181,17 +211,40 @@ func (t *Telemetry) init() error {
 	return nil
 }
 
+// trafficTotals returns the running traffic totals of a listener or cluster.
+func (t *Telemetry) trafficTotals(n string, c ConnType) *totals {
+	t.totalsMu.Lock()
+	defer t.totalsMu.Unlock()
+	tt, ok := t.totals[totalsKey{n, c}]
+	if !ok {
+		tt = &totals{}
+		t.totals[totalsKey{n, c}] = tt
+	}
+	return tt
+}
+
+// Stats returns the traffic a listener (ListenerType) or a cluster (ClusterType) carried, in user
+// space and, as the offload reporter adds it, in the kernel.
+func (t *Telemetry) Stats(n string, c ConnType) stnrv2.DirStat {
+	tt := t.trafficTotals(n, c)
+	return stnrv2.DirStat{
+		Rx: stnrv2.StatInfo{Pkts: tt.rxPkts.Load(), Bytes: tt.rxBytes.Load()},
+		Tx: stnrv2.StatInfo{Pkts: tt.txPkts.Load(), Bytes: tt.txBytes.Load()},
+	}
+}
+
 // Counters counts the traffic of one listener or cluster. It builds the metric attributes of both
 // directions once, so the per-packet path neither allocates nor hashes the name.
 type Counters struct {
 	t                  *Telemetry
 	packets, bytes     metric.Int64Counter
 	incoming, outgoing metric.AddOption
+	totals             *totals
 }
 
 // Counters returns the traffic counters of a listener (ListenerType) or a cluster (ClusterType).
 func (t *Telemetry) Counters(n string, c ConnType) *Counters {
-	ret := &Counters{t: t,
+	ret := &Counters{t: t, totals: t.trafficTotals(n, c),
 		incoming: metric.WithAttributeSet(attribute.NewSet(attribute.String("name", n),
 			attribute.String("direction", Incoming.String()))),
 		outgoing: metric.WithAttributeSet(attribute.NewSet(attribute.String("name", n),
@@ -217,6 +270,7 @@ func (c *Counters) Add(d Direction, n int) {
 	}
 	c.packets.Add(c.t.ctx, 1, attrs)
 	c.bytes.Add(c.t.ctx, int64(n), attrs)
+	c.totals.add(d, 1, uint64(n))
 }
 
 func (t *Telemetry) IncrementPackets(n string, c ConnType, d Direction, count uint64) {
@@ -231,6 +285,7 @@ func (t *Telemetry) IncrementPackets(n string, c ConnType, d Direction, count ui
 	case ClusterType:
 		t.ClusterPacketsCounter.Add(t.ctx, int64(count), attrs)
 	}
+	t.trafficTotals(n, c).add(d, count, 0)
 }
 
 func (t *Telemetry) IncrementBytes(n string, c ConnType, d Direction, count uint64) {
@@ -245,6 +300,7 @@ func (t *Telemetry) IncrementBytes(n string, c ConnType, d Direction, count uint
 	case ClusterType:
 		t.ClusterBytesCounter.Add(t.ctx, int64(count), attrs)
 	}
+	t.trafficTotals(n, c).add(d, 0, count)
 }
 
 func (t *Telemetry) AddConnection(n string, c ConnType) {

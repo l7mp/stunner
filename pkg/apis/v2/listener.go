@@ -185,14 +185,13 @@ func (req *ListenerConfig) String() string {
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }
 
-// ListenerStatus is the status of a listener: its config and its offload counters.
+// ListenerStatus is the status of a listener: its config and the traffic of its clients.
 type ListenerStatus struct {
 	*ListenerConfig
-	Stats OffloadDirStat `json:"stats"`
+	Stats Stats `json:"stats"`
 }
 
 // String stringifies the status.
 func (req *ListenerStatus) String() string {
-	return fmt.Sprintf("%s,offload(rx/tx): %d/%d pkts %d/%d bytes", req.ListenerConfig.String(),
-		req.Stats.Rx.Pkts, req.Stats.Tx.Pkts, req.Stats.Rx.Bytes, req.Stats.Tx.Bytes)
+	return req.ListenerConfig.String() + "," + req.Stats.String()
 }

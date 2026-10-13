@@ -16,6 +16,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/dialer"
 	"github.com/l7mp/stunner/v2/internal/router"
 	"github.com/l7mp/stunner/v2/internal/runtime"
+	"github.com/l7mp/stunner/v2/internal/telemetry"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
@@ -200,8 +201,11 @@ func (c *Cluster) Close(shutdown bool) error {
 
 func (c *Cluster) Status() stnrv2.Status {
 	status := &stnrv2.ClusterStatus{ClusterConfig: c.GetConfig().(*stnrv2.ClusterConfig)}
+	if c.rt.Telemetry != nil {
+		status.Stats.Total = c.rt.Telemetry.Stats(c.name, telemetry.ClusterType)
+	}
 	if offloadStatus, ok := c.rt.GetStatus(runtime.TypeOffload, "").(*stnrv2.OffloadStatus); ok {
-		status.Stats = offloadStatus.Clusters[c.name]
+		status.Stats.Offload = offloadStatus.Clusters[c.name]
 	}
 	return status
 }

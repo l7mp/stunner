@@ -442,15 +442,37 @@ func (p OffloadMode) String() string {
 	}
 }
 
-// OffloadDirStat defines the TX/RX offload statistics for a particular listener or cluster.
-type OffloadDirStat struct {
-	Rx OffloadStatInfo `json:"rx"`
-	Tx OffloadStatInfo `json:"tx"`
+// Stats is the traffic of a listener or cluster: all it carried, and the part of it the offload
+// engine carried in the kernel.
+type Stats struct {
+	Total   DirStat `json:"total"`
+	Offload DirStat `json:"offload"`
 }
 
-// OffloadStatInfo holds the statistics for a listener or cluster in RX or TX direction.
-type OffloadStatInfo struct {
+// String stringifies the traffic statistics, the offloaded part only when there is any.
+func (s Stats) String() string {
+	ret := "total(rx/tx): " + s.Total.String()
+	if s.Offload != (DirStat{}) {
+		ret += ",offload(rx/tx): " + s.Offload.String()
+	}
+	return ret
+}
+
+// DirStat is the RX and TX traffic of a listener or cluster.
+type DirStat struct {
+	Rx StatInfo `json:"rx"`
+	Tx StatInfo `json:"tx"`
+}
+
+// String stringifies the traffic in both directions.
+func (d DirStat) String() string {
+	return fmt.Sprintf("%d/%d pkts %d/%d bytes", d.Rx.Pkts, d.Tx.Pkts, d.Rx.Bytes, d.Tx.Bytes)
+}
+
+// StatInfo is the traffic of a listener or cluster in one direction, and for the offloaded
+// traffic the time it was last seen.
+type StatInfo struct {
 	Pkts          uint64 `json:"pkts"`
 	Bytes         uint64 `json:"bytes"`
-	TimestampLast uint64 `json:"timestamp"`
+	TimestampLast uint64 `json:"timestamp,omitempty"`
 }

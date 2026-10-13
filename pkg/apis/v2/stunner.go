@@ -438,10 +438,10 @@ func (s *StunnerStatus) String() string {
 // OffloadStatus holds the offload engine's runtime status and traffic counters: the client side
 // per listener, the peer side per cluster.
 type OffloadStatus struct {
-	Engine     string                    `json:"engine,omitempty"`
-	Interfaces []string                  `json:"interfaces,omitempty"`
-	Listeners  map[string]OffloadDirStat `json:"listeners,omitempty"`
-	Clusters   map[string]OffloadDirStat `json:"clusters,omitempty"`
+	Engine     string             `json:"engine,omitempty"`
+	Interfaces []string           `json:"interfaces,omitempty"`
+	Listeners  map[string]DirStat `json:"listeners,omitempty"`
+	Clusters   map[string]DirStat `json:"clusters,omitempty"`
 }
 
 // String stringifies the offload status.

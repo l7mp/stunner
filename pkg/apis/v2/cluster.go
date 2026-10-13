@@ -168,15 +168,13 @@ func (req *ClusterConfig) String() string {
 	return fmt.Sprintf("%q:{%s}", n, strings.Join(status, ","))
 }
 
-// ClusterStatus is the status of a cluster: its config and the offload counters of the peer-side
-// traffic it carries.
+// ClusterStatus is the status of a cluster: its config and the peer-side traffic it carries.
 type ClusterStatus struct {
 	*ClusterConfig
-	Stats OffloadDirStat `json:"stats"`
+	Stats Stats `json:"stats"`
 }
 
 // String stringifies the status.
 func (req *ClusterStatus) String() string {
-	return fmt.Sprintf("%s,offload(rx/tx): %d/%d pkts %d/%d bytes", req.ClusterConfig.String(),
-		req.Stats.Rx.Pkts, req.Stats.Tx.Pkts, req.Stats.Rx.Bytes, req.Stats.Tx.Bytes)
+	return req.ClusterConfig.String() + "," + req.Stats.String()
 }

@@ -20,7 +20,7 @@ func TestGetStunnerdStatus(t *testing.T) {
 		Status: "Ready",
 		Listeners: []*stnrv2.ListenerStatus{{
 			ListenerConfig: &stnrv2.ListenerConfig{Name: "ns/gw/udp"},
-			Stats:          stnrv2.OffloadDirStat{Rx: stnrv2.OffloadStatInfo{Pkts: 3}},
+			Stats:          stnrv2.Stats{Total: stnrv2.DirStat{Rx: stnrv2.StatInfo{Pkts: 3}}},
 		}},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +37,7 @@ func TestGetStunnerdStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ns/gw", got.Admin.Name)
 	assert.Equal(t, "TC[all]", got.Admin.OffloadStatus)
-	assert.Equal(t, uint64(3), got.Listeners[0].Stats.Rx.Pkts)
+	assert.Equal(t, uint64(3), got.Listeners[0].Stats.Total.Rx.Pkts)
 
 	// an instance that is not there
 	_, err = GetStunnerdStatus(context.Background(), "127.0.0.1:1")

@@ -90,8 +90,8 @@ func (o *Offload) Status() stnrv2.Status {
 	status := &stnrv2.OffloadStatus{
 		Engine:     conf.Engine,
 		Interfaces: conf.Interfaces,
-		Listeners:  map[string]stnrv2.OffloadDirStat{},
-		Clusters:   map[string]stnrv2.OffloadDirStat{},
+		Listeners:  map[string]stnrv2.DirStat{},
+		Clusters:   map[string]stnrv2.DirStat{},
 	}
 	stats, err := o.rt.OffloadEngine.Stats()
 	if err != nil {
@@ -100,7 +100,7 @@ func (o *Offload) Status() stnrv2.Status {
 	listeners := o.nameIndex(runtime.TypeListener)
 	clusters := o.nameIndex(runtime.TypeCluster)
 	for k, v := range stats {
-		info := stnrv2.OffloadStatInfo{Pkts: v.Pkts, Bytes: v.Bytes, TimestampLast: v.TimestampLast}
+		info := stnrv2.StatInfo{Pkts: v.Pkts, Bytes: v.Bytes, TimestampLast: v.TimestampLast}
 		dst := status.Clusters
 		index := clusters
 		if offload.IsListener(k.Flags) {
