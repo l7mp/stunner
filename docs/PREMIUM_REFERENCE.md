@@ -10,7 +10,7 @@ STUNner's premium features are designed to help medium to large scale enterprise
 1. [Relay address discovery](#relay-address-discovery)
 1. [TCP routes](#tcp-routes)
 1. [Dual-stack TURN](#dual-stack-turn)
-1. [Operator restarts and failover](#operator-restarts-and-failover)
+1. [High-availability operator](#high-availability-operator)
 1. [Post-quantum TLS](#post-quantum-tls)
 1. [TURN offload](#turn-offload)
 
