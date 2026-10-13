@@ -1,9 +1,13 @@
 package v2
 
 import (
+	"crypto/hmac"
+	"crypto/sha1" //nolint:gosec
+	"encoding/base64"
 	"fmt"
 	"maps"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,6 +43,76 @@ func (req *AuthConfig) CredentialLifetime() time.Duration {
 		return DefaultCredentialLifetime
 	}
 	return d
+}
+
+// GenerateCredentials generates the credentials a TURN client of the policy authenticates with,
+// a fresh pair on every call: for "static" the configured username and password, for "ephemeral"
+// a time-windowed credential of the user id from the shared secret, expiring at expiry, or after
+// the configured lifetime for a zero expiry. A nil policy and "none" both yield empty credentials,
+// an anonymous session.
+func (req *AuthConfig) GenerateCredentials(userid string, expiry time.Time) (string, string, error) {
+	if req == nil {
+		return "", "", nil
+	}
+
+	atype, err := NewAuthType(req.Type)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch atype {
+	case AuthTypeNone:
+		return "", "", nil
+
+	case AuthTypeStatic:
+		username, userFound := req.Credentials["username"]
+		password, passFound := req.Credentials["password"]
+		if !userFound || !passFound {
+			return "", "", fmt.Errorf("no username or password found in %s auth config",
+				atype.String())
+		}
+		return username, password, nil
+
+	case AuthTypeEphemeral:
+		secret, found := req.Credentials["secret"]
+		if !found {
+			return "", "", fmt.Errorf("no secret found in %s auth config", atype.String())
+		}
+		if expiry.IsZero() {
+			expiry = time.Now().Add(req.CredentialLifetime())
+		}
+		username := GenerateTimeWindowedUsername(expiry, userid)
+		password, err := GetLongTermCredential(username, secret)
+		return username, password, err
+
+	default:
+		return "", "", fmt.Errorf("unknown authentication type %q", req.Type)
+	}
+}
+
+// UsernameSeparator separates the expiry timestamp and the user id in a time-windowed username, as
+// per the "REST API For Access To TURN Services"
+// (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec.
+const UsernameSeparator = ":"
+
+// GenerateTimeWindowedUsername creates a time-windowed username of the expiry UNIX timestamp and
+// the user id, or only the timestamp for an empty user id, as per the "REST API For Access To
+// TURN Services" (https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) spec.
+func GenerateTimeWindowedUsername(expiry time.Time, userid string) string {
+	timeUsername := strconv.FormatInt(expiry.Unix(), 10)
+	if userid == "" {
+		return timeUsername
+	}
+	return timeUsername + UsernameSeparator + userid
+}
+
+// GetLongTermCredential creates the password of a time-windowed username from the shared secret.
+func GetLongTermCredential(username string, sharedSecret string) (string, error) {
+	mac := hmac.New(sha1.New, []byte(sharedSecret))
+	if _, err := mac.Write([]byte(username)); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
 // Validate checks a configuration and injects defaults.

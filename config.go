@@ -59,9 +59,11 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 		return nil, fmt.Errorf("invalid URI '%s': %s", uri, err)
 	}
 
-	if u.Username == "" || u.Password == "" {
+	auth := u.AuthConfig()
+	if auth == nil || auth.Type != stnrv2.AuthTypeStatic.String() {
 		return nil, fmt.Errorf("username/password must be set: '%s'", uri)
 	}
+	auth.Realm = stnrv2.DefaultRealm
 
 	// the TURN URI names a TURN transport: the listener takes the transport underneath
 	if !u.Protocol.IsTURN() {
@@ -83,14 +85,7 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			LogLevel:            stnrv2.DefaultLogLevel,
 			HealthCheckEndpoint: &h,
 		},
-		Auths: []stnrv2.AuthConfig{{
-			Type:  "plaintext",
-			Realm: stnrv2.DefaultRealm,
-			Credentials: map[string]string{
-				"username": u.Username,
-				"password": u.Password,
-			},
-		}},
+		Auths: []stnrv2.AuthConfig{*auth},
 		Listeners: []stnrv2.ListenerConfig{{
 			Name:     "default-listener",
 			Protocol: transport.String(),

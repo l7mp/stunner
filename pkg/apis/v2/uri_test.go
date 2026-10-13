@@ -123,3 +123,19 @@ func TestParseURI(t *testing.T) {
 		})
 	}
 }
+
+func TestURIAuthConfig(t *testing.T) {
+	u, err := ParseURI("turn://user:p%40ss@1.2.3.4:3478")
+	require.NoError(t, err)
+	assert.Equal(t, &AuthConfig{Type: "static",
+		Credentials: map[string]string{"username": "user", "password": "p@ss"}}, u.AuthConfig())
+
+	u, err = ParseURI("turns://s3cret@1.2.3.4:443?transport=tcp")
+	require.NoError(t, err)
+	assert.Equal(t, &AuthConfig{Type: "ephemeral",
+		Credentials: map[string]string{"secret": "s3cret"}}, u.AuthConfig(), "a bare secret")
+
+	u, err = ParseURI("turn:1.2.3.4:3478")
+	require.NoError(t, err)
+	assert.Nil(t, u.AuthConfig(), "no credentials")
+}

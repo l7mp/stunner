@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -244,4 +245,58 @@ func TestServerTypeBlocks(t *testing.T) {
 	s := ServerConfig{ServerSpec: ServerSpec{Name: "s"}}
 	require.NoError(t, s.Validate())
 	assert.Equal(t, DefaultAuthName, s.TURN.Auth, "a TURN server defaults to the default policy")
+}
+
+// TestGetTURNURIForListener pins the TURN URIs of a listener: one per public address, carrying the
+// credentials of the policy of the first TURN server in its chain.
+func TestGetTURNURIForListener(t *testing.T) {
+	c := &StunnerConfig{
+		ApiVersion: ApiVersion,
+		Auths: []AuthConfig{{Name: "default", Type: "static",
+			Credentials: map[string]string{"username": "u", "password": "p"}},
+			{Name: "eph", Type: "ephemeral", Credentials: map[string]string{"secret": "s"}}},
+		Listeners: []ListenerConfig{{Name: "stunner/gw/l", Protocol: "UDP", Port: 3478,
+			PublicAddr: "1.2.3.4", PublicPort: 443, Servers: []string{"sip", "turn"}}},
+		Servers: []ServerConfig{
+			{ServerSpec: ServerSpec{Name: "sip", Type: "SIP"}, SIP: &SIPServerConfig{}},
+			{ServerSpec: ServerSpec{Name: "turn", Type: "TURN"},
+				TURN: &TURNServerConfig{Auth: "eph"}}},
+	}
+	require.NoError(t, c.Validate())
+	l := &c.Listeners[0]
+
+	expiry := time.Now().Add(time.Hour)
+	uris, err := c.GetTURNURIForListener("stunner/gw/l", "alice", expiry)
+	require.NoError(t, err)
+	require.Len(t, uris, 1)
+	assert.Equal(t, "turn:1.2.3.4:443?transport=udp", uris[0].String())
+	assert.Equal(t, GenerateTimeWindowedUsername(expiry, "alice"), uris[0].Username,
+		"the policy of the first TURN server in the chain")
+	password, err := GetLongTermCredential(uris[0].Username, "s")
+	require.NoError(t, err)
+	assert.Equal(t, password, uris[0].Password)
+
+	l.PublicAddrs = []string{"1.2.3.4", "::1"}
+	uris, err = c.GetTURNURIForListener("stunner/gw/l", "", time.Time{})
+	require.NoError(t, err)
+	require.Len(t, uris, 2, "a URI per public address")
+	assert.Equal(t, "turn:[::1]:443?transport=udp", uris[1].String())
+	assert.Equal(t, uris[0].Username, uris[1].Username, "the same credentials")
+
+	l.PublicAddr, l.PublicAddrs = "", nil
+	_, err = c.GetTURNURIForListener("stunner/gw/l", "", time.Time{})
+	assert.Error(t, err, "no public address")
+
+	l.PublicAddr = "1.2.3.4"
+	l.Servers = []string{"sip"}
+	_, err = c.GetTURNURIForListener("stunner/gw/l", "", time.Time{})
+	assert.Error(t, err, "no TURN server in the chain")
+
+	_, err = c.GetTURNURIForListener("stunner/gw/other", "", time.Time{})
+	assert.Error(t, err, "no such listener")
+
+	l.Servers = []string{"turn"}
+	c.Servers[1].TURN.Auth = "missing"
+	_, err = c.GetTURNURIForListener("stunner/gw/l", "", time.Time{})
+	assert.Error(t, err, "no such policy")
 }

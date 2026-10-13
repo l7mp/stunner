@@ -59,6 +59,17 @@ The below opens a local UDP tunnel endpoint at port 5000 that relays through the
 stunnerd udp://127.0.0.1:5000 turn://user:pass@1.2.3.4:3478 udp://10.0.0.1:9000
 ```
 
+Inside Kubernetes, two meta-URIs save looking up addresses and credentials by hand; both are resolved once at startup, and the usual kubeconfig flags apply:
+
+- `turn-URI` may be `k8s://<gateway-namespace>/<gateway-name>:<listener>`: the TURN server of a Gateway listener, at the listener's public address, with the credentials of the Gateway, taken from the running config of the Gateway.
+- `peer-addr` may be `k8s://<namespace>/<service>:<port-name-or-number>`: the cluster IP and port of a Service, with the transport of the Service port.
+
+The below relays through the `udp-listener` listener of the `udp-gateway` Gateway in the `stunner` namespace to the `rtp` port of the `media-server` Service in the `media` namespace:
+
+```console
+stunnerd udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener k8s://media/media-server:rtp
+```
+
 The `--sni` and `--insecure` flags apply to the TLS/DTLS transports. Type `./stunnerd -h` to get a short description of the supported command line arguments.
 
 ## Configuration

@@ -228,14 +228,16 @@ standard input and send everything it receives to STUNner. Type any input and pr
 should see a nice greeting from your cluster!
 
 ```console
-export STUNNER_IP=$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-./stunnerd - turn://user-1:pass-1@${STUNNER_IP}:3478 udp://${PEER_IP}:9001
+./stunnerd - k8s://stunner/udp-gateway:udp-listener udp://${PEER_IP}:9001
 Hello STUNner
 Greetings from STUNner!
 ```
 
-The TURN server URI names the public address and port of the Gateway (see the [running
-config](#check-your-config)) and the credentials of the Secret set above.
+Note that we haven't specified the public IP address and port: the tunnel is clever enough to parse
+the running [STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the
+special STUNner URI `k8s://stunner/udp-gateway:udp-listener`, using the namespace (`stunner` here)
+and the name of the Gateway (`udp-gateway`) plus the listener you want to connect to
+(`udp-listener`), and `stunnerd` will do the heavy lifting.
 
 Note that your actual WebRTC clients will *not* need a tunnel to reach the cluster: all
 modern Web browsers and WebRTC clients come with a STUN/TURN client built in. Here, the tunnel is
@@ -309,15 +311,13 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
    ```
 
 1. Fire up the tunnel again, but this time let it connect through TLS. This is achieved by
-   specifying the public address and port of the TLS Gateway and the `tls` transport in the TURN
-   server URI. The `-i` command
+   specifying the name of the TLS listener (`tls-listener`) in the STUNner URI. The `-i` command
    line argument (`--insecure`) is added to prevent the TURN client from rejecting our insecure
    self-signed TLS certificate; this will not be needed when using a real signed certificate.
 
    ```console
-   export STUNNER_TLS_IP=$(kubectl get svc tls-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-   ./stunnerd --insecure -l all:INFO - "turn://user-1:pass-1@${STUNNER_TLS_IP}:443?transport=tls" udp://${PEER_IP}:9001
-   [...] tunnel-cli INFO: tunnel running: - -> turn://user-1:pass-1@35.187.97.94:443?transport=tls -> udp://10.104.175.57:9001
+   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway:tls-listener udp://${PEER_IP}:9001
+   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway:tls-listener -> udp://10.104.175.57:9001
    [...]
    Hello STUNner
    Greetings from STUNner!

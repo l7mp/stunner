@@ -3,6 +3,7 @@ package v2
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // StunnerConfig is the configuration of the STUNner daemon.
@@ -243,6 +244,67 @@ func (req *StunnerConfig) GetFilterConfig(name string) (FilterConfig, error) {
 		}
 	}
 	return FilterConfig{}, ErrNoSuchFilter
+}
+
+// GetTURNURIForListener returns the TURN URIs of a listener, one per public address: the
+// listener's transport makes the TURN transport, at the public port or else the listen port, and
+// the URIs carry the credentials of the auth policy of the first TURN server in the listener's
+// chain, which an ephemeral policy mints for the user id, expiring at expiry, or after the
+// policy's lifetime for a zero expiry.
+func (req *StunnerConfig) GetTURNURIForListener(listener, userid string, expiry time.Time) ([]URI, error) {
+	l, err := req.GetListenerConfig(listener)
+	if err != nil {
+		return nil, fmt.Errorf("no listener %q", listener)
+	}
+	proto, err := NewListenerProtocol(l.Protocol)
+	if err != nil {
+		return nil, fmt.Errorf("listener %q: %w", l.Name, err)
+	}
+	turnProto, ok := map[Protocol]Protocol{
+		ProtocolUDP:  ProtocolTURNUDP,
+		ProtocolTCP:  ProtocolTURNTCP,
+		ProtocolTLS:  ProtocolTURNTLS,
+		ProtocolDTLS: ProtocolTURNDTLS,
+	}[proto]
+	if !ok {
+		return nil, fmt.Errorf("listener %q: no TURN URI for a %s listener", l.Name, proto.String())
+	}
+	var turn *TURNServerConfig
+	for _, name := range l.Servers {
+		if s, err := req.GetServerConfig(name); err == nil && s.TURN != nil {
+			turn = s.TURN
+			break
+		}
+	}
+	if turn == nil {
+		return nil, fmt.Errorf("listener %q feeds no TURN server", l.Name)
+	}
+	auth, err := req.GetAuthConfig(turn.Auth)
+	if err != nil {
+		return nil, fmt.Errorf("no authentication policy %q for listener %q", turn.Auth, l.Name)
+	}
+	username, password, err := auth.GenerateCredentials(userid, expiry)
+	if err != nil {
+		return nil, fmt.Errorf("listener %q: %w", l.Name, err)
+	}
+
+	addrs := l.PublicAddrs
+	if len(addrs) == 0 && l.PublicAddr != "" {
+		addrs = []string{l.PublicAddr}
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("listener %q has no public address", l.Name)
+	}
+	port := l.PublicPort
+	if port == 0 {
+		port = l.Port
+	}
+	uris := []URI{}
+	for _, addr := range addrs {
+		uris = append(uris, URI{Protocol: turnProto, Host: addr, Port: port, Username: username,
+			Password: password})
+	}
+	return uris, nil
 }
 
 // String stringifies the configuration.

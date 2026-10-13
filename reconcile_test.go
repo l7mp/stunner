@@ -737,8 +737,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, authCreds(t, auth)["secret"], "newsecret")
 
 			duration, _ := time.ParseDuration("10h")
-			username := a12n.GenerateTimeWindowedUsername(time.Now(), duration, "dummy_user")
-			passwd, err := a12n.GetLongTermCredential(username, "newsecret")
+			username := stnrv2.GenerateTimeWindowedUsername(time.Now().Add(duration), "dummy_user")
+			passwd, err := stnrv2.GetLongTermCredential(username, "newsecret")
 			assert.NoError(t, err, "GetLongTermCredential")
 
 			handler := newAuthHandler(s)

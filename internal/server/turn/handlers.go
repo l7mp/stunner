@@ -83,7 +83,7 @@ func (s *Server) AuthHandler() a12n.AuthHandler {
 				log.Infof("ephemeral auth request: failed: %s", err)
 				return "", nil, false
 			}
-			password, err := a12n.GetLongTermCredential(username, secret)
+			password, err := stnrv2.GetLongTermCredential(username, secret)
 			if err != nil {
 				log.Debugf("ephemeral auth request: error generating password: %s", err)
 				return "", nil, false

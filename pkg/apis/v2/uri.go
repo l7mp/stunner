@@ -81,36 +81,19 @@ func (u *URI) String() string {
 	}
 }
 
-// NewURIFromListener returns the TURN URI of a listener feeding a TURN server: the listener's
-// transport makes the TURN transport, the public address and port are preferred over the listen
-// address and port, and a missing or placeholder address is "0.0.0.0".
-func NewURIFromListener(l *ListenerConfig) (*URI, error) {
-	proto, err := NewListenerProtocol(l.Protocol)
-	if err != nil {
-		return nil, err
+// AuthConfig returns the authentication policy the credentials of the URI make: static for a
+// username and a password, ephemeral for a bare username taken as the shared secret, nil for none.
+func (u *URI) AuthConfig() *AuthConfig {
+	switch {
+	case u.Username != "" && u.Password != "":
+		return &AuthConfig{Type: AuthTypeStatic.String(), Credentials: map[string]string{
+			"username": u.Username, "password": u.Password}}
+	case u.Username != "":
+		return &AuthConfig{Type: AuthTypeEphemeral.String(), Credentials: map[string]string{
+			"secret": u.Username}}
+	default:
+		return nil
 	}
-	turnProto, ok := map[Protocol]Protocol{
-		ProtocolUDP:  ProtocolTURNUDP,
-		ProtocolTCP:  ProtocolTURNTCP,
-		ProtocolTLS:  ProtocolTURNTLS,
-		ProtocolDTLS: ProtocolTURNDTLS,
-	}[proto]
-	if !ok {
-		return nil, fmt.Errorf("no TURN URI for a %s listener", proto.String())
-	}
-
-	addr := l.PublicAddr
-	if addr == "" {
-		addr = l.Addr
-	}
-	if addr == "" || addr == DefaultNodeAddressPlaceholder {
-		addr = "0.0.0.0"
-	}
-	port := l.PublicPort
-	if port == 0 {
-		port = l.Port
-	}
-	return &URI{Protocol: turnProto, Host: addr, Port: port}, nil
 }
 
 // HostPort returns the server as "host:port", bracketing an IPv6 host.

@@ -841,11 +841,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "UDP",
-				Servers:  []string{"udp"},
-				Addr:     "::1",
-				Port:     23478,
+				Name:       "udp",
+				Protocol:   "UDP",
+				Servers:    []string{"udp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
@@ -868,11 +869,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "tcp",
-				Protocol: "TCP",
-				Servers:  []string{"tcp"},
-				Addr:     "::1",
-				Port:     23478,
+				Name:       "tcp",
+				Protocol:   "TCP",
+				Servers:    []string{"tcp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
@@ -895,11 +897,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "tcp",
-				Protocol: "TCP",
-				Servers:  []string{"tcp"},
-				Addr:     "::1",
-				Port:     23478,
+				Name:       "tcp",
+				Protocol:   "TCP",
+				Servers:    []string{"tcp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
@@ -922,13 +925,14 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "tls",
-				Protocol: "TLS",
-				Servers:  []string{"tls"},
-				Addr:     "::1",
-				Port:     23478,
-				Cert:     certPem64,
-				Key:      keyPem64,
+				Name:       "tls",
+				Protocol:   "TLS",
+				Servers:    []string{"tls"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
+				Cert:       certPem64,
+				Key:        keyPem64,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -951,13 +955,14 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "dtls",
-				Protocol: "DTLS",
-				Servers:  []string{"dtls"},
-				Addr:     "::1",
-				Port:     23478,
-				Cert:     certPem64,
-				Key:      keyPem64,
+				Name:       "dtls",
+				Protocol:   "DTLS",
+				Servers:    []string{"dtls"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
+				Cert:       certPem64,
+				Key:        keyPem64,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -982,11 +987,12 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
 			}},
 			Listeners: []stnrv2.ListenerConfig{{
-				Name:     "udp",
-				Protocol: "UDP",
-				Servers:  []string{"udp"},
-				Addr:     "::1",
-				Port:     23478,
+				Name:       "udp",
+				Protocol:   "UDP",
+				Servers:    []string{"udp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
@@ -1063,9 +1069,11 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 			log.Debugf("-------------- Running test: %s -------------", testName)
 
 			log.Debug("testing TURN URI")
-			luri, err := stnrv2.NewURIFromListener(&c.Listeners[0])
-			assert.NoError(t, err, "NewURIFromListener")
-			assert.Equal(t, test.uri, luri.String(), "listener uri")
+			vc := c.DeepCopy()
+			require.NoError(t, vc.Validate(), "validate")
+			luris, err := vc.GetTURNURIForListener(vc.Listeners[0].Name, "", time.Time{})
+			require.NoError(t, err, "GetTURNURIForListener")
+			assert.Equal(t, test.uri, luris[0].String(), "listener uri")
 
 			// Each case binds a fresh kernel-allocated listener port: with a fixed
 			// port, a case can race the asynchronous socket release of its

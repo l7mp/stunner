@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
@@ -18,7 +19,6 @@ import (
 	"github.com/pion/turn/v5"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
-	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
 
 // Config specifies the upstream TURN server to dial.
@@ -83,7 +83,7 @@ func NewConfig(t *stnrv2.TunnelConfig, auth *stnrv2.AuthConfig) (Config, error) 
 	if !u.Protocol.IsTURN() {
 		return Config{}, fmt.Errorf("not a TURN URL: %q", t.URL)
 	}
-	user, pass, err := a12n.GenerateCredentials(auth)
+	user, pass, err := auth.GenerateCredentials("", time.Time{})
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to generate credentials for TURN server %q: %w",
 			u.HostPort(), err)
