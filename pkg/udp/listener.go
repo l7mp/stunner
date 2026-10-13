@@ -3,8 +3,10 @@
 package udp
 
 import (
+	"bytes"
 	"errors"
 	"net"
+	"net/netip"
 	"os"
 	goruntime "runtime"
 	"sync"
@@ -14,7 +16,6 @@ import (
 	"github.com/pion/transport/v5/deadline"
 	"github.com/pion/transport/v5/reuseport"
 	"github.com/pion/transport/v5/stdnet"
-	"k8s.io/utils/lru"
 )
 
 const (
@@ -26,8 +27,6 @@ const (
 	backlog = 128
 	// drainWait is how long a closing connected conn waits for each datagram left on its socket.
 	drainWait = time.Millisecond
-	// connectedTableSize bounds the table of connected conns.
-	connectedTableSize = 4096
 	// readBufferSize is the receive buffer asked for the listener sockets, best effort.
 	readBufferSize = 1 << 20
 )
@@ -70,8 +69,7 @@ func (lc ListenConfig) Listen(network, address string) (net.Listener, error) {
 		socks:       socks,
 		connectBack: reuse && lc.ConnectBack,
 		admit:       lc.Admit,
-		demuxed:     map[string]*conn{},
-		connected:   lru.New(connectedTableSize),
+		conns:       map[netip.AddrPort]*conn{},
 		acceptQueue: make(chan *conn, backlog),
 		closed:      make(chan struct{}),
 	}
@@ -93,9 +91,8 @@ type listener struct {
 	connectBack bool
 	admit       func(net.Addr) bool
 
-	mu        sync.Mutex
-	demuxed   map[string]*conn // the demuxed conns, by client address
-	connected *lru.Cache       // client address -> the most recently active connected conns
+	mu    sync.RWMutex
+	conns map[netip.AddrPort]*conn // the conns, demuxed and connected, by unmapped client address
 
 	acceptQueue chan *conn
 	acceptMu    sync.RWMutex // orders the pushes to accept against Close
@@ -132,12 +129,14 @@ func (l *listener) Close() error {
 			break
 		}
 		l.acceptMu.Unlock()
-		l.mu.Lock()
-		demuxed := make([]*conn, 0, len(l.demuxed))
-		for _, c := range l.demuxed {
-			demuxed = append(demuxed, c)
+		l.mu.RLock()
+		demuxed := make([]*conn, 0, len(l.conns))
+		for _, c := range l.conns {
+			if c.conn == nil {
+				demuxed = append(demuxed, c)
+			}
 		}
-		l.mu.Unlock()
+		l.mu.RUnlock()
 		for _, c := range demuxed {
 			_ = c.Close()
 		}
@@ -148,44 +147,59 @@ func (l *listener) Close() error {
 // catch reads a listener socket until it closes.
 func (l *listener) catch(sock net.PacketConn) {
 	buf := make([]byte, maxDatagramSize)
+	udpSock, _ := sock.(*net.UDPConn)
 	for {
+		if udpSock != nil {
+			n, src, err := udpSock.ReadFromUDPAddrPort(buf)
+			if err != nil {
+				return
+			}
+			l.intake(sock, unmap(src), buf[:n])
+			continue
+		}
 		n, src, err := sock.ReadFrom(buf)
 		if err != nil {
 			return
 		}
-		l.intake(sock, src, buf[:n])
+		if src, ok := src.(*net.UDPAddr); ok {
+			l.intake(sock, unmap(src.AddrPort()), buf[:n])
+		}
 	}
 }
 
-// intake queues a datagram on the conn of its source, making the conn on the first one.
-func (l *listener) intake(sock net.PacketConn, src net.Addr, p []byte) {
+// unmap turns an IPv4-mapped IPv6 address, as a dual-stack socket reports an IPv4 client, into
+// the IPv4 address, so that a client has a single key whatever socket reads it.
+func unmap(ap netip.AddrPort) netip.AddrPort {
+	return netip.AddrPortFrom(ap.Addr().Unmap(), ap.Port())
+}
+
+// intake queues a datagram on the conn of its source, making the conn on the first one. The
+// source must be unmapped.
+func (l *listener) intake(sock net.PacketConn, src netip.AddrPort, p []byte) {
 	select {
 	case <-l.closed:
 		return
 	default:
 	}
 
-	key := src.String()
-	l.mu.Lock()
-	c, ok := l.demuxed[key]
+	l.mu.RLock()
+	c, ok := l.conns[src]
+	l.mu.RUnlock()
 	if !ok {
-		if v, found := l.connected.Get(key); found {
-			c, ok = v.(*conn), true
+		// Look again under the write lock: the handbacks of the connected conns race the read
+		// loops for the same client.
+		l.mu.Lock()
+		if c, ok = l.conns[src]; !ok {
+			peerAddr := net.UDPAddrFromAddrPort(src)
+			if l.admit != nil && !l.admit(peerAddr) {
+				l.mu.Unlock()
+				return
+			}
+			c = l.newConn(sock, src, peerAddr)
+			l.conns[src] = c
 		}
-	}
-	if !ok && l.admit != nil && !l.admit(src) {
 		l.mu.Unlock()
-		return
 	}
-	if !ok {
-		c = l.newConn(sock, src)
-		if c.conn != nil {
-			l.connected.Add(key, c)
-		} else {
-			l.demuxed[key] = c
-		}
-	}
-	l.mu.Unlock()
 
 	c.deliver(p)
 	if ok {
@@ -200,11 +214,12 @@ func (l *listener) intake(sock net.PacketConn, src net.Addr, p []byte) {
 	}
 }
 
-func (l *listener) newConn(sock net.PacketConn, src net.Addr) *conn {
+func (l *listener) newConn(sock net.PacketConn, src netip.AddrPort, peerAddr *net.UDPAddr) *conn {
 	c := &conn{
 		l:        l,
 		sock:     sock,
 		peer:     src,
+		peerAddr: peerAddr,
 		queue:    make(chan []byte, queueSize),
 		deadline: deadline.New(),
 		closed:   make(chan struct{}),
@@ -213,7 +228,7 @@ func (l *listener) newConn(sock net.PacketConn, src net.Addr) *conn {
 		return c
 	}
 	d := net.Dialer{LocalAddr: sock.LocalAddr(), Control: reuseport.Control}
-	raw, err := d.Dial("udp", src.String()) //nolint:noctx
+	raw, err := d.Dial("udp", peerAddr.String()) //nolint:noctx
 	if err != nil {
 		return c
 	}
@@ -222,24 +237,22 @@ func (l *listener) newConn(sock net.PacketConn, src net.Addr) *conn {
 }
 
 // forget drops the conn of a client, if it is still the one registered.
-func (l *listener) forget(key string, c *conn) {
+func (l *listener) forget(c *conn) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.demuxed[key] == c {
-		delete(l.demuxed, key)
-	}
-	if v, ok := l.connected.Get(key); ok && v.(*conn) == c {
-		l.connected.Remove(key)
+	if l.conns[c.peer] == c {
+		delete(l.conns, c.peer)
 	}
 }
 
 // conn is the conn of one client: a socket connected back to it, or the listener socket that read
 // it.
 type conn struct {
-	l    *listener
-	sock net.PacketConn // the listener socket that read the client first
-	conn *net.UDPConn   // the connected socket, nil when demuxing
-	peer net.Addr
+	l        *listener
+	sock     net.PacketConn // the listener socket that read the client first
+	conn     *net.UDPConn   // the connected socket, nil when demuxing
+	peer     netip.AddrPort // the unmapped client address
+	peerAddr *net.UDPAddr   // the client address as a net.Addr
 
 	queue    chan []byte
 	deadline *deadline.Deadline // the read deadline
@@ -253,7 +266,7 @@ type conn struct {
 // deliver queues a datagram, waking a Read blocked on the connected socket.
 func (c *conn) deliver(p []byte) {
 	select {
-	case c.queue <- append([]byte(nil), p...):
+	case c.queue <- bytes.Clone(p):
 	default:
 		return
 	}
@@ -288,7 +301,7 @@ func (c *conn) Read(p []byte) (int, error) {
 			}
 		}
 
-		n, from, err := c.conn.ReadFrom(p)
+		n, from, err := c.conn.ReadFromUDPAddrPort(p)
 		if err != nil {
 			if !errors.Is(err, os.ErrDeadlineExceeded) {
 				return 0, err
@@ -312,7 +325,7 @@ func (c *conn) Read(p []byte) (int, error) {
 			}
 			continue
 		}
-		if from.String() != c.peer.String() {
+		if from = unmap(from); from != c.peer {
 			// another client's datagram, caught before the socket was connected
 			c.l.intake(c.sock, from, p[:n])
 			continue
@@ -330,7 +343,10 @@ func (c *conn) Write(p []byte) (int, error) {
 		return 0, net.ErrClosed
 	default:
 	}
-	return c.sock.WriteTo(p, c.peer)
+	if udpSock, ok := c.sock.(*net.UDPConn); ok {
+		return udpSock.WriteToUDPAddrPort(p, c.peer)
+	}
+	return c.sock.WriteTo(p, c.peerAddr)
 }
 
 // Close closes the conn; a connected one first hands other clients' datagrams back to the listener.
@@ -339,18 +355,18 @@ func (c *conn) Close() error {
 		c.mu.Lock()
 		close(c.closed)
 		c.mu.Unlock()
-		c.l.forget(c.peer.String(), c)
+		c.l.forget(c)
 		if c.conn == nil {
 			return
 		}
 		buf := make([]byte, maxDatagramSize)
 		for i := 0; i < queueSize; i++ {
 			_ = c.conn.SetReadDeadline(time.Now().Add(drainWait))
-			n, from, err := c.conn.ReadFrom(buf)
+			n, from, err := c.conn.ReadFromUDPAddrPort(buf)
 			if err != nil {
 				break
 			}
-			if from.String() != c.peer.String() {
+			if from = unmap(from); from != c.peer {
 				c.l.intake(c.sock, from, buf[:n])
 			}
 		}
@@ -366,7 +382,7 @@ func (c *conn) LocalAddr() net.Addr {
 	return c.sock.LocalAddr()
 }
 
-func (c *conn) RemoteAddr() net.Addr { return c.peer }
+func (c *conn) RemoteAddr() net.Addr { return c.peerAddr }
 
 func (c *conn) SetDeadline(t time.Time) error {
 	if err := c.SetReadDeadline(t); err != nil {

@@ -90,6 +90,8 @@ Configuration files for `stunnerd`, now at API version `v2`, are built from five
 
 A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON (e.g., `{"key":"...","hmac":"..."}`); `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`) on every interface; and `--no-graceful-shutdown` disables graceful shutdowns: normally on being closed `stunnerd` waits for live sessions to end, which minimizes disruptions to clients but may take minutes or hours, which this flag disables and lets `stunnerd` to close immediately.
 
+The `--enable-udp-listener-connect` flag enables an optimized UDP listeners codepath. By default every UDP packet involves a goroutine context switch. This is fast but it still adds overhead. With the flag turned on the extra goroutine is eliminated, resulting a much faster UDP listener, at the cost of a minimal chance of losing 1-2 packets at the connection initialization phase under very high load.
+
 In practice, you'll rarely need to run `stunnerd` directly: just fire up the [prebuilt container image](https://hub.docker.com/repository/docker/l7mp/stunnerd) in Kubernetes and you should be good to go. Or better yet, [install](/docs/INSTALL.md) the STUNner Kubernetes gateway operator that will readily manage the `stunnerd` pods for each Gateway you create.
 
 ## License

@@ -33,6 +33,7 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/buildinfo"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
+	"github.com/l7mp/stunner/v2/pkg/udp"
 )
 
 var (
@@ -77,6 +78,7 @@ func main() {
 	var insecure = flag.Bool("insecure", false, "Accept self-signed TURN server TLS certificates (tunnel mode, default: false)")
 	var licenseArg = flag.String("license", "", `License config as the JSON licensegen writes, {"license_config":{"key":"...","hmac":"..."}}, or just {"key":"...","hmac":"..."} (overrides the config's)`)
 	var offload = flag.String("offload", "", `Offload engine on every interface: "none", "xdp", "tc" or "auto" (overrides the config's)`)
+	var udpConnect = flag.Bool("enable-udp-listener-connect", false, "Connect a socket back to every client of a UDP listener so the kernel demuxes the clients instead of the read loops, where reuse-port is available (default: false)")
 
 	// Kubernetes config flags
 	k8sConfigFlags := cliopt.NewConfigFlags(true)
@@ -117,6 +119,10 @@ func main() {
 			fmt.Fprintf(os.Stderr, "invalid --offload: %s\n", err.Error())
 			os.Exit(1)
 		}
+	}
+
+	if *udpConnect {
+		udp.DefaultListenConfig.ConnectBack = true
 	}
 
 	logLevel := stnrv2.DefaultLogLevel
