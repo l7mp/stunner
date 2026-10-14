@@ -9,15 +9,19 @@ theme:
   name: readthedocs
   highlightjs: true
 nav:
-- 'Why STUNner': 'WHY.md'
-- 'Deployment models': 'DEPLOYMENT.md'
-- 'Concepts': 'CONCEPTS.md'
-- 'Installation': 'INSTALL.md'
-- 'Gateway API reference': 'GATEWAY.md'
-- 'Security': 'SECURITY.md'
-- 'Authentication': 'AUTH.md'
-- 'Scaling': 'SCALING.md'
-- 'Monitoring': 'MONITORING.md'
+- 'Home': 'index.md'
+- 'Overview':
+  - 'Why STUNner': 'WHY.md'
+  - 'Deployment models': 'DEPLOYMENT.md'
+  - 'Concepts': 'CONCEPTS.md'
+- 'Getting started':
+  - 'Installation: Free tier': 'INSTALL.md'
+- 'User guides':
+  - 'Authentication': 'AUTH.md'
+  - 'Monitoring': 'MONITORING.md'
+  - 'Scaling': 'SCALING.md'
+  - 'Security': 'SECURITY.md'
+  - 'Reference: Free tier': 'GATEWAY.md'
 - 'Tutorials':
   - 'Configuring TLS for tutorials': 'examples/TLS.md'
   - 'Basics':
@@ -41,8 +45,8 @@ nav:
   - 'stunnerd': 'cmd/stunnerd.md'
   - 'icetester': 'cmd/icetester.md'
 - 'Premium':
-    'Getting started': 'PREMIUM_INSTALL.md'
-    'Features': 'PREMIUM_REFERENCE.md'
+  - 'Getting started': 'PREMIUM_INSTALL.md'
+  - 'Features': 'PREMIUM_REFERENCE.md'
 plugins:
   - search
   - mkdocstrings:
