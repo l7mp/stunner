@@ -55,21 +55,12 @@ nav:
   - 'Features': 'PREMIUM_REFERENCE.md'
 plugins:
   - search
-  - mkdocstrings:
-      handlers:
-        # See: https://mkdocstrings.github.io/python/usage/
-        python:
-          options:
-            docstring_style: sphinx
 markdown_extensions:
-  - markdown_include.include:
-      base_path: .
   - admonition
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
   - pymdownx.superfences
   - gfm_admonition

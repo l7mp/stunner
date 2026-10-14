@@ -1,4 +1,3 @@
-markdown-include
 markdown-gfm-admonition
 mkdocs
-mkdocstrings[python]
+pymdown-extensions
