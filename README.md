@@ -108,7 +108,7 @@ only in STUNner's paid premium editions. The **STUNner member tier** includes th
 targeted for small and medium scale operations, while the fully featured **STUNner enterprise
 tier** is optimized for large-scale deployments. See the [tier
 comparison](/docs/TIERS.md) for the features of each tier, and
-[here](https://l7mp.io/#/products) for up-to-date info on how to purchase a license.
+[here](https://l7mp.io/pricing) for up-to-date info on how to purchase a license.
 
 ## Features
 
