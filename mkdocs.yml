@@ -7,7 +7,10 @@ copyright: L7mp Technologies Kft.
 use_directory_urls: true
 theme:
   name: readthedocs
+  custom_dir: docs/overrides
   highlightjs: true
+exclude_docs: |
+  overrides/
 nav:
 - 'Home': 'index.md'
 - 'Overview':
