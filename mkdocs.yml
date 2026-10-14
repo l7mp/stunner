@@ -1,4 +1,5 @@
 site_name: STUNner
+site_url: !ENV [READTHEDOCS_CANONICAL_URL, 'https://docs.l7mp.io/en/latest/']
 repo_url: https://github.com/l7mp/stunner
 edit_uri: edit/main/docs/
 site_description: "Documentation of STUNner"
