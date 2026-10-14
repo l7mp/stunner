@@ -1,6 +1,6 @@
 # Premium features
 
-STUNner's premium features are designed to help medium to large scale enterprises to deploy, operate and scale pools of STUN and TURN servers over Kubernetes. Below is a reference of the premium features currently available in STUNner.
+STUNner's premium features are designed to help medium to large scale enterprises to deploy, operate and scale pools of STUN and TURN servers over Kubernetes. Below is a reference of the premium features currently available in STUNner. See the [tier comparison](TIERS.md) for which tier unlocks which feature.
 
 ## Table of Contents
 

@@ -2,7 +2,7 @@
 
 Congratulations for subscribing to STUNner premium. You should have received a customer key during the subscription procedure; [contact us](mailto:info@l7mp.io) if not. Make sure to save the customer key to a safe place, you will need it every time you (re)deploy STUNner.
 
-The below guide will walk you through unlocking STUNner's premium features.
+The below guide will walk you through unlocking STUNner's premium features. See the [tier comparison](TIERS.md) for the features available in your tier.
 
 ## Table of Contents
 

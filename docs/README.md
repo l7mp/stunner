@@ -12,6 +12,7 @@
 * [Why STUNner](WHY.md)
 * [Deployment models](DEPLOYMENT.md)
 * [Concepts](CONCEPTS.md)
+* [Free vs. premium tiers](TIERS.md)
 
 ## Getting started
 

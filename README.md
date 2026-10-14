@@ -106,8 +106,9 @@ just like any other "normal" Kubernetes service.
 free tier** will suit simple WebRTC applications. Certain advanced features are however available
 only in STUNner's paid premium editions. The **STUNner member tier** includes the premium features
 targeted for small and medium scale operations, while the fully featured **STUNner enterprise
-tier** is optimized for large-scale deployments. See [here](https://l7mp.io/#/products) for
-up-to-date info on how to purchase a license.
+tier** is optimized for large-scale deployments. See the [tier
+comparison](/docs/TIERS.md) for the features of each tier, and
+[here](https://l7mp.io/#/products) for up-to-date info on how to purchase a license.
 
 ## Features
 
