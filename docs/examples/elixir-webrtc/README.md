@@ -91,7 +91,7 @@ cd apps/nexus
 You have to modify the ICE config to use STUNner with the given credentials in two files:
 
 `assets/js/home.js`:
-```
+```text
 ...
 # const pcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
@@ -101,7 +101,7 @@ You have to modify the ICE config to use STUNner with the given credentials in t
 ```
 
 `lib/nexus/peer.ex`:
-```
+```text
 ...
 # ice_servers: [%{urls: "stun:stun.l.google.com:19302"}],
 
@@ -112,7 +112,7 @@ You have to modify the ICE config to use STUNner with the given credentials in t
 ```
 
 Now rebuild the Docker image, and push it into your image repository:
-```
+```bash
 export MYREPO=myrepo # use your own Docker repository name!
 sudo docker build -t $MYREPO/nexus .
 sudo docker push $MYREPO/nexus

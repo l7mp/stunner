@@ -77,7 +77,7 @@ STUNner will search for the customer key in the Kubernetes Secret named `stunner
 
    Don't forget to replace the placeholder `<YOUR_CUSTOMER_KEY>` with your own customer key.  Save and exit. If all goes well, `kubectl` should report that the secret has been successfully modified:
 
-   ```
+   ```text
    secret/stunner-gateway-operator-customer-secret edited
    ```
 
@@ -122,7 +122,7 @@ You should see your subscription tier (e.g., `free`, `member` or `enterprise`) w
 
 If something goes wrong, check the gateway operator logs for lines like the below that should help you debug the problem:
 
-```
+```console
 kubectl -n stunner-system logs $(kubectl -n stunner-system get pods -l \
     control-plane=stunner-gateway-operator-controller-manager -o jsonpath='{.items[0].metadata.name}')
 ...

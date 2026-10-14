@@ -47,7 +47,7 @@ with an additional environment variable we can load the pod's private IP into th
 
 - Added the following in server.js in the function "async function createExpressApp()" to serve the mediasoup-client file
 
-```
+```text
 147:	expressApp.use(express.static('public'))
 ```
 

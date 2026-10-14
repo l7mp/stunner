@@ -50,7 +50,7 @@ The authentication workflow of STUNner is as follows.
 
 3. WebRTC clients are *configured with the ICE configuration*. The below snippet shows how to initialize a WebRTC [`PeerConnection`](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection) to use the above ICE server configuration in order to use STUNner as the default TURN service.
 
-   ```
+   ```js
    var iceConfig = <obtain ICE configuration sent by the application server>
    var pc = new RTCPeerConnection(iceConfig);
    ```

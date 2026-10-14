@@ -300,7 +300,7 @@ stunnerctl -n <gateway-namespace> status <gateway-name>
 
 You may also check the dataplane logs. The below was logged by `stunnerd` while running `stunnerctl icetest --offload-mode=TC --force-cleanup`:
 
-```
+```text
 stunnerd INFO: Starting stunnerd id "icetest/icetest-udp-gateway", STUNner version ... 
 ...
 offload INFO: TC init complete on interfaces: [lo eth0]

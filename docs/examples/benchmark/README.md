@@ -41,7 +41,7 @@ You are good to go. No installation steps required.
 
 Configure STUNner to act as a STUN server towards [tunnel](../../cmd/stunnerd.md#tunnel-mode) clients, and to let `iperf` client's traffic reach the `iperf` server.
 
-```
+```bash
 kubectl apply -f iperf-server.yaml
 kubectl apply -f performance-stunner.yaml
 ```
@@ -59,7 +59,7 @@ We bundle a helper script for executing performance measurements. The script use
 - `-b` Bandwidth to send in bits/sec
 - `-p` Platform, can be `local` or `k8s`
 
-```
+```bash
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000 -p k8s
 ```
 
@@ -79,7 +79,7 @@ An example for:
 - 5 seconds of evaluation time
 - 1000 byte packets
 - 100 Mbits/sec
-```
+```bash
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p local
 ```
 ### Performance measuring with Kubernetes
@@ -98,7 +98,7 @@ An example for:
 - 5 seconds of evaluation time
 - 1000 byte packets
 - 100 Mbits/sec
-```
+```bash
 ./benchmark.sh -n 5 -t 5 -s 1000 -b 100000000 -p k8s
 ```
 
@@ -115,7 +115,7 @@ Next, we see an example output for a local measurement and a measurement in Kube
 
 In a local measurement the output contains a single summarized test.
 You should see a similar output:
-```
+```text
 Number of concurrent tunnel clients: 5
 Evaluation time: 1 sec
 Packet size: 1000 bytes
@@ -135,7 +135,7 @@ Results
 ### Kubernetes measurement
 
 In case of a Kubernetes measurement, the output contains one or more summarized tests. In case the user reruns the script, `iperf` outputs will be appended. You should see an output similar to this:
-```
+```text
 Number of concurrent tunnel clients: 5
 Evaluation time: 1 sec
 Packet size: 1000 bytes
