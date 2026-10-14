@@ -19,12 +19,14 @@ nav:
   - 'Concepts': 'CONCEPTS.md'
 - 'Getting started':
   - 'Installation: Free tier': 'INSTALL.md'
+  - 'Installation: Premium tiers': 'PREMIUM_INSTALL/'
 - 'User guides':
   - 'Authentication': 'AUTH.md'
   - 'Monitoring': 'MONITORING.md'
   - 'Scaling': 'SCALING.md'
   - 'Security': 'SECURITY.md'
   - 'Reference: Free tier': 'GATEWAY.md'
+  - 'Reference: Premium tiers': 'PREMIUM_REFERENCE/'
 - 'Tutorials':
   - 'Configuring TLS for tutorials': 'examples/TLS.md'
   - 'Basics':
