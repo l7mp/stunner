@@ -57,6 +57,9 @@ plugins:
   - search
 markdown_extensions:
   - admonition
+  # a link to each heading, shown on hover
+  - toc:
+      permalink: "🔗"
   # highlight.js colors the code in the browser
   - pymdownx.highlight:
       use_pygments: false
