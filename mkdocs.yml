@@ -57,10 +57,9 @@ plugins:
   - search
 markdown_extensions:
   - admonition
+  # highlight.js colors the code in the browser
   - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
+      use_pygments: false
   - pymdownx.inlinehilite
   - pymdownx.superfences
   - gfm_admonition
