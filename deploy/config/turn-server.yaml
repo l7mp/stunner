@@ -21,14 +21,16 @@ listeners:
   - name: tls
     protocol: TLS
     port: 3479
-    cert: "$STUNNER_TLS_CERT"
-    key: "$STUNNER_TLS_KEY"
+    tls:
+      cert: "$STUNNER_TLS_CERT"
+      key: "$STUNNER_TLS_KEY"
     servers: [turn]
   - name: dtls
     protocol: DTLS
     port: 3479
-    cert: "$STUNNER_TLS_CERT"
-    key: "$STUNNER_TLS_KEY"
+    tls:
+      cert: "$STUNNER_TLS_CERT"
+      key: "$STUNNER_TLS_KEY"
     servers: [turn]
 servers:
   - name: turn

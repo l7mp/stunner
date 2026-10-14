@@ -107,7 +107,7 @@ func (stubObject) Inspect(_, _ stnrv2.Config, _ *stnrv2.StunnerConfig) (runtime.
 	return runtime.ActionNone, nil
 }
 
-func newDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ClusterConfig) api.Dialer {
+func startDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ClusterConfig) api.Dialer {
 	t.Helper()
 	require.NoError(t, conf.Validate())
 	require.NoError(t, rt.Registry.Add(stubObject{typ: runtime.TypeCluster, conf: conf}, nil))
@@ -119,7 +119,7 @@ func newDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ClusterConfig) ap
 
 func TestUDPDialer(t *testing.T) {
 	rt := newTestRuntime(t)
-	cl := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "udp", Protocol: "UDP",
+	cl := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "udp", Protocol: "UDP",
 		Addrs: []string{"10.0.0.1", "fd00::1"}})
 	peer := udpEcho(t)
 	assert.Equal(t, stnrv2.ProtocolUDP, cl.Protocol())
@@ -154,7 +154,7 @@ func TestUDPDialer(t *testing.T) {
 	assert.ErrorIs(t, err, api.ErrNotSupported, "a UDP dialer makes no relayed listeners")
 
 	// without an address of the family, the relay socket's own address is advertised
-	own, ownAdvertised, err := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "v6only",
+	own, ownAdvertised, err := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "v6only",
 		Protocol: "UDP", Addrs: []string{"fd00::1"}}).ListenPacket("udp4", 0)
 	require.NoError(t, err)
 	defer own.Close() //nolint:errcheck
@@ -163,7 +163,7 @@ func TestUDPDialer(t *testing.T) {
 
 func TestTCPDialer(t *testing.T) {
 	rt := newTestRuntime(t)
-	cl := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "tcp", Protocol: "TCP",
+	cl := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "tcp", Protocol: "TCP",
 		Addrs: []string{"10.0.0.1"}})
 	assert.Equal(t, stnrv2.ProtocolTCP, cl.Protocol())
 
@@ -219,7 +219,7 @@ func TestTCPDialer(t *testing.T) {
 func TestTunnelDialer(t *testing.T) {
 	rt := newTestRuntime(t)
 	tunnel := turnServer(t, rt)
-	cl := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "upstream", Protocol: "UDP", Tunnel: tunnel})
+	cl := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "upstream", Protocol: "UDP", Tunnel: tunnel})
 	peer := udpEcho(t)
 
 	// a dial is an allocation connected to the peer, its wire the session's
@@ -251,7 +251,7 @@ func TestTunnelDialer(t *testing.T) {
 	assert.ErrorIs(t, err, api.ErrNotSupported)
 
 	// a TCP peer needs a stream transport towards the upstream server: over UDP, dialing fails
-	tcp := newDialer(t, rt, &stnrv2.ClusterConfig{Name: "upstream-tcp", Protocol: "TCP",
+	tcp := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "upstream-tcp", Protocol: "TCP",
 		Tunnel: tunnel})
 	_, err = tcp.Dial(context.Background(), nil, "127.0.0.1:22")
 	assert.ErrorContains(t, err, "stream transport")

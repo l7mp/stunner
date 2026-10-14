@@ -27,7 +27,7 @@ func TestConvertToV2(t *testing.T) {
 			{Name: "ns/gw/udp", Protocol: "TURN-UDP", Addr: "10.0.0.1", Port: 3478,
 				Addrs: []string{"10.0.0.1", "fd00::1"}, PublicAddr: "1.2.3.4", PublicPort: 3478,
 				Routes: []string{"media"}},
-			{Name: "ns/gw/tls", Protocol: "TURN-TLS", Port: 443, Cert: "c", Key: "k",
+			{Name: "ns/gw/tls", Protocol: "TURN-TLS", Port: 443, Cert: "Y2VydA==", Key: "a2V5",
 				PQCMode: "enforced", Routes: []string{"media"}},
 			{Name: "ns/gw/proxy", Protocol: "TURN-UDP", Port: 3479, Routes: []string{"upstream"}},
 			{Name: "ns/gw/tcp", Protocol: "TCP", Port: 5000,
@@ -76,7 +76,8 @@ func TestConvertToV2(t *testing.T) {
 	l, err = v2.GetListenerConfig("ns/gw/tls")
 	require.NoError(t, err)
 	assert.Equal(t, "TLS", l.Protocol)
-	assert.Equal(t, "enforced", l.PQCMode)
+	require.NotNil(t, l.TLS)
+	assert.Equal(t, "enforced", l.TLS.PQCMode)
 
 	// TURN-* listeners get TURN servers, the others L4 servers; the clusters carry over in order
 	s, err := v2.GetServerConfig("ns/gw/udp")

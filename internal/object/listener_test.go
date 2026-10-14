@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"io"
 	"math/big"
 	"net"
 	"strconv"
@@ -86,6 +87,13 @@ func TestListenerObjectSemantics(t *testing.T) {
 				want: runtime.ActionRestart,
 			},
 			{
+				name: "connect-change-restart",
+				conf: listener(func(c *stnrv2.ListenerConfig) {
+					c.Connect = &stnrv2.ListenerConnectConfig{Address: "127.0.0.1:5060"}
+				}),
+				want: runtime.ActionRestart,
+			},
+			{
 				// the server is resolved by name for every conn: no restart
 				name: "server-change-reconcile",
 				conf: listener(func(c *stnrv2.ListenerConfig) { c.Servers = []string{"server-b"} }),
@@ -120,8 +128,7 @@ func TestListenerTLSObjectSemantics(t *testing.T) {
 			Servers:  []string{"server-a"},
 			Addr:     "127.0.0.1",
 			Port:     5349,
-			Cert:     certA,
-			Key:      keyA,
+			TLS:      &stnrv2.TLSConfig{Cert: certA, Key: keyA},
 		}
 		mod(c)
 		require.NoError(t, c.Validate())
@@ -145,17 +152,17 @@ func TestListenerTLSObjectSemantics(t *testing.T) {
 			},
 			{
 				name: "cert-change-reconcile",
-				conf: listener(func(c *stnrv2.ListenerConfig) { c.Cert = certB }),
+				conf: listener(func(c *stnrv2.ListenerConfig) { c.TLS.Cert = certB }),
 				want: runtime.ActionReconcile,
 			},
 			{
 				name: "key-change-reconcile",
-				conf: listener(func(c *stnrv2.ListenerConfig) { c.Key = keyB }),
+				conf: listener(func(c *stnrv2.ListenerConfig) { c.TLS.Key = keyB }),
 				want: runtime.ActionReconcile,
 			},
 			{
 				name: "pqc-mode-change-reconcile",
-				conf: listener(func(c *stnrv2.ListenerConfig) { c.PQCMode = stnrv2.PQCModeEnforced.String() }),
+				conf: listener(func(c *stnrv2.ListenerConfig) { c.TLS.PQCMode = stnrv2.PQCModeEnforced.String() }),
 				want: runtime.ActionReconcile,
 			},
 		},
@@ -357,7 +364,7 @@ func TestListeners(t *testing.T) {
 	t.Run("TLS", func(t *testing.T) {
 		port := freePort(t, "tcp")
 		accepted := startListener(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS",
-			Port: port, Servers: []string{"s"}, Cert: cert, Key: key})
+			Port: port, Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: cert, Key: key}})
 		c, err := tls.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), //nolint:noctx
 			&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
 		require.NoError(t, err)
@@ -369,7 +376,7 @@ func TestListeners(t *testing.T) {
 	t.Run("TLSHandshakeBeforeAccept", func(t *testing.T) {
 		port := freePort(t, "tcp")
 		accepted := startListener(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS",
-			Port: port, Servers: []string{"s"}, Cert: cert, Key: key})
+			Port: port, Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: cert, Key: key}})
 		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 
 		// a client that never handshakes is not emitted, and does not hold up the next one
@@ -389,7 +396,7 @@ func TestListeners(t *testing.T) {
 	t.Run("DTLS", func(t *testing.T) {
 		port := freePort(t, "udp")
 		accepted := startListener(t, rt, &stnrv2.ListenerConfig{Name: "dtls", Protocol: "DTLS",
-			Port: port, Servers: []string{"s"}, Cert: cert, Key: key})
+			Port: port, Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: cert, Key: key}})
 		sock, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 		require.NoError(t, err)
 		c, err := dtls.ClientWithOptions(sock, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
@@ -458,7 +465,7 @@ func TestReconcileLive(t *testing.T) {
 	certB, keyB := selfSignedPEM(t)
 	port := freePort(t, "tcp")
 	conf := &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS", Port: port, Servers: []string{"s"},
-		Cert: certA, Key: keyA}
+		TLS: &stnrv2.TLSConfig{Cert: certA, Key: keyA}}
 	require.NoError(t, conf.Validate())
 	accepted := make(chan api.Conn, 8)
 	l, err := object.NewListener(conf, rt)
@@ -478,7 +485,7 @@ func TestReconcileLive(t *testing.T) {
 	assert.Nil(t, (<-accepted).Tag().Labels)
 
 	upd := *conf
-	upd.Cert, upd.Key, upd.Labels = certB, keyB, map[string]string{"role": "control"}
+	upd.TLS, upd.Labels = &stnrv2.TLSConfig{Cert: certB, Key: keyB}, map[string]string{"role": "control"}
 	require.NoError(t, l.Reconcile(&upd))
 	second := served()
 	assert.NotEqual(t, first, second, "the next handshake serves the new certificate")
@@ -486,7 +493,7 @@ func TestReconcileLive(t *testing.T) {
 		"the next conn carries the new labels")
 
 	bad := upd
-	bad.Cert = "garbage"
+	bad.TLS = &stnrv2.TLSConfig{Cert: base64.StdEncoding.EncodeToString([]byte("garbage")), Key: keyB}
 	assert.Error(t, l.Reconcile(&bad))
 	assert.Equal(t, second, served(), "a certificate that does not load keeps the previous one")
 }
@@ -536,7 +543,7 @@ func TestTLSConfigSeam(t *testing.T) {
 
 	port := freePort(t, "tcp")
 	startListener(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS", Port: port,
-		Servers: []string{"s"}, Cert: certPEM, Key: keyPEM, PQCMode: "preferred"})
+		Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: certPEM, Key: keyPEM, PQCMode: "preferred"}})
 
 	c, err := tls.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), //nolint:noctx
 		&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
@@ -546,4 +553,192 @@ func TestTLSConfigSeam(t *testing.T) {
 	assert.Equal(t, stnrv2.PQCModePreferred, seen, "the seam sees the listener's PQC mode")
 	assert.Equal(t, uint16(tls.VersionTLS12), c.ConnectionState().Version,
 		"the listener serves the seam's configuration")
+}
+
+// startDialer starts a dialing listener whose emitted conns are handed to the test.
+func startDialer(t *testing.T, rt *runtime.Runtime, conf *stnrv2.ListenerConfig) (*object.Listener, chan api.Conn) {
+	t.Helper()
+	require.NoError(t, conf.Validate())
+	emitted := make(chan api.Conn, 16)
+	l, err := object.NewListener(conf, rt)
+	require.NoError(t, err)
+	l.SetSink(func(c api.Conn) { emitted <- c })
+	require.NoError(t, l.Start())
+	t.Cleanup(func() { _ = l.Close(false) })
+	return l, emitted
+}
+
+// next returns the next emitted conn, failing the test after a few seconds.
+func next(t *testing.T, emitted chan api.Conn) api.Conn {
+	t.Helper()
+	select {
+	case c := <-emitted:
+		return c
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "no conn emitted")
+		return nil
+	}
+}
+
+// echoStream serves an echo on every conn the listener accepts, handing the accepted conns to
+// the test.
+func echoStream(t *testing.T, ln net.Listener) chan net.Conn {
+	t.Helper()
+	t.Cleanup(func() { _ = ln.Close() })
+	accepted := make(chan net.Conn, 16)
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted <- c
+			go func() { _, _ = io.Copy(c, c) }()
+		}
+	}()
+	return accepted
+}
+
+// echoUDP serves an echo on a UDP socket.
+func echoUDP(t *testing.T) string {
+	t.Helper()
+	sock, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sock.Close() })
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			n, addr, err := sock.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			_, _ = sock.WriteTo(buf[:n], addr)
+		}
+	}()
+	return sock.LocalAddr().String()
+}
+
+// keyPair decodes the base64 PEM certificate and key of a config.
+func keyPair(t *testing.T, cert, key string) tls.Certificate {
+	t.Helper()
+	c, err := base64.StdEncoding.DecodeString(cert)
+	require.NoError(t, err)
+	k, err := base64.StdEncoding.DecodeString(key)
+	require.NoError(t, err)
+	kp, err := tls.X509KeyPair(c, k)
+	require.NoError(t, err)
+	return kp
+}
+
+func TestDialingListener(t *testing.T) {
+	nw, err := stdnet.NewNet()
+	require.NoError(t, err)
+	rt := newTestRuntime(t, nw)
+	cert, key := selfSignedPEM(t)
+	serverCert := keyPair(t, cert, key)
+	labels := map[string]string{stnrv2.RegistrationLabel: "carrier"}
+
+	t.Run("UDP", func(t *testing.T) {
+		peer := echoUDP(t)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "udp", Protocol: "UDP",
+			Servers: []string{"s"}, Labels: labels,
+			Connect: &stnrv2.ListenerConnectConfig{Address: peer}})
+		c := next(t, emitted)
+		roundTrip(t, c, "hello")
+		assert.Equal(t, api.Tag{Name: "udp", Proto: stnrv2.ProtocolUDP, Labels: labels}, c.Tag())
+		assert.Equal(t, peer, c.RemoteAddr().String())
+	})
+
+	t.Run("TCP", func(t *testing.T) {
+		ln, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx
+		require.NoError(t, err)
+		echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "tcp", Protocol: "TCP",
+			Servers: []string{"s"}, Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String()}})
+		c := next(t, emitted)
+		roundTrip(t, c, "hello")
+		assert.Equal(t, api.Tag{Name: "tcp", Proto: stnrv2.ProtocolTCP}, c.Tag())
+	})
+
+	t.Run("TLS verified by the CA", func(t *testing.T) {
+		ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{serverCert}})
+		require.NoError(t, err)
+		echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS",
+			Servers: []string{"s"}, Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String(),
+				TLS: &stnrv2.TLSConfig{CA: cert}}})
+		c := next(t, emitted)
+		roundTrip(t, c, "hello")
+		assert.Equal(t, api.Tag{Name: "tls", Proto: stnrv2.ProtocolTLS}, c.Tag())
+	})
+
+	t.Run("TLS refused by the system roots", func(t *testing.T) {
+		ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{serverCert}})
+		require.NoError(t, err)
+		echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS",
+			Servers: []string{"s"}, Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String()}})
+		select {
+		case <-emitted:
+			assert.Fail(t, "a peer with an untrusted certificate is emitted")
+		case <-time.After(200 * time.Millisecond):
+		}
+	})
+
+	t.Run("mutual TLS", func(t *testing.T) {
+		clientCert, clientKey := selfSignedPEM(t)
+		ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{serverCert},
+			ClientAuth: tls.RequireAnyClientCert})
+		require.NoError(t, err)
+		accepted := echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "mtls", Protocol: "TLS",
+			Servers: []string{"s"}, Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String(),
+				TLS: &stnrv2.TLSConfig{Cert: clientCert, Key: clientKey, Insecure: true}}})
+		roundTrip(t, next(t, emitted), "hello")
+		peerSide := (<-accepted).(*tls.Conn)
+		require.Len(t, peerSide.ConnectionState().PeerCertificates, 1)
+		assert.Equal(t, keyPair(t, clientCert, clientKey).Certificate[0],
+			peerSide.ConnectionState().PeerCertificates[0].Raw, "the peer sees the client certificate")
+	})
+
+	t.Run("DTLS", func(t *testing.T) {
+		ln, err := dtls.Listen("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")},
+			&dtls.Config{Certificates: []tls.Certificate{serverCert}})
+		require.NoError(t, err)
+		echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "dtls", Protocol: "DTLS",
+			Servers: []string{"s"}, Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String(),
+				TLS: &stnrv2.TLSConfig{CA: cert}}})
+		c := next(t, emitted)
+		roundTrip(t, c, "hello")
+		assert.Equal(t, api.Tag{Name: "dtls", Proto: stnrv2.ProtocolDTLS}, c.Tag())
+	})
+
+	t.Run("filters check the peer", func(t *testing.T) {
+		deny, err := object.NewFilter(&stnrv2.FilterConfig{Name: "deny-loopback",
+			Rules: []stnrv2.FilterRule{{Action: "DENY"}}})
+		require.NoError(t, err)
+		require.NoError(t, rt.Registry.Add(deny, nil))
+		ln, err := net.Listen("tcp", "127.0.0.1:0") //nolint:noctx
+		require.NoError(t, err)
+		echoStream(t, ln)
+		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "filtered", Protocol: "TCP",
+			Servers: []string{"s"}, Filters: []string{"deny-loopback"},
+			Connect: &stnrv2.ListenerConnectConfig{Address: ln.Addr().String()}})
+		select {
+		case <-emitted:
+			assert.Fail(t, "a peer the filters deny is emitted")
+		case <-time.After(200 * time.Millisecond):
+		}
+	})
+
+	t.Run("config round trip", func(t *testing.T) {
+		conf := &stnrv2.ListenerConfig{Name: "rt", Protocol: "TLS", Servers: []string{"s"},
+			Connect: &stnrv2.ListenerConnectConfig{Address: "sip.example.com:5061",
+				TLS: &stnrv2.TLSConfig{SNI: "sip", CA: cert, Insecure: true}}}
+		require.NoError(t, conf.Validate())
+		l, err := object.NewListener(conf, rt)
+		require.NoError(t, err)
+		assert.True(t, conf.DeepEqual(l.GetConfig()), "GetConfig returns the connect block")
+	})
 }

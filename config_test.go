@@ -533,6 +533,7 @@ func TestStunnerConfigPatcher(t *testing.T) {
 				Listeners: []stnrv2.ListenerConfig{{
 					Name:     "default-listener",
 					Protocol: "UDP",
+					Port:     stnrv2.DefaultPort,
 					Servers:  []string{"default-server"},
 				}},
 				Servers: []stnrv2.ServerConfig{{

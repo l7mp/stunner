@@ -110,8 +110,8 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 		if err != nil {
 			return nil, err
 		}
-		c.Listeners[0].Cert = base64.StdEncoding.EncodeToString(certPem)
-		c.Listeners[0].Key = base64.StdEncoding.EncodeToString(keyPem)
+		c.Listeners[0].TLS = &stnrv2.TLSConfig{Cert: base64.StdEncoding.EncodeToString(certPem),
+			Key: base64.StdEncoding.EncodeToString(keyPem)}
 	}
 
 	if err := c.Validate(); err != nil {

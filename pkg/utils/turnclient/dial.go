@@ -7,6 +7,7 @@ package turnclient
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"sync"
@@ -38,6 +39,10 @@ type Config struct {
 	ServerName string
 	// Insecure allows TLS certificate verification to be skipped for the TLS/DTLS transports.
 	Insecure bool
+	// RootCAs verify the TURN server over TLS/DTLS, nil for the system roots.
+	RootCAs *x509.CertPool
+	// Certificates are presented to the TURN server over TLS/DTLS, none by default.
+	Certificates []tls.Certificate
 	// LoggerFactory is an optional external logger.
 	LoggerFactory logging.LoggerFactory
 	// Net is the network to reach the TURN server over, nil for the OS network.
@@ -62,6 +67,8 @@ func (c Config) dialTLS(nw transport.Net) (net.Conn, error) {
 		MinVersion:         tls.VersionTLS12,
 		ServerName:         c.ServerName,
 		InsecureSkipVerify: c.Insecure, //nolint:gosec
+		RootCAs:            c.RootCAs,
+		Certificates:       c.Certificates,
 	})
 	if err := conn.Handshake(); err != nil {
 		_ = raw.Close()
@@ -91,18 +98,20 @@ func NewConfig(t *stnrv2.TunnelConfig, auth *stnrv2.AuthConfig) (Config, error) 
 
 	// the SNI override wins; otherwise the host doubles as the server name (no SNI for an IP
 	// literal: the TLS stack ignores ServerName in that case)
-	serverName := u.Host
-	if t.SNI != "" {
-		serverName = t.SNI
+	tlsConf, err := t.TLS.DialConfig(u.Host)
+	if err != nil {
+		return Config{}, err
 	}
 
 	c := Config{
-		Protocol:   u.Protocol,
-		ServerAddr: u.HostPort(),
-		Username:   user,
-		Password:   pass,
-		ServerName: serverName,
-		Insecure:   t.Insecure,
+		Protocol:     u.Protocol,
+		ServerAddr:   u.HostPort(),
+		Username:     user,
+		Password:     pass,
+		ServerName:   tlsConf.ServerName,
+		Insecure:     tlsConf.InsecureSkipVerify,
+		RootCAs:      tlsConf.RootCAs,
+		Certificates: tlsConf.Certificates,
 	}
 	if auth != nil {
 		c.Realm = auth.Realm
@@ -287,10 +296,13 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to allocate TURN/DTLS socket: %w", err)
 		}
-		conn, err := dtls.ClientWithOptions(sock, udpAddr,
-			dtls.WithInsecureSkipVerify(c.Insecure),
-			dtls.WithServerName(c.ServerName),
-		)
+		opts := []dtls.ClientOption{dtls.WithInsecureSkipVerify(c.Insecure),
+			dtls.WithServerName(c.ServerName), dtls.WithRootCAs(c.RootCAs)}
+		if len(c.Certificates) > 0 {
+			// pion refuses an empty certificate option
+			opts = append(opts, dtls.WithCertificates(c.Certificates...))
+		}
+		conn, err := dtls.ClientWithOptions(sock, udpAddr, opts...)
 		if err != nil {
 			_ = sock.Close()
 			return nil, nil, fmt.Errorf("failed to allocate TURN/DTLS socket: %w", err)

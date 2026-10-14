@@ -1,16 +1,20 @@
 // Package dialer implements the transport of a cluster: the conns, relay sockets and relayed
-// listeners towards the peers, tagged and accounted under the cluster's name.
+// listeners towards the peers, tagged and accounted under the cluster's name, and the socket of a
+// dialing listener, which reaches its peer through a dialer of its own, accounted as the listener.
 package dialer
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/pion/dtls/v3"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5/reuseport"
 
@@ -23,8 +27,21 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
+// handshakeTimeout bounds the TLS or DTLS handshake of a dialed conn.
+const handshakeTimeout = 10 * time.Second
+
+// keepAlive is the TCP keepalive of the dialed TCP conns: it refreshes NAT and load-balancer state
+// and turns a dead peer into a read error within about a minute.
+var keepAlive = net.KeepAliveConfig{Enable: true, Idle: 30 * time.Second, Interval: 10 * time.Second,
+	Count: 3}
+
 // New creates the dialer of a cluster config; admit applies the cluster's filters to a peer.
 func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) bool) (api.Dialer, error) {
+	return newDialer(conf, rt, admit, telemetry.ClusterType)
+}
+
+// newDialer creates a dialer accounting its conns as kind under the config's name.
+func newDialer(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) bool, kind telemetry.ConnType) (api.Dialer, error) {
 	proto, err := stnrv2.NewClusterProtocol(conf.Protocol)
 	if err != nil {
 		return nil, err
@@ -32,11 +49,17 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) b
 	b := base{
 		name:  conf.Name,
 		proto: proto,
+		kind:  kind,
 		tag:   api.Tag{Name: conf.Name, Proto: proto},
 		rt:    rt,
 		admit: admit,
 		log:   rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", conf.Name)),
 		addrs: slices.Clone(conf.Addrs),
+	}
+	if conf.TLS != nil && proto != stnrv2.ProtocolFIFO {
+		if b.tls, err = conf.TLS.DialConfig(""); err != nil {
+			return nil, err
+		}
 	}
 
 	if conf.Tunnel != nil {
@@ -58,6 +81,7 @@ func New(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.Addr) b
 type base struct {
 	name  string
 	proto stnrv2.Protocol
+	kind  telemetry.ConnType
 	tag   api.Tag
 	rt    *runtime.Runtime
 	admit func(net.Addr) bool
@@ -66,6 +90,9 @@ type base struct {
 	// tunnel is the upstream TURN server, nil for a direct dialer; transport is its transport.
 	tunnel    *stnrv2.TunnelConfig
 	transport stnrv2.Protocol
+	// tls makes the dialed conns TLS over TCP and DTLS over UDP, nil for plain; an empty
+	// ServerName is the host dialed.
+	tls *tls.Config
 }
 
 func (b *base) Name() string              { return b.name }
@@ -73,10 +100,43 @@ func (b *base) Protocol() stnrv2.Protocol { return b.proto }
 func (b *base) Start() error              { return nil }
 func (b *base) Close(bool) error          { return nil }
 
-// wrap accounts and tags a peer conn.
-func (b *base) wrap(c net.Conn, w netconn.Wire) api.Conn {
-	accounted := account.Conn(b.rt.Telemetry, c, b.name, telemetry.ClusterType)
-	return netconn.NewConn(accounted, b.tag, w)
+// establish completes a conn dialed to addr into the conn the dialer returns: the TLS or DTLS
+// handshake if the dialer secures its conns, then the accounting and the tag. A secured conn
+// reports no wire: its traffic must never be offloaded past the encryption.
+func (b *base) establish(ctx context.Context, c net.Conn, w netconn.Wire, addr string) (api.Conn, error) {
+	if b.tls != nil {
+		conf := b.tls.Clone()
+		if conf.ServerName == "" {
+			conf.ServerName, _, _ = net.SplitHostPort(addr)
+		}
+		ctx, cancel := context.WithTimeout(ctx, handshakeTimeout)
+		defer cancel()
+		var handshake func(context.Context) error
+		if b.proto == stnrv2.ProtocolTCP {
+			tc := tls.Client(c, conf)
+			c, handshake = tc, tc.HandshakeContext
+		} else {
+			opts := []dtls.ClientOption{dtls.WithServerName(conf.ServerName),
+				dtls.WithRootCAs(conf.RootCAs), dtls.WithInsecureSkipVerify(conf.InsecureSkipVerify)}
+			if len(conf.Certificates) > 0 {
+				// pion refuses an empty certificate option
+				opts = append(opts, dtls.WithCertificates(conf.Certificates...))
+			}
+			dc, err := dtls.ClientWithOptions(netconn.PacketConn{Conn: c}, c.RemoteAddr(), opts...)
+			if err != nil {
+				_ = c.Close()
+				return nil, err
+			}
+			c, handshake = dc, dc.HandshakeContext
+		}
+		if err := handshake(ctx); err != nil {
+			_ = c.Close()
+			return nil, fmt.Errorf("%s handshake with %s failed: %w", b.name, addr, err)
+		}
+		w = nil
+	}
+	accounted := account.Conn(b.rt.Telemetry, c, b.name, b.kind)
+	return netconn.NewConn(accounted, b.tag, w), nil
 }
 
 // advertise returns local's port at the cluster's address of the family, else local itself.
@@ -102,7 +162,7 @@ type udpDialer struct {
 	base
 }
 
-func (cl *udpDialer) Dial(ctx context.Context, _ net.Addr, addr string) (api.Conn, error) {
+func (cl *udpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api.Conn, error) {
 	if cl.tunnel != nil {
 		peer, err := cl.rt.Net.ResolveUDPAddr("udp", addr)
 		if err != nil {
@@ -115,7 +175,7 @@ func (cl *udpDialer) Dial(ctx context.Context, _ net.Addr, addr string) (api.Con
 		if err != nil {
 			return nil, err
 		}
-		return cl.wrap(&peerConn{PacketConn: session, peer: peer}, session), nil
+		return cl.establish(ctx, &peerConn{PacketConn: session, peer: peer}, session, addr)
 	}
 	peer, err := cl.rt.Net.ResolveUDPAddr("udp", addr)
 	if err != nil {
@@ -124,11 +184,11 @@ func (cl *udpDialer) Dial(ctx context.Context, _ net.Addr, addr string) (api.Con
 	if err := cl.checkPeer(peer); err != nil {
 		return nil, err
 	}
-	c, err := cl.rt.Net.Dial("udp", peer.String())
+	c, err := cl.rt.Net.CreateDialer(&net.Dialer{LocalAddr: local}).Dial("udp", peer.String())
 	if err != nil {
 		return nil, err
 	}
-	return cl.wrap(c, nil), nil
+	return cl.establish(ctx, c, nil, addr)
 }
 
 func (cl *udpDialer) ListenPacket(network string, port int) (net.PacketConn, net.Addr, error) {
@@ -138,14 +198,14 @@ func (cl *udpDialer) ListenPacket(network string, port int) (net.PacketConn, net
 			return nil, nil, err
 		}
 		return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, session, cl.name,
-			telemetry.ClusterType), admit: cl.admit}, session.LocalAddr(), nil
+			cl.kind), admit: cl.admit}, session.LocalAddr(), nil
 	}
 	sock, err := cl.rt.Net.ListenPacket(network, net.JoinHostPort("", strconv.Itoa(sanitizePort(port))))
 	if err != nil {
 		return nil, nil, err
 	}
 	return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, sock, cl.name,
-		telemetry.ClusterType), admit: cl.admit}, cl.advertise(network, sock.LocalAddr()), nil
+		cl.kind), admit: cl.admit}, cl.advertise(network, sock.LocalAddr()), nil
 }
 
 func (cl *udpDialer) Listen(string, int) (net.Listener, net.Addr, error) {
@@ -180,7 +240,7 @@ func (cl *tcpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api
 		if err != nil {
 			return nil, err
 		}
-		return cl.wrap(c, c), nil
+		return cl.establish(ctx, c, c, addr)
 	}
 	peer, err := cl.rt.Net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
@@ -189,7 +249,8 @@ func (cl *tcpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api
 	if err := cl.checkPeer(peer); err != nil {
 		return nil, err
 	}
-	nd := cl.rt.Net.CreateDialer(&net.Dialer{LocalAddr: local, Control: reuseport.Control})
+	nd := cl.rt.Net.CreateDialer(&net.Dialer{LocalAddr: local, Control: reuseport.Control,
+		KeepAliveConfig: keepAlive})
 	c, err := nd.Dial("tcp", peer.String())
 	if err != nil {
 		return nil, err
@@ -198,7 +259,7 @@ func (cl *tcpDialer) Dial(ctx context.Context, local net.Addr, addr string) (api
 		_ = c.Close()
 		return nil, err
 	}
-	return cl.wrap(c, nil), nil
+	return cl.establish(ctx, c, nil, addr)
 }
 
 func (cl *tcpDialer) ListenPacket(string, int) (net.PacketConn, net.Addr, error) {
@@ -218,7 +279,7 @@ func (cl *tcpDialer) Listen(network string, port int) (net.Listener, net.Addr, e
 		l = rejectListener{l}
 	}
 	return &filteredListener{Listener: account.Listener(cl.rt.Telemetry, l, cl.name,
-		telemetry.ClusterType), admit: cl.admit}, cl.advertise(network, l.Addr()), nil
+		cl.kind), admit: cl.admit}, cl.advertise(network, l.Addr()), nil
 }
 
 // fifoDialer opens the fifo the first address of its cluster names, whatever it is asked to dial.
@@ -232,7 +293,7 @@ func (cl *fifoDialer) Dial(ctx context.Context, _ net.Addr, _ string) (api.Conn,
 	if err != nil {
 		return nil, err
 	}
-	return cl.wrap(c, nil), nil
+	return cl.establish(ctx, c, nil, cl.fifo)
 }
 
 func (cl *fifoDialer) ListenPacket(string, int) (net.PacketConn, net.Addr, error) {

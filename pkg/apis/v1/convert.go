@@ -116,6 +116,10 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 		proto, serverType = ProtocolDTLS, stnrv2.ServerTypeTURN
 	}
 
+	var tlsConf *stnrv2.TLSConfig
+	if l.Cert != "" || l.Key != "" || l.PQCMode != "" {
+		tlsConf = &stnrv2.TLSConfig{Cert: l.Cert, Key: l.Key, PQCMode: l.PQCMode}
+	}
 	return stnrv2.ListenerConfig{
 		Name:        l.Name,
 		Protocol:    proto.String(),
@@ -124,9 +128,7 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 		PublicAddr:  l.PublicAddr,
 		PublicPort:  l.PublicPort,
 		PublicAddrs: l.PublicAddrs,
-		Cert:        l.Cert,
-		Key:         l.Key,
-		PQCMode:     l.PQCMode,
+		TLS:         tlsConf,
 	}, stnrv2.ServerConfig{
 		ServerSpec: stnrv2.ServerSpec{Name: l.Name, Type: serverType.String(), Clusters: l.Routes},
 	}
@@ -230,7 +232,9 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 		if s := cl.TURNServer; s != nil {
 			cluster.Tunnel.URL = (&stnrv2.URI{Protocol: tunnelProto, Host: s.Address,
 				Port: s.Port}).String()
-			cluster.Tunnel.Insecure, cluster.Tunnel.SNI = s.Insecure, s.SNI
+			if s.Insecure || s.SNI != "" {
+				cluster.Tunnel.TLS = &stnrv2.TLSConfig{Insecure: s.Insecure, SNI: s.SNI}
+			}
 			if s.Auth != nil {
 				// the policy itself is added by ConvertToV2, under this name
 				cluster.Tunnel.Auth = cl.Name

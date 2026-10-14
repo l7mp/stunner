@@ -58,6 +58,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -130,6 +131,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -160,6 +162,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -188,6 +191,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -247,6 +251,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []stnrv2.ListenerConfig{{
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{""},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -278,6 +283,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -306,6 +312,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -340,6 +347,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -415,6 +423,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -490,6 +499,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -572,6 +582,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -645,6 +656,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -718,6 +730,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -861,6 +874,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "renamed-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"renamed-listener"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -993,6 +1007,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}, {
 				Name:     "newlistener",
@@ -1064,9 +1079,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "DTLS",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
-				Cert:     dummyCert64,
-				Key:      dummyKey64,
+				TLS:      &stnrv2.TLSConfig{Cert: dummyCert64, Key: dummyKey64},
 			}, {
 				Name:     "newlistener",
 				Protocol: "TCP",
@@ -1099,8 +1114,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolDTLS.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Cert, dummyCert64, "listener cert ok")
-			assert.Equal(t, listenerConf(t, l).Key, dummyKey64, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).TLS.Cert, dummyCert64, "listener cert ok")
+			assert.Equal(t, listenerConf(t, l).TLS.Key, dummyKey64, "listener key ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
 			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
@@ -1143,9 +1158,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "TLS",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
-				Cert:     dummyCert64,
-				Key:      dummyKey64,
+				TLS:      &stnrv2.TLSConfig{Cert: dummyCert64, Key: dummyKey64},
 			}, {
 				Name:     "newlistener",
 				Protocol: "TCP",
@@ -1178,8 +1193,8 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.IsType(t, l, &object.Listener{}, "listener type ok")
 			assert.Equal(t, listenerConf(t, l).Protocol, stnrv2.ProtocolTLS.String(), "listener proto ok")
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
-			assert.Equal(t, listenerConf(t, l).Cert, dummyCert64, "listener cert ok")
-			assert.Equal(t, listenerConf(t, l).Key, dummyKey64, "listener key ok")
+			assert.Equal(t, listenerConf(t, l).TLS.Cert, dummyCert64, "listener cert ok")
+			assert.Equal(t, listenerConf(t, l).TLS.Key, dummyKey64, "listener key ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
 			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
@@ -1222,6 +1237,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
 				Protocol:   "UDP",
+				Port:       stnrv2.DefaultPort,
 				Servers:    []string{"default-server"},
 				PublicAddr: "127.0.0.2",
 				PublicPort: 33478,
@@ -1310,6 +1326,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1352,6 +1369,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1396,6 +1414,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1441,6 +1460,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1486,6 +1506,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1537,6 +1558,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1589,6 +1611,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1641,6 +1664,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1809,6 +1833,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "2001:db8::1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1843,6 +1868,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:       "default-listener",
 				Addr:       "127.0.0.1",
 				Protocol:   "UDP",
+				Port:       stnrv2.DefaultPort,
 				Servers:    []string{"default-server"},
 				PublicAddr: "2001:db8::2",
 				PublicPort: 33478,
@@ -1877,6 +1903,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:       "default-listener",
 				Addr:       "2001:db8::1",
 				Protocol:   "UDP",
+				Port:       stnrv2.DefaultPort,
 				Servers:    []string{"default-server"},
 				PublicAddr: "1.2.3.4",
 				PublicPort: 33478,
@@ -1914,6 +1941,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1947,6 +1975,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -1977,6 +2006,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Name:     "default-listener",
 				Addr:     "127.0.0.1",
 				Protocol: "UDP",
+				Port:     stnrv2.DefaultPort,
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
@@ -2016,9 +2046,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 				Addr:     "127.0.0.1",
 				Port:     3478,
-				Key:      "ZHVtbXkK",
-				Cert:     "ZHVtbXkK",
-				PQCMode:  "Preferred",
+				TLS:      &stnrv2.TLSConfig{Cert: "ZHVtbXkK", Key: "ZHVtbXkK", PQCMode: "Preferred"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
@@ -2037,7 +2065,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			l := s.GetListener("default-listener")
 			require.NotNil(t, l, "listener found")
-			assert.Equal(t, "preferred", listenerConf(t, l).PQCMode, "pqc mode normalized")
+			assert.Equal(t, "preferred", listenerConf(t, l).TLS.PQCMode, "pqc mode normalized")
 			assert.Contains(t, l.Status().String(), "pqc=preferred", "pqc mode in status")
 
 			tlsConf := func(mode string, clusters ...string) *stnrv2.StunnerConfig {
@@ -2052,9 +2080,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 						Servers:  []string{"default-server"},
 						Addr:     "127.0.0.1",
 						Port:     3478,
-						Key:      "ZHVtbXkK",
-						Cert:     "ZHVtbXkK",
-						PQCMode:  mode,
+						TLS:      &stnrv2.TLSConfig{Cert: "ZHVtbXkK", Key: "ZHVtbXkK", PQCMode: mode},
 					}},
 					Servers: []stnrv2.ServerConfig{{
 						ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: clusters},
@@ -2068,16 +2094,16 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			// a mode change reconciles in place: the next handshake uses it
 			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any")), "mode change: no restart")
-			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "mode change applied")
+			assert.Equal(t, "enforced", listenerConf(t, l).TLS.PQCMode, "mode change applied")
 
 			// the same mode with a cluster change reconciles in place
 			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any", "dummy")), "cluster change: no restart")
-			assert.Equal(t, "enforced", listenerConf(t, l).PQCMode, "cluster change: mode kept")
+			assert.Equal(t, "enforced", listenerConf(t, l).TLS.PQCMode, "cluster change: mode kept")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "cluster change applied")
 
 			// back to the default mode, in place: the default is the empty string
 			assert.NoError(t, s.Reconcile(tlsConf("Default", "allow-any", "dummy")), "default mode: no restart")
-			assert.Empty(t, listenerConf(t, l).PQCMode, "default mode normalized to empty")
+			assert.Empty(t, listenerConf(t, l).TLS.PQCMode, "default mode normalized to empty")
 			assert.NotContains(t, l.Status().String(), "pqc=", "default mode absent from status")
 
 			// an omitted mode and a spelled-out default are the running mode: no restart
@@ -2086,11 +2112,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			// the mode must parse
 			assert.ErrorContains(t, s.Reconcile(tlsConf("quantum", "allow-any", "dummy")), "unknown PQC mode", "unknown mode")
-			assert.Empty(t, listenerConf(t, l).PQCMode, "a rejected config leaves the listener alone")
+			assert.Empty(t, listenerConf(t, l).TLS.PQCMode, "a rejected config leaves the listener alone")
 
 			// a listener of another protocol takes a mode and ignores it
 			udp := tlsConf("preferred", "allow-any", "dummy")
-			udp.Listeners[0].Protocol, udp.Listeners[0].Cert, udp.Listeners[0].Key = "UDP", "", ""
+			udp.Listeners[0].Protocol, udp.Listeners[0].TLS = "UDP", &stnrv2.TLSConfig{PQCMode: "preferred"}
 			_, ok = s.Reconcile(udp).(stnrv2.ErrRestarted)
 			assert.True(t, ok, "a mode on a UDP listener: restarted for the protocol change")
 			// a restart replaces the listener object
@@ -3415,8 +3441,7 @@ var testReconcileRollback = map[string][]StunnerTestReconcileE2EConfig{
 					Servers:  []string{"default-server"},
 					Addr:     "1.2.3.4",
 					Port:     3478,
-					Key:      "ZHVtbXkK",
-					Cert:     "ZHVtbXkK",
+					TLS:      &stnrv2.TLSConfig{Cert: "ZHVtbXkK", Key: "ZHVtbXkK"},
 				}},
 				Servers: []stnrv2.ServerConfig{{
 					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"echo-server-cluster"}},

@@ -710,8 +710,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -746,8 +745,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
 				Port:       23478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -781,8 +779,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -817,8 +814,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicAddr: "1.2.3.4",
 				PublicPort: 3478,
 				Port:       23478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -931,8 +927,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Addr:       "::1",
 				PublicAddr: "::1",
 				Port:       23478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
@@ -961,8 +956,7 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Addr:       "::1",
 				PublicAddr: "::1",
 				Port:       23478,
-				Cert:       certPem64,
-				Key:        keyPem64,
+				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
 				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"allow-any"}},

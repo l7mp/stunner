@@ -21,8 +21,8 @@ func validConfig() *StunnerConfig {
 		}},
 		Listeners: []ListenerConfig{
 			{Name: "turn-udp", Protocol: "UDP", Port: 3478, Servers: []string{"media-gw"}},
-			{Name: "turn-tls", Protocol: "TLS", Port: 443, Servers: []string{"media-gw"}, Cert: "cert",
-				Key: "key", PQCMode: "preferred"},
+			{Name: "turn-tls", Protocol: "TLS", Port: 443, Servers: []string{"media-gw"},
+				TLS: &TLSConfig{Cert: "Y2VydA==", Key: "a2V5", PQCMode: "preferred"}},
 			{Name: "tunnel", Protocol: "UDP", Port: 10000, Servers: []string{"rtp-tunnel"}},
 		},
 		Servers: []ServerConfig{
@@ -88,7 +88,21 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"bad version", func(c *StunnerConfig) { c.ApiVersion = "v1" }},
 		{"TURN listener protocol", func(c *StunnerConfig) { c.Listeners[0].Protocol = "TURN-UDP" }},
 		{"invalid port", func(c *StunnerConfig) { c.Listeners[0].Port = 70000 }},
-		{"unknown PQC mode", func(c *StunnerConfig) { c.Listeners[1].PQCMode = "sometimes" }},
+		{"missing port", func(c *StunnerConfig) { c.Listeners[1].Port = 0 }},
+		{"connect address without a port", func(c *StunnerConfig) {
+			c.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com"}
+		}},
+		{"connect address without a host", func(c *StunnerConfig) {
+			c.Listeners[1].Connect = &ListenerConnectConfig{Address: ":5061"}
+		}},
+		{"TLS CA not base64", func(c *StunnerConfig) { c.Listeners[1].TLS.CA = "%%" }},
+		{"connect TLS CA not base64", func(c *StunnerConfig) {
+			c.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061",
+				TLS: &TLSConfig{CA: "%%"}}
+		}},
+		{"cluster TLS cert not base64", func(c *StunnerConfig) { c.Clusters[0].TLS = &TLSConfig{Cert: "%%"} }},
+		{"tunnel TLS CA not base64", func(c *StunnerConfig) { c.Clusters[1].Tunnel.TLS = &TLSConfig{CA: "%%"} }},
+		{"unknown PQC mode", func(c *StunnerConfig) { c.Listeners[1].TLS.PQCMode = "sometimes" }},
 		{"duplicate listener", func(c *StunnerConfig) { c.Listeners[2].Name = "turn-udp" }},
 		{"duplicate cluster", func(c *StunnerConfig) { c.Clusters[1].Name = "media-pods" }},
 		{"unknown server type", func(c *StunnerConfig) { c.Servers[0].Type = "no-such-type" }},
@@ -104,6 +118,21 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		}},
 		{"unknown load-balancing policy", func(c *StunnerConfig) {
 			c.Servers[1].L4 = &L4ServerConfig{LBPolicy: "RANDOM"}
+		}},
+		{"SIP registration without a name", func(c *StunnerConfig) {
+			c.Servers[0].Type = "SIP"
+			c.Servers[0].SIP = &SIPServerConfig{Registrations: []SIPRegistrationConfig{
+				{AOR: "sip:+3612345678@sip.example.com"}}}
+		}},
+		{"SIP registration AOR not a SIP URI", func(c *StunnerConfig) {
+			c.Servers[0].Type = "SIP"
+			c.Servers[0].SIP = &SIPServerConfig{Registrations: []SIPRegistrationConfig{
+				{Name: "carrier", AOR: "+3612345678@sip.example.com"}}}
+		}},
+		{"invalid SIP registration expiry", func(c *StunnerConfig) {
+			c.Servers[0].Type = "SIP"
+			c.Servers[0].SIP = &SIPServerConfig{Registrations: []SIPRegistrationConfig{
+				{Name: "carrier", AOR: "sip:+3612345678@sip.example.com", Expires: "-1s"}}}
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -121,8 +150,13 @@ func TestStunnerConfigValidateAccepts(t *testing.T) {
 		mutate func(c *StunnerConfig)
 	}{
 		{"listener without a server", func(c *StunnerConfig) { c.Listeners[0].Servers = nil }},
-		{"TLS without a cert", func(c *StunnerConfig) { c.Listeners[1].Cert = "" }},
-		{"PQC mode on UDP", func(c *StunnerConfig) { c.Listeners[0].PQCMode = "enforced" }},
+		{"TLS without a cert", func(c *StunnerConfig) { c.Listeners[1].TLS = nil }},
+		{"PQC mode on UDP", func(c *StunnerConfig) { c.Listeners[0].TLS = &TLSConfig{PQCMode: "enforced"} }},
+		{"SNI on an accepting listener", func(c *StunnerConfig) { c.Listeners[1].TLS.SNI = "x" }},
+		{"TLS on a FIFO cluster", func(c *StunnerConfig) {
+			c.Clusters[0].Protocol, c.Clusters[0].Addrs = "FIFO", []string{"ng"}
+			c.Clusters[0].TLS = &TLSConfig{}
+		}},
 		{"domain in a STATIC cluster", func(c *StunnerConfig) {
 			c.Clusters[0].Endpoints = []string{"media.default.svc"}
 		}},
@@ -130,6 +164,17 @@ func TestStunnerConfigValidateAccepts(t *testing.T) {
 		{"TCP cluster tunnelled over UDP", func(c *StunnerConfig) {
 			c.Clusters[1].Protocol = "TCP"
 			c.Clusters[1].Tunnel.URL = "turn:turn.example.com:3478?transport=udp"
+		}},
+		{"dialing listener without a port", func(c *StunnerConfig) {
+			c.Listeners[1].Port = 0
+			c.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061"}
+		}},
+		{"TLS on a UDP dialing listener", func(c *StunnerConfig) {
+			c.Listeners[0].Connect = &ListenerConnectConfig{Address: "10.0.0.1:5060", TLS: &TLSConfig{SNI: "x"}}
+		}},
+		{"dialing STDIN listener", func(c *StunnerConfig) {
+			c.Listeners[0] = ListenerConfig{Name: "stdin", Protocol: "STDIN", Servers: []string{"media-gw"},
+				Connect: &ListenerConnectConfig{Address: "10.0.0.1:5060"}}
 		}},
 		{"STDIN listener on a TURN server", func(c *StunnerConfig) {
 			c.Listeners[0] = ListenerConfig{Name: "stdin", Protocol: "STDIN", Servers: []string{"media-gw"}}
@@ -155,6 +200,11 @@ func TestDeepCopyIsExact(t *testing.T) {
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
 	full.Servers[0].TURN = &TURNServerConfig{PermissionFilters: []string{"peers"}}
 	full.Listeners[0].Labels = map[string]string{"role": "control"}
+	full.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061",
+		TLS: &TLSConfig{SNI: "sip.example.com"}}
+	full.Clusters[0].TLS = &TLSConfig{SNI: "media", Insecure: true}
+	full.Clusters[1].Tunnel.TLS = &TLSConfig{SNI: "turn"}
+	full.Servers[0].SIP = &SIPServerConfig{Registrations: []SIPRegistrationConfig{{Name: "carrier"}}}
 	validated := validConfig()
 	require.NoError(t, validated.Validate())
 
@@ -178,6 +228,15 @@ func TestDeepCopyIsExact(t *testing.T) {
 			for k := range cp.Listeners[i].Labels {
 				cp.Listeners[i].Labels[k] = "changed"
 			}
+			if cp.Listeners[i].Connect != nil {
+				cp.Listeners[i].Connect.Address = "changed"
+				if cp.Listeners[i].Connect.TLS != nil {
+					cp.Listeners[i].Connect.TLS.SNI = "changed"
+				}
+			}
+			if cp.Listeners[i].TLS != nil {
+				cp.Listeners[i].TLS.Cert = "changed"
+			}
 		}
 		for i := range cp.Servers {
 			if turn := cp.Servers[i].TURN; turn != nil {
@@ -185,13 +244,24 @@ func TestDeepCopyIsExact(t *testing.T) {
 					turn.PermissionFilters[j] = "changed"
 				}
 			}
+			if sip := cp.Servers[i].SIP; sip != nil {
+				for j := range sip.Registrations {
+					sip.Registrations[j].Name = "changed"
+				}
+			}
 		}
 		for i := range cp.Clusters {
 			for j := range cp.Clusters[i].Endpoints {
 				cp.Clusters[i].Endpoints[j] = "changed"
 			}
+			if cp.Clusters[i].TLS != nil {
+				cp.Clusters[i].TLS.SNI = "changed"
+			}
 			if cp.Clusters[i].Tunnel != nil {
 				cp.Clusters[i].Tunnel.URL = "changed"
+				if cp.Clusters[i].Tunnel.TLS != nil {
+					cp.Clusters[i].Tunnel.TLS.SNI = "changed"
+				}
 			}
 		}
 		assert.True(t, reflect.DeepEqual(c, orig), "%s: the copy shares nothing with the original", name)
@@ -204,6 +274,10 @@ func TestValidateIsIdempotent(t *testing.T) {
 	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
+	full.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061"}
+	full.Servers = append(full.Servers, ServerConfig{ServerSpec: ServerSpec{Name: "sip", Type: "SIP"},
+		SIP: &SIPServerConfig{Registrations: []SIPRegistrationConfig{
+			{Name: "carrier", AOR: "sip:+3612345678@sip.example.com"}}}})
 
 	minimal := &StunnerConfig{ApiVersion: ApiVersion} // everything else defaulted
 	for name, c := range map[string]*StunnerConfig{"minimal": minimal, "valid": validConfig(), "full": full} {

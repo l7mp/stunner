@@ -16,10 +16,8 @@ type TunnelConfig struct {
 	// Auth names the authentication policy whose credentials the tunnel presents to the TURN
 	// server, static or ephemeral; none for a server that authenticates nobody.
 	Auth string `json:"auth,omitempty"`
-	// Insecure skips the verification of the TURN server's certificate over TLS and DTLS.
-	Insecure bool `json:"insecure,omitempty"`
-	// SNI overrides the server name the TURN server's certificate is verified against.
-	SNI string `json:"sni,omitempty"`
+	// TLS is how the tunnel verifies the TURN server over TLS and DTLS, ignored otherwise.
+	TLS *TLSConfig `json:"tls,omitempty"`
 }
 
 // Validate checks a tunnel configuration and injects defaults.
@@ -31,12 +29,18 @@ func (t *TunnelConfig) Validate() error {
 	if !u.Protocol.IsTURN() {
 		return fmt.Errorf("invalid tunnel URL %q: not a TURN URL", t.URL)
 	}
+	if t.TLS != nil {
+		return t.TLS.Validate()
+	}
 	return nil
 }
 
 // DeepCopy copies a tunnel configuration.
 func (t *TunnelConfig) DeepCopy() *TunnelConfig {
 	ret := *t
+	if t.TLS != nil {
+		ret.TLS = t.TLS.DeepCopy()
+	}
 	return &ret
 }
 
@@ -53,6 +57,9 @@ type ClusterConfig struct {
 	Protocol string `json:"protocol"`
 	// Tunnel is the upstream TURN server the peers are reached through, nil for direct.
 	Tunnel *TunnelConfig `json:"tunnel,omitempty"`
+	// TLS makes the conns the cluster dials TLS over TCP and DTLS over UDP, nil for plain;
+	// FIFO clusters, relay sockets and relayed listeners ignore it.
+	TLS *TLSConfig `json:"tls,omitempty"`
 	// Addrs are the relay addresses, at most one per family; the operator sets status.podIPs
 	// and FIFOs use custom strings.
 	Addrs []string `json:"addresses,omitempty"`
@@ -92,6 +99,11 @@ func (req *ClusterConfig) Validate() error {
 
 	if req.Tunnel != nil {
 		if err := req.Tunnel.Validate(); err != nil {
+			return fmt.Errorf("%w in cluster configuration: %s", err, req.String())
+		}
+	}
+	if req.TLS != nil {
+		if err := req.TLS.Validate(); err != nil {
 			return fmt.Errorf("%w in cluster configuration: %s", err, req.String())
 		}
 	}
@@ -139,6 +151,9 @@ func (req *ClusterConfig) DeepCopyInto(dst Config) {
 	if req.Tunnel != nil {
 		ret.Tunnel = req.Tunnel.DeepCopy()
 	}
+	if req.TLS != nil {
+		ret.TLS = req.TLS.DeepCopy()
+	}
 }
 
 // String stringifies the configuration.
@@ -152,12 +167,15 @@ func (req *ClusterConfig) String() string {
 		fmt.Sprintf("protocol=%q", req.Protocol)}
 	if req.Tunnel != nil {
 		status = append(status, fmt.Sprintf("tunnel=%q", req.Tunnel.URL))
-		if req.Tunnel.SNI != "" {
-			status = append(status, fmt.Sprintf("tunnel-sni=%q", req.Tunnel.SNI))
-		}
 		if req.Tunnel.Auth != "" {
 			status = append(status, fmt.Sprintf("tunnel-auth=%q", req.Tunnel.Auth))
 		}
+		if req.Tunnel.TLS != nil {
+			status = append(status, "tunnel-"+req.Tunnel.TLS.String())
+		}
+	}
+	if req.TLS != nil {
+		status = append(status, req.TLS.String())
 	}
 	if len(req.Addrs) > 0 {
 		status = append(status, fmt.Sprintf("addresses=[%s]", strings.Join(req.Addrs, ",")))

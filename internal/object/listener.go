@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/dialer"
 	"github.com/l7mp/stunner/v2/internal/fifo"
 	"github.com/l7mp/stunner/v2/internal/netconn"
 	"github.com/l7mp/stunner/v2/internal/netconn/account"
@@ -38,21 +40,18 @@ var newTLSConfig = func(_ *runtime.Runtime, _ stnrv2.PQCMode, cert tls.Certifica
 	}
 }
 
-// Listener is a listener object: it accepts client conns, applies the listener filters, and
-// processes them via a chain of servers.
+// Listener is a listener object: it accepts client conns, or dials its peer, applies the listener
+// filters, and processes the conns via a chain of servers.
 type Listener struct {
-	tag   api.Tag // the name and the protocol: a change of either restarts
-	addr  string
-	port  int
-	rt    *runtime.Runtime
-	log   logging.LeveledLogger
-	scope string // of the logger
+	tag     api.Tag // the name and the protocol: a change of either restarts
+	addr    string
+	port    int
+	connect *stnrv2.ListenerConnectConfig // nil for an accepting listener
+	rt      *runtime.Runtime
+	log     logging.LeveledLogger
+	scope   string // of the logger
 	// sink takes the conns the listener emits: serve, or a test's
 	sink func(api.Conn)
-
-	listen func() (net.Listener, error)
-	// secure wraps an accepted conn in TLS or DTLS, nil for plain listeners.
-	secure func(net.Conn) (net.Conn, func(context.Context) error, error)
 
 	mu          sync.RWMutex
 	servers     []string
@@ -61,7 +60,7 @@ type Listener struct {
 	publicAddr  string
 	publicPort  int
 	publicAddrs []string
-	cert, key   string // the base64 PEM of the config
+	tls         *stnrv2.TLSConfig // the config's, nil for none
 	keyPair     tls.Certificate
 	pqcMode     stnrv2.PQCMode
 
@@ -92,61 +91,52 @@ func NewListener(conf stnrv2.Config, rt *runtime.Runtime) (*Listener, error) {
 	}
 	l.log = rt.Logger.NewLogger(l.scope)
 	l.sink = l.serve
+	if req.Connect != nil {
+		l.connect = req.Connect.DeepCopy()
+	}
 	if err := l.Reconcile(req); err != nil {
 		return nil, err
 	}
-
-	addr := net.JoinHostPort(req.Addr, strconv.Itoa(req.Port))
-	listenUDP := func() (net.Listener, error) {
-		lc := udp.DefaultListenConfig
-		lc.Net, lc.Admit = rt.Net, l.admits
-		return lc.Listen("udp", addr)
-	}
-	listenTCP := func() (net.Listener, error) {
-		return rt.Net.CreateListenConfig(&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
-	}
-	switch proto {
-	case stnrv2.ProtocolUDP:
-		l.listen = listenUDP
-	case stnrv2.ProtocolDTLS:
-		l.listen = listenUDP
-		l.secure = func(c net.Conn) (net.Conn, func(context.Context) error, error) {
-			dc, err := dtls.ServerWithOptions(packetConn{c}, c.RemoteAddr(), dtls.WithGetCertificate(
-				func(*dtls.ClientHelloInfo) (*tls.Certificate, error) {
-					l.mu.RLock()
-					defer l.mu.RUnlock()
-					kp := l.keyPair
-					return &kp, nil
-				}))
-			if err != nil {
-				return nil, nil, err
-			}
-			return dc, dc.HandshakeContext, nil
-		}
-	case stnrv2.ProtocolTCP:
-		l.listen = listenTCP
-	case stnrv2.ProtocolTLS:
-		tlsConf := &tls.Config{GetConfigForClient: func(*tls.ClientHelloInfo) (*tls.Config, error) {
-			l.mu.RLock()
-			mode, kp := l.pqcMode, l.keyPair
-			l.mu.RUnlock()
-			return newTLSConfig(rt, mode, kp, l.log), nil
-		}}
-		l.listen = listenTCP
-		l.secure = func(c net.Conn) (net.Conn, func(context.Context) error, error) {
-			tc := tls.Server(c, tlsConf)
-			return tc, tc.HandshakeContext, nil
-		}
-	case stnrv2.ProtocolSTDIN:
-		l.listen = func() (net.Listener, error) { return util.NewStdioListener(), nil }
-	case stnrv2.ProtocolFIFO:
-		l.listen = func() (net.Listener, error) {
-			return rt.Fifos.Listen(context.Background(), fifo.Network, req.Addr)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported listener protocol %q", proto.String())
-	}
 	return l, nil
+}
+
+// socket makes the socket of the listener: a dialing one, or the bound one of its protocol.
+func (l *Listener) socket() (net.Listener, error) {
+	addr := net.JoinHostPort(l.addr, strconv.Itoa(l.port))
+	switch {
+	case l.connect != nil:
+		return dialer.NewListener(&stnrv2.ListenerConfig{Name: l.Name(), Protocol: l.tag.Proto.String(),
+			Addr: l.addr, Port: l.port, Connect: l.connect}, l.rt, l.admits)
+	case l.tag.Proto == stnrv2.ProtocolUDP || l.tag.Proto == stnrv2.ProtocolDTLS:
+		lc := udp.DefaultListenConfig
+		lc.Net, lc.Admit = l.rt.Net, l.admits
+		return lc.Listen("udp", addr)
+	case l.tag.Proto == stnrv2.ProtocolTCP || l.tag.Proto == stnrv2.ProtocolTLS:
+		return l.rt.Net.CreateListenConfig(&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	case l.tag.Proto == stnrv2.ProtocolSTDIN:
+		return util.NewStdioListener(), nil
+	case l.tag.Proto == stnrv2.ProtocolFIFO:
+		return l.rt.Fifos.Listen(context.Background(), fifo.Network, l.addr)
+	}
+	return nil, fmt.Errorf("unsupported listener protocol %q", l.tag.Proto.String())
+}
+
+// secure starts the server side of TLS or DTLS on an accepted conn, with the certificate and the
+// PQC mode of the moment, and returns the handshake to complete.
+func (l *Listener) secure(c net.Conn) (net.Conn, func(context.Context) error, error) {
+	l.mu.RLock()
+	mode, kp := l.pqcMode, l.keyPair
+	l.mu.RUnlock()
+	if l.tag.Proto == stnrv2.ProtocolTLS {
+		tc := tls.Server(c, newTLSConfig(l.rt, mode, kp, l.log))
+		return tc, tc.HandshakeContext, nil
+	}
+	dc, err := dtls.ServerWithOptions(netconn.PacketConn{Conn: c}, c.RemoteAddr(),
+		dtls.WithCertificates(kp))
+	if err != nil {
+		return nil, nil, err
+	}
+	return dc, dc.HandshakeContext, nil
 }
 
 // desiredListener returns the validated listener config of a New, an Inspect or a Reconcile.
@@ -164,7 +154,8 @@ func desiredListener(conf stnrv2.Config) (*stnrv2.ListenerConfig, error) {
 func (l *Listener) Name() string             { return l.tag.Name }
 func (l *Listener) Type() runtime.ObjectType { return runtime.TypeListener }
 
-// Inspect restarts on a socket change (protocol, address, port); the rest reconciles in place.
+// Inspect restarts on a socket change (protocol, address, port, connect); the rest reconciles in
+// place.
 func (l *Listener) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (runtime.Action, error) {
 	req, err := desiredListener(new)
 	if err != nil {
@@ -181,7 +172,8 @@ func (l *Listener) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (
 	switch {
 	case cur.DeepEqual(req):
 		return runtime.ActionNone, nil
-	case cur.Protocol != req.Protocol || cur.Addr != req.Addr || cur.Port != req.Port:
+	case cur.Protocol != req.Protocol || cur.Addr != req.Addr || cur.Port != req.Port ||
+		!reflect.DeepEqual(cur.Connect, req.Connect):
 		return runtime.ActionRestart, nil
 	}
 	return runtime.ActionReconcile, nil
@@ -202,9 +194,16 @@ func (l *Listener) Reconcile(conf stnrv2.Config) error {
 	keyPair := l.keyPair
 	l.mu.RUnlock()
 	if l.ln != nil {
-		if keyPair, err = l.loadKeyPair(req.Cert, req.Key); err != nil {
+		if keyPair, err = l.loadKeyPair(req.TLS); err != nil {
 			return err
 		}
+	}
+	var tlsConf *stnrv2.TLSConfig
+	pqcMode := stnrv2.PQCModeDefault
+	if req.TLS != nil {
+		tlsConf = req.TLS.DeepCopy()
+		// a validated config holds a known mode
+		pqcMode, _ = stnrv2.NewPQCMode(req.TLS.PQCMode)
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -212,17 +211,19 @@ func (l *Listener) Reconcile(conf stnrv2.Config) error {
 	l.labels = maps.Clone(req.Labels)
 	l.publicAddr, l.publicPort = req.PublicAddr, req.PublicPort
 	l.publicAddrs = slices.Clone(req.PublicAddrs)
-	// a validated config holds a known mode
-	l.pqcMode, _ = stnrv2.NewPQCMode(req.PQCMode)
-	l.cert, l.key, l.keyPair = req.Cert, req.Key, keyPair
+	l.tls, l.pqcMode, l.keyPair = tlsConf, pqcMode, keyPair
 	return nil
 }
 
-// loadKeyPair loads the base64 PEM certificate and key of a TLS or DTLS listener; other listeners
-// have none.
-func (l *Listener) loadKeyPair(certB64, keyB64 string) (tls.Certificate, error) {
-	if l.tag.Proto != stnrv2.ProtocolTLS && l.tag.Proto != stnrv2.ProtocolDTLS {
+// loadKeyPair loads the base64 PEM certificate and key of an accepting TLS or DTLS listener;
+// other listeners have none.
+func (l *Listener) loadKeyPair(conf *stnrv2.TLSConfig) (tls.Certificate, error) {
+	if l.connect != nil || l.tag.Proto != stnrv2.ProtocolTLS && l.tag.Proto != stnrv2.ProtocolDTLS {
 		return tls.Certificate{}, nil
+	}
+	var certB64, keyB64 string
+	if conf != nil {
+		certB64, keyB64 = conf.Cert, conf.Key
 	}
 	cert, err := base64.StdEncoding.DecodeString(certB64)
 	if err != nil {
@@ -251,13 +252,16 @@ func (l *Listener) GetConfig() stnrv2.Config {
 		PublicAddr:  l.publicAddr,
 		PublicPort:  l.publicPort,
 		PublicAddrs: slices.Clone(l.publicAddrs),
-		Cert:        l.cert,
-		Key:         l.key,
-		PQCMode:     l.pqcMode.String(),
 		Filters:     slices.Clone(l.filters),
 		Labels:      maps.Clone(l.labels),
 	}
+	if l.tls != nil {
+		c.TLS = l.tls.DeepCopy()
+	}
 	l.mu.RUnlock()
+	if l.connect != nil {
+		c.Connect = l.connect.DeepCopy()
+	}
 	_ = c.Validate()
 	return c
 }
@@ -276,28 +280,33 @@ func (l *Listener) Status() stnrv2.Status {
 // Start loads the certificate and binds the socket.
 func (l *Listener) Start() error {
 	l.mu.RLock()
-	certB64, keyB64 := l.cert, l.key
+	tlsConf := l.tls
 	l.mu.RUnlock()
-	keyPair, err := l.loadKeyPair(certB64, keyB64)
+	keyPair, err := l.loadKeyPair(tlsConf)
 	if err != nil {
 		return err
 	}
 	l.mu.Lock()
 	l.keyPair = keyPair
 	l.mu.Unlock()
-	ln, err := l.listen()
+	ln, err := l.socket()
 	if err != nil {
 		return fmt.Errorf("failed to create %s listener at %s:%d: %w", l.tag.Proto.String(),
 			l.addr, l.port, err)
 	}
 	l.ln = ln
 	go l.accept()
-	l.log.Infof("listener %s: %s listener running at %s", l.Name(), l.tag.Proto.String(),
+	// the socket of a dialing listener reports the peer it dials as its address
+	state := "running at"
+	if l.connect != nil {
+		state = "dialing"
+	}
+	l.log.Infof("listener %s: %s listener %s %s", l.Name(), l.tag.Proto.String(), state,
 		ln.Addr().String())
 	return nil
 }
 
-// Close closes the socket. Emitted conns stay up.
+// Close closes the socket. Emitted conns stay up, except the conn of a dialing listener.
 func (l *Listener) Close(_ bool) error {
 	l.closeOnce.Do(func() { close(l.closed) })
 	if l.ln == nil {
@@ -364,35 +373,40 @@ func (l *Listener) accept() {
 		if err != nil {
 			return
 		}
-		// a UDP listener admits its sources before it makes a conn
-		if l.tag.Proto != stnrv2.ProtocolUDP && l.tag.Proto != stnrv2.ProtocolDTLS &&
-			!l.admits(c.RemoteAddr()) {
+		switch {
+		case l.connect == nil && l.tag.Proto != stnrv2.ProtocolUDP &&
+			l.tag.Proto != stnrv2.ProtocolDTLS && !l.admits(c.RemoteAddr()):
+			// dialed conns are admitted by the dialer before it dials, UDP ones by the intake
+			// before it makes a conn
 			_ = c.Close()
-			continue
-		}
-		if l.secure == nil {
+		case l.connect == nil && (l.tag.Proto == stnrv2.ProtocolTLS || l.tag.Proto == stnrv2.ProtocolDTLS):
+			if sc, handshake, err := l.secure(c); err != nil {
+				l.log.Debugf("listener %s: cannot secure the conn of %s: %s", l.Name(),
+					c.RemoteAddr().String(), err.Error())
+				_ = c.Close()
+			} else {
+				go l.handshake(l.emit(sc), handshake)
+			}
+		default:
+			// a plain conn, or a dialed one: the dialer has secured it
 			l.sink(l.emit(c))
-			continue
 		}
-		sc, handshake, err := l.secure(c)
-		if err != nil {
-			_ = c.Close()
-			continue
-		}
-		go l.handshake(l.emit(sc), handshake)
 	}
 }
 
-// emit accounts and tags a client conn.
+// emit accounts and tags a client conn; the conns of a dialing listener are accounted by its
+// dialer.
 func (l *Listener) emit(c net.Conn) api.Conn {
-	accounted := account.Conn(l.rt.Telemetry, c, l.Name(), telemetry.ListenerType)
+	if l.connect == nil {
+		c = account.Conn(l.rt.Telemetry, c, l.Name(), telemetry.ListenerType)
+	}
 	tag := l.tag
 	l.mu.RLock()
 	if len(l.labels) > 0 {
 		tag.Labels = l.labels
 	}
 	l.mu.RUnlock()
-	return netconn.NewConn(accounted, tag, nil)
+	return netconn.NewConn(c, tag, nil)
 }
 
 // handshake completes the TLS or DTLS handshake of a conn and hands it to the sink.
@@ -411,15 +425,3 @@ func (l *Listener) handshake(c api.Conn, handshake func(context.Context) error) 
 		l.sink(c)
 	}
 }
-
-// packetConn is the datagram view of a connected UDP conn that pion/dtls runs over.
-type packetConn struct {
-	net.Conn
-}
-
-func (c packetConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	n, err := c.Read(p)
-	return n, c.RemoteAddr(), err
-}
-
-func (c packetConn) WriteTo(p []byte, _ net.Addr) (int, error) { return c.Write(p) }

@@ -8,14 +8,16 @@ listeners:
   - name: tls
     protocol: TLS
     port: 443
-    cert: "$STUNNER_TLS_CERT"
-    key: "$STUNNER_TLS_KEY"
+    tls:
+      cert: "$STUNNER_TLS_CERT"
+      key: "$STUNNER_TLS_KEY"
     servers: [tls-to-tcp]
   - name: dtls
     protocol: DTLS
     port: 443
-    cert: "$STUNNER_TLS_CERT"
-    key: "$STUNNER_TLS_KEY"
+    tls:
+      cert: "$STUNNER_TLS_CERT"
+      key: "$STUNNER_TLS_KEY"
     servers: [dtls-to-udp]
 servers:
   - name: tls-to-tcp

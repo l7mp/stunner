@@ -65,7 +65,8 @@ func TestNewConfig(t *testing.T) {
 	})
 
 	t.Run("SNI overrides the server name", func(t *testing.T) {
-		s := &stnrv2.TunnelConfig{URL: "turns:1.2.3.4:5349?transport=tcp", SNI: "turn.example.com"}
+		s := &stnrv2.TunnelConfig{URL: "turns:1.2.3.4:5349?transport=tcp",
+			TLS: &stnrv2.TLSConfig{SNI: "turn.example.com"}}
 		c, err := NewConfig(s, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "turn.example.com", c.ServerName, "SNI wins")

@@ -340,13 +340,19 @@ func tunnelConfig(clientArg string, server *stnrv2.URI, peerProto stnrv2.Protoco
 	if !server.Protocol.IsTURN() {
 		return nil, fmt.Errorf("invalid TURN server %q: not a TURN transport", server.String())
 	}
-	tunnel := &stnrv2.TunnelConfig{URL: server.String(), Insecure: insecure}
+	tunnel := &stnrv2.TunnelConfig{URL: server.String()}
+	if insecure {
+		tunnel.TLS = &stnrv2.TLSConfig{Insecure: true}
+	}
 	if sni != "" {
 		if server.Protocol != stnrv2.ProtocolTURNTLS && server.Protocol != stnrv2.ProtocolTURNDTLS {
 			return nil, fmt.Errorf("--sni is valid only for the TLS/DTLS transports, "+
 				"server transport is %q", server.Protocol.String())
 		}
-		tunnel.SNI = sni
+		if tunnel.TLS == nil {
+			tunnel.TLS = &stnrv2.TLSConfig{}
+		}
+		tunnel.TLS.SNI = sni
 	}
 
 	listener := stnrv2.ListenerConfig{

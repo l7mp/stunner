@@ -89,8 +89,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Servers:  []string{"default-server"},
 			Addr:     "127.0.0.1",
 			Port:     23478,
-			Cert:     certPem64,
-			Key:      keyPem64,
+			TLS:      &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 		}},
 		Servers: []stnrv2.ServerConfig{{
 			ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
@@ -169,9 +168,9 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			Endpoints: []string{"127.0.0.1:65432"},
 			Protocol:  "UDP",
 			Tunnel: &stnrv2.TunnelConfig{
-				URL:      (&stnrv2.URI{Protocol: tunnelProto, Host: "127.0.0.1", Port: 23478}).String(),
-				Auth:     "upstream",
-				Insecure: true,
+				URL:  (&stnrv2.URI{Protocol: tunnelProto, Host: "127.0.0.1", Port: 23478}).String(),
+				Auth: "upstream",
+				TLS:  &stnrv2.TLSConfig{Insecure: true},
 			},
 		}},
 	})); err != nil {

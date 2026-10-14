@@ -161,7 +161,7 @@ func TestOffloadMatrix(t *testing.T) {
 		conf := &stnrv2.ListenerConfig{Name: name, Protocol: proto.String(), Servers: []string{srv.Name()},
 			Addr: "127.0.0.1", Port: freePort(t, network)}
 		if proto == stnrv2.ProtocolTLS || proto == stnrv2.ProtocolDTLS {
-			conf.Cert, conf.Key = cert, key
+			conf.TLS = &stnrv2.TLSConfig{Cert: cert, Key: key}
 		}
 		l, err := object.NewListener(conf, env.rt)
 		require.NoError(t, err)
@@ -255,7 +255,7 @@ func TestOffloadMatrix(t *testing.T) {
 					cconf.Protocol = stnrv2.ProtocolUDP.String()
 					cconf.Tunnel = &stnrv2.TunnelConfig{
 						URL:  (&stnrv2.URI{Protocol: row.cluster, Host: "127.0.0.1", Port: p}).String(),
-						Auth: stnrv2.DefaultAuthName, Insecure: true}
+						Auth: stnrv2.DefaultAuthName, TLS: &stnrv2.TLSConfig{Insecure: true}}
 				}
 				cl, err := object.NewCluster(cconf, env.rt)
 				require.NoError(t, err)

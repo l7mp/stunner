@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// ListenerConfig is a socket and the servers it feeds. Every listener has the same shape whatever
-// server it feeds.
+// ListenerConfig is a socket and the servers it feeds. A listener accepts connections or dials its
+// peer when Connect is set.
 type ListenerConfig struct {
 	// Name of the listener.
 	Name string `json:"name,omitempty"`
@@ -22,9 +22,11 @@ type ListenerConfig struct {
 	// a conn or passes it on to the next one.
 	Servers []string `json:"servers"`
 	// Addr is the IP address the listener binds or a plain string for FIFOs. Default (empty)
-	// is every address of the host, both families on a dual-stack host.
+	// is every address of the host, both families on a dual-stack host. A dialing listener
+	// binds it as the local address.
 	Addr string `json:"address,omitempty"`
-	// Port is the port the listener binds. Default is 3478.
+	// Port is the port the listener binds, required for an accepting UDP, TCP, TLS or DTLS
+	// listener. A dialing listener binds it as the local port, 0 is an ephemeral port.
 	Port int `json:"port,omitempty"`
 	// PublicAddr is the address clients reach the listener at from outside (used to build ICE
 	// server configurations, ignored by stunnerd). A bare host: an IP literal or a DNS name.
@@ -34,18 +36,35 @@ type ListenerConfig struct {
 	// PublicAddrs is the list of public addresses of a dual-stack listener (ignored by
 	// stunnerd).
 	PublicAddrs []string `json:"public_addresses,omitempty"`
-	// Cert is the base64-encoded TLS certificate of a TLS or DTLS listener.
-	Cert string `json:"cert,omitempty"`
-	// Key is the base64-encoded TLS key of a TLS or DTLS listener.
-	Key string `json:"key,omitempty"`
-	// PQCMode is the post-quantum key exchange policy of a TLS listener: "default",
-	// "preferred" or "enforced".
-	PQCMode string `json:"pqc_mode,omitempty"`
+	// Connect makes the listener dial its peer instead of accepting conns, and redial whenever
+	// the conn closes. Empty is an accepting listener.
+	Connect *ListenerConnectConfig `json:"connect,omitempty"`
+	// TLS is the TLS or DTLS of an accepting TLS or DTLS listener, the others ignore it: the
+	// listener presents its cert. A dialing listener takes its TLS from Connect.
+	TLS *TLSConfig `json:"tls,omitempty"`
 	// Filters name the filters checking a client's source before a conn is made for it.
 	Filters []string `json:"filters,omitempty"`
 	// Labels are key-value pairs every conn of the listener carries in its tag, telling the
 	// servers what the conn is for.
 	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// ListenerConnectConfig is the peer a dialing listener dials. Retry and keepalive are automatic.
+type ListenerConnectConfig struct {
+	// Address is the host:port of the peer, the host re-resolved on every dial.
+	Address string `json:"address"`
+	// TLS is how a TLS or DTLS listener verifies the peer and, optionally, the certificate it
+	// presents; nil is the system roots and the host of Address. Other listeners ignore it.
+	TLS *TLSConfig `json:"tls,omitempty"`
+}
+
+// DeepCopy copies a connect configuration.
+func (c *ListenerConnectConfig) DeepCopy() *ListenerConnectConfig {
+	ret := *c
+	if c.TLS != nil {
+		ret.TLS = c.TLS.DeepCopy()
+	}
+	return &ret
 }
 
 // Validate checks a configuration and injects defaults.
@@ -63,25 +82,39 @@ func (req *ListenerConfig) Validate() error {
 	req.Protocol = proto.String()
 
 	// A STDIN listener serves the process stdio pair and a FIFO listener a named fifo: neither
-	// has a socket, so they ignore the port and get no default for it.
+	// has a socket, so they ignore the port. A dialing listener binds an ephemeral port by
+	// default.
 	if proto == ProtocolFIFO && req.Addr == "" {
 		return fmt.Errorf("FIFO listener %q names no fifo in its address", req.Name)
 	}
-	if proto != ProtocolSTDIN && proto != ProtocolFIFO && req.Port == 0 {
-		req.Port = DefaultPort
+	if proto != ProtocolSTDIN && proto != ProtocolFIFO && req.Connect == nil && req.Port == 0 {
+		return fmt.Errorf("missing port in %s listener %q", proto.String(), req.Name)
 	}
 	if req.Port < 0 || req.Port > 65535 {
 		return fmt.Errorf("invalid port: %d", req.Port)
 	}
 
-	// Only TLS listeners take a PQC mode, the others ignore it.
-	pqcMode, err := NewPQCMode(req.PQCMode)
-	if err != nil {
-		return err
+	if c := req.Connect; c != nil {
+		host, port, err := net.SplitHostPort(c.Address)
+		if err != nil {
+			return fmt.Errorf("invalid connect address %q in listener %q: %w", c.Address,
+				req.Name, err)
+		}
+		if p, err := strconv.Atoi(port); host == "" || err != nil || p < 1 || p > 65535 {
+			return fmt.Errorf("invalid connect address %q in listener %q: want host:port",
+				c.Address, req.Name)
+		}
+		if c.TLS != nil {
+			if err := c.TLS.Validate(); err != nil {
+				return fmt.Errorf("%w in the connect block of listener %q", err, req.Name)
+			}
+		}
 	}
-	req.PQCMode = ""
-	if pqcMode != PQCModeDefault {
-		req.PQCMode = pqcMode.String()
+
+	if req.TLS != nil {
+		if err := req.TLS.Validate(); err != nil {
+			return fmt.Errorf("%w in listener %q", err, req.Name)
+		}
 	}
 
 	if req.PublicAddrs == nil {
@@ -128,6 +161,12 @@ func (req *ListenerConfig) DeepCopyInto(dst Config) {
 	ret.PublicAddrs = slices.Clone(req.PublicAddrs)
 	ret.Filters = slices.Clone(req.Filters)
 	ret.Labels = maps.Clone(req.Labels)
+	if req.Connect != nil {
+		ret.Connect = req.Connect.DeepCopy()
+	}
+	if req.TLS != nil {
+		ret.TLS = req.TLS.DeepCopy()
+	}
 }
 
 // String stringifies the configuration.
@@ -149,6 +188,12 @@ func (req *ListenerConfig) String() string {
 		status = append(status, fmt.Sprintf("%s://%s", strings.ToLower(req.Protocol),
 			net.JoinHostPort(addr, strconv.Itoa(req.Port))))
 	}
+	if c := req.Connect; c != nil {
+		status = append(status, "connect="+c.Address)
+		if c.TLS != nil {
+			status = append(status, "connect-"+c.TLS.String())
+		}
+	}
 	status = append(status, fmt.Sprintf("servers=[%s]", strings.Join(req.Servers, ",")))
 
 	a, p := "-", "-"
@@ -160,16 +205,8 @@ func (req *ListenerConfig) String() string {
 	}
 	status = append(status, fmt.Sprintf("public=%s", net.JoinHostPort(a, p)))
 
-	c, k := "-", "-"
-	if req.Cert != "" {
-		c = "<SECRET>"
-	}
-	if req.Key != "" {
-		k = "<SECRET>"
-	}
-	status = append(status, fmt.Sprintf("cert/key=%s/%s", c, k))
-	if req.PQCMode != "" {
-		status = append(status, fmt.Sprintf("pqc=%s", req.PQCMode))
+	if req.TLS != nil {
+		status = append(status, req.TLS.String())
 	}
 	if len(req.Filters) > 0 {
 		status = append(status, fmt.Sprintf("filters=[%s]", strings.Join(req.Filters, ",")))

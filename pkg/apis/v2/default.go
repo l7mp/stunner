@@ -18,6 +18,7 @@ const (
 	DefaultMaxRelayPort           int    = 1<<16 - 1
 	DefaultClusterType                   = "STATIC"
 	DefaultLBPolicy                      = "ROUND_ROBIN"
+	DefaultSIPRegistrationExpires        = "600s"
 	DefaultAdminName                     = "default-admin-config"
 	DefaultAuthName                      = "default"
 	DefaultHealthName                    = "default-health"

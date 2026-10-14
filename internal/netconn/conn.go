@@ -39,3 +39,15 @@ func (c *conn) Channel(peer net.Addr) (uint16, bool) {
 	}
 	return 0, false
 }
+
+// PacketConn is the datagram view of a connected conn, the shape pion/dtls runs over.
+type PacketConn struct {
+	net.Conn
+}
+
+func (c PacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	n, err := c.Read(p)
+	return n, c.RemoteAddr(), err
+}
+
+func (c PacketConn) WriteTo(p []byte, _ net.Addr) (int, error) { return c.Write(p) }

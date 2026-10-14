@@ -33,6 +33,7 @@ type Cluster struct {
 	endpoints  []string
 	protocol   stnrv2.Protocol
 	tunnel     *stnrv2.TunnelConfig
+	tls        *stnrv2.TLSConfig
 	addrs      []string
 	filters    []string
 	router     api.Router
@@ -100,7 +101,7 @@ func (c *Cluster) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (r
 	return runtime.ActionReconcile, nil
 }
 
-// Reconcile rebuilds the router, swaps the dialer on a change of its protocol, tunnel or addresses,
+// Reconcile rebuilds the router, swaps the dialer on a change of its protocol, tunnel, TLS or addresses,
 // and moves the resolver registrations of a running cluster to the new domains.
 func (c *Cluster) Reconcile(conf stnrv2.Config) error {
 	req, err := desiredCluster(conf)
@@ -118,7 +119,7 @@ func (c *Cluster) Reconcile(conf stnrv2.Config) error {
 
 	old, d := c.dialer, c.dialer
 	if old == nil || c.protocol != proto || !reflect.DeepEqual(c.tunnel, req.Tunnel) ||
-		!slices.Equal(c.addrs, req.Addrs) {
+		!reflect.DeepEqual(c.tls, req.TLS) || !slices.Equal(c.addrs, req.Addrs) {
 		if d, err = dialer.New(req, c.rt, c.admits); err != nil {
 			return err
 		}
@@ -133,9 +134,13 @@ func (c *Cluster) Reconcile(conf stnrv2.Config) error {
 	if req.Tunnel != nil {
 		tunnel = req.Tunnel.DeepCopy()
 	}
+	var tlsConf *stnrv2.TLSConfig
+	if req.TLS != nil {
+		tlsConf = req.TLS.DeepCopy()
+	}
 	c.mu.Lock()
 	c.typ, c.endpoints = req.Type, slices.Clone(req.Endpoints)
-	c.protocol, c.tunnel, c.addrs = proto, tunnel, slices.Clone(req.Addrs)
+	c.protocol, c.tunnel, c.tls, c.addrs = proto, tunnel, tlsConf, slices.Clone(req.Addrs)
 	c.filters, c.router, c.dialer = slices.Clone(req.Filters), r, d
 	c.mu.Unlock()
 	if old != nil && old != d {
@@ -173,6 +178,9 @@ func (c *Cluster) GetConfig() stnrv2.Config {
 	}
 	if c.tunnel != nil {
 		conf.Tunnel = c.tunnel.DeepCopy()
+	}
+	if c.tls != nil {
+		conf.TLS = c.tls.DeepCopy()
 	}
 	c.mu.RUnlock()
 	_ = conf.Validate()

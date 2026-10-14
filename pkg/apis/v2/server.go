@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 )
 
 // ServerSpec is base server config shared across all transport servers.
@@ -64,6 +65,26 @@ type SIPServerConfig struct {
 	PublicPort int `json:"public_port,omitempty"`
 	// MediaProxy names the cluster reaching the ng control endpoint of the media proxy.
 	MediaProxy string `json:"media_proxy,omitempty"`
+	// LBPolicy is how the server chooses the in-cluster SIP target of a new dialog among the
+	// targets of its clusters: ROUND_ROBIN (the default).
+	LBPolicy string `json:"lb_policy,omitempty"`
+	// Registrations are the registrations the server keeps up with registrar-based carriers,
+	// each over the conns of the listeners labeled RegistrationLabel: its name.
+	Registrations []SIPRegistrationConfig `json:"registrations,omitempty"`
+}
+
+// SIPRegistrationConfig is a registration of an address of record with a carrier's registrar.
+type SIPRegistrationConfig struct {
+	// Name of the registration, the value of the RegistrationLabel of its listeners.
+	Name string `json:"name"`
+	// Auth names the authentication policy holding the credentials the server answers the
+	// registrar's digest challenge with. Default is none.
+	Auth string `json:"auth,omitempty"`
+	// AOR is the address of record to register, a sip: or sips: URI.
+	AOR string `json:"aor"`
+	// Expires is the registration lifetime the server asks for, as a duration string. Default
+	// is 600s.
+	Expires string `json:"expires,omitempty"`
 }
 
 // RTPServerConfig holds the options of an RTP server: a media proxy relaying the media of the
@@ -81,6 +102,10 @@ const (
 	RoleLabel   = "role"
 	RoleControl = "control"
 )
+
+// RegistrationLabel is the listener label naming the SIP registration the conns of the listener
+// carry.
+const RegistrationLabel = "sip.registration"
 
 // Validate checks a configuration and injects defaults.
 func (req *ServerConfig) Validate() error {
@@ -126,6 +151,31 @@ func (req *ServerConfig) Validate() error {
 		if req.SIP == nil {
 			req.SIP = &SIPServerConfig{}
 		}
+		if req.SIP.LBPolicy == "" {
+			req.SIP.LBPolicy = DefaultLBPolicy
+		}
+		p, err := NewLBPolicy(req.SIP.LBPolicy)
+		if err != nil {
+			return err
+		}
+		req.SIP.LBPolicy = p.String()
+		for i := range req.SIP.Registrations {
+			r := &req.SIP.Registrations[i]
+			if r.Name == "" {
+				return fmt.Errorf("missing name in SIP registration of server %q", req.Name)
+			}
+			if aor := strings.ToLower(r.AOR); !strings.HasPrefix(aor, "sip:") &&
+				!strings.HasPrefix(aor, "sips:") {
+				return fmt.Errorf("invalid AOR %q in SIP registration %q: want a sip: or sips: URI",
+					r.AOR, r.Name)
+			}
+			if r.Expires == "" {
+				r.Expires = DefaultSIPRegistrationExpires
+			}
+			if d, err := time.ParseDuration(r.Expires); err != nil || d <= 0 {
+				return fmt.Errorf("invalid expires %q in SIP registration %q", r.Expires, r.Name)
+			}
+		}
 	case ServerTypeRTP:
 		if req.RTP == nil {
 			req.RTP = &RTPServerConfig{}
@@ -160,6 +210,7 @@ func (req *ServerConfig) DeepCopyInto(dst Config) {
 	}
 	if req.SIP != nil {
 		sip := *req.SIP
+		sip.Registrations = slices.Clone(req.SIP.Registrations)
 		ret.SIP = &sip
 	}
 	if req.RTP != nil {
@@ -193,8 +244,15 @@ func (req *ServerConfig) String() string {
 		if sip.Auth != "" {
 			opts += ",auth=" + sip.Auth
 		}
-		opts += fmt.Sprintf(",public=%s:%d,media_proxy=%s", sip.PublicAddr, sip.PublicPort,
-			sip.MediaProxy)
+		opts += fmt.Sprintf(",public=%s:%d,media_proxy=%s,lb_policy=%s", sip.PublicAddr,
+			sip.PublicPort, sip.MediaProxy, sip.LBPolicy)
+		if len(sip.Registrations) > 0 {
+			names := []string{}
+			for _, r := range sip.Registrations {
+				names = append(names, r.Name)
+			}
+			opts += ",registrations=[" + strings.Join(names, ",") + "]"
+		}
 	}
 	if rtp := req.RTP; rtp != nil {
 		opts += fmt.Sprintf(",public=%s:%d", rtp.PublicAddr, rtp.PublicPort)

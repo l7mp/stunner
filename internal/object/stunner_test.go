@@ -110,7 +110,7 @@ func TestStunnerStatus(t *testing.T) {
 	require.NoError(t, err)
 	mustAdd(t, env, server)
 	listener, err := object.NewListener(&stnrv2.ListenerConfig{Name: "listener-a",
-		Servers: []string{"server-a"}}, env.rt)
+		Port: stnrv2.DefaultPort, Servers: []string{"server-a"}}, env.rt)
 	require.NoError(t, err)
 	mustAdd(t, env, listener)
 
