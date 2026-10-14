@@ -9,6 +9,9 @@ use_directory_urls: true
 theme:
   name: readthedocs
   highlightjs: true
+# the build requirements of the docs are not part of the site
+exclude_docs: |
+  /requirements.*
 nav:
 - 'Overview':
   - 'Why STUNner': 'WHY.md'
