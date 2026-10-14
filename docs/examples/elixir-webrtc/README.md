@@ -24,7 +24,7 @@ To run this example, you need:
 
 ### STUNner
 
-Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](livekit-server.yaml) packaged with STUNner.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](nexus-server.yaml) packaged with STUNner.
 
 To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
@@ -78,7 +78,7 @@ export STUNNERIP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.sta
 ### Nexus Docker images
 
 The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server.
-Unfortunately, currently the [official Nexus Docker image](ghcr.io/elixir-webrtc/apps/nexus) does not support this configuration in runtime (by default Google's STUN server is hardcoded into it).
+Unfortunately, currently the [official Nexus Docker image](https://ghcr.io/elixir-webrtc/apps/nexus) does not support this configuration in runtime (by default Google's STUN server is hardcoded into it).
 Therefore, we have to modify this setting to STUNner's IP and build a new Docker image.
 
 In order to achieve this, first clone the Elixir WebRTC sample app repository:
