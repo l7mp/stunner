@@ -48,6 +48,7 @@ build-bin:
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerd ./cmd/stunnerd
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/stunnerctl ./cmd/stunnerctl
 	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/icetester ./cmd/icetester
+	go build ${GOARGS} -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/softphone ./cmd/softphone
 
 .PHONY: clean
 clean:

@@ -1,0 +1,75 @@
+# A SIP gateway registered with a carrier: stunnerd dials the carrier's SBC over TLS, registers the
+# number with it, and takes the inbound calls over the same flow, so its egress address never
+# matters. The SIP server proxies the calls to a SIP backend over TLS, and the RTP server relays
+# their media on UDP/30000 to the media peers in 10.0.0.0/8, controlled over ng on an in-process
+# fifo. The carrier sends its media to the public address of the RTP listener.
+version: v2
+admin:
+  name: sip-registration
+  loglevel: all:INFO
+auths:
+  - name: default
+    type: none
+  # the credentials the registration answers the carrier's digest challenge with
+  - name: carrier-digest
+    type: static
+    credentials:
+      username: "+3612345678"
+      password: carrier-password
+listeners:
+  # dials the carrier instead of accepting; the label ties its conns to the registration
+  - name: carrier
+    protocol: TLS
+    connect:
+      address: "sip.carrier.example:5061"
+      # optional: the system roots verify the carrier against the host of the address by default
+      # tls:
+      #   ca: "$CARRIER_CA"
+    servers: [sip]
+    labels: {sip.registration: carrier}
+  - name: media
+    protocol: UDP
+    port: 30000
+    servers: [rtp]
+  - name: rtp-ng
+    protocol: FIFO
+    address: rtp-ng
+    servers: [rtp]
+    labels: {role: control}
+servers:
+  - name: sip
+    type: SIP
+    clusters: [sip-backend]
+    sip:
+      media_proxy: rtp-ng
+      registrations:
+        - name: carrier
+          auth: carrier-digest
+          aor: "sip:+3612345678@sip.carrier.example"
+          expires: 600s
+  - name: rtp
+    type: RTP
+    clusters: [media-peers]
+    rtp:
+      public_address: "$STUNNER_ADDR"
+      public_port: 30000
+clusters:
+  # TLS towards the SIP backend: the backend's certificate is verified against the SNI
+  - name: sip-backend
+    protocol: TCP
+    endpoints: ["$SIP_BACKEND:5061"]
+    tls:
+      sni: sip-backend.example.com
+  - name: media-peers
+    protocol: UDP
+    addresses: ["$STUNNER_ADDR"]
+    filters: [media]
+  - name: rtp-ng
+    protocol: FIFO
+    addresses: [rtp-ng]
+filters:
+  - name: media
+    rules:
+      - action: ALLOW
+        ip_block: {cidr: 10.0.0.0/8}
+      - action: DENY
