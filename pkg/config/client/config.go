@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strconv"
 
-	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1" //nolint:staticcheck // loads deprecated v1 configs
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"sigs.k8s.io/yaml"
 )
@@ -112,8 +112,8 @@ func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
 	return confExp, nil
 }
 
-// parseRaw parses a v1 or a v2 config, returning it as v2: a v1 config (what the gateway operator
-// renders) is converted.
+// parseRaw parses a v1 or a v2 config, returning it as v2: a v1 config is converted. The v1 config
+// API is deprecated.
 func parseRaw(c []byte) (*stnrv2.StunnerConfig, error) {
 	// try to parse only the config version first
 	k := ConfigSkeleton{}

@@ -1,4 +1,6 @@
-// Package v1 is the v1 version of the STUNner API.
+// Package v1 is the v1 version of the STUNner API. v1 configs are converted to v2 on load.
+//
+// Deprecated: write v2 configs (package v2); v1 support will be removed in a later release.
 package v1
 
 // Config is the main interface for STUNner configuration objects.
