@@ -10,6 +10,7 @@ import (
 	"time"
 
 	sipmsg "github.com/emiago/sipgo/sip"
+	"github.com/icholy/digest"
 	"github.com/pion/stun/v4"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
@@ -26,13 +27,34 @@ var (
 	KeepaliveMisses = 2
 )
 
-var errDigestNotImplemented = errors.New("digest authentication towards registrars is not implemented")
-
-// answerChallenge answers the digest challenge of a registrar with the credentials of the auth
-// policy of a registration, returning the Authorization or Proxy-Authorization header to retry
-// with. The open-source build has no digest towards registrars.
-var answerChallenge = func(_ *Server, _ stnrv2.SIPRegistrationConfig, _ *sipmsg.Request, _ *sipmsg.Response) (sipmsg.Header, error) {
-	return nil, errDigestNotImplemented
+// answerChallenge answers the digest challenge of a registrar with the username and password of the
+// auth policy of a registration, returning the Authorization or Proxy-Authorization header to
+// retry with.
+func (s *Server) answerChallenge(reg stnrv2.SIPRegistrationConfig, req *sipmsg.Request, res *sipmsg.Response) (sipmsg.Header, error) {
+	auth := s.rt.AuthConfig(reg.Auth)
+	if auth == nil || auth.Credentials["username"] == "" {
+		return nil, fmt.Errorf("no username in auth policy %q", reg.Auth)
+	}
+	challenge, answer := "WWW-Authenticate", "Authorization"
+	if res.StatusCode == sipmsg.StatusProxyAuthRequired {
+		challenge, answer = "Proxy-Authenticate", "Proxy-Authorization"
+	}
+	h := res.GetHeader(challenge)
+	if h == nil {
+		return nil, fmt.Errorf("no %s header", challenge)
+	}
+	chal, err := digest.ParseChallenge(h.Value())
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: %w", challenge, err)
+	}
+	// registrars send the algorithm in lower case too
+	chal.Algorithm = strings.ToUpper(chal.Algorithm)
+	cred, err := digest.Digest(chal, digest.Options{Method: req.Method.String(), URI: req.Recipient.String(),
+		Count: 1, Username: auth.Credentials["username"], Password: auth.Credentials["password"]})
+	if err != nil {
+		return nil, err
+	}
+	return sipmsg.NewHeader(answer, cred.String()), nil
 }
 
 // register keeps a registration up over the flow of a peer: a REGISTER now, a refresh at half of
@@ -132,7 +154,7 @@ func (s *Server) registerOnce(p *peer, reg stnrv2.SIPRegistrationConfig, callID,
 			return 0, errors.New("the registrar granted no expiry")
 		case (res.StatusCode == sipmsg.StatusUnauthorized || res.StatusCode == sipmsg.StatusProxyAuthRequired) &&
 			auth == nil:
-			if auth, err = answerChallenge(s, reg, req, res); err != nil {
+			if auth, err = s.answerChallenge(reg, req, res); err != nil {
 				return 0, fmt.Errorf("%d %s: %w", res.StatusCode, res.Reason, err)
 			}
 		case res.StatusCode == sipmsg.StatusIntervalToBrief:

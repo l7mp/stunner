@@ -9,6 +9,7 @@ import (
 	"time"
 
 	sipmsg "github.com/emiago/sipgo/sip"
+	"github.com/icholy/digest"
 	"github.com/pion/stun/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,11 +74,29 @@ func (r *registrar) closed() bool {
 	return err == io.EOF || err == io.ErrClosedPipe
 }
 
-// newRegistration starts a SIP server with the registration "carrier" and hands it a flow of a
-// protocol labeled with it; the other end of the flow is returned.
+// authPolicy is an auth policy in the runtime.
+type authPolicy struct{ conf *stnrv2.AuthConfig }
+
+func (a authPolicy) Name() string                { return a.conf.Name }
+func (authPolicy) Type() objruntime.ObjectType   { return objruntime.TypeAuth }
+func (authPolicy) Start() error                  { return nil }
+func (authPolicy) Close(bool) error              { return nil }
+func (a authPolicy) GetConfig() stnrv2.Config    { return a.conf }
+func (authPolicy) Reconcile(stnrv2.Config) error { return nil }
+func (authPolicy) Status() stnrv2.Status         { return nil }
+func (authPolicy) Inspect(_, _ stnrv2.Config, _ *stnrv2.StunnerConfig) (objruntime.Action, error) {
+	return objruntime.ActionNone, nil
+}
+
+// newRegistration starts a SIP server with the registration "carrier", whose auth policy holds
+// the carrier's credentials, and hands it a flow of a protocol labeled with it; the other end of
+// the flow is returned.
 func newRegistration(t *testing.T, proto stnrv2.Protocol) *registrar {
 	t.Helper()
 	rt := objruntime.New(objruntime.Config{Logger: logger.NewLoggerFactory("all:ERROR")})
+	require.NoError(t, rt.Registry.Add(authPolicy{&stnrv2.AuthConfig{Name: "carrier-digest",
+		Type:        stnrv2.AuthTypeStatic.String(),
+		Credentials: map[string]string{"username": "+3612345678", "password": "secret"}}}, nil))
 	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "sip", Type: "SIP"},
 		SIP: &stnrv2.SIPServerConfig{Registrations: []stnrv2.SIPRegistrationConfig{
 			{Name: "carrier", Auth: "carrier-digest", AOR: "sip:+3612345678@sip.carrier.example"}}}}
@@ -132,13 +151,39 @@ func TestRegistration(t *testing.T) {
 	})
 
 	t.Run("challenge", func(t *testing.T) {
-		// the open-source build answers no digest challenge: the flow is closed, so its dialing
-		// listener redials
-		r := newRegistration(t, stnrv2.ProtocolTCP)
-		req := r.next()
-		r.answer(req, sipmsg.StatusUnauthorized, "Unauthorized",
-			sipmsg.NewHeader("WWW-Authenticate", `Digest realm="carrier", nonce="n"`))
-		assert.True(t, r.closed(), "the flow is closed")
+		for _, c := range []struct {
+			code              int
+			challenge, answer string
+		}{
+			{sipmsg.StatusUnauthorized, "WWW-Authenticate", "Authorization"},
+			{sipmsg.StatusProxyAuthRequired, "Proxy-Authenticate", "Proxy-Authorization"},
+		} {
+			r := newRegistration(t, stnrv2.ProtocolTCP)
+			req := r.next()
+			chal := `Digest realm="carrier", nonce="n", algorithm=md5, qop="auth"`
+			r.answer(req, c.code, "Challenge", sipmsg.NewHeader(c.challenge, chal))
+
+			// the retry carries a digest computed with the carrier's credentials
+			retry := r.next()
+			assert.Equal(t, req.CSeq().SeqNo+1, retry.CSeq().SeqNo)
+			h := retry.GetHeader(c.answer)
+			require.NotNil(t, h, c.answer)
+			cred, err := digest.ParseCredentials(h.Value())
+			require.NoError(t, err)
+			assert.Equal(t, "+3612345678", cred.Username)
+			parsed, err := digest.ParseChallenge(chal)
+			require.NoError(t, err)
+			parsed.Algorithm = "MD5"
+			want, err := digest.Digest(parsed, digest.Options{Method: "REGISTER",
+				URI: retry.Recipient.String(), Count: 1, Cnonce: cred.Cnonce,
+				Username: "+3612345678", Password: "secret"})
+			require.NoError(t, err)
+			assert.Equal(t, want.Response, cred.Response)
+
+			// a second challenge fails the flow, so its dialing listener redials
+			r.answer(retry, c.code, "Challenge", sipmsg.NewHeader(c.challenge, chal))
+			assert.True(t, r.closed(), "the flow is closed")
+		}
 	})
 
 	t.Run("refused", func(t *testing.T) {
