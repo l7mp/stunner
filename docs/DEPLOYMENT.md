@@ -13,15 +13,15 @@ how the carrier authenticates the trunk.
 ## Architectural models
 
 STUNner supports two architectural models, depending on whether it is used as a simple STUN/TURN
-service or it is functioning as an actual ingress gateway service to feed traffic into a media
-server pool deployed *behind* STUNner.
+service for real-time media or it is functioning as an actual ingress gateway service to feed
+traffic into a media server pool deployed *behind* STUNner.
 
 ### Headless deployment model
 
-In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that WebRTC
-clients and servers can use as a NAT traversal facility for establishing media connections between
-themselves. This is not that much different from a standard public STUN/TURN server setup, but in
-this case the STUN/TURN servers are deployed into Kubernetes.
+In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that can be
+used for real-time media clients and servers as a NAT traversal facility for establishing media
+connections between themselves. This is not that much different from a standard public STUN/TURN
+server setup, but in this case the STUN/TURN servers are deployed into Kubernetes.
 
 ![STUNner headless deployment architecture](img/stunner_standalone_arch.svg)
 
@@ -33,29 +33,28 @@ this case the STUN/TURN servers are deployed into Kubernetes.
 
 ### Media-plane deployment model
 
-In the fully fledged *media-plane deployment model*, STUNner implements a STUN/TURN ingress gateway
-service that WebRTC clients can use to open a transport relay connection to the media servers
-running *inside* the Kubernetes cluster. This makes it possible to deploy WebRTC application
-servers and media servers into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent
-tooling to manage, scale, monitor and troubleshoot the WebRTC infrastructure like any other
-cloud-bound workload.
+In the fully fledged *media-plane deployment model*, STUNner implements an ingress gateway service
+that real-time media clients can use to open a relay connection to the media servers running
+*inside* the Kubernetes cluster. This makes it possible to deploy WebRTC and SIP/VoIP services into
+ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
+monitor and troubleshoot media services like any other cloud-bound workload.
 
 ![STUNner media-plane deployment architecture](img/stunner_arch.svg)
 
-There is no limitation as to how many gateway and media server pods can be opened in this model,
-which theoretically means limitless scalability. Furthermore, by creating connection-tracking state
-for each client session STUNner supports the dynamic scale-out of the media server pool without
-dropping active client connections. Whether scaling STUNner itself causes client connection drops
-depend on the cloud provider's load-balancer service: if the load-balancer creates conntrack state
-for clients' UDP transport streams then STUNner can be scaled freely, otherwise scaling STUNner may
-result the [disconnection of a small number of client
-connections](https://cilium.io/blog/2020/11/10/cilium-19/#maglev).
+<!-- This model provides theoretically limitless scalability. Furthermore, by creating -->
+<!-- connection-tracking state for each client session STUNner supports the dynamic scale-out of the -->
+<!-- media server pool without dropping active client connections. Whether scaling STUNner itself causes -->
+<!-- client connection drops depend on the cloud provider's load-balancer service: if the load-balancer -->
+<!-- creates conntrack state for clients' UDP transport streams then STUNner can be scaled freely, -->
+<!-- otherwise scaling STUNner may result the [disconnection of a small number of client -->
+<!-- connections](https://cilium.io/blog/2020/11/10/cilium-19/#maglev). -->
 
-## ICE models
+## WebRTC ICE models
 
-The peers willing to create a connection via STUNner (e.g., two clients as per the headless model,
-or a client and a media server in the media-plane deployment model) need to decide how to create
-ICE candidates.
+WebRTC services rely on ICEm the Interactive Connectivity Establishment framework to establish
+direct peer-to-peer communication between browsers or devices, even when they are behind firewalls
+or Network Address Translation (NAT) routers.  STUNner offers two major modes for creating a
+working ICE association.
 
 ### Asymmetric ICE mode
 
@@ -132,38 +131,37 @@ you from adopting STUNner.
 ## SIP deployment models
 
 > [!WARNING]
-> The SIP gateway is experimental: its API may change in any release, it comes with no support,
-> and the official STUNner images serve one SIP Gateway with at most 5 parallel calls.
+> The SIP gateway is experimental: the API may change, there is no support, and the official
+> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
+> issues, but in any way use it at your own risk.
 
-A SIP trunk connects a carrier, who owns the phone numbers and the connection to the public phone
-network, to your SIP server. STUNner sits between the two as the trunk's gateway: it proxies the
-SIP signaling of every call to the SIP servers running in the cluster (for instance [LiveKit
-SIP](https://docs.livekit.io/sip)) and relays the call's RTP media between the carrier and those
-servers, so the SIP servers need no public address and no public RTP port range. Carriers offer two
-kinds of trunks, and STUNner supports both; the [SIP gateway guide](SIP.md) shows how to configure
-them.
+A SIP trunk connects a carrier, owning the phone numbers and the connection to the public phone
+network, to your Kubernetes-bound SIP server pool. STUNner sits between the two as a gateway: it
+proxies the SIP signaling to the SIP servers running in the cluster and relays RTP media between
+the carrier and the SIP servers. This allows SIP/RTP servers to run without a public address and a
+public RTP port range. STUNner supports two kinds of carrier trunks.
 
 In both models the carrier sends the media of a call to the public media port of the Gateway, and
-STUNner matches it by its source address. This requires a load balancer that preserves the
-carriers' source addresses (`externalTrafficPolicy: Local` on the Gateway's Service).
+STUNner matches packets to calls by the source IP address. This requires a load balancer that
+preserves the carriers' source addresses: most Kubernetes load-balancer integrations provide
+excellent support for this mode (`externalTrafficPolicy: Local` on the Gateway's Service).
 
 ### IP-authenticated SIP trunk
 
-In an *IP-authenticated trunk* (also called a static or peering trunk, as sold by most CPaaS
-providers like Twilio, Telnyx or Bandwidth), the carrier sends the calls to a SIP address you give
-it, from a known set of signaling addresses. STUNner exposes the SIP listeners of the Gateway on
-its public address, admits calls only from the carrier's address ranges, and forwards them to the
-SIP servers behind it.
+In an *IP-authenticated trunk* (also called a static or peering trunk, as sold by CPaaS providers
+like Twilio, Telnyx or Bandwidth), the carrier sends the calls to a dedicated public SIP address
+from a known set of signaling addresses. STUNner exposes the SIP listeners of the Gateway on a
+public address, admits calls only from the carrier's address ranges, and forwards signaling traffic
+to the SIP servers behind it.
 
 ![STUNner IP-authenticated SIP trunk](img/stunner_sip_inbound.svg)
 
 ### Registration-based SIP trunk
 
-In a *registration-based trunk* (the SIP account of most SMB and ISP carriers), the carrier
-expects your side to register with its registrar, like a SIP phone does, and delivers the calls
-to the registered contact. STUNner dials the registrar itself, preferably over TLS, registers the
-number with the trunk's credentials, and takes the inbound calls over the same connection: the
-carrier needs no route to the cluster for signaling, and the egress address of the cluster does
-not matter.
+In a *registration-based trunk* (the SIP account of most SMB and ISP carriers), the carrier expects
+your side to register with the registrar and delivers the calls to the registered contact. STUNner
+can dial the registrar itself, preferably over TLS, registers the number with the trunk's
+credentials, and takes the inbound calls over the same connection: the carrier needs no route to
+the cluster for signaling, and the egress address of the cluster does not matter.
 
 ![STUNner registration-based SIP trunk](img/stunner_sip_registration.svg)
