@@ -153,13 +153,16 @@ func (w *ConfigFileClient) Poll(ctx context.Context, ch chan<- *stnrv2.StunnerCo
 			}
 
 			w.log.Debugf("loading configuration file: %s", config)
+			// an empty file or an invalid config (a typo, a partial write) keeps the last config and
+			// the watch: the next write brings the next config.
 			c, err := w.Load()
 			if err != nil {
 				if errors.Is(err, errFileTruncated) {
 					w.log.Debugf("ignoring: %s", err.Error())
-					continue
+				} else {
+					w.log.Warnf("ignoring config file %q: %s", config, err.Error())
 				}
-				return err
+				continue
 			}
 
 			// suppress repeated events

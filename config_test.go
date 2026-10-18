@@ -241,7 +241,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// this makes sure that we do not share anything with ConfigWatch
 	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
 
-	// wrong config file must not trigger an update
+	// wrong config file must not trigger an update, nor stop the watch.
 	mustNotReadConfig(t, conf, 50*time.Millisecond)
 
 	log.Debug("update the config file and check")
@@ -255,7 +255,9 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	_, err = f.Write(y)
 	assert.NoError(t, err, "write config to temp file")
 
-	c3 := mustReadConfig(t, conf, time.Second)
+	// the watch is still up: the update arrives well within the retry period a restarted watcher
+	// would wait.
+	c3 := mustReadConfig(t, conf, cdsclient.RetryPeriod/2)
 	checkDefaultConfig(t, c3, "TCP")
 }
 
