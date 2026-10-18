@@ -18,18 +18,14 @@ const (
 	authTypeNoneStr      = "none"
 	authTypeStaticStr    = "static"
 	authTypeEphemeralStr = "ephemeral"
-	AuthTypePlainText    = AuthTypeStatic
-	AuthTypeLongTerm     = AuthTypeEphemeral
-	authTypePlainTextStr = "plaintext"
-	authTypeLongTermStr  = "longterm"
 )
 
 // NewAuthType parses the authentication mechanism specification.
 func NewAuthType(raw string) (AuthType, error) {
 	switch raw {
-	case authTypeStaticStr, authTypePlainTextStr:
+	case authTypeStaticStr:
 		return AuthTypeStatic, nil
-	case authTypeEphemeralStr, authTypeLongTermStr:
+	case authTypeEphemeralStr:
 		return AuthTypeEphemeral, nil
 	case authTypeNoneStr:
 		return AuthTypeNone, nil

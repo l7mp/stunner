@@ -2616,9 +2616,9 @@ func getTestCredentials(t *testing.T, authType, username, password, secret strin
 	t.Helper()
 
 	switch authType {
-	case "", "plaintext", "static":
+	case "", "static":
 		return username, password
-	case "longterm", "ephemeral":
+	case "ephemeral":
 		if secret == "" {
 			secret = "my-secret"
 		}

@@ -254,3 +254,22 @@ func TestConvertCluster(t *testing.T) {
 	_, _, err = ConvertCluster(ClusterConfig{Name: "bad", Endpoints: []string{"10.0.0.1:<70000-70000>"}}, nil)
 	assert.Error(t, err)
 }
+
+func TestConvertDeprecatedAuthTypes(t *testing.T) {
+	// the deprecated v1 type names convert to the v2 ones, which alone v2 accepts
+	v1 := &StunnerConfig{
+		ApiVersion: ApiVersion,
+		Auth:       AuthConfig{Type: "longterm", Credentials: map[string]string{"secret": "s"}},
+		Listeners:  []ListenerConfig{{Name: "proxy", Protocol: "TURN-UDP", Port: 3478, Routes: []string{"upstream"}}},
+		Clusters: []ClusterConfig{{Name: "upstream", Protocol: "TURN-UDP",
+			TURNServer: &TURNServer{Address: "turn.example.com", Port: 3478,
+				Auth: &AuthConfig{Type: "plaintext", Credentials: map[string]string{"username": "u", "password": "p"}}}}},
+	}
+
+	v2, err := ConvertToV2(v1)
+	require.NoError(t, err)
+	require.NoError(t, v2.Validate())
+	require.Len(t, v2.Auths, 2)
+	assert.Equal(t, "ephemeral", v2.Auths[0].Type)
+	assert.Equal(t, "static", v2.Auths[1].Type, "the tunnel credentials")
+}

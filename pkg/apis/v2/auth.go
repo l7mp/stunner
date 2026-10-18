@@ -17,9 +17,7 @@ import (
 type AuthConfig struct {
 	// Name of the policy, the name servers refer to it by. Default is "default".
 	Name string `json:"name,omitempty"`
-	// Type of the STUN/TURN authentication mechanism ("static" or "ephemeral"). The deprecated
-	// type name "plaintext" is accepted for "static" and the deprecated type name "longterm"
-	// is accepted for "ephemeral" for compatibility with older versions.
+	// Type of the STUN/TURN authentication mechanism: "static", "ephemeral" or "none".
 	Type string `json:"type,omitempty"`
 	// Realm defines the STUN/TURN authentication realm.
 	Realm string `json:"realm,omitempty"`

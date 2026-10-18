@@ -17,13 +17,13 @@ const clientNum = 20
 var TestStunnerConfigsMultithreadedUDP = []TestStunnerConfigCase{
 	{
 		config: stnrv2.StunnerConfig{
-			// udp, plaintext
+			// udp, static
 			ApiVersion: stnrv2.ApiVersion,
 			Admin: stnrv2.AdminConfig{
 				LogLevel: stunnerTestLoglevel,
 			},
 			Auths: []stnrv2.AuthConfig{{
-				Type: "plaintext",
+				Type: "static",
 				Credentials: map[string]string{
 					"username": "user1",
 					"password": "passwd1",
@@ -77,7 +77,7 @@ func RunBenchmarkServer(b *testing.B, proto string) {
 			LogLevel: stunnerTestLoglevel,
 		},
 		Auths: []stnrv2.AuthConfig{{
-			Type: "plaintext",
+			Type: "static",
 			Credentials: map[string]string{
 				"username": "user1",
 				"password": "passwd1",
