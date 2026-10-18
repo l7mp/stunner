@@ -12,12 +12,14 @@ theme:
 # the build requirements of the docs are not part of the site
 exclude_docs: |
   /requirements.*
+# the old reference URL, kept as a pointer to its new place
+not_in_nav: |
+  /GATEWAY.md
 nav:
 - 'Overview':
   - 'Why STUNner': 'WHY.md'
   - 'Deployment models': 'DEPLOYMENT.md'
   - 'Concepts': 'CONCEPTS.md'
-  - 'Free vs. premium tiers': 'TIERS.md'
 - 'Getting started':
   - 'Installation: Free tier': 'INSTALL.md'
   - 'Installation: Premium tiers': 'PREMIUM_INSTALL/'
@@ -26,7 +28,8 @@ nav:
   - 'Monitoring': 'MONITORING.md'
   - 'Scaling': 'SCALING.md'
   - 'Security': 'SECURITY.md'
-  - 'Reference: Free tier': 'GATEWAY.md'
+  - 'SIP gateway (experimental)': 'SIP/'
+  - 'Reference': 'REFERENCE.md'
   - 'Reference: Premium tiers': 'PREMIUM_REFERENCE/'
 - 'Tutorials':
   - 'Configuring TLS for tutorials': 'examples/TLS.md'
@@ -45,6 +48,8 @@ nav:
     - 'Remote desktop access with Neko': 'examples/neko/README.md'
     - 'One to one video call with Kurento': 'examples/kurento-one2one-call/README.md'
     - 'Magic mirror with Kurento': 'examples/kurento-magic-mirror/README.md'
+  - 'SIP deployment models (experimental)':
+    - 'Calling a SIP echo service in Kubernetes': 'examples/sip-echo/README.md'
   - 'Benchmarking': 'examples/benchmark/README.md'
 - 'CMD':
   - 'stunnerctl': 'cmd/stunnerctl.md'

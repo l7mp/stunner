@@ -12,7 +12,6 @@
 * [Why STUNner](WHY.md)
 * [Deployment models](DEPLOYMENT.md)
 * [Concepts](CONCEPTS.md)
-* [Free vs. premium tiers](TIERS.md)
 
 ## Getting started
 
@@ -25,7 +24,8 @@
 * [Monitoring](MONITORING.md)
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
-* [Reference: Free tier](GATEWAY.md)
+* [SIP gateway (experimental)](SIP.md)
+* [Reference](REFERENCE.md)
 * [Reference: Premium tiers](PREMIUM_REFERENCE.md)
 
 ## Tutorials
@@ -50,6 +50,10 @@
 * [Remote desktop access with Neko](examples/neko/README.md)
 * [One to one video call with Kurento](examples/kurento-one2one-call)
 * [Magic mirror with Kurento](examples/kurento-magic-mirror/README.md)
+
+### SIP deployment models (experimental)
+
+* [Calling a SIP echo service in Kubernetes](examples/sip-echo/README.md)
 
 ## Manuals
 

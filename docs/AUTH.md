@@ -2,7 +2,9 @@
 
 STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner.
 
-Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features (only available in premium tiers), in which case it runs with no authentication (`type: none`). Refer to the [user guide](PREMIUM_REFERENCE.md) for the details.
+Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](REFERENCE.md#gatewayconfig).
+
+SIP trunks authenticate differently, by the carrier's addresses or by a SIP registration; see [SIP authentication](#sip-authentication) at the end of this guide.
 
 ## The long-term credential mechanism
 
@@ -68,7 +70,7 @@ kubectl -n stunner create secret generic stunner-auth-secret --from-literal=type
     --from-literal=username=my-user --from-literal=password=my-password
 ```
 
-Then, we update the [GatewayConfig](GATEWAY.md) to refer STUNner to this Secret for setting authentication credentials.
+Then, we update the [GatewayConfig](REFERENCE.md) to refer STUNner to this Secret for setting authentication credentials.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -143,3 +145,28 @@ curl "http://stunner-auth.stunner-system:8088/ice?service=turn&username=user-id"
   "iceTransportPolicy": "all"
 }
 ```
+
+## SIP authentication
+
+> [!WARNING]
+> The SIP gateway is experimental, see the [SIP gateway guide](SIP.md).
+
+The credentials of this guide, and the STUNner authentication service, are for TURN clients. A
+SIP trunk authenticates the other way round, between the carrier and you, in one of two ways:
+
+- **By address (IP-authenticated trunks).** The carrier sends calls from known address ranges and
+  STUNner admits calls only from the `allowedSources` of the [SIPTrunk](REFERENCE.md#siptrunk).
+  This relies on the load balancer preserving the carriers' source addresses
+  (`stunner.l7mp.io/external-traffic-policy: local` on the Gateway). The SIP servers behind
+  STUNner see the calls arrive from the STUNner pods, so their own address filters cannot tell
+  carriers apart: filter in the SIPTrunk.
+- **By SIP digest (registration-based trunks).** STUNner registers with the carrier's registrar
+  and answers its digest challenge with the `username` and `password` of the Secret the
+  registration's `authRef` names, MD5 or SHA-256 as the registrar asks. The carrier then trusts
+  the registered connection and delivers the calls over it.
+
+A carrier that answers digest challenges on its calls can also be authenticated end to end by the
+SIP server behind STUNner (for instance the credentials of a [LiveKit SIP inbound
+trunk](https://docs.livekit.io/sip/trunk-inbound)): STUNner passes the challenge and the answer
+through unchanged.
+

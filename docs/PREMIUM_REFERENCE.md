@@ -1,14 +1,12 @@
 # Premium features
 
-STUNner's premium features are designed to help medium to large scale enterprises to deploy, operate and scale pools of STUN and TURN servers over Kubernetes. Below is a reference of the premium features currently available in STUNner. See the [tier comparison](TIERS.md) for which tier unlocks which feature.
+STUNner's premium features are designed to help medium to large scale enterprises to deploy, operate and scale pools of STUN and TURN servers over Kubernetes. Below is a reference of the premium features currently available in STUNner. Each feature below names the tiers it is available in; see [here](https://l7mp.io/pricing) for the tiers and their pricing. The experimental [SIP gateway](SIP.md) ships with the official STUNner images on every tier.
 
 ## Table of Contents
 
 1. [User quota](#user-quota)
-1. [STUN server mode](#stun-server-mode)
 1. [Deploying into a DaemonSet](#deploying-into-a-daemonset)
 1. [Relay address discovery](#relay-address-discovery)
-1. [TCP routes](#tcp-routes)
 1. [Dual-stack TURN](#dual-stack-turn)
 1. [High-availability operator](#high-availability-operator)
 1. [Post-quantum TLS](#post-quantum-tls)
@@ -55,41 +53,13 @@ stunnerctl -n stunner config udp-gateway -o jsonpath='{.admin.user_quota}' -->
 
 Once the number of allocations created for a user-id reach the configured quota, new allocations will be rejected with an `error 486: Allocation Quota Exceeded` status.
 
-## STUN server mode
-
-**Feature:** `STUNServer`. **Availability:** member and enterprise tiers.
-
-By default STUNner is configured to run as a TURN server. As TURN is an extension of the STUN protocol, this setting lets STUNner to serve plain [STUN requests](https://medium.com/l7mp-technologies/deploying-a-scalable-stun-service-in-kubernetes-c7b9726fa41d) as well. Running a TURN server, however, comes at a potentially high cost, typically needing a high-bandwidth network connection and consuming pricey CPU resources. This is suboptimal for the case when STUNner is deployed as a pure STUN service, since malicious clients can consume excess server resources by creating phony TURN allocations.
-
-In order to prevent the potential DoS attack vector, STUNner's TURN protocol engine can be completely turned off. This prohibits clients from making TURN allocations, but still guarantees that STUNner will serve STUN requests. Pure STUN server mode is available in your tier if the `STUNServer` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
-
-To switch a Gateway into STUN server mode, set `STUNServer: true` in the GatewayConfig:
-
-```yaml
-apiVersion: stunner.l7mp.io/v1
-kind: GatewayConfig
-metadata:
-  name: stunner-gatewayconfig
-spec:
-  STUNMode: true
-```
-
-This will disable STUNner's authentication engine, prohibiting clients from creating TURN allocations all together:
-
-```console
-bin/stunnerctl -n <gateway-namespace> status <gateway-name> -o jsonpath='{.auths[*].type}'
-none
-```
-
-Set `STUNServer: false` to re-enable the TURN protocol engine.
-
 ## Deploying into a DaemonSet
 
 **Feature:** `DaemonSet`. **Availability:** member and enterprise tiers.
 
-By default, the TURN server pods that run the dataplane for STUNner gateways are deployed into a Kubernetes Deployment. This ensures that a configurable number of TURN servers are available per each Gateway. In certain cases, however, it may be desirable to deploy STUNner with a single dataplane pod per each Kubernetes node instead. This is crucial, for instance, when the STUNner dataplane is [deployed in the host-network namespace](https://github.com/l7mp/stunner/blob/main/docs/GATEWAY.md#dataplane) to run a [public TURN service](https://medium.com/l7mp-technologies/running-stunner-as-a-public-turn-server-1a2c61f78e67), or when a Gateway is exposed with the [`service.spec.externalTrafficPolicy: Local`](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip) configuration to implement [direct server return](https://en.wikipedia.org/w/index.php?title=Load_balancing_(computing)#Load_balancer_features) to minimize clients' round-trip-time.
+By default, the TURN server pods that run the dataplane for STUNner gateways are deployed into a Kubernetes Deployment. This ensures that a configurable number of TURN servers are available per each Gateway. In certain cases, however, it may be desirable to deploy STUNner with a single dataplane pod per each Kubernetes node instead. This is crucial, for instance, when the STUNner dataplane is [deployed in the host-network namespace](https://github.com/l7mp/stunner/blob/main/docs/REFERENCE.md#dataplane) to run a [public TURN service](https://medium.com/l7mp-technologies/running-stunner-as-a-public-turn-server-1a2c61f78e67), or when a Gateway is exposed with the [`service.spec.externalTrafficPolicy: Local`](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip) configuration to implement [direct server return](https://en.wikipedia.org/w/index.php?title=Load_balancing_(computing)#Load_balancer_features) to minimize clients' round-trip-time.
 
-To configure STUNner to run a single STUNner dataplane pod per each node in the Kubernetes cluster, you can set `spec.dataplaneResource` to `DaemonSet` in the [`Dataplane` resource](https://github.com/l7mp/stunner/blob/main/docs/GATEWAY.md#dataplane) corresponding to your Gateway. This will instruct STUNner to re-deploy the dataplane into a [Kubernetes DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset) instead of a Deployment. DaemonSet mode is available in your tier if the `DaemonSet` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
+To configure STUNner to run a single STUNner dataplane pod per each node in the Kubernetes cluster, you can set `spec.dataplaneResource` to `DaemonSet` in the [`Dataplane` resource](https://github.com/l7mp/stunner/blob/main/docs/REFERENCE.md#dataplane) corresponding to your Gateway. This will instruct STUNner to re-deploy the dataplane into a [Kubernetes DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset) instead of a Deployment. DaemonSet mode is available in your tier if the `DaemonSet` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
 
 The below will set the dataplane for all gateways using the `default` Dataplane to use a DaemonSet.
 
@@ -113,7 +83,7 @@ STUNner was designed for a specific use case: ingest real-time media into a Kube
 
 Public TURN servers typically run on a public IP address, which makes it possible for both clients and peers to connect via the server. However, STUNner's TURN servers (the `stunnerd` pods) are by default deployed over private IPs. This is perfectly fine when peers, e.g., WebRTC media servers, are deployed into the same cluster (the pivotal use case for STUNner), but this pretty much makes it impossible to deploy STUNner as a public TURN server since peers will not be able to connect to the private IP of STUNner's TURN servers. (Note that ["symmetric ICE mode"](DEPLOYMENT.md#symmetric-ice-mode) would still work but it may increase STUNner's resource consumption.)
 
-<!-- You can experiment with [deploying STUNner into the host-network namespace](GATEWAY.md#dataplane), but most of the time this would not solve the issue either because either Kubernetes will deploy pods running in host-network mode over a private IP address. -->
+<!-- You can experiment with [deploying STUNner into the host-network namespace](REFERENCE.md#dataplane), but most of the time this would not solve the issue either because either Kubernetes will deploy pods running in host-network mode over a private IP address. -->
 
 Relay address discovery, when enabled, will configure STUNner's TURN servers with a public IP address, if available. The public IP is obtained from the Kubernetes node the TURN server runs at. Relay address discovery is available in your tier if the `RelayAddressDiscovery` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
 
@@ -166,40 +136,6 @@ Below is the set of steps to enable relay address discovery:
 
    Note that depending on your Kubernetes provider's platform your nodes may run without a public IP, or host-networking may not be available at all. Symmetric ICE mode is still be usable as a fallback in such cases.
 
-## TCP routes
-
-**Feature:** `TCPRoute`. **Availability:** member and enterprise tiers.
-
-STUNner can route clients to backends over TCP over TURN. The `TCPRoute` resource is the TCP counterpart of the UDPRoute: it admits the same kinds of backends, but the relay leg towards the backend is a TCP connection.
-
-```yaml
-apiVersion: stunner.l7mp.io/v1
-kind: TCPRoute
-metadata:
-  name: media-plane-route
-  namespace: stunner
-spec:
-  parentRefs:
-    - name: tcp-gateway
-  rules:
-    - backendRefs:
-        - name: media-server-pool
-          namespace: media-plane
-```
-
-See the [TCPRoute reference](GATEWAY.md#tcproute) for the full spec. There is no protocol conversion anywhere: the client's allocation fixes the protocol of the relay leg, so a TCP backend is reachable only through an [RFC 6062](https://datatracker.ietf.org/doc/html/rfc6062) TCP allocation. Browsers do not implement RFC 6062, so TCP backends are not reachable from a browser's relay candidates.
-
-TCP routing is available in your tier if the `TCPRoute` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature the operator still accepts your TCPRoutes and maintains their status, but it renders no dataplane cluster for them and reports the reason in the route's `ResolvedRefs` status condition:
-
-```console
-kubectl get tcproute media-plane-route -o jsonpath='{.status.parents[0].conditions}'
-```
-
-```console
-[..., {"type":"ResolvedRefs","status":"False","reason":"UnsupportedValue",
-       "message":"route kind not available in the current license tier"}]
-```
-
 ## Dual-stack TURN
 
 **Feature:** `DualStack`. **Availability:** member and enterprise tiers.
@@ -233,7 +169,7 @@ High-availability operator mode is available in your tier if the `HAOperator` fe
 
 A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows for STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
 
-The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TURN-TLS listeners of a Gateway. There are three modes: `default` (or a missing annotation) serves the standard TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
+The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TLS listeners of a Gateway (TURN-TLS and plain TLS). There are three modes: `default` (or a missing annotation) serves the standard TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
 
 Below is the set of steps to enable post-quantum TLS:
 
@@ -250,7 +186,7 @@ Below is the set of steps to enable post-quantum TLS:
    The [`stunnerctl`](/docs/cmd/stunnerctl.md) tool will load the dataplane configuration for the gateway `<gateway-namespace>/<gateway-name>` and print the mode of each listener (an empty value is the default mode):
 
    ```console
-   stunnerctl -n <gateway-namespace> config <gateway-name> -o jsonpath='{.listeners[*].pqc_mode}'
+   stunnerctl -n <gateway-namespace> config <gateway-name> -o jsonpath='{.listeners[*].tls.pqc_mode}'
    enforced
    ...
    ```

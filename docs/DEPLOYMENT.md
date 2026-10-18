@@ -1,16 +1,14 @@
 # Deployment models
 
 STUNner can be deployed in many different ways, supporting a wide range of operational
-requirements. STUNner supports multiple [architectural models](#architectural-models) where it can
-act either as a simple headless STUN/TURN server or a fully fledged ingress gateway in front of an
-entire Kubernetes-based media server pool. In addition, if STUNner is configured as an ingress
-gateway then it can run in one of two [ICE models](#ice-models), based on whether only the
-client connects via STUNner or both clients and media servers use STUNner to set up the media-plane
-connection. 
-
-<!-- Third, STUNner can run in one of several [data plane models](#data-plane-models),
-based --> <!-- on whether the dataplane is automatically provisioned or the user has to manually
-supply the --> <!-- dataplane pods for STUNner. -->
+requirements. For WebRTC, STUNner supports multiple [architectural models](#architectural-models)
+where it acts either as a simple headless STUN/TURN server or as a fully fledged ingress gateway in
+front of an entire Kubernetes-based media server pool. If STUNner is configured as an ingress
+gateway then it can run in one of two [ICE models](#ice-models), based on whether only the client
+connects via STUNner or both clients and media servers use STUNner to set up the media-plane
+connection. For SIP and RTP, STUNner is the gateway between a carrier's SIP trunk and the SIP
+servers in the cluster, in one of two [SIP deployment models](#sip-deployment-models) that follow
+how the carrier authenticates the trunk.
 
 ## Architectural models
 
@@ -130,3 +128,42 @@ operational advantages. Namely, this is the only ICE mode that would allow STUNn
 internal IP addresses in the ICE candidates from attackers; note that this is not implemented yet,
 but feel free to open an issue if [exposing internal IP addresses](SECURITY.md) is blocking
 you from adopting STUNner.
+
+## SIP deployment models
+
+> [!WARNING]
+> The SIP gateway is experimental: its API may change in any release, it comes with no support,
+> and the official STUNner images serve one SIP Gateway with at most 5 parallel calls.
+
+A SIP trunk connects a carrier, who owns the phone numbers and the connection to the public phone
+network, to your SIP server. STUNner sits between the two as the trunk's gateway: it proxies the
+SIP signaling of every call to the SIP servers running in the cluster (for instance [LiveKit
+SIP](https://docs.livekit.io/sip)) and relays the call's RTP media between the carrier and those
+servers, so the SIP servers need no public address and no public RTP port range. Carriers offer two
+kinds of trunks, and STUNner supports both; the [SIP gateway guide](SIP.md) shows how to configure
+them.
+
+In both models the carrier sends the media of a call to the public media port of the Gateway, and
+STUNner matches it by its source address. This requires a load balancer that preserves the
+carriers' source addresses (`externalTrafficPolicy: Local` on the Gateway's Service).
+
+### IP-authenticated SIP trunk
+
+In an *IP-authenticated trunk* (also called a static or peering trunk, as sold by most CPaaS
+providers like Twilio, Telnyx or Bandwidth), the carrier sends the calls to a SIP address you give
+it, from a known set of signaling addresses. STUNner exposes the SIP listeners of the Gateway on
+its public address, admits calls only from the carrier's address ranges, and forwards them to the
+SIP servers behind it.
+
+![STUNner IP-authenticated SIP trunk](img/stunner_sip_inbound.svg)
+
+### Registration-based SIP trunk
+
+In a *registration-based trunk* (the SIP account of most SMB and ISP carriers), the carrier
+expects your side to register with its registrar, like a SIP phone does, and delivers the calls
+to the registered contact. STUNner dials the registrar itself, preferably over TLS, registers the
+number with the trunk's credentials, and takes the inbound calls over the same connection: the
+carrier needs no route to the cluster for signaling, and the egress address of the cluster does
+not matter.
+
+![STUNner registration-based SIP trunk](img/stunner_sip_registration.svg)

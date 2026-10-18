@@ -1,0 +1,40 @@
+# A SIP echo service: the STUNner softphone image answers every call and sends
+# the media back.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sip-echo
+  namespace: default
+  labels:
+    app: sip-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sip-echo
+  template:
+    metadata:
+      labels:
+        app: sip-echo
+    spec:
+      containers:
+        - name: sip-echo
+          image: docker.io/l7mp/softphone:latest
+          imagePullPolicy: Always
+          command: ["softphone", "sip-l:5060"]
+          ports:
+            - containerPort: 5060
+              protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sip-echo
+  namespace: default
+spec:
+  selector:
+    app: sip-echo
+  ports:
+    - name: sip
+      port: 5060
+      protocol: UDP

@@ -12,7 +12,7 @@ fi
 helm install stunner stunner/stunner --create-namespace --namespace stunner $kcontext
 kubectl apply -f stunner-gwcc.yaml $context
 kubectl apply $context -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: udp-gateway
@@ -25,7 +25,7 @@ spec:
       protocol: TURN-UDP
 EOF
 kubectl apply $context -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
   name: worker-udp-route

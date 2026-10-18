@@ -1,0 +1,71 @@
+# A STUNner SIP Gateway for the SIP echo service: the carrier (your softphone, at MY_IP) calls the
+# SIP listener, its media arrives at the media listener, and both go to the sip-echo Service.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is the Kubernetes real-time media gateway"
+---
+apiVersion: stunner.l7mp.io/v1
+kind: GatewayConfig
+metadata:
+  name: stunner-gatewayconfig
+  namespace: stunner
+spec:
+  realm: stunner.l7mp.io
+  authType: static
+  userName: "user-1"
+  password: "pass-1"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sip-gateway
+  namespace: stunner
+  annotations:
+    stunner.l7mp.io/external-traffic-policy: local
+spec:
+  gatewayClassName: stunner-gatewayclass
+  infrastructure:
+    parametersRef:
+      group: stunner.l7mp.io
+      kind: SIPTrunk
+      name: sip-echo
+  listeners:
+    - name: sip
+      protocol: UDP
+      port: 5060
+    - name: media
+      protocol: UDP
+      port: 30000
+---
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: SIPTrunk
+metadata:
+  name: sip-echo
+  namespace: stunner
+spec:
+  mediaListener: media
+  allowedSources:
+    - MY_IP
+---
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: sip-echo
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: sip-gateway
+  rules:
+    - backendRefs:
+        - name: sip-echo
+          namespace: default
+          port: 5060

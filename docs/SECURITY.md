@@ -161,3 +161,27 @@ Nevertheless, if worried about information exposure then STUNner may not be the 
 ## User quota (only available in the premium version)
 
 In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM_REFERENCE.md) for the details.
+
+## SIP gateway
+
+> [!WARNING]
+> The SIP gateway is experimental, see the [SIP gateway guide](SIP.md).
+
+A public SIP port is found and probed by scanners within minutes. STUNner proxies only inbound
+calls, so a SIP gateway cannot be abused to place calls, but every call that reaches your SIP
+server may start a session you pay for (an AI agent, a conference room). Lock the gateway down:
+
+- **Admit only your carriers.** List the carriers' signaling address ranges in the SIPTrunk's
+  `allowedSources`; an empty list admits no inbound call at all, which is right for
+  registration-only trunks. The filter needs the carriers' real source addresses, so set
+  `stunner.l7mp.io/external-traffic-policy: local` on the Gateway.
+- **Prefer TLS.** Use `TLS` listeners for SIP over TLS from carriers that offer it, and `sips:`
+  registrars for registrations, so neither the signaling nor the credentials cross the Internet in
+  the clear. SRTP media is relayed untouched: STUNner never holds the media keys.
+- **Keep the media port tight.** STUNner relays media only for the calls it set up, and only from
+  the source addresses in their SDP; anything else arriving at the media port is dropped.
+- **Keep the credentials in Secrets.** Registration credentials live in the Secret the
+  registration's `authRef` names, in the namespace of the SIPTrunk.
+- **Cap the calls.** The official images serve at most 5 parallel calls per SIP Gateway; the cap
+  also bounds what a misconfigured trunk can cost.
+

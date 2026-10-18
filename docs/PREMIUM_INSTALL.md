@@ -2,7 +2,7 @@
 
 Congratulations for subscribing to STUNner premium. You should have received a customer key during the subscription procedure; [contact us](mailto:info@l7mp.io) if not. Make sure to save the customer key to a safe place, you will need it every time you (re)deploy STUNner.
 
-The below guide will walk you through unlocking STUNner's premium features. See the [tier comparison](TIERS.md) for the features available in your tier.
+The below guide will walk you through unlocking STUNner's premium features. See the [premium feature reference](PREMIUM_REFERENCE.md) for the features of each tier, and [here](https://l7mp.io/pricing) for the tiers and their pricing.
 
 ## Table of Contents
 
@@ -14,12 +14,12 @@ The below guide will walk you through unlocking STUNner's premium features. See 
 
 Start with a fresh Kubernetes cluster. Remove all previous STUNner installations, otherwise some premium features may not be available.
 
-Use the below Helm chart to deploy the premium version of STUNner:
+Install STUNner with your customer key:
 
 ```console
 helm repo add stunner https://l7mp.io/stunner
 helm repo update
-helm install stunner stunner/stunner-premium --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.customerKey="<YOUR_CUSTOMER_KEY>"
+helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.customerKey="<YOUR_CUSTOMER_KEY>"
 ```
 
 We recommend you deploy STUNner into the `stunner-system` namespace, this simplifies configuration later. See the [installation guide](INSTALL.md) for more info on customization options for the Helm chart.

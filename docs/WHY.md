@@ -1,11 +1,16 @@
 # Introduction
 
-STUNner is a *WebRTC media gateway for Kubernetes*. All words matter here: indeed STUNner is for
-*WebRTC*, so it is specifically designed to help dealing with the intricacies of WebRTC protocol
-encapsulations, it is a *media gateway* so its job is to ingest WebRTC audio/video streams into a
-virtualized media plane, and it is *opinionated towards Kubernetes*, so everything around STUNner
-is designed and built to fit into the Kubernetes ecosystem. That being said, STUNner can easily be
-used outside of this context (e.g., as a regular STUN/TURN server), but this is not the main focus.
+STUNner is *the Kubernetes real-time media gateway*. All words matter here: it is for *real-time
+media*, so it is specifically designed to deal with the intricacies of the protocols that carry
+it, WebRTC's STUN/TURN and, experimentally, SIP and RTP; it is a *media gateway* so its job is to
+ingest audio and video streams into a virtualized media plane; and it is *opinionated towards
+Kubernetes*, so everything around STUNner is designed and built to fit into the Kubernetes
+ecosystem. That being said, STUNner can easily be used outside of this context (e.g., as a regular
+STUN/TURN server), but this is not the main focus.
+
+The rest of this introduction tells the WebRTC story; SIP and RTP media face the same problems in
+Kubernetes (public addresses, wide UDP port ranges, host networking), and STUNner answers them the
+same way, see the [SIP deployment models](DEPLOYMENT.md#sip-deployment-models).
 
 ## The problem
 
@@ -94,7 +99,7 @@ Long story short, running your media servers with `hostNetwork=true` is just not
 Kubernetes! There is a reason why, instead of just installing the entire workload into the
 host-network namespace, Kubernetes relies on a comprehensive collection of [Gateway
 services](https://gateway-api.sigs.k8s.io) to ingest traffic into the cluster in a controlled
-manner. STUNner is exactly such a gateway service, carefully tailored to WebRTC media.
+manner. STUNner is exactly such a gateway service, carefully tailored to real-time media.
 
 Using STUNner allows you to specify a set of high-level declarative policies (UDP/TCP ports,
 authentication credentials, etc.) to define the way you want traffic to enter the cluster and
