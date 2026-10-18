@@ -279,6 +279,35 @@ func TestSIPGateway(t *testing.T) {
 		require.NoError(t, call.Hangup(ctx))
 	})
 
+	t.Run("call-quota", func(t *testing.T) {
+		f := newSIPFixture(t, softphone.Config{})
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// the quota caps the parallel calls of the media proxy
+		conf := sipGatewayConfig()
+		conf.Admin.UserQuota = 1
+		require.NoError(t, f.stunner.Reconcile(conf))
+
+		call, err := f.trunk.Dial(ctx, uri)
+		require.NoError(t, err)
+		in := answered(t, ctx, f.peer)
+		var se *softphone.StatusError
+		_, err = f.trunk.Dial(ctx, uri)
+		require.ErrorAs(t, err, &se, "a call over the quota is refused")
+		assert.Equal(t, 503, se.Code)
+
+		require.NoError(t, call.Hangup(ctx))
+		<-in.Done()
+		require.Eventually(t, func() bool {
+			call, err := f.trunk.Dial(ctx, uri)
+			if err != nil {
+				return false
+			}
+			_ = call.Hangup(ctx)
+			return true
+		}, 5*time.Second, 100*time.Millisecond, "a call fits again after the hangup")
+	})
+
 	t.Run("digest-auth", func(t *testing.T) {
 		f := newSIPFixture(t, softphone.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

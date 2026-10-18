@@ -27,8 +27,9 @@ type AdminConfig struct {
 	// health-checking at `http://:8086`. Set to a pointer to an empty string to disable
 	// health-checking.
 	HealthCheckEndpoint *string `json:"healthcheck_endpoint,omitempty"`
-	// UserQuota defines the number of permitted TURN allocations per username. Affects
-	// allocation created on any listener. Default is 0, meaning no quota is enforced.
+	// UserQuota defines the number of permitted TURN allocations per username, and the number of
+	// parallel calls per SIP media proxy. Affects sessions created on any listener. Default is 0,
+	// meaning no quota is enforced.
 	UserQuota int `json:"user_quota,omitempty"`
 	// OffloadEngine defines the dataplane offload mode, either "None", "XDP", "TC", or
 	// "Auto". Set to "Auto" to let STUNner find the optimal offload mode. Default is "None".

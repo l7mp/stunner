@@ -807,24 +807,26 @@ func addrPort(a net.Addr) netip.AddrPort {
 	return netip.AddrPortFrom(ap.Addr().Unmap(), ap.Port())
 }
 
-// admit reserves the quota of a call a trunk starts: the server's name is the user, in the realm
-// of the server's auth policy.
+// admit reserves the quota of a call a trunk starts, in the realm of the server's auth policy.
 func (s *Server) admit(callID string, in *peer) bool {
 	s.confMu.RLock()
-	name := s.auth
+	name, user := s.auth, s.mediaProxy
 	s.confMu.RUnlock()
+	if user == "" {
+		user = s.Name()
+	}
 	realm := stnrv2.DefaultRealm
 	if auth := s.rt.AuthConfig(name); auth != nil {
 		realm = auth.Realm
 	}
 	src := in.RemoteAddr()
-	if !s.gate(s.Name(), realm, src) {
+	if !s.gate(user, realm, src) {
 		return false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls[callID] = &call{event: CallEvent{SrcAddr: src, DstAddr: in.LocalAddr(),
-		Protocol: in.Tag().Proto, CallID: callID, Username: s.Name(), Realm: realm}}
+		Protocol: in.Tag().Proto, CallID: callID, Username: user, Realm: realm}}
 	return true
 }
 
