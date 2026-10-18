@@ -66,8 +66,6 @@ const (
 	FeatureUserQuota
 	FeatureDaemonSet
 	FeatureRelayAddressDiscovery
-	FeatureSTUNServer
-	FeatureTCPRoute
 	FeatureDualStack
 	FeatureHAOperator
 	FeaturePQC
@@ -82,12 +80,8 @@ func NewFeature(f string) Feature {
 		return FeatureUserQuota
 	case "daemonset":
 		return FeatureDaemonSet
-	case "stunserver":
-		return FeatureSTUNServer
 	case "relayaddressdiscovery":
 		return FeatureRelayAddressDiscovery
-	case "tcproute":
-		return FeatureTCPRoute
 	case "dualstack":
 		return FeatureDualStack
 	case "haoperator":
@@ -114,10 +108,6 @@ func (f feature) String() string {
 		return "DaemonSet"
 	case FeatureRelayAddressDiscovery:
 		return "RelayAddressDiscovery"
-	case FeatureSTUNServer:
-		return "STUNServer"
-	case FeatureTCPRoute:
-		return "TCPRoute"
 	case FeatureDualStack:
 		return "DualStack"
 	case FeatureHAOperator:
@@ -131,9 +121,8 @@ func (f feature) String() string {
 
 // AllFeatures returns all defined valid features.
 func AllFeatures() []Feature {
-	return []Feature{FeatureTURNOffload, FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
-		FeaturePQC}
+	return []Feature{FeatureTURNOffload, FeatureUserQuota, FeatureDaemonSet,
+		FeatureRelayAddressDiscovery, FeatureDualStack, FeatureHAOperator, FeaturePQC}
 }
 
 // AllFeaturesString returns all valid features in a string slice.
@@ -145,14 +134,27 @@ func AllFeaturesString() []string {
 func Features(t SubscriptionType) []Feature {
 	switch t {
 	case SubscriptionTypeMember:
-		return []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-			FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
-			FeaturePQC}
+		return []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureRelayAddressDiscovery,
+			FeatureDualStack, FeatureHAOperator, FeaturePQC}
 	case SubscriptionTypeEnterprise:
 		return AllFeatures()
 	default:
 		return []Feature{}
 	}
+}
+
+// Limits are the usage limits of a subscription type; 0 means unlimited.
+type Limits struct {
+	// SIPGateways is the number of Gateways the operator renders a SIP gateway for.
+	SIPGateways int
+	// Calls is the number of parallel calls of a SIP gateway.
+	Calls int
+}
+
+// GetLimits returns the usage limits of a subscription type. The SIP gateway is experimental, so
+// every tier has the same limits.
+func GetLimits(_ SubscriptionType) Limits {
+	return Limits{SIPGateways: 1, Calls: 5}
 }
 
 // helper

@@ -16,7 +16,7 @@ func TestFeatureCatalog(t *testing.T) {
 		}
 		defined = append(defined, f)
 	}
-	assert.Len(t, defined, 9, "the feature enum grew or shrank")
+	assert.Len(t, defined, 7, "the feature enum grew or shrank")
 
 	for _, f := range defined {
 		assert.Equal(t, f, NewFeature(f.String()),
@@ -27,9 +27,8 @@ func TestFeatureCatalog(t *testing.T) {
 			"%s is granted by no tier", f)
 	}
 
-	assert.ElementsMatch(t, []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureSTUNServer,
-		FeatureRelayAddressDiscovery, FeatureTCPRoute, FeatureDualStack, FeatureHAOperator,
-		FeaturePQC},
+	assert.ElementsMatch(t, []Feature{FeatureUserQuota, FeatureDaemonSet,
+		FeatureRelayAddressDiscovery, FeatureDualStack, FeatureHAOperator, FeaturePQC},
 		Features(SubscriptionTypeMember), "the member tier changed")
 	assert.NotContains(t, Features(SubscriptionTypeMember), FeatureTURNOffload,
 		"offload is enterprise only")
@@ -39,5 +38,7 @@ func TestFeatureCatalog(t *testing.T) {
 
 	for _, s := range AllSubscriptionTypes() {
 		assert.Equal(t, s, NewSubscriptionType(s.String()), "%s does not parse back", s)
+		assert.Equal(t, Limits{SIPGateways: 1, Calls: 5}, GetLimits(s), "the SIP limits of %s", s)
 	}
+	assert.Equal(t, FeatureNone, NewFeature("tcproute"), "a removed feature parses to none")
 }
