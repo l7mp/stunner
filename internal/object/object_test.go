@@ -78,7 +78,7 @@ func newLiveEnv(t *testing.T, eng offload.Engine) *testEnv {
 	require.NoError(t, err)
 	rt := runtime.New(runtime.Config{Logger: log, Telemetry: tm, Net: nw, OffloadEngine: eng,
 		Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
-	rt.QuotaHandler = quota.New(rt)
+	rt.QuotaHandler = quota.New()
 	env := &testEnv{rt: rt}
 
 	auth, err := object.NewAuth(staticAuthConfig())

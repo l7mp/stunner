@@ -170,7 +170,7 @@ func NewStunner(options Options) *Stunner {
 		OffloadEngine: offloadEngine,
 		Net:           s.net,
 	})
-	rt.QuotaHandler = quota.New(rt)
+	rt.QuotaHandler = quota.New()
 	rt.SetForceReady(s.forceReady)
 	s.rt = rt
 

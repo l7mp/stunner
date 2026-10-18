@@ -96,7 +96,7 @@ func newTestServer(t *testing.T) *testServer {
 	fo := &fakeOffload{}
 	rt := runtime.New(runtime.Config{Logger: log, Telemetry: tm, Net: nw, OffloadEngine: fo,
 		Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
-	rt.QuotaHandler = quota.New(rt)
+	rt.QuotaHandler = quota.New()
 
 	auth := &stnrv2.AuthConfig{Name: stnrv2.DefaultAuthName, Type: "static", Realm: realm,
 		Credentials: map[string]string{"username": "user", "password": "pass"}}

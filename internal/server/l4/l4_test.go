@@ -79,7 +79,7 @@ func newTestServer(t *testing.T, c setup) *testServer {
 	rt := objruntime.New(objruntime.Config{Logger: log, Telemetry: tm, Net: nw,
 		QuotaHandler: c.quota, Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
 	if rt.QuotaHandler == nil {
-		rt.QuotaHandler = quotapkg.New(rt)
+		rt.QuotaHandler = quotapkg.New()
 	}
 
 	// the server and its cluster, found by name through the registry

@@ -1,21 +1,46 @@
 package quota
 
-import "github.com/l7mp/stunner/v2/internal/runtime"
+import (
+	"sync"
 
-// The stub below satisfies the runtime.QuotaHandler interface structurally. New takes the
-// Runtime so a licensed implementation can reach the license manager (rt.License) and re-check
-// entitlement on every call. The open-source stub ignores it and enforces no quota.
+	"github.com/l7mp/stunner/v2/internal/runtime"
+)
 
-var constructor = func(*runtime.Runtime) runtime.QuotaHandler { return &stub{} }
+var _ runtime.QuotaHandler = &Quota{}
 
-// New returns a quota store.
-func New(rt *runtime.Runtime) runtime.QuotaHandler { return constructor(rt) }
+// Quota counts the live sessions of every username and refuses a new one over a non-zero quota.
+// The realm is ignored: usernames are counted across realms.
+type Quota struct {
+	lock     sync.Mutex
+	sessions map[string]int
+}
 
-// stub is a no-op quota store: it admits every allocation regardless of quota or license.
-type stub struct{}
+// New returns an empty quota store.
+func New() *Quota { return &Quota{sessions: map[string]int{}} }
 
-// CheckAndIncrement always admits the allocation.
-func (stub) CheckAndIncrement(_, _ string, _ int) bool { return true }
+// CheckAndIncrement admits a session of a username unless the username already holds quota
+// sessions; a zero quota admits every session. An admitted session is counted.
+func (q *Quota) CheckAndIncrement(username, _ string, quota int) bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if quota > 0 && q.sessions[username] >= quota {
+		return false
+	}
+	q.sessions[username]++
+	return true
+}
 
-// Decrement is a no-op.
-func (stub) Decrement(_, _ string) {}
+// Decrement releases a session of a username.
+func (q *Quota) Decrement(username, _ string) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	n, ok := q.sessions[username]
+	if !ok {
+		return
+	}
+	if n <= 1 {
+		delete(q.sessions, username)
+		return
+	}
+	q.sessions[username] = n - 1
+}
