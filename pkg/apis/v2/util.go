@@ -52,8 +52,7 @@ func (a AuthType) String() string {
 	}
 }
 
-// PQCMode selects the post-quantum key exchange policy of a TLS listener. Honouring it is a
-// premium feature: a build without it serves the default TLS settings whatever the mode says.
+// PQCMode selects the post-quantum key exchange policy of a TLS listener.
 type PQCMode int
 
 const (

@@ -31,13 +31,25 @@ import (
 // handshakeTimeout bounds the TLS or DTLS handshake of a new client.
 const handshakeTimeout = 10 * time.Second
 
-// newTLSConfig builds the TLS configuration of a TLS listener. The open-source build ignores the
-// PQC mode; a build with the PQC feature replaces it.
-var newTLSConfig = func(_ *runtime.Runtime, _ stnrv2.PQCMode, cert tls.Certificate, _ logging.LeveledLogger) *tls.Config {
-	return &tls.Config{
-		MinVersion:   tls.VersionTLS12,
-		Certificates: []tls.Certificate{cert},
+// newTLSConfig builds the TLS configuration of a TLS listener for its PQC mode: enforced accepts
+// only TLS 1.3 with the X25519MLKEM768 hybrid key exchange, preferred offers it first with the
+// classical ones as fallback, default leaves the key exchange to the Go runtime.
+func newTLSConfig(mode stnrv2.PQCMode, cert tls.Certificate, log logging.LeveledLogger) *tls.Config {
+	c := &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}
+	switch mode {
+	case stnrv2.PQCModeEnforced:
+		c.MinVersion, c.MaxVersion = tls.VersionTLS13, tls.VersionTLS13
+		c.CurvePreferences = []tls.CurveID{tls.X25519MLKEM768}
+	case stnrv2.PQCModePreferred:
+		c.CurvePreferences = []tls.CurveID{tls.X25519MLKEM768, tls.X25519, tls.CurveP256}
 	}
+	c.VerifyConnection = func(state tls.ConnectionState) error {
+		log.Debugf("TLS handshake: pqc_mode=%s key_exchange=%s version=%s cipher=%s sni=%q", mode,
+			state.CurveID, tls.VersionName(state.Version), tls.CipherSuiteName(state.CipherSuite),
+			state.ServerName)
+		return nil
+	}
+	return c
 }
 
 // Listener is a listener object: it accepts client conns, or dials its peer, applies the listener
@@ -128,7 +140,7 @@ func (l *Listener) secure(c net.Conn) (net.Conn, func(context.Context) error, er
 	mode, kp := l.pqcMode, l.keyPair
 	l.mu.RUnlock()
 	if l.tag.Proto == stnrv2.ProtocolTLS {
-		tc := tls.Server(c, newTLSConfig(l.rt, mode, kp, l.log))
+		tc := tls.Server(c, newTLSConfig(mode, kp, l.log))
 		return tc, tc.HandshakeContext, nil
 	}
 	dc, err := dtls.ServerWithOptions(netconn.PacketConn{Conn: c}, c.RemoteAddr(),

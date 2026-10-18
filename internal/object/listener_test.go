@@ -498,9 +498,8 @@ func TestReconcileLive(t *testing.T) {
 	assert.Equal(t, second, served(), "a certificate that does not load keeps the previous one")
 }
 
-// TestTLSConfigDefault pins what the open-source build serves: the default TLS settings, whatever
-// PQC mode the listener asks for.
-func TestTLSConfigDefault(t *testing.T) {
+// TestTLSConfigPQC checks the TLS settings of each PQC mode.
+func TestTLSConfigPQC(t *testing.T) {
 	certB64, keyB64 := selfSignedPEM(t)
 	certPEM, err := base64.StdEncoding.DecodeString(certB64)
 	require.NoError(t, err)
@@ -509,50 +508,44 @@ func TestTLSConfigDefault(t *testing.T) {
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	require.NoError(t, err)
 	log := logging.NewDefaultLoggerFactory().NewLogger("test")
-	nw, err := stdnet.NewNet()
-	require.NoError(t, err)
-	rt := newTestRuntime(t, nw)
 
-	for _, mode := range []stnrv2.PQCMode{stnrv2.PQCModeDefault, stnrv2.PQCModePreferred, stnrv2.PQCModeEnforced} {
-		c := (*object.NewTLSConfig)(rt, mode, cert, log)
-		assert.Equal(t, uint16(tls.VersionTLS12), c.MinVersion, "mode %q: default minimum version", mode)
-		assert.Zero(t, c.MaxVersion, "mode %q: default maximum version", mode)
-		assert.Nil(t, c.CurvePreferences, "mode %q: default key exchanges", mode)
-		assert.Len(t, c.Certificates, 1, "mode %q: the listener certificate", mode)
-	}
+	c := object.NewTLSConfig(stnrv2.PQCModeDefault, cert, log)
+	assert.Equal(t, uint16(tls.VersionTLS12), c.MinVersion)
+	assert.Zero(t, c.MaxVersion)
+	assert.Nil(t, c.CurvePreferences, "the Go runtime picks the key exchange")
+	assert.Len(t, c.Certificates, 1)
+
+	c = object.NewTLSConfig(stnrv2.PQCModePreferred, cert, log)
+	assert.Equal(t, uint16(tls.VersionTLS12), c.MinVersion)
+	assert.Equal(t, []tls.CurveID{tls.X25519MLKEM768, tls.X25519, tls.CurveP256}, c.CurvePreferences)
+
+	c = object.NewTLSConfig(stnrv2.PQCModeEnforced, cert, log)
+	assert.Equal(t, uint16(tls.VersionTLS13), c.MinVersion)
+	assert.Equal(t, uint16(tls.VersionTLS13), c.MaxVersion)
+	assert.Equal(t, []tls.CurveID{tls.X25519MLKEM768}, c.CurvePreferences)
 }
 
-// TestTLSConfigSeam checks that a TLS listener takes its TLS configuration from the constructor
-// variable, handing it the listener's PQC mode and certificate, and serves what it returns.
-func TestTLSConfigSeam(t *testing.T) {
+// TestTLSListenerPQCEnforced checks that a listener enforcing PQC serves a hybrid key exchange
+// and refuses a client that cannot do one.
+func TestTLSListenerPQCEnforced(t *testing.T) {
 	certPEM, keyPEM := selfSignedPEM(t)
 	nw, err := stdnet.NewNet()
 	require.NoError(t, err)
 	rt := newTestRuntime(t, nw)
-
-	seen := stnrv2.PQCModeDefault
-	defer func(f func(*runtime.Runtime, stnrv2.PQCMode, tls.Certificate, logging.LeveledLogger) *tls.Config) {
-		*object.NewTLSConfig = f
-	}(*object.NewTLSConfig)
-	*object.NewTLSConfig = func(_ *runtime.Runtime, mode stnrv2.PQCMode, cert tls.Certificate, _ logging.LeveledLogger) *tls.Config {
-		seen = mode
-		// a setting the default does not have, to tell the served config apart
-		return &tls.Config{MinVersion: tls.VersionTLS12, MaxVersion: tls.VersionTLS12,
-			Certificates: []tls.Certificate{cert}}
-	}
-
 	port := freePort(t, "tcp")
 	startListener(t, rt, &stnrv2.ListenerConfig{Name: "tls", Protocol: "TLS", Port: port,
-		Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: certPEM, Key: keyPEM, PQCMode: "preferred"}})
+		Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: certPEM, Key: keyPEM, PQCMode: "enforced"}})
+	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 
-	c, err := tls.Dial("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), //nolint:noctx
-		&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
+	c, err := tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true}) //nolint:noctx,gosec
 	require.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	roundTrip(t, c, "hello")
-	assert.Equal(t, stnrv2.PQCModePreferred, seen, "the seam sees the listener's PQC mode")
-	assert.Equal(t, uint16(tls.VersionTLS12), c.ConnectionState().Version,
-		"the listener serves the seam's configuration")
+	assert.Equal(t, tls.X25519MLKEM768, c.ConnectionState().CurveID, "the hybrid key exchange")
+
+	_, err = tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true, //nolint:noctx,gosec
+		CurvePreferences: []tls.CurveID{tls.X25519}})
+	assert.Error(t, err, "a classical client is refused")
 }
 
 // startDialer starts a dialing listener whose emitted conns are handed to the test.
