@@ -278,6 +278,51 @@ func TestSIPGateway(t *testing.T) {
 		require.NoError(t, err, "a missing filter admits")
 		require.NoError(t, call.Hangup(ctx))
 	})
+
+	t.Run("digest-auth", func(t *testing.T) {
+		f := newSIPFixture(t, softphone.Config{})
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// a carrier the filter admits must also answer the digest challenge of the server's auth
+		// policy
+		conf := sipGatewayConfig()
+		conf.Auths = append(conf.Auths, stnrv2.AuthConfig{Name: "carriers", Type: "static",
+			Realm: "sip.example.com", Credentials: map[string]string{"username": "carrier", "password": "secret"}})
+		conf.Servers[0].SIP.Auth = "carriers"
+		require.NoError(t, f.stunner.Reconcile(conf))
+
+		var se *softphone.StatusError
+		_, err := f.trunk.Dial(ctx, uri)
+		require.ErrorAs(t, err, &se, "a carrier without credentials is challenged")
+		assert.Equal(t, 407, se.Code)
+
+		lf := logger.NewLoggerFactory(stunnerTestLoglevel)
+		carrier, err := softphone.New(softphone.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5070",
+			LoggerFactory: lf, Username: "carrier", Password: "secret"})
+		require.NoError(t, err)
+		defer carrier.Close()
+		call, err := carrier.Dial(ctx, uri)
+		require.NoError(t, err)
+		in := answered(t, ctx, f.peer)
+		assertEcho(t, call, 10)
+		require.NoError(t, call.Hangup(ctx))
+		<-in.Done()
+
+		impostor, err := softphone.New(softphone.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5080",
+			LoggerFactory: lf, Username: "carrier", Password: "guess"})
+		require.NoError(t, err)
+		defer impostor.Close()
+		_, err = impostor.Dial(ctx, uri)
+		require.ErrorAs(t, err, &se, "a wrong password is refused")
+		assert.Equal(t, 407, se.Code)
+
+		// a server naming a missing auth policy refuses every call instead of admitting it
+		conf.Servers[0].SIP.Auth = "no-such-policy"
+		require.NoError(t, f.stunner.Reconcile(conf))
+		_, err = carrier.Dial(ctx, uri)
+		require.ErrorAs(t, err, &se, "a missing auth policy refuses")
+		assert.Equal(t, 403, se.Code)
+	})
 }
 
 // TestSIPGatewayLoad runs concurrent calls through the gateway, each against an echo.

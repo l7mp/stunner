@@ -72,7 +72,7 @@ type Server struct {
 	media     *ng.Client
 	calls     map[string]*call // the calls the server admitted, by Call-ID
 	stop      chan struct{}
-	// key signs the flow tokens of the proxy, and the digest nonces of a build with digest auth
+	// key signs the flow tokens and the digest nonces of the proxy
 	key []byte
 	// instance is the RFC 5626 instance id the server registers with
 	instance string
@@ -101,10 +101,6 @@ type call struct {
 
 // CallSweepInterval is how often the server asks the media proxy whether its calls still run.
 var CallSweepInterval = 30 * time.Second
-
-// authenticate tells whether a request a trunk starts passes the server's auth policy, answering it
-// if not. The open-source build admits every request.
-var authenticate = func(_ *Server, _ *siptx.ServerTx, _ *sipmsg.Request, _ *peer) bool { return true }
 
 // constructor builds the SIP server of a validated config.
 var constructor = func(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (objruntime.Object, error) {
@@ -471,7 +467,7 @@ func (s *Server) proxy(req *sipmsg.Request, tx *siptx.ServerTx, in *peer) {
 
 	// a request a trunk starts authenticates by the server's auth policy
 	if r := req.Route(); !in.dialed && (r == nil || !r.Address.UriParams.Has(routeParam)) &&
-		!authenticate(s, tx, req, in) {
+		!s.authenticate(tx, req) {
 		return
 	}
 
