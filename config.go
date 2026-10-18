@@ -29,10 +29,6 @@ type Options struct {
 	// Resolver swaps the internal DNS resolver with a custom implementation. Intended for
 	// testing.
 	Resolver resolver.DnsResolver
-	// UDPListenerThreadNum is ignored: every UDP listener runs one read loop per GOMAXPROCS.
-	//
-	// Deprecated: the number of UDP read loops is not configurable.
-	UDPListenerThreadNum int
 	// NodeName is the name of the Kubernetes node the TURN server is running on (if any).
 	NodeName string
 	// ForceReadyDuringTermination is flag to prevent the server failing the readiness

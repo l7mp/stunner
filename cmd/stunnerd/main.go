@@ -69,7 +69,6 @@ func main() {
 	var logFormat = flag.String("log-format", "text", `Log output format: "text" (default) or "json"`)
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>)")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
-	_ = flag.IntP("udp-thread-num", "u", 0, "Number of readloops per UDP listener (deprecated, defaults to GOMAXPROCS)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
 	var noGracefulShutdown = flag.Bool("no-graceful-shutdown", false, "Exit at once on SIGTERM or SIGINT, closing the live sessions, instead of waiting for them to end (default: false)")
 	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the readiness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
