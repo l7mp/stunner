@@ -56,12 +56,12 @@ To manually install the CRDs:
 
 ```console
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
-kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/main/deploy/manifests/static/stunner-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/main/helm/stunner/crds/stunner-crds.yaml
 ```
 
 ## Customization
 
-The Helm charts let you fine-tune STUNner features, including [compute resources](#resources) provisioned for `stunnerd` pods, [UDP multithreading](#udp-multithreading), and [graceful shutdown](#graceful-shutdown).
+The Helm charts let you fine-tune STUNner features, including [compute resources](#resources) provisioned for `stunnerd` pods and [graceful shutdown](#graceful-shutdown).
 
 ### Resources requests/limits
 

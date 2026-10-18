@@ -71,45 +71,6 @@ The `config` sub-command is used to load or watch running dataplane configs from
   ...
   ```
 
-For those who don't have the Go toolchain available to run `go install`, STUNner provides a minimalistic `stunnerctl` replacement called `stunnerctl.sh`.
-This script requires nothing else than `bash`, `kubectl`, `curl` and `jq` to work.
-
-The below will dump the running config of `tcp-gateway` deployed into the `stunner` namespace:
-
-```console
-cd stunner
-cmd/stunnerctl/stunnerctl.sh running-config stunner/tcp-gateway
-STUN/TURN authentication type:  static
-STUN/TURN username:             user-1
-STUN/TURN password:             pass-1
-Listener 1
-        Name:   stunner/tcp-gateway/tcp-listener
-        Listener:       stunner/tcp-gateway/tcp-listener
-        Protocol:       TURN-TCP
-        Public address: 35.187.97.94
-        Public port:    3478
-```
-
-You can also use `kubectl port-forward` to load or watch STUNner configs manually.  Open a port-forwarded connection to the STUNner gateway operator:
-
-``` console
-export CDS_SERVER_NAME=$(kubectl get pods -l stunner.l7mp.io/config-discovery-service=enabled --all-namespaces -o jsonpath='{.items[0].metadata.name}')
-export CDS_SERVER_NAMESPACE=$(kubectl get pods -l stunner.l7mp.io/config-discovery-service=enabled --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
-kubectl -n $CDS_SERVER_NAMESPACE port-forward pod/${CDS_SERVER_NAME} 63478:13478 &
-```
-
-If all goes well, you can now connect to the STUNner CDS API served by the gateway operator through the port-forwarded tunnel opened by `kubectl` just using `curl`.  The below will load the config of the `udp-gateway` in the `stunner` namespace:
-
-``` console
-curl -s http://127.0.0.1:63478/api/v1/configs/stunner/udp-gateway
-```
-
-If you happen to have a WebSocket client like the wonderful [`websocat`](https://github.com/vi/websocat) tool installed, you can also watch the configs as they are being rendered by the operator en live.
-
-``` console
-websocat ws://127.0.0.1:63478/api/v1/configs/stunner/udp-gateway?watch=true -
-```
-
 ### Status
 
 The `status` sub-command reports the status of the dataplane pods for a gateway, especially the runtime state of the `stunnerd` daemon.
