@@ -406,21 +406,27 @@ func (s *Server) route(req *sipmsg.Request, in *peer) (*peer, error) {
 	return p, nil
 }
 
-// addr returns the proxy's SIP address towards a peer: the public address of the server towards
-// a carrier, where set, else the local address of the peer's conn. A registration's flow is
-// reached over the flow itself: its local address, as in the Contact it registered.
+// addr returns the proxy's SIP address towards a peer: towards a carrier, the public address of
+// the listener of the carrier's conn, else that of the server, where set, else the local address
+// of the conn. A registration's flow is reached over the flow itself: its local address, as in the
+// Contact it registered.
 func (s *Server) addr(p *peer) (string, int) {
 	local := addrPort(p.LocalAddr())
 	host, port := local.Addr().String(), int(local.Port())
-	if !p.dialed && p.registration == "" {
-		s.confMu.RLock()
-		if s.publicAddr != "" {
-			host = s.publicAddr
-		}
-		if s.publicPort != 0 {
-			port = s.publicPort
-		}
-		s.confMu.RUnlock()
+	if p.dialed || p.registration != "" {
+		return host, port
+	}
+	s.confMu.RLock()
+	publicAddr, publicPort := s.publicAddr, s.publicPort
+	s.confMu.RUnlock()
+	if tag := p.Tag(); tag.PublicAddr != "" {
+		publicAddr, publicPort = tag.PublicAddr, tag.PublicPort
+	}
+	if publicAddr != "" {
+		host = publicAddr
+	}
+	if publicPort != 0 {
+		port = publicPort
 	}
 	return host, port
 }

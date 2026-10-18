@@ -24,6 +24,9 @@ type Tag struct {
 	Name   string
 	Proto  stnrv2.Protocol
 	Labels map[string]string
+	// PublicAddr and PublicPort are the public address of the listener, where set.
+	PublicAddr string
+	PublicPort int
 }
 
 // Conn is a connected transport with its tag and the wire facts the offload engine needs.

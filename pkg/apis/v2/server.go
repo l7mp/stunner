@@ -57,11 +57,11 @@ type SIPServerConfig struct {
 	// Auth names the authentication policy the server challenges by digest the carriers its
 	// listeners admit but do not trust. Default is none.
 	Auth string `json:"auth,omitempty"`
-	// PublicAddr is the address the carriers reach the server at; empty is the local address of
-	// the carrier's conn.
+	// PublicAddr is the address the carriers reach the server at when the listener of the
+	// carrier's conn has no public address; empty is the local address of the conn.
 	PublicAddr string `json:"public_address,omitempty"`
-	// PublicPort is the port the carriers reach the server at; 0 is the local port of the
-	// carrier's conn.
+	// PublicPort is the port the carriers reach the server at when the listener of the carrier's
+	// conn has no public address; 0 is the local port of the conn.
 	PublicPort int `json:"public_port,omitempty"`
 	// MediaProxy names the cluster reaching the ng control endpoint of the media proxy.
 	MediaProxy string `json:"media_proxy,omitempty"`

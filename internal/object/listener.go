@@ -405,6 +405,7 @@ func (l *Listener) emit(c net.Conn) api.Conn {
 	if len(l.labels) > 0 {
 		tag.Labels = l.labels
 	}
+	tag.PublicAddr, tag.PublicPort = l.publicAddr, l.publicPort
 	l.mu.RUnlock()
 	return netconn.NewConn(c, tag, nil)
 }

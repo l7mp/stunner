@@ -246,3 +246,32 @@ func TestRegistration(t *testing.T) {
 		})
 	})
 }
+
+func TestProxyAddr(t *testing.T) {
+	rt := objruntime.New(objruntime.Config{Logger: logger.NewLoggerFactory("all:ERROR")})
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "sip", Type: "SIP"},
+		SIP: &stnrv2.SIPServerConfig{PublicAddr: "198.51.100.1", PublicPort: 5060}}
+	require.NoError(t, conf.Validate())
+	s, err := newServer(conf, rt)
+	require.NoError(t, err)
+
+	conn := func(tag api.Tag) *peer {
+		c, _ := net.Pipe()
+		t.Cleanup(func() { _ = c.Close() })
+		return &peer{Conn: netconn.NewConn(c, tag, nil)}
+	}
+
+	host, port := s.addr(conn(api.Tag{Name: "udp", Proto: stnrv2.ProtocolUDP}))
+	assert.Equal(t, "198.51.100.1", host, "the server's public address")
+	assert.Equal(t, 5060, port)
+
+	host, port = s.addr(conn(api.Tag{Name: "tls", Proto: stnrv2.ProtocolTLS,
+		PublicAddr: "sip.example.com", PublicPort: 5061}))
+	assert.Equal(t, "sip.example.com", host, "the listener's public address wins")
+	assert.Equal(t, 5061, port)
+
+	p := conn(api.Tag{Name: "carrier", Proto: stnrv2.ProtocolTLS, PublicAddr: "sip.example.com"})
+	p.registration = "carrier"
+	host, _ = s.addr(p)
+	assert.NotEqual(t, "sip.example.com", host, "a registration flow is reached over itself")
+}
