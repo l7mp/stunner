@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 var turnURIAddrRegexp = regexp.MustCompile(`:(\d+\.\d+\.\d+\.\d+):`)
@@ -43,11 +43,11 @@ func getGVR(config *rest.Config, obj *unstructured.Unstructured) (schema.GroupVe
 	return mapping.Resource, nil
 }
 
-func gwFromProto(proto v1.ListenerProtocol, ns string) *unstructured.Unstructured {
+func gwFromProto(proto stnrv2.Protocol, ns string) *unstructured.Unstructured {
 	switch proto {
-	case v1.ListenerProtocolTURNUDP, v1.ListenerProtocolUDP:
+	case stnrv2.ProtocolTURNUDP, stnrv2.ProtocolUDP:
 		return newICETesterUDPGateway(ns)
-	case v1.ListenerProtocolTCP, v1.ListenerProtocolTURNTCP:
+	case stnrv2.ProtocolTCP, stnrv2.ProtocolTURNTCP:
 		return newICETesterTCPGateway(ns)
 	default:
 		return nil
@@ -56,7 +56,7 @@ func gwFromProto(proto v1.ListenerProtocol, ns string) *unstructured.Unstructure
 
 // updateICEServerAddr modifies the cluster-side ICE server config for symmetric ICE tests so that
 // the backend will be configured with the gateway as a TURN server
-func (t *iceTester) updateICEServerAddr(ss []webrtc.ICEServer, proto v1.ListenerProtocol) []webrtc.ICEServer {
+func (t *iceTester) updateICEServerAddr(ss []webrtc.ICEServer, proto stnrv2.Protocol) []webrtc.ICEServer {
 	// use service as the TURN server address
 	gw := gwFromProto(proto, t.namespace)
 	ret := []webrtc.ICEServer{}

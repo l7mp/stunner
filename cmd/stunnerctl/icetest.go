@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/l7mp/stunner/v2/internal/icetester"
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -26,30 +26,30 @@ func runICETest(_ *cobra.Command, args []string) error {
 		ns = *k8sConfigFlags.Namespace
 	}
 
-	turnTransports := []v1.ListenerProtocol{}
+	turnTransports := []stnrv2.Protocol{}
 	protos := args
 	if len(protos) == 0 {
 		// run all tests for all transports if no specific transport is provided
 		protos = []string{"udp", "tcp"}
 	}
 	for _, arg := range protos {
-		proto, err := v1.NewListenerProtocol(arg)
+		proto, err := stnrv2.NewProtocol(arg)
 		if err != nil {
 			return err
 		}
 		switch proto {
-		case v1.ListenerProtocolUDP:
-			turnTransports = append(turnTransports, v1.ListenerProtocolTURNUDP)
-		case v1.ListenerProtocolTCP:
-			turnTransports = append(turnTransports, v1.ListenerProtocolTURNTCP)
-		case v1.ListenerProtocolTURNUDP, v1.ListenerProtocolTURNTCP:
+		case stnrv2.ProtocolUDP:
+			turnTransports = append(turnTransports, stnrv2.ProtocolTURNUDP)
+		case stnrv2.ProtocolTCP:
+			turnTransports = append(turnTransports, stnrv2.ProtocolTURNTCP)
+		case stnrv2.ProtocolTURNUDP, stnrv2.ProtocolTURNTCP:
 			turnTransports = append(turnTransports, proto)
 		default:
 			return fmt.Errorf("ICE test is currently not available on TURN transport protocol %s", proto)
 		}
 	}
 
-	offloadEngine, err := v1.NewOffloadEngine(iceTesterOffloadEngine)
+	offloadEngine, err := stnrv2.NewOffloadEngine(iceTesterOffloadEngine)
 	if err != nil {
 		return fmt.Errorf("could not initialize offload engine: %w", err)
 	}

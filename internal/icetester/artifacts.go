@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 const (
@@ -119,7 +119,7 @@ func newICETesterTCPGateway(namespace string) *unstructured.Unstructured {
 	}
 }
 
-func newICETesterUDPRoute(namespace string, protos []v1.ListenerProtocol) *unstructured.Unstructured {
+func newICETesterUDPRoute(namespace string, protos []stnrv2.Protocol) *unstructured.Unstructured {
 	r := &unstructured.Unstructured{
 		Object: map[string]any{
 			"apiVersion": "stunner.l7mp.io/v1",
@@ -143,11 +143,11 @@ func newICETesterUDPRoute(namespace string, protos []v1.ListenerProtocol) *unstr
 		},
 	}
 
-	if slices.Contains(protos, v1.ListenerProtocolTURNUDP) {
+	if slices.Contains(protos, stnrv2.ProtocolTURNUDP) {
 		r = addGWtoUDPRoute("icetest-udp-gateway", r)
 
 	}
-	if slices.Contains(protos, v1.ListenerProtocolTURNTCP) {
+	if slices.Contains(protos, stnrv2.ProtocolTURNTCP) {
 		r = addGWtoUDPRoute("icetest-tcp-gateway", r)
 	}
 
@@ -215,7 +215,7 @@ func newICETesterBackendService(namespace string) *unstructured.Unstructured {
 				"ports": []any{
 					map[string]any{
 						"name":     "whip-port",
-						"port":     int64(v1.DefaultICETesterPort),
+						"port":     int64(stnrv2.DefaultICETesterPort),
 						"protocol": "TCP",
 					},
 				},
@@ -227,15 +227,15 @@ func newICETesterBackendService(namespace string) *unstructured.Unstructured {
 	}
 }
 
-func newICETesterICETesterResources(ns, iceTesterImage string, protos []v1.ListenerProtocol) []*unstructured.Unstructured {
+func newICETesterICETesterResources(ns, iceTesterImage string, protos []stnrv2.Protocol) []*unstructured.Unstructured {
 	l := []*unstructured.Unstructured{
 		newICETesterGatewayClass(ns),
 		newICETesterGatewayConfig(ns),
 	}
-	if slices.Contains(protos, v1.ListenerProtocolTURNUDP) {
+	if slices.Contains(protos, stnrv2.ProtocolTURNUDP) {
 		l = append(l, newICETesterUDPGateway(ns))
 	}
-	if slices.Contains(protos, v1.ListenerProtocolTURNTCP) {
+	if slices.Contains(protos, stnrv2.ProtocolTURNTCP) {
 		l = append(l, newICETesterTCPGateway(ns))
 	}
 
@@ -284,7 +284,7 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 	}
 
 	// offload customizations
-	if t.offloadEngine != v1.OffloadEngineNone {
+	if t.offloadEngine != stnrv2.OffloadEngineNone {
 		if err := unstructured.SetNestedSlice(d.Object, []any{"NET_ADMIN", "SYS_ADMIN", "SYS_MODULE"},
 			"spec", "containerSecurityContext", "capabilities", "add"); err != nil {
 			return nil, fmt.Errorf("failed to enable NET_ADMIN capabilities: %w", err)

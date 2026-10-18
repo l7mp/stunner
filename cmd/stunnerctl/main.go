@@ -10,7 +10,7 @@ import (
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/l7mp/stunner/v2/internal/icetester"
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 )
@@ -157,7 +157,7 @@ func init() {
 		"Timeout")
 	iceTestCmd.Flags().StringVar(&iceTesterImage, "ice-tester-image", icetester.DefaultICETesterImage,
 		"Icetester container image")
-	iceTestCmd.Flags().StringVar(&iceTesterOffloadEngine, "offload-mode", v1.OffloadEngineNone.String(),
+	iceTestCmd.Flags().StringVar(&iceTesterOffloadEngine, "offload-mode", stnrv2.OffloadEngineNone.String(),
 		"TURN (UDP) offload mode")
 	iceTestCmd.Flags().BoolVar(&forceCleanup, "force-cleanup", false,
 		"Remove tester namespace if it exists before launching the ICE test")

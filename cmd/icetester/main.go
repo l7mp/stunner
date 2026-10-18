@@ -14,7 +14,7 @@ import (
 	"github.com/pion/webrtc/v4"
 	flag "github.com/spf13/pflag"
 
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/buildinfo"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 	"github.com/l7mp/stunner/v2/pkg/whipconn"
@@ -43,7 +43,7 @@ var (
 	defaultICETransportPolicy = webrtc.NewICETransportPolicy("all")
 	defaultBearerToken        = ""
 	defaultWHIPEndpoint       = "/whip"
-	defaultICETesterAddr      = fmt.Sprintf(":%d", v1.DefaultICETesterPort)
+	defaultICETesterAddr      = fmt.Sprintf(":%d", stnrv2.DefaultICETesterPort)
 
 	loggerFactory logging.LoggerFactory
 	log           logging.LeveledLogger

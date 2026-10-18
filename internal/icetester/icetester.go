@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 
-	v1 "github.com/l7mp/stunner/v2/pkg/apis/v1"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 	"github.com/l7mp/stunner/v2/pkg/whipconn"
@@ -79,11 +79,11 @@ type Config struct {
 	AuthConfigFlags *discovery.AuthConfigFlags
 
 	Namespace      string
-	TURNTransports []v1.ListenerProtocol
+	TURNTransports []stnrv2.Protocol
 	ICETesterImage string
 	ForceCleanup   bool
 	PacketRate     int
-	OffloadEngine  v1.OffloadMode
+	OffloadEngine  stnrv2.OffloadMode
 	AllowNodePort  bool
 
 	Logger logger.LoggerFactory
@@ -100,11 +100,11 @@ type iceTester struct {
 	authConfigFlags *discovery.AuthConfigFlags
 
 	namespace             string
-	transports            []v1.ListenerProtocol
+	transports            []stnrv2.Protocol
 	iceTesterImage        string
 	forceCleanup          bool
 	floodTestSendInterval time.Duration
-	offloadEngine         v1.OffloadMode
+	offloadEngine         stnrv2.OffloadMode
 	allowNodePort         bool
 
 	logger logger.LoggerFactory
@@ -295,7 +295,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 		)
 	}
 
-	whipEndpoint, err := discovery.DiscoverK8sPod(ctx, t.k8sConfigFlags, t.namespace, "app=icetester", v1.DefaultICETesterPort,
+	whipEndpoint, err := discovery.DiscoverK8sPod(ctx, t.k8sConfigFlags, t.namespace, "app=icetester", stnrv2.DefaultICETesterPort,
 		t.logger.NewLogger("auth-fwd"))
 	if err != nil {
 		return t.sendEventComplete(EventInstallationComplete,
@@ -412,7 +412,7 @@ func (t *iceTester) Start(ctx context.Context) error {
 	///////// EventICEConfigAvailable in-progress
 	t.sendEventInit(EventICEConfigAvailable, nil) //nolint:errcheck
 
-	iceServers := map[v1.ListenerProtocol]webrtc.Configuration{}
+	iceServers := map[stnrv2.Protocol]webrtc.Configuration{}
 	for _, proto := range t.transports {
 		log.Infof("testing ICE connection over TURN transport %s", proto.String())
 
