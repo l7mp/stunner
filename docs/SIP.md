@@ -1,6 +1,9 @@
 # SIP gateway
 
-*Experimental: one SIP Gateway with at most 5 parallel calls.*
+> [!WARNING]
+> The SIP gateway is experimental: the API may change, there is no support, and the official
+> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
+> issues, but in any way use it at your own risk.
 
 The SIP gateway is an experimental feature: its API may change in any release, it comes with no
 support, and the official STUNner images serve a single SIP Gateway with at most 5 parallel calls on
@@ -14,7 +17,7 @@ and the in-cluster media peers, with no host networking and no per-pod Services.
 1. [Concepts](#concepts)
 1. [IP-authenticated trunks](#ip-authenticated-trunks)
 1. [Registration-based trunks](#registration-based-trunks)
-1. [LiveKit SIP](#livekit-sip)
+1. [Separate SIP and media servers](#separate-sip-and-media-servers)
 1. [Limitations](#limitations)
 
 ## Concepts
@@ -154,14 +157,62 @@ its own, only the media listener. The calls of a registration go to the next hop
 the SIP listeners. A TLS registration verifies the registrar's certificate against the system roots
 and the host of `registrar`. An inbound trunk and registrations may share a SIPTrunk.
 
-## LiveKit SIP
+## Separate SIP and media servers
 
-- Run LiveKit SIP with its pod address in the SDP it sends: no external IP, no host networking, no
-  public RTP port range.
-- LiveKit SIP sees the calls arrive from the STUNner pods, not from the carriers, so its inbound
-  trunk's `allowed_addresses` cannot filter the carriers; use `allowedSources` in the SIPTrunk. An
-  inbound trunk that lists its `numbers` may leave `allowed_addresses` empty, a trunk with no
-  `numbers` can set it to the pod address range of the cluster.
+Some SIP servers use a dedicated media server pool to handle real-time traffic, like Kamailio with
+rtpengine. In such cases the SIP next hop and the media peers are different Services. STUNner
+allows to enforce this distinction via attaching a separate UDPRoute for the SIP backends and
+another one for the media server backends: the UDPRoute pointing to the SIP servers attaches to the
+SIP listeners by the `sectionName`, while the UDPRoute for media attaches to the media listener,
+again by `sectionName`. Other SIP servers terminate the media themselves (LiveKit SIP): a single
+UDPRoute with no `sectionName` serves both roles. In any case, STUNner relays the media to the
+address in the SDP the SIP server returns, which must be an address of the media server's pods.
+
+LiveKit SIP runs with a single shared UDPRoute for both SIP signaling and media. Configure the
+STUNner UDPRoute with no `sectionName`, and LiveKit SIP with its pod address in the SDP it sends:
+no external IP, no host networking, no public RTP port range. Since LiveKit SIP will see the calls
+to arrive from the STUNner pods instead of from the carriers, its inbound trunk's
+`allowed_addresses` cannot filter the carriers; STUNner instead filters carrier traffic by
+configuring `allowedSources` in the SIPTrunk. An inbound trunk that lists its `numbers` may leave
+`allowed_addresses` empty, a trunk with no `numbers` can set it to the pod address range of the
+cluster. 
+
+When SIP servers and media servers are separate, STUNner must be configured with two UDPRoutes, one
+attaching to the SIP listener by the `sectionName` and pointing to the cluster's SIP server pool
+(e.g., Kamailio), while the other attaching to the RTP media listener and pointing to the
+in-cluster media server pool (e.g., rtpengine), again by `sectionName`:
+
+```yaml
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: kamailio
+spec:
+  parentRefs:
+    - name: sip-gateway
+      sectionName: sip
+  rules:
+    - backendRefs:
+        - name: kamailio
+          port: 5060
+---
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: rtpengine
+spec:
+  parentRefs:
+    - name: sip-gateway
+      sectionName: media
+  rules:
+    - backendRefs:
+        - name: rtpengine
+          port: 30000
+          endPort: 40000
+```
+
+The `port` of a backend is the SIP port STUNner dials; a `port` with an `endPort` restricts the
+media peers to that range, here rtpengine's media port range.
 
 ## Limitations
 
