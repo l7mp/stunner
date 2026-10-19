@@ -41,7 +41,10 @@ UDPRoutes attach to the listeners of a SIP Gateway as to any Gateway: a UDPRoute
 is the SIP next hop (STUNner proxies the calls to the backend pods at the backend port, round robin),
 a UDPRoute on the media listener lists the media peers (the pods STUNner relays the media to). A
 UDPRoute with no `sectionName` attaches to every listener, so a single route serves both roles when
-the SIP backend also terminates the media, as LiveKit SIP does.
+the SIP backend also terminates the media, as LiveKit SIP does. A SIP server with a media server of
+its own, like Kamailio with rtpengine, takes a route on each (see the [deployment
+models](DEPLOYMENT.md#separate-sip-and-media-servers)); a backend with a `port` and an `endPort`
+restricts the media peers to that port range.
 
 Carriers match the media of a call by the exact source address of the media they receive, so the
 Gateway's load balancer must preserve the client source address: the
