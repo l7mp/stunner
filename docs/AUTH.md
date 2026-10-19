@@ -1,12 +1,12 @@
 # Authentication
 
-STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner.
+STUNner authentication depends on whether it is used as a TURN/STUN server for WebRTC or a SIP/RTP proxy for VoIP.
 
-Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](REFERENCE.md#gatewayconfig).
+## TURN authentication
 
-SIP trunks authenticate differently, by the carrier's addresses or by a SIP registration; see [SIP authentication](#sip-authentication) at the end of this guide.
+For WebRTC, STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner. Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](REFERENCE.md#gatewayconfig).
 
-## The long-term credential mechanism
+### The long-term credential mechanism
 
 STUNner relies on the STUN [long-term credential
 mechanism](https://www.rfc-editor.org/rfc/rfc8489.html#page-26) to provide user authentication.
@@ -15,7 +15,7 @@ The long-term credential mechanism assumes that, prior to the communication, STU
 
 STUNner secures the authentication process against replay attacks using a digest challenge.  In this mechanism, the server sends the user a realm (used to guide the user or agent in selection of a username and password) and a nonce.  The nonce provides replay protection.  The client also includes a message-integrity attribute in the authentication message, which provides an HMAC over the entire request, including the nonce.  The server validates the nonce and checks the message integrity.  If they match, the request is authenticated, otherwise the server rejects the request.
 
-## Authentication workflow
+### Authentication workflow
 
 The authentication workflow of STUNner is as follows.
 
@@ -57,7 +57,7 @@ The authentication workflow of STUNner is as follows.
    var pc = new RTCPeerConnection(iceConfig);
    ```
 
-## Static authentication
+### Static authentication
 
 In STUNner, `static` authentication is the simplest and least secure authentication mode, basically corresponding to a traditional "log-in" username and password pair given to users.
 
@@ -95,7 +95,7 @@ kubectl -n stunner edit secret stunner-auth-secret
 >
 > Modifying STUNner's credentials goes *without* restarting the TURN server but may affect existing sessions, in that active sessions will not be able to refresh their TURN allocation any more. This will result in the disconnection of clients using the old credentials.
 
-## Ephemeral authentication
+### Ephemeral authentication
 
 STUNner provides the `ephemeral` authentication mode for production use, which uses per-client time-limited STUN/TURN authentication credentials.  Ephemeral credentials are dynamically generated with a pre-configured lifetime and, once the lifetime expires, the credential cannot be used to authenticate (or refresh) with STUNner any more. This authentication mode is more secure since credentials are not shared between clients and come with a limited lifetime. Configuring `ephemeral` authentication may be more complex though, since credentials must be dynamically generated for each session and properly returned to clients.
 
@@ -149,11 +149,11 @@ curl "http://stunner-auth.stunner-system:8088/ice?service=turn&username=user-id"
 ## SIP authentication
 
 > [!WARNING]
-> The SIP gateway is experimental, see the [SIP gateway guide](SIP.md).
+> The SIP gateway is experimental: the API may change, there is no support, and the official
+> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
+> issues, but in any way use it at your own risk.
 
-The credentials of this guide, and the STUNner authentication service, are for TURN clients. A
-SIP trunk authenticates the other way round, between the carrier and you, in one of two ways:
-
+SIP trunks authenticate by the carrier's IP addresses or by a SIP registration:
 - **By address (IP-authenticated trunks).** The carrier sends calls from known address ranges and
   STUNner admits calls only from the `allowedSources` of the [SIPTrunk](REFERENCE.md#siptrunk).
   This relies on the load balancer preserving the carriers' source addresses

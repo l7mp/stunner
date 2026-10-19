@@ -6,7 +6,8 @@ You need a Kubernetes cluster (>1.22), and the `kubectl` command-line tool must 
 
 The simplest way to expose STUNner to clients is through Kubernetes [LoadBalancer services](https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer); these are automatically managed by STUNner. This depends on a functional LoadBalancer integration in your cluster (if using Minikube, try `minikube tunnel` to get an idea of how this works). STUNner automatically detects if LoadBalancer service integration is functional and falls back to using NodePorts when it is not; however, this may require manual tweaking of the firewall rules to admit the UDP NodePort range into the cluster.
 
-To compile STUNner, at least Go v1.19 is required. Building the container images requires [Docker](https://docker.io) or [Podman](https://podman.io).
+To compile STUNner, at least Go v1.27 is required. Building the container images requires
+[Docker](https://docker.io) or [Podman](https://podman.io).
 
 ## Installation
 
@@ -21,7 +22,7 @@ helm repo update
 
 ### Stable version
 
-The below will install the stable version of STUNner. In particular, the this will install only the STUNner control plane, i.e., the gateway operator and the authentication service, the dataplane will be automatically provisioned by the operator when needed. We recommend to use the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
+The below will install the stable version of STUNner: the chart deploys the STUNner control plane and the authentication service. We recommend to use the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
 
 ```console
 helm install stunner stunner/stunner --create-namespace --namespace=stunner-system

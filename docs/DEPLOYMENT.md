@@ -51,17 +51,17 @@ monitor and troubleshoot media services like any other cloud-bound workload.
 
 ## WebRTC ICE models
 
-WebRTC services rely on ICEm the Interactive Connectivity Establishment framework to establish
+WebRTC services rely on the Interactive Connectivity Establishment (ICE) framework to establish
 direct peer-to-peer communication between browsers or devices, even when they are behind firewalls
-or Network Address Translation (NAT) routers.  STUNner offers two major modes for creating a
-working ICE association.
+or Network Address Translation (NAT) routers. STUNner offers two major modes for creating a working
+ICE association.
 
 ### Asymmetric ICE mode
 
 In *asymmetric ICE mode*, one peer is configured with STUNner as the TURN server and the other peer
 runs with no STUN or TURN servers whatsoever. The first peer will create a TURN transport relay
 connection via STUNner to which the other peer can directly join. Asymmetric ICE mode is the
-recommended way for the media-plane deployment model.
+recommended way for the media-plane deployment model for deploying WebRTC services. 
 
 ![STUNner asymmetric ICE mode](img/stunner_asymmetric_ice.svg)
 
