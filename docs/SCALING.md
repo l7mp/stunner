@@ -8,6 +8,8 @@ Further factors to autoscale your WebRTC workload are:
 
 Autoscaling a production service, especially one as sensitive to latency and performance as WebRTC, can be challenging. This guide will provide the basics on autoscaling; see the [official docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) for more detail.
 
+Note that SIP Gateways cannot be scaled beyond a single dataplane pod at the moment. Please file a whislist issue if you critically depend on SIP/RTP server scaling.
+
 ## Horizontal scaling
 
 It is a good practice to scale your STUNner deployment [horizontally](https://openmetal.io/docs/edu/openstack/horizontal-scaling-vs-vertical-scaling) (that is, by adding or removing `stunnderd` pods) instead of vertically (that is, by increasing the resource limits of your pods) when demand increases. We advice to set the [resource limits and requests](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) of the `stunnerd` pods to the bare minimum (this can be set in the [Dataplane](REFERENCE.md#dataplane) template used for provisioning `stunnerd` pods) and let Kubernetes to automatically scale out the STUNner dataplane by adding more `stunnerd` pods if needed.  Note that HPA uses the [requested amount of resources](https://pauldally.medium.com/horizontalpodautoscaler-uses-request-not-limit-to-determine-when-to-scale-97643d808997) to determine when to scale-up or down the number of instances.
@@ -25,7 +27,7 @@ Graceful shutdown enables full support for scaling STUNner down without affectin
 2. Currently the max lifetime for `stunnerd` to remain alive is 1 hour after being deleted: this means that `stunnerd` will remain active only for 1 hour after it has been deleted/scaled-down even if active allocations would last longer. You can adjust the grace period in the `terminationGracePeriod` setting in the [Dataplane](REFERENCE.md#dataplane) template.
 3. STUNner pods may remain alive well after the last client connection is gone. This occurs when an allocation is left open by a client (e.g., spontaneous UDP client-side connection closure cannot be reliably detected by the server). As the default TURN refresh lifetime is [10 minutes](https://www.rfc-editor.org/rfc/rfc8656#section-3.2-3) it may take 10 minutes until all allocations time out, letting `stunnerd` to finally terminate. In such cases `stunnerd` may refuse to stop after a `kubectl delete`. Use `kubectl delete pod --grace-period=0 --force stunner-XXX` to force removal.
 
-### Example
+## Example
 
 Below is a simple [HorizontalPodAutoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/) config for autoscaling `stunnerd`. The example assumes that the [Kubernetes metric server](https://github.com/kubernetes-sigs/metrics-server#installation) is available in the cluster.
 

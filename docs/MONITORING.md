@@ -2,6 +2,12 @@
 
 STUNner can export various statistics into an external timeseries database like [Prometheus](https://prometheus.io). This allows observing the state of a STUNner gateway instance (such as CPU usage, memory consumption, and the volume of data received and sent) in near real-time. These statistics can then be presented to the operator in a monitoring dashboard using, e.g., [Grafana](https://grafana.com).
 
+## Table of Contents
+
+1. [Configuration](#configuration)
+1. [Metrics](#metrics)
+1. [Integration with Prometheus](#integration-with-prometheus)
+
 ## Configuration
 
 Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](REFERENCE.md#dataplane) template. This will configure the `stunnerd` dataplane pods to expose an HTTP metrics endpoint on port 8080 that Prometheus can scrape for metrics.

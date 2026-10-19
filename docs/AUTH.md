@@ -2,6 +2,11 @@
 
 STUNner authentication depends on whether it is used as a TURN/STUN server for WebRTC or a SIP/RTP proxy for VoIP.
 
+## Table of Contents
+
+1. [TURN authentication](#turn-authentication)
+1. [SIP authentication](#sip-authentication)
+
 ## TURN authentication
 
 For WebRTC, STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner. Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](REFERENCE.md#gatewayconfig).
@@ -164,6 +169,36 @@ SIP trunks authenticate by the carrier's IP addresses or by a SIP registration:
   and answers its digest challenge with the `username` and `password` of the Secret the
   registration's `authRef` names, MD5 or SHA-256 as the registrar asks. The carrier then trusts
   the registered connection and delivers the calls over it.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: carrier-digest
+  namespace: voice
+stringData:
+  username: "+3612345678"
+  password: "<password>"
+---
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: SIPTrunk
+metadata:
+  name: carriers
+  namespace: voice
+spec:
+  mediaListener: media
+  registrations:
+    - name: carrier
+      registrar: "sips:sip.carrier.example"
+      aor: "sip:+3612345678@sip.carrier.example"
+      authRef:
+        name: carrier-digest
+```
+
+The `authRef` must name a Secret in the namespace of the SIPTrunk with `username` and `password`
+keys. Use a `sips:` registrar, so the registration and the calls run over TLS with the registrar's
+certificate verified; with no `allowedSources`, as here, the trunk takes calls only over the
+registered connection.
 
 A carrier that answers digest challenges on its calls can also be authenticated end to end by the
 SIP server behind STUNner (for instance the credentials of a [LiveKit SIP inbound
