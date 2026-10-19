@@ -170,6 +170,7 @@ func LicensingStatus(req *LicenseConfig) string {
 // AdminStatus represents the administrative status.
 type AdminStatus struct {
 	Name                string `json:"name,omitempty"`
+	Build               string `json:"build,omitempty"`
 	LogLevel            string `json:"loglevel,omitempty"`
 	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
@@ -181,6 +182,9 @@ type AdminStatus struct {
 // String returns a string representation of the administrative status.
 func (a *AdminStatus) String() string {
 	status := []string{fmt.Sprintf("id=%q", a.Name)}
+	if a.Build != "" {
+		status = append(status, fmt.Sprintf("build=%q", a.Build))
+	}
 	if a.LogLevel != "" {
 		status = append(status, fmt.Sprintf("logLevel=%q", a.LogLevel))
 	}

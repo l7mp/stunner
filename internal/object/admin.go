@@ -142,6 +142,7 @@ func (a *Admin) Status() stnrv2.Status {
 	}
 	return &stnrv2.AdminStatus{
 		Name:                conf.Name,
+		Build:               a.rt.BuildInfo.Version,
 		LogLevel:            conf.LogLevel,
 		MetricsEndpoint:     conf.MetricsEndpoint,
 		HealthCheckEndpoint: healthEndpoint,

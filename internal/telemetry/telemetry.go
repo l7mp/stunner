@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/buildinfo"
+
 	"github.com/pion/logging"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/prometheus"
@@ -28,6 +30,8 @@ const (
 type Callbacks struct {
 	// GetAllocationCount should map to the total allocation counter of the server.
 	GetAllocationCount func() int64
+	// GetBuildInfo returns the version of the binary, exported as the build info metric.
+	GetBuildInfo func() buildinfo.BuildInfo
 }
 
 type Telemetry struct {
@@ -46,6 +50,7 @@ type Telemetry struct {
 	ClusterPacketsCounter  metric.Int64Counter
 	ClusterBytesCounter    metric.Int64Counter
 	AllocationsGauge       metric.Int64ObservableGauge
+	BuildInfoGauge         metric.Int64ObservableGauge
 
 	callbacks Callbacks
 
@@ -208,7 +213,30 @@ func (t *Telemetry) init() error {
 		return err
 	}
 
-	return nil
+	// the Prometheus build info convention: a constant 1 labeled with the version of the binary
+	t.BuildInfoGauge, err = t.meter.Int64ObservableGauge(
+		stunnerInstrumentName+"_build_info",
+		metric.WithDescription("The version of the binary, as labels; always 1"),
+	)
+	if err != nil {
+		return err
+	}
+
+	if t.callbacks.GetBuildInfo == nil {
+		return nil
+	}
+	_, err = t.meter.RegisterCallback(
+		func(_ context.Context, o metric.Observer) error {
+			bi := t.callbacks.GetBuildInfo()
+			o.ObserveInt64(t.BuildInfoGauge, 1, metric.WithAttributes(
+				attribute.String("version", bi.Version),
+				attribute.String("commit", bi.CommitHash),
+				attribute.String("build_date", bi.BuildDate)))
+			return nil
+		},
+		t.BuildInfoGauge,
+	)
+	return err
 }
 
 // trafficTotals returns the running traffic totals of a listener or cluster.

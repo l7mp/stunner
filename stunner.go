@@ -20,6 +20,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	"github.com/l7mp/stunner/v2/pkg/buildinfo"
 	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
@@ -143,6 +144,7 @@ func NewStunner(options Options) *Stunner {
 	// callback reads the running value after Listeners exist.
 	telemetryCallbacks := telemetry.Callbacks{
 		GetAllocationCount: func() int64 { return s.GetActiveConnections() },
+		GetBuildInfo:       func() buildinfo.BuildInfo { return options.BuildInfo },
 	}
 	t, err := telemetry.New(telemetryCallbacks, s.dryRun, logFactory.NewLogger("metrics"))
 	if err != nil {
@@ -169,6 +171,7 @@ func NewStunner(options Options) *Stunner {
 		License:       licenseMgr,
 		OffloadEngine: offloadEngine,
 		Net:           s.net,
+		BuildInfo:     options.BuildInfo,
 	})
 	rt.QuotaHandler = quota.New()
 	rt.SetForceReady(s.forceReady)

@@ -10,6 +10,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	"github.com/l7mp/stunner/v2/pkg/buildinfo"
 	"github.com/l7mp/stunner/v2/pkg/config/client"
 )
 
@@ -42,6 +43,9 @@ type Options struct {
 	// Net will switch on testing mode, using a vnet.Net instance to run STUNner over an
 	// emulated data-plane.
 	Net transport.Net
+	// BuildInfo is the version of the binary, reported in the admin status and the build info
+	// metric.
+	BuildInfo buildinfo.BuildInfo
 }
 
 // NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI

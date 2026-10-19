@@ -31,6 +31,7 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | Metric | Description | Type | Labels |
 | :--- | :--- | :--- | :--- |
 | `stunner_allocations_active` | Number of active allocations. | gauge | none |
+| `stunner_build_info` | The version of the `stunnerd` binary, as labels; always 1. Quote it in an issue report. | gauge | `version`, `commit`, `build_date` |
 | `stunner_listener_connections` | Number of *active* downstream connections at a listener. Stays constant when using only UDP listeners. | gauge | `name=<listener-name>` |
 | `stunner_listener_connections_total` | Number of downstream connections at a listener. | counter | `name=<listener-name>` |
 | `stunner_listener_packets_total` | Number of datagrams sent or received at a listener. Unreliable for listeners running on a connection-oriented transport protocol (TCP/TLS).  | counter | `direction=<rx\|tx>`, `name=<listener-name>`|

@@ -159,18 +159,19 @@ func main() {
 		}
 	}
 
+	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
 	st := stunner.NewStunner(stunner.Options{
 		Name:                        *id,
 		LogOptions:                  stunner.LogOptions{Level: logLevel, Format: *logFormat},
 		DryRun:                      *dryRun,
 		NodeName:                    nodeName,
 		ForceReadyDuringTermination: *forceReadyDuringTermination,
+		BuildInfo:                   buildInfo,
 	})
 	defer st.Close()
 
 	log := st.GetLogger().NewLogger("stunnerd")
 
-	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
 	log.Infof("starting stunnerd id %q, STUNner %s ", st.GetId(), buildInfo.String())
 
 	conf := make(chan *stnrv2.StunnerConfig, 1)

@@ -8,6 +8,8 @@ package runtime
 import (
 	"sync/atomic"
 
+	"github.com/l7mp/stunner/v2/pkg/buildinfo"
+
 	"github.com/pion/transport/v5"
 
 	"github.com/l7mp/stunner/v2/internal/fifo"
@@ -33,6 +35,8 @@ type Config struct {
 	Net           transport.Net
 	// Fifos are the in-process fifos the FIFO listeners bind and the FIFO clusters dial.
 	Fifos *fifo.Fifos
+	// BuildInfo is the version of the binary.
+	BuildInfo buildinfo.BuildInfo
 }
 
 // Runtime is the single cross-object access point: process-wide dependencies, the object
