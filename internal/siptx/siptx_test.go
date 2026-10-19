@@ -119,6 +119,12 @@ func TestTransactions(t *testing.T) {
 	bad.RemoveHeader("Call-ID")
 	require.NoError(t, uac.Write(c, bad))
 	assert.Equal(t, sip.StatusBadRequest, (<-strays).StatusCode)
+
+	// a branch without the RFC 3261 magic cookie makes no transaction key: 400 as well
+	legacy := request(sip.OPTIONS, c)
+	legacy.Via().Params.Add("branch", "1234")
+	require.NoError(t, uac.Write(c, legacy))
+	assert.Equal(t, sip.StatusBadRequest, (<-strays).StatusCode)
 }
 
 func TestConnClose(t *testing.T) {

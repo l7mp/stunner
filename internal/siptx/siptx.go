@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -157,7 +158,14 @@ func (l *Layer) handle(msg sip.Message, c net.Conn) {
 	}
 
 	req := msg.(*sip.Request)
-	if req.Via() == nil || req.CSeq() == nil || req.CallID() == nil || req.From() == nil || req.To() == nil {
+	// the transactions are keyed by the top Via's branch, which must carry the magic cookie of RFC
+	// 3261 (section 8.1.1.7): requests without one would share a key
+	branch := ""
+	if v := req.Via(); v != nil {
+		branch, _ = v.Params.Get("branch")
+	}
+	if req.Via() == nil || req.CSeq() == nil || req.CallID() == nil || req.From() == nil || req.To() == nil ||
+		!strings.HasPrefix(branch, sip.RFC3261BranchMagicCookie) || branch == sip.RFC3261BranchMagicCookie {
 		if req.Method != sip.ACK {
 			_ = l.Write(c, sip.NewResponseFromRequest(req, sip.StatusBadRequest, "Bad Request", nil))
 		}
@@ -351,7 +359,7 @@ func NewCancel(invite *sip.Request) *sip.Request {
 }
 
 // txKey is the key of a client transaction: the branch of the top Via and the method of the CSeq,
-// INVITE for an ACK, or the method given.
+// or the method given.
 func txKey(msg sip.Message, method sip.RequestMethod) string {
 	branch := ""
 	if v := msg.Via(); v != nil {
@@ -359,9 +367,6 @@ func txKey(msg sip.Message, method sip.RequestMethod) string {
 	}
 	if method == "" && msg.CSeq() != nil {
 		method = msg.CSeq().MethodName
-	}
-	if method == sip.ACK {
-		method = sip.INVITE
 	}
 	return branch + "|" + string(method)
 }
