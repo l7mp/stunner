@@ -25,6 +25,9 @@
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
 * [SIP gateway (experimental)](SIP.md)
+
+## Reference
+
 * [Reference](REFERENCE.md)
 * [Reference: Premium tiers](PREMIUM_REFERENCE.md)
 

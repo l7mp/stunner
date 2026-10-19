@@ -105,9 +105,9 @@ Note that STUNner can also be deployed as a STUN server without enabling the TUR
 
 ### Plain listeners
 
-A plain UDP or TCP listener relays raw client flows to its preconfigured peer with *no authentication whatsoever*: raw flows carry no credentials, so anyone who can reach the listener socket can relay traffic to the peer. An open plain listener is therefore unauthenticated open ingress to the pinned peer, limited only to the endpoints of the server's clusters, with no per-user quota and no rate limiting. A Gateway listener is plain when its protocol is `UDP`, `TCP`, `TLS` or `DTLS` instead of `TURN-UDP`, `TURN-TCP`, `TURN-TLS` or `TURN-DTLS`, so opening one is always a deliberate act. Keep plain listeners on internal or otherwise firewalled addresses unless the peer service is meant to be publicly reachable.
+A plain UDP or TCP listener relays raw client flows to its preconfigured peer with *no authentication whatsoever*: raw flows carry no credentials, so anyone who can reach the listener socket can relay traffic to the peer. An open plain listener is therefore unauthenticated open ingress to the pinned peer, limited only to the endpoints of the server's clusters, with no per-user quota and no rate limiting. A Gateway listener is plain when its protocol is `UDP`, `TCP`, `TLS` or `DTLS` instead of `TURN-UDP`, `TURN-TCP`, `TURN-TLS` or `TURN-DTLS` or with a SIPTrunk in the parameters reference. Keep plain listeners on internal or otherwise firewalled addresses unless the peer service is meant to be publicly reachable.
 
-A typical use is exposing a pure TCP workload that runs only inside the cluster, such as the RTMP ingest of a media server: drones, IP cameras and encoders push their streams to it over TCP port 1935. The below Gateway exposes a [MediaMTX](https://github.com/bluenviron/mediamtx) server in the `media-plane` namespace on a plain TCP listener, next to the TURN listeners of the same STUNner installation.
+A typical use is exposing a pure TCP workload that runs only inside the cluster, such as the RTMP ingest of a media server. This lets drones, IP cameras and encoders push streams to the media server over TCP port 1935. The below Gateway exposes a [MediaMTX](https://github.com/bluenviron/mediamtx) server in the `media-plane` namespace on a plain TCP listener, next to the TURN listeners of the same STUNner installation.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -137,7 +137,7 @@ spec:
           port: 1935
 ```
 
-The `protocol: TCP` of the listener is what makes it plain: every connection that reaches port 1935 is relayed to the `mediamtx` Service at port 1935, without any credentials. STUNner adds no authentication of its own here, so the workload must authenticate its clients: configure publish credentials in MediaMTX before exposing it. To keep a plain listener inside the cluster instead, add the `stunner.l7mp.io/service-type: ClusterIP` annotation to the Gateway.
+Observe the `protocol: TCP` setting on the listener: every connection that reaches port 1935 is relayed to the `mediamtx` Service at port 1935, without any credentials. STUNner adds no authentication of its own here, so the workload must authenticate its clients: configure publish credentials in MediaMTX before exposing it. To keep a plain listener inside the cluster instead, add the `stunner.l7mp.io/service-type: ClusterIP` annotation to the Gateway.
 
 ## Access control
 
@@ -193,7 +193,7 @@ Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/
 
 ## Exposing internal IP addresses
 
-The trick in STUNner is that both the TURN relay transport address and the media server address are internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model) without the involvement of a NAT. This makes it possible to host the entire WebRTC infrastructure over the private internal pod network and still allow external clients to make connections to the media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP addresses are now exposed to the WebRTC clients in ICE candidates.
+The trick in STUNner is that both the internal proxy address (e.g., the TURN relay transport address) and the media server address are internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model) without the involvement of a NAT. This makes it possible to host the entire media server infrastructure over the private internal pod network and still allow external clients to make connections to the media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP addresses may now exposed to the Internet: e.g., WebRTC clients may read servers' pod addresses from the ICE candidates.
 
 The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP address of all STUNner pods and all media server pods. This should pose no major security risk though: remember, none of these private IP addresses can be reached externally. The attack surface can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE mode](DEPLOYMENT.md#symmetric-ice-mode).
 
@@ -206,17 +206,21 @@ In order to prevent potential Denial-of-Service (DoS) attacks that may be launch
 ## SIP gateway
 
 > [!WARNING]
-> The SIP gateway is experimental, see the [SIP gateway guide](SIP.md).
+> The SIP gateway is experimental: the API may change, there is no support, and the official
+> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
+> issues, but in any way use it at your own risk.
 
 A public SIP port is found and probed by scanners within minutes. STUNner proxies only inbound
 calls, so a SIP gateway cannot be abused to place calls, but every call that reaches your SIP
-server may start a session you pay for (an AI agent, a conference room). Lock the gateway down:
+server may still start a session unless properly locked down. Below are a set of best-practices to
+make sure only SIP trunks can place calls in the cluster:
 
-- **Admit only your carriers.** List the carriers' signaling address ranges in the SIPTrunk's
+- **Admit only the SIP carriers.** List the carriers' signaling address ranges in the SIPTrunk's
   `allowedSources`; an empty list admits no inbound call at all, which is right for
   registration-only trunks. The filter needs the carriers' real source addresses, so set
-  `stunner.l7mp.io/external-traffic-policy: local` on the Gateway.
-- **Prefer TLS.** Use `TLS` listeners for SIP over TLS from carriers that offer it, and `sips:`
+  `stunner.l7mp.io/external-traffic-policy: local` on the Gateway. Note that register-only SIP
+  trunks require no `allowedSources` setting.
+- **Prefer TLS.** Use `TLS` listeners for SIP over TLS from carriers when available, and `sips:`
   registrars for registrations, so neither the signaling nor the credentials cross the Internet in
   the clear. SRTP media is relayed untouched: STUNner never holds the media keys.
 - **Keep the media port tight.** STUNner relays media only for the calls it set up, and only from

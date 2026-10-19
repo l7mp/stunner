@@ -170,6 +170,12 @@ SIP trunks authenticate by the carrier's IP addresses or by a SIP registration:
   registration's `authRef` names, MD5 or SHA-256 as the registrar asks. The carrier then trusts
   the registered connection and delivers the calls over it.
 
+Below is an example for configuring STUNner for registration-based SIP digests.  The `authRef` must
+name a Secret in the namespace of the SIPTrunk with `username` and `password` keys. Use a `sips:`
+registrar, so the registration and the calls run over TLS with the registrar's certificate
+verified. Do not set `allowedSources`: here it is the trunk that takes calls only over the
+registered connection initiated by STUNner.
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -194,11 +200,6 @@ spec:
       authRef:
         name: carrier-digest
 ```
-
-The `authRef` must name a Secret in the namespace of the SIPTrunk with `username` and `password`
-keys. Use a `sips:` registrar, so the registration and the calls run over TLS with the registrar's
-certificate verified; with no `allowedSources`, as here, the trunk takes calls only over the
-registered connection.
 
 A carrier that answers digest challenges on its calls can also be authenticated end to end by the
 SIP server behind STUNner (for instance the credentials of a [LiveKit SIP inbound
