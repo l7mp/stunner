@@ -12,9 +12,6 @@ theme:
 # the build requirements of the docs are not part of the site
 exclude_docs: |
   /requirements.*
-# the old reference URL, kept as a pointer to its new place
-not_in_nav: |
-  /GATEWAY.md
 nav:
 - 'Overview':
   - 'Why STUNner': 'WHY.md'
@@ -28,9 +25,15 @@ nav:
   - 'Monitoring': 'MONITORING.md'
   - 'Scaling': 'SCALING.md'
   - 'Security': 'SECURITY.md'
-  - 'SIP gateway (experimental)': 'SIP/'
-  - 'Reference': 'REFERENCE.md'
-  - 'Reference: Premium tiers': 'PREMIUM_REFERENCE/'
+  - 'TURN gateway': 'TURN.md'
+  - 'SIP gateway (beta)': 'SIP/'
+  - 'SRT gateway (beta)': 'SRT.md'
+  - 'RTSP streaming (beta)': 'RTSP.md'
+- 'Reference':
+  - 'GatewayClass, GatewayConfig, Dataplane': 'GATEWAYCLASS.md'
+  - 'Gateway': 'GATEWAY.md'
+  - 'Routes': 'ROUTE.md'
+  - 'Premium tiers': 'PREMIUM_REFERENCE/'
 - 'Tutorials':
   - 'Configuring TLS for tutorials': 'examples/TLS.md'
   - 'Basics':
@@ -48,13 +51,14 @@ nav:
     - 'Remote desktop access with Neko': 'examples/neko/README.md'
     - 'One to one video call with Kurento': 'examples/kurento-one2one-call/README.md'
     - 'Magic mirror with Kurento': 'examples/kurento-magic-mirror/README.md'
-  - 'SIP deployment models (experimental)':
+  - 'SIP deployment models (beta)':
     - 'Calling a SIP echo service in Kubernetes': 'examples/sip-echo/README.md'
   - 'Benchmarking': 'examples/benchmark/README.md'
 - 'CMD':
   - 'stunnerctl': 'cmd/stunnerctl.md'
   - 'stunnerd': 'cmd/stunnerd.md'
   - 'icetester': 'cmd/icetester.md'
+  - 'mediactl': 'cmd/mediactl.md'
 - 'Premium':
   - 'Getting started': 'PREMIUM_INSTALL.md'
   - 'Features': 'PREMIUM_REFERENCE.md'

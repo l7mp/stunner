@@ -67,7 +67,7 @@ cd stunner
 kubectl apply -f docs/examples/mediasoup/mediasoup-call-stunner.yaml
 ```
 
-The relevant parts here are the STUNner [Gateway definition](../../REFERENCE.md), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../REFERENCE.md), which takes care of routing media to the pods running behind the `mediasoup-server` service.
+The relevant parts here are the STUNner [Gateway definition](../../GATEWAY.md#gateway), which exposes the STUNner STUN/TURN server over UDP:3478 to the Internet, and the [UDPRoute definition](../../ROUTE.md#udproute), which takes care of routing media to the pods running behind the `mediasoup-server` service.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1

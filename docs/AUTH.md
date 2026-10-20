@@ -9,7 +9,7 @@ STUNner authentication depends on whether it is used as a TURN/STUN server for W
 
 ## TURN authentication
 
-For WebRTC, STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner. Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](REFERENCE.md#gatewayconfig).
+For WebRTC, STUNner uses the IETF STUN/TURN protocol suite to ingest media traffic into a Kubernetes cluster, which, [by design](https://datatracker.ietf.org/doc/html/rfc5766#section-17), provides comprehensive security. In particular, STUNner provides message integrity and, if configured with the TURN-TLS or TURN-DTLS listeners, confidentiality. To complete the CIA triad, this guide shows how to configure user authentication with STUNner. Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol features, in which case it runs with no authentication (`type: none`): set `stunMode: true` in the [GatewayConfig](GATEWAYCLASS.md#gatewayconfig).
 
 ### The long-term credential mechanism
 
@@ -75,7 +75,7 @@ kubectl -n stunner create secret generic stunner-auth-secret --from-literal=type
     --from-literal=username=my-user --from-literal=password=my-password
 ```
 
-Then, we update the [GatewayConfig](REFERENCE.md) to refer STUNner to this Secret for setting authentication credentials.
+Then, we update the [GatewayConfig](GATEWAYCLASS.md#gatewayconfig) to refer STUNner to this Secret for setting authentication credentials.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -154,13 +154,12 @@ curl "http://stunner-auth.stunner-system:8088/ice?service=turn&username=user-id"
 ## SIP authentication
 
 > [!WARNING]
-> The SIP gateway is experimental: the API may change, there is no support, and the official
-> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
-> issues, but in any way use it at your own risk.
+> The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
+> Please test and report issues, but in any way, use it at your own risk.
 
 SIP trunks authenticate by the carrier's IP addresses or by a SIP registration:
 - **By address (IP-authenticated trunks).** The carrier sends calls from known address ranges and
-  STUNner admits calls only from the `allowedSources` of the [SIPTrunk](REFERENCE.md#siptrunk).
+  STUNner admits calls only from the `allowedSources` of the [SIPTrunk](GATEWAY.md#siptrunk).
   This relies on the load balancer preserving the carriers' source addresses
   (`stunner.l7mp.io/external-traffic-policy: local` on the Gateway). The SIP servers behind
   STUNner see the calls arrive from the STUNner pods, so their own address filters cannot tell

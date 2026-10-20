@@ -29,7 +29,7 @@ stunner` if it does not exist.
 1. Given a fresh STUNner install, the first step is to register STUNner with the Kubernetes Gateway
    API. This amounts to creating a
    [GatewayClass](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass),
-   which serves as the [root level configuration](/docs/REFERENCE.md#gatewayclass) for your STUNner
+   which serves as the [root level configuration](/docs/GATEWAYCLASS.md#gatewayclass) for your STUNner
    deployment.
 
    Each GatewayClass must specify a controller that will manage the Gateway objects created under
@@ -55,7 +55,7 @@ stunner` if it does not exist.
    EOF
    ```
 
-1. The next step is to set some [general configuration](/docs/REFERENCE.md#gatewayconfig) for STUNner,
+1. The next step is to set some [general configuration](/docs/GATEWAYCLASS.md#gatewayconfig) for STUNner,
    most importantly the STUN/TURN authentication [credentials](/docs/AUTH.md). This requires loading
    a GatewayConfig custom resource into Kubernetes.
 
@@ -99,7 +99,7 @@ stunner` if it does not exist.
 
    Note that these steps are required only once per STUNner installation.
 
-1. At this point, we are ready to [expose STUNner](/docs/REFERENCE.md#gateway) to clients! This occurs
+1. At this point, we are ready to [expose STUNner](/docs/GATEWAY.md#gateway) to clients! This occurs
    by loading a
    [Gateway](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway)
    resource into Kubernetes.
@@ -130,12 +130,12 @@ stunner` if it does not exist.
 
 1. The final step is to tell STUNner what to do with the client connections received on the
    Gateway. This occurs by attaching a
-   [UDPRoute](/docs/REFERENCE.md#udproute)
+   [UDPRoute](/docs/ROUTE.md#udproute)
    resource to the Gateway by setting the `parentRef` to the Gateway's name and specifying the
    target service in the `backendRef`.
 
    The below UDPRoute will configure STUNner to [route client
-   connections](/docs/REFERENCE.md#udproute) received on the Gateway called `udp-gateway` to the
+   connections](/docs/ROUTE.md#udproute) received on the Gateway called `udp-gateway` to the
    WebRTC media server pool identified by the Kubernetes service `media-plane` in the `default`
    namespace.
 

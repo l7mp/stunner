@@ -8,7 +8,9 @@ gateway then it can run in one of two [ICE models](#ice-models), based on whethe
 connects via STUNner or both clients and media servers use STUNner to set up the media-plane
 connection. For SIP and RTP, STUNner is the gateway between a carrier's SIP trunk and the SIP
 servers in the cluster, in one of two [SIP deployment models](#sip-deployment-models) that follow
-how the carrier authenticates the trunk.
+how the carrier authenticates the trunk. For live video, STUNner routes SRT streams to a pool of
+media servers in the [SRT deployment model](#srt-deployment-model), and lets viewers watch IP
+cameras through a restreamer in the cluster in the [RTSP deployment model](#rtsp-deployment-model).
 
 ## Architectural models
 
@@ -131,9 +133,8 @@ you from adopting STUNner.
 ## SIP deployment models
 
 > [!WARNING]
-> The SIP gateway is experimental: the API may change, there is no support, and the official
-> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
-> issues, but in any way use it at your own risk.
+> The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
+> Please test and report issues, but in any way, use it at your own risk.
 
 A SIP trunk connects a carrier, owning the phone numbers and the connection to the public phone
 network, to your Kubernetes-bound SIP server pool. STUNner sits between the two as a gateway: it
@@ -165,3 +166,33 @@ credentials, and takes the inbound calls over the same connection: the carrier n
 the cluster for signaling, and the egress address of the cluster does not matter.
 
 ![STUNner registration-based SIP trunk](img/stunner_sip_registration.svg)
+
+## SRT deployment model
+
+> [!WARNING]
+> The SRT gateway is in beta: the API may change in any release and there is no support on any tier.
+> Please test and report issues, but in any way, use it at your own risk.
+
+SRT carries live video from the field to the studio or the cloud: an encoder, a drone or a camera
+publishes its stream, decoders and players read it, all through a media server in between. STUNner
+exposes one public UDP port for every SRT caller and routes every connection to the media server
+pod that holds its stream, by the stream ID of the SRT handshake: the publisher and the readers of
+a stream meet on the same pod, however many replicas run behind the Gateway. The encryption of
+the streams stays end to end between the callers and the media servers. See the [SRT gateway
+guide](SRT.md).
+
+![STUNner SRT deployment model](img/stunner_srt.svg)
+
+## RTSP deployment model
+
+> [!WARNING]
+> RTSP streaming through STUNner is in beta: the deployment model may change in any release, there
+> is no support on any tier, and only RTSP interleaved over TCP is supported. Please test and report
+> issues, but in any way, use it at your own risk.
+
+IP cameras are RTSP servers that answer whoever pulls them, so a restreamer in the cluster (e.g.,
+MediaMTX) pulls every camera over its own outgoing connection, and the viewers watch what the
+restreamer re-serves: browsers over WebRTC with STUNner as the TURN server, RTSP clients over a
+plain TCP listener of STUNner. See the [RTSP streaming guide](RTSP.md).
+
+![STUNner RTSP deployment model](img/stunner_rtsp.svg)

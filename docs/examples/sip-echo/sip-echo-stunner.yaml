@@ -1,4 +1,4 @@
-# A STUNner SIP Gateway for the SIP echo service: the carrier (your softphone, at MY_IP) calls the
+# A STUNner SIP Gateway for the SIP echo service: the carrier (your SIP phone, at MY_IP) calls the
 # SIP listener, its media arrives at the media listener, and both go to the sip-echo Service.
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass

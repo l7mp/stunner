@@ -40,25 +40,32 @@
 Ever wondered how to [deploy your real-time communications infrastructure into the
 cloud](https://webrtchacks.com/webrtc-media-servers-in-the-cloud)? Frightened away by the
 complexities of Kubernetes container networking, and the surprising ways in which it may interact
-with your UDP/RTP media? Indeed, Kubernetes was built for HTTP/TCP, while WebRTC and VoIP media is
-UDP/RTP that simply does not fit into the cloud-native model. The usual answer is host networking
-and thousands of open UDP ports, just to get a per-pod public address for UDP/RTP endpoints.
+with your media streams? Indeed, Kubernetes was built for HTTP/TCP, while WebRTC, VoIP and live
+video run over UDP protocols that simply do not fit into the cloud-native model. The usual answer is
+host networking and thousands of open UDP ports, just to get a per-pod public address for every
+media endpoint.
 
 STUNner is a media gateway that makes real-time media just another Kubernetes workload. It exposes
-only a single external port (two for VoIP) to ingest *all* real-time media into the cluster in a
-standards-compliant way. This allows STUNner to relay your media service running in ordinary,
-unprivileged Kubernetes pods, removing all operational friction that hinders Kubernetes real-time
-services today.
+a single external port per use case to ingest *all* media streams into the cluster in a
+standards-compliant way, and relays them to your media services running in ordinary, unprivileged
+Kubernetes pods, removing all operational friction that hinders Kubernetes media services today.
 
-STUNner speaks all the media protocols of the real-time communications world:
+STUNner can ingest essentially all protocols of the media streaming landscape:
 * **WebRTC:** a STUN/TURN gateway for browsers and WebRTC clients to reach your media servers
   ([LiveKit](https://livekit.io), [Janus](https://janus.conf.meetecho.com),
   [Jitsi](https://jitsi.org), [mediasoup](https://mediasoup.org), [Elixir
   WebRTC](https://elixir-webrtc.org), and the like), with full browser compatibility and no change
   to your existing WebRTC codebase.
-* **SIP and RTP (experimental):** a SIP and RTP gateway for SIP trunks, so carriers can deliver
+* **SIP and RTP (beta):** a SIP and RTP gateway for SIP trunks, so carriers can deliver
   phone calls to SIP servers like [LiveKit SIP](https://docs.livekit.io/sip) running in the
   cluster, with no host networking and no public RTP port range.
+* **SRT (beta):** a stream router for live video contribution, so encoders, drones and
+  cameras publish their SRT streams to media servers like
+  [MediaMTX](https://github.com/bluenviron/mediamtx) running in the cluster, and the publisher and
+  the readers of every stream meet on the same pod behind a single UDP port.
+* **RTSP (beta):** viewers watch IP cameras through a restreamer in the cluster over RTSP
+  interleaved over TCP.
+* **Plain UDP and TCP:** any UDP or TCP service gets a public port with no per-pod Services.
 
 STUNner implements the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io), so you configure
 it with the same YAML manifests as the rest of your workload.
@@ -89,13 +96,14 @@ The main goal of STUNner is to allow *anyone* to deploy their own real-time medi
 into Kubernetes, without relying on any external service other than the cloud provider's standard
 hosted Kubernetes offering. STUNner can act as a standalone STUN/TURN server that WebRTC clients
 and media servers use for NAT traversal (headless model), or as a gateway that ingests WebRTC media
-into the cluster through a public STUN/TURN server (media-plane model), or as a gateway that
-connects SIP trunks to SIP servers deployed into a Kubernetes cluster (SIP model,
-experimental). Your application servers, media servers and SIP servers then run in ordinary
+into the cluster through a public STUN/TURN server (media-plane model), as a gateway that
+connects SIP trunks to SIP servers deployed into a Kubernetes cluster (SIP model, beta), or
+as a stream router in front of a pool of SRT media servers (SRT model, beta). Your
+application servers, media servers, SIP servers and streaming servers then run in ordinary
 Kubernetes pods, managed, scaled, monitored and troubleshooted in exactly the same way as any other
 Kubernetes workload.
 
-![STUNner deployment architecture](./docs/img/stunner_arch.svg)
+![STUNner media gateway landscape](./docs/img/stunner_landscape.svg)
 
 Don't worry about the performance implications of processing all your media through a gateway:
 STUNner is fast, it is co-located with your media servers so you don't pay the round-trip time to
@@ -105,26 +113,27 @@ a far-away relay, and it scales like any other Kubernetes service.
 authentication service, the Helm chart and the tools are all public on GitHub. The official STUNner
 images and the `stunner/stunner` Helm chart are built by [l7mp.io](https://l7mp.io) from the same
 code, plus a few premium additions. Without a customer key you get the **free tier**: unlimited
-TURN Gateways and connections, or an SIP/RTP Gateway with at most 5 parallel calls. The **member
-tier**, aimed at small and medium-scale operations, unlocks a number of premium features and higher
-call limits, while the fully featured **enterprise tier**, optimized for large-scale deployments,
-add unlimited calls and unlocks STUNner's industry-leading [Linux/eBPF TURN acceleration
+TURN Gateways and connections, a single SIP/RTP or SRT Gateway with at most 10 parallel
+calls/streams. The **member tier**, aimed at small and medium-scale operations, unlocks a number of
+premium features and 10x call limits: 3 SIP and SRT Gateways with 100 calls/streams each. The fully
+featured **enterprise tier**, optimized for large-scale deployments, adds unlimited Gateways, calls
+and streams and unlocks STUNner's industry-leading [Linux/eBPF TURN acceleration
 engine](/docs/PREMIUM_REFERENCE.md#turn-offload). See [here](https://l7mp.io/pricing) for
-up-to-date info on how to purchase a license.
+up-to-date info on how to purchase a license. Note that SIP/RTP and SRT are in beta and there is
+absolutely no support at any tier: use the beta features at your own risk.
 
 ## Features
 
 Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
-streaming workloads, and especially UDP/RTP media, feel like a foreign citizen. STUNner aims to
-change this, by a single public gateway port for ingesting *all* media traffic into a Kubernetes
-cluster in a controlled and standards-compliant way. An additional external port let's STUNner
-ingest SIP signaling traffic as well in a similar way, opening the door to deploy SIP/RTP services
-into Kubernetes.
+streaming workloads, and especially UDP media, feel like a foreign citizen. STUNner aims to
+change this, by a single public gateway port for ingesting *all* media traffic of a use case into a
+Kubernetes cluster in a controlled and standards-compliant way: TURN for WebRTC, SIP and RTP for
+VoIP, SRT for live video contribution, plain UDP and TCP for everything else.
 
 * **Seamless integration with Kubernetes.** STUNner can be deployed into any Kubernetes cluster,
   even into restricted ones like GKE Autopilot, using a single command. Manage your HTTP/HTTPS
   application servers with your favorite [service mesh](https://istio.io), and STUNner takes care
-  of all UDP/RTP media, WebRTC or SIP. STUNner implements the [Kubernetes Gateway
+  of all media streams, WebRTC, SIP or SRT. STUNner implements the [Kubernetes Gateway
   API](https://gateway-api.sigs.k8s.io) so you configure it in exactly the same way as
   [the](https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway)
   [rest](https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api)
@@ -145,10 +154,15 @@ into Kubernetes.
   cluster as the rest of your WebRTC infrastructure, and any WebRTC client can connect to it
   directly without the use of *any* external STUN/TURN service whatsoever.
 
-* **SIP trunks into the cluster (experimental).** Connect a carrier's SIP trunk to SIP servers
+* **SIP trunks into the cluster (beta).** Connect a carrier's SIP trunk to SIP servers
   running in ordinary pods and STUNner does the rest: it proxies SIP signaling traffic and relays
   RTP media into the cluster via a single external address. See the [SIP gateway
   guide](/docs/SIP.md) for details.
+
+* **Live video streams into the cluster (beta).** Point your encoders, drones and cameras
+  at one public UDP port and STUNner routes every SRT stream by its stream ID: the publisher and
+  the readers of a stream reach the same media server pod, and new streams land on new pods as you
+  scale out. See the [SRT gateway guide](/docs/SRT.md) for details.
 
 * **Scale your media infrastructure.** Tired of manually provisioning your media servers?  STUNner
   lets you deploy the entire media infrastructure into ordinary Kubernetes pods, thus [scaling the
@@ -175,14 +189,14 @@ into Kubernetes.
 
 ## Getting Started
 
-With a minimal understanding of WebRTC or SIP and Kubernetes, deploying STUNner should take less
-than 5 minutes.
+With a minimal understanding of WebRTC, SIP or SRT and Kubernetes, deploying STUNner should take
+less than 5 minutes.
 
 * [Customize STUNner and deploy it](/docs/INSTALL.md) into your Kubernetes cluster.
 * [Deploy a WebRTC media server](/docs/DEPLOYMENT.md#media-plane-deployment-model) or a [SIP
 server](https://docs.livekit.io/sip) in ordinary Kubernetes pod.
-* [Set STUNner as the ICE server](/docs/AUTH.md) in your WebRTC clients, or [connect your SIP
-trunk](/docs/SIP.md) through a STUNner Gateway.
+* [Set STUNner as the ICE server](/docs/TURN.md) in your WebRTC clients, [connect your SIP
+trunk](/docs/SIP.md) or [point your SRT encoders](/docs/SRT.md) at a STUNner Gateway.
 * ...
 * Profit!!
 
@@ -216,8 +230,8 @@ WebRTC service in 5-10 minutes using a purely declarative configuration.
   introductory tutorial shows how to deploy a simple UDP echo service into Kubernetes and expose it
   via STUNner. If you read just one STUNner tutorial, this should be it.
 * [Calling a SIP echo service in Kubernetes](/docs/examples/sip-echo/README.md): This tutorial
-  connects a softphone through a STUNner SIP Gateway to a SIP echo service in the cluster, the
-  smallest end-to-end test of the experimental SIP gateway.
+  connects `mediactl`, a SIP phone among other things, through a STUNner SIP Gateway to a SIP echo
+  service in the cluster, the smallest end-to-end test of the beta SIP gateway.
 * [Opening a UDP tunnel via STUNner](/docs/examples/simple-tunnel/README.md): This tutorial shows
   how to tunnel an external UDP client via STUNner to a standard iperf server deployed into
   Kubernetes. The demo can be used to benchmark your STUNner installation.

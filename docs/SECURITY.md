@@ -206,9 +206,8 @@ In order to prevent potential Denial-of-Service (DoS) attacks that may be launch
 ## SIP gateway
 
 > [!WARNING]
-> The SIP gateway is experimental: the API may change, there is no support, and the official
-> STUNner images serve only one SIP Gateway with at most 5 parallel calls. Please test and report
-> issues, but in any way use it at your own risk.
+> The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
+> Please test and report issues, but in any way, use it at your own risk.
 
 A public SIP port is found and probed by scanners within minutes. STUNner proxies only inbound
 calls, so a SIP gateway cannot be abused to place calls, but every call that reaches your SIP
@@ -227,6 +226,7 @@ make sure only SIP trunks can place calls in the cluster:
   the source addresses in their SDP; anything else arriving at the media port is dropped.
 - **Keep the credentials in Secrets.** Registration credentials live in the Secret the
   registration's `authRef` names, in the namespace of the SIPTrunk.
-- **Cap the calls.** The official images serve at most 5 parallel calls per SIP Gateway; the cap
-  also bounds what a misconfigured trunk can cost.
+- **Cap the calls.** Every tier caps the parallel calls per SIP Gateway (10 free, 100 member), and
+  a GatewayConfig `userQuota` below the cap lowers it: the cap also bounds what a misconfigured
+  trunk can cost.
 

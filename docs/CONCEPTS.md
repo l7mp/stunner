@@ -18,7 +18,7 @@ STUNner gateways.
 
 The STUNner control plane consists of the following components:
 
-* **Gateway API resources:** The high-level STUNner configuration is a collection of [Gateway API](https://gateway-api.sigs.k8s.io) resources that together describe the way media traffic should enter the cluster. The anchor of the configuration hierarchy is the GatewayClass object, and the rest of the resources form a complete hierarchy underneath it: the GatewayConfig describes general STUNner configuration, Gateways define the port and transport protocol per each TURN server listener, and UDPRoutes point to the backend services client traffic should be forwarded to. See [here](REFERENCE.md) for a full reference.
+* **Gateway API resources:** The high-level STUNner configuration is a collection of [Gateway API](https://gateway-api.sigs.k8s.io) resources that together describe the way media traffic should enter the cluster. The anchor of the configuration hierarchy is the GatewayClass object, and the rest of the resources form a complete hierarchy underneath it: the GatewayConfig describes general STUNner configuration, Gateways define the port and transport protocol per each TURN server listener, and UDPRoutes point to the backend services client traffic should be forwarded to. See the reference of the [GatewayClass](GATEWAYCLASS.md), the [Gateway](GATEWAY.md) and the [routes](ROUTE.md).
 
 * **Gateway operator:** The main purpose of the gateway operator is to watch Gateway API resources and, once a Gateway API resource is added or modified by the user, update the dataplane accordingly (see below).
 
@@ -26,7 +26,7 @@ The STUNner control plane consists of the following components:
 
 ## Dataplane
 
-The STUNner dataplane is comprised of a fleet of `stunnerd` pods implementing the media gateway services clients connect to (TURN servers for WebRTC, plain L4 relays, and the experimental SIP proxy and RTP relay), plus some additional configuration to expose these services to clients. The complete dataplane configuration per each Gateway is as follows:
+The STUNner dataplane is comprised of a fleet of `stunnerd` pods implementing the media gateway services clients connect to (TURN servers for WebRTC, plain L4 relays, and the beta SIP proxy and RTP relay), plus some additional configuration to expose these services to clients. The complete dataplane configuration per each Gateway is as follows:
 
 * **`stunnerd` Deployment:** Once you create a new Gateway the gateway operator will spawn a new
   dataplane for the Gateway automatically. For each Gateway there will be `stunnerd` Deployment

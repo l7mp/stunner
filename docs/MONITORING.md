@@ -10,7 +10,7 @@ STUNner can export various statistics into an external timeseries database like 
 
 ## Configuration
 
-Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](REFERENCE.md#dataplane) template. This will configure the `stunnerd` dataplane pods to expose an HTTP metrics endpoint on port 8080 that Prometheus can scrape for metrics.
+Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](GATEWAYCLASS.md#dataplane) template. This will configure the `stunnerd` dataplane pods to expose an HTTP metrics endpoint on port 8080 that Prometheus can scrape for metrics.
 
 ## Metrics
 
@@ -59,7 +59,7 @@ The STUNner monitoring configuration steps involve enabling monitoring in STUNne
 helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
 ```
 
-Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](REFERENCE.md#dataplane) objects.
+Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](GATEWAYCLASS.md#dataplane) objects.
 
 > [!NOTE]
 > Metrics are exposed at `http://:8080/metrics` on each STUNner pod

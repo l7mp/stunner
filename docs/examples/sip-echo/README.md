@@ -1,37 +1,38 @@
 # STUNner Tutorial: Call a SIP echo service in Kubernetes
 
-*Experimental: one SIP Gateway with at most 5 parallel calls.*
+*Beta: no support on any tier. Please test and report issues, but in any way, use it at your own
+risk.*
 
-This tutorial connects a softphone on your machine through a STUNner SIP Gateway to a SIP echo
+This tutorial connects a SIP phone on your machine through a STUNner SIP Gateway to a SIP echo
 service running in Kubernetes: STUNner proxies the SIP signaling and relays the RTP media, the
-echo service answers the call and sends the media back, and the softphone counts what comes
-back. It is the smallest end-to-end test of the experimental [SIP gateway](../../SIP.md), the
+echo service answers the call and sends the media back, and `mediactl` counts what comes
+back. It is the smallest end-to-end test of the beta [SIP gateway](../../SIP.md), the
 same path a carrier's calls take into your SIP server.
 
 In this tutorial you will learn how to:
 * deploy a SIP service into Kubernetes,
 * make a STUNner Gateway a SIP gateway with a SIPTrunk,
-* call the service through STUNner with the `softphone` tool.
+* call the service through STUNner with the `mediactl` tool.
 
 ## Prerequisites
 
 * A STUNner installation from the official Helm chart, see the [installation
-  guide](../../INSTALL.md): the SIP gateway is available in the official STUNner images only.
+  guide](../../INSTALL.md).
 * A load balancer that preserves the source address of the traffic it forwards
   (`externalTrafficPolicy: Local`): the managed load balancers of the large cloud providers do, and
   so does [MetalLB](https://metallb.io) on a local [kind](https://kind.sigs.k8s.io) cluster.
-* A machine to run the softphone on whose address the cluster sees unchanged: a machine with a
+* A machine to run `mediactl` on whose address the cluster sees unchanged: a machine with a
   public IP address, or your own machine calling a local kind cluster. STUNner matches the media
-  of a call to the address in its SDP, so a softphone behind a NAT that rewrites its source
+  of a call to the address in its SDP, so a phone behind a NAT that rewrites its source
   address gets no media back (carriers do not sit behind such NATs, which is why STUNner can rely
   on this).
-* The `softphone` tool: download it from the [STUNner
-  releases](https://github.com/l7mp/stunner/releases) or install it with `go install
-  github.com/l7mp/stunner/v2/cmd/softphone@latest`.
+* The `mediactl` tool, a media source and sink that also makes SIP calls: download it from the
+  [STUNner releases](https://github.com/l7mp/stunner/releases) or install it with `go install
+  github.com/l7mp/stunner/v2/cmd/mediactl@latest`.
 
 ## Configuration
 
-1. Deploy the SIP echo service: the STUNner `softphone` image, answering every
+1. Deploy the SIP echo service: the STUNner `mediactl` image, answering every
    call on UDP port 5060 and echoing the media.
 
    ```console
@@ -75,15 +76,21 @@ In this tutorial you will learn how to:
 Call the echo service for ten seconds:
 
 ```console
-softphone --timeout 10s sip:echo@${SIP_IP}:5060
+mediactl sip call -t 10s sip:echo@${SIP_IP}:5060
 ```
 
-The softphone logs the connected call, sends audio for ten seconds and hangs up, logging what it
+or, letting `mediactl` find the address of the Gateway through your kubeconfig:
+
+```console
+mediactl sip call -t 10s k8s://stunner/sip-gateway/sip
+```
+
+`mediactl` logs the connected call, sends audio for ten seconds and hangs up, logging what it
 sent and what came back:
 
 ```console
-softphone INFO: connected call ...
-softphone INFO: call ... ended (local hangup): sent=500 received=500 lost=0 rtcp-sent=... rtcp-received=...
+mediactl INFO: connected call ...
+mediactl INFO: call ... ended (local hangup): sent=500 received=500 lost=0 rtcp-sent=... rtcp-received=...
 ```
 
 A `received` count close to `sent` and no loss means the media made the round trip through
@@ -99,11 +106,11 @@ stunnerctl -n stunner status sip-gateway
   Check that `MY_IP` is the address the cluster sees, and that the load balancer preserves it (the
   `stunner.l7mp.io/external-traffic-policy: local` annotation).
 * **The call connects but `received` stays zero.** The media is matched to the address in the
-  softphone's SDP: a NAT on the way that rewrites the source address breaks the match. Run the
-  softphone from a machine with a public address, or from the network of a local kind cluster.
+  SDP of `mediactl`: a NAT on the way that rewrites the source address breaks the match. Run
+  `mediactl` from a machine with a public address, or from the network of a local kind cluster.
 * **The Gateway is not accepted.** The open-source operator supports no SIPTrunk: install the
-  official STUNner chart. One SIP Gateway is served at a time; the oldest one by creation time
-  wins.
+  official STUNner chart. The free tier serves one SIP Gateway at a time (the member tier
+  three); the oldest ones by creation time win.
 
 ## Clean up
 

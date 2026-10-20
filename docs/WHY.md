@@ -2,8 +2,8 @@
 
 STUNner is *the Kubernetes real-time media gateway*. All words matter here: it is for *real-time
 media*, so it is specifically designed to deal with the intricacies of the STUN/TURN protocol for
-WebRTC services and SIP and RTP for Voice over IP; it is a *media gateway* so its job is to ingest
-audio and video streams into a virtualized media plane; and it is *opinionated towards Kubernetes*,
+WebRTC services, SIP and RTP for Voice over IP, and SRT and RTSP for live video; it is a *media
+gateway* so its job is to ingest audio and video streams into a virtualized media plane; and it is *opinionated towards Kubernetes*,
 so everything around STUNner is designed and built to fit into the Kubernetes ecosystem. That being
 said, STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but
 this is not the main focus.
@@ -100,11 +100,17 @@ services](https://gateway-api.sigs.k8s.io) to ingest traffic into the cluster in
 manner. STUNner is exactly such a gateway service, carefully tailored to real-time media.
 
 Using STUNner allows you to specify a set of high-level declarative policies (UDP/TCP ports, SIP
-endpoints, authentication credentials, etc.) to define the way you want traffic to enter the
-cluster and control the internal services client media can reach (i.e., UDP routes and backend
-services). This will then make it possible to leave behind the host-networking hack once and for
+endpoints, SRT stream routes, authentication credentials, etc.) to define the way you want traffic
+to enter the cluster and control the internal services client media can reach (i.e., UDP routes
+and backend services). This will then make it possible to leave behind the host-networking hack once and for
 all, and run, scale and monitor the media-plane workload in the usual private pod-network behind
 the secure perimeter defense provided by STUNner. From here, the rest is just PURE STUNner MAGIC!
 (In fact, it is not: STUNner is just an everyday real-time media proxy with some small tweaks to
 let it play nicely with Kubernetes.)
 
+WebRTC, SIP and live video streaming share this problem, and STUNner solves it for each with the
+protocol the use case speaks: a TURN gateway for WebRTC clients, a SIP and RTP gateway for SIP
+trunks, a stream router for SRT encoders, and a plain UDP or TCP relay for everything else, such as
+RTSP viewers.
+
+![STUNner media gateway landscape](img/stunner_landscape.svg)

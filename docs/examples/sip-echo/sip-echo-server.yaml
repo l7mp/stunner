@@ -1,4 +1,4 @@
-# A SIP echo service: the STUNner softphone image answers every call and sends
+# A SIP echo service: the STUNner mediactl image answers every call and sends
 # the media back.
 apiVersion: apps/v1
 kind: Deployment
@@ -19,9 +19,9 @@ spec:
     spec:
       containers:
         - name: sip-echo
-          image: docker.io/l7mp/softphone:latest
+          image: docker.io/l7mp/mediactl:latest
           imagePullPolicy: Always
-          command: ["softphone", "sip-l:5060"]
+          command: ["mediactl", "sip", "answer", ":5060"]
           ports:
             - containerPort: 5060
               protocol: UDP

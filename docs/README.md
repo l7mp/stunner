@@ -24,12 +24,17 @@
 * [Monitoring](MONITORING.md)
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
-* [SIP gateway (experimental)](SIP.md)
+* [TURN gateway](TURN.md)
+* [SIP gateway (beta)](SIP.md)
+* [SRT gateway (beta)](SRT.md)
+* [RTSP streaming (beta)](RTSP.md)
 
 ## Reference
 
-* [Reference](REFERENCE.md)
-* [Reference: Premium tiers](PREMIUM_REFERENCE.md)
+* [GatewayClass, GatewayConfig and Dataplane](GATEWAYCLASS.md)
+* [Gateway](GATEWAY.md)
+* [Routes](ROUTE.md)
+* [Premium tiers](PREMIUM_REFERENCE.md)
 
 ## Tutorials
 
@@ -54,7 +59,7 @@
 * [One to one video call with Kurento](examples/kurento-one2one-call)
 * [Magic mirror with Kurento](examples/kurento-magic-mirror/README.md)
 
-### SIP deployment models (experimental)
+### SIP deployment models (beta)
 
 * [Calling a SIP echo service in Kubernetes](examples/sip-echo/README.md)
 
@@ -62,4 +67,5 @@
 
 * [`stunnerd` manual](cmd/stunnerd.md)
 * [`stunnerctl` manual](cmd/stunnerctl.md)
+* [`mediactl` manual](cmd/mediactl.md)
 * [Benchmarking](examples/benchmark)
