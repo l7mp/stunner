@@ -18,9 +18,9 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/dialer"
-	"github.com/l7mp/stunner/v2/internal/fifo"
 	"github.com/l7mp/stunner/v2/internal/netconn"
 	"github.com/l7mp/stunner/v2/internal/netconn/account"
+	"github.com/l7mp/stunner/v2/internal/proto/fifo"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	"github.com/l7mp/stunner/v2/internal/util"

@@ -26,12 +26,12 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/flow"
-	"github.com/l7mp/stunner/v2/internal/ng"
+	"github.com/l7mp/stunner/v2/internal/proto/ng"
+	"github.com/l7mp/stunner/v2/internal/proto/siptx"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
 	"github.com/l7mp/stunner/v2/internal/server/balancer"
 	turnsrv "github.com/l7mp/stunner/v2/internal/server/turn"
-	"github.com/l7mp/stunner/v2/internal/siptx"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 

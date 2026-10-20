@@ -1,6 +1,8 @@
-// Package softphone is a minimal SIP phone: it dials calls that send silence and answers calls
-// with an echo.
-package softphone
+// Package sip is a minimal SIP phone, a dialer and a listener of calls: Dial and DialContext
+// return a call once it is answered, Accept the next call the phone answered. A call is a net.Conn
+// of its RTP media, so any packet stream runs over it: mediactl.Stream sends, mediactl.Echo
+// answers.
+package sip
 
 import (
 	"context"
@@ -17,12 +19,12 @@ import (
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/stdnet"
 
-	"github.com/l7mp/stunner/v2/internal/siptx"
+	"github.com/l7mp/stunner/v2/internal/proto/siptx"
 	"github.com/l7mp/stunner/v2/pkg/udp"
 )
 
 // user is the user part of the phone's SIP URI.
-const user = "softphone"
+const user = "phone"
 
 // Config is the configuration of a phone.
 type Config struct {
@@ -92,7 +94,7 @@ func New(cfg Config) (*Phone, error) {
 	if err != nil {
 		return nil, err
 	}
-	log := lf.NewLogger("softphone")
+	log := lf.NewLogger("sip-phone")
 	p := &Phone{cfg: cfg, net: n, listener: l, txl: siptx.New(log), log: log,
 		calls: map[string]*Call{}, conns: map[net.Conn]bool{}, incoming: make(chan *Call, 64),
 		bindings: map[string]binding{}, registered: make(chan Registration, 64),
@@ -119,8 +121,32 @@ func New(cfg Config) (*Phone, error) {
 // Addr returns the address the phone answers calls at.
 func (p *Phone) Addr() net.Addr { return p.listener.Addr() }
 
+// CloseTimeout bounds the BYE of a call closed as a conn.
+var CloseTimeout = 5 * time.Second
+
 // Incoming returns the calls the phone answered, once acknowledged.
 func (p *Phone) Incoming() <-chan *Call { return p.incoming }
+
+// Accept returns the next call the phone answered, once acknowledged: the phone is a
+// net.Listener of calls. It fails once the phone is closed.
+func (p *Phone) Accept() (net.Conn, error) {
+	select {
+	case c := <-p.incoming:
+		return c, nil
+	case <-p.done:
+		return nil, net.ErrClosed
+	}
+}
+
+// DialContext calls the SIP URI of address, over UDP whatever the network: the phone is a dialer
+// of calls.
+func (p *Phone) DialContext(ctx context.Context, _, address string) (net.Conn, error) {
+	c, err := p.Dial(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
 
 // Registration is a REGISTER a registrar phone took.
 type Registration struct {
@@ -220,7 +246,7 @@ func (p *Phone) handle(req *sip.Request, tx *siptx.ServerTx, conn net.Conn) {
 	}
 }
 
-// Dial calls a SIP URI and returns the call once it is answered; the call sends silence. An AOR
+// Dial calls a SIP URI and returns the call once it is answered. An AOR
 // registered with a registrar phone is called at its Contact over the flow it registered on.
 // Cancelling the context before the answer cancels the call.
 func (p *Phone) Dial(ctx context.Context, uri string) (*Call, error) {
@@ -321,7 +347,7 @@ func (p *Phone) Dial(ctx context.Context, uri string) (*Call, error) {
 	}
 }
 
-// answer answers an INVITE with an echoing call.
+// answer answers an INVITE with a call.
 func (p *Phone) answer(req *sip.Request, tx *siptx.ServerTx, conn net.Conn) {
 	respond := func(code int, reason string) {
 		_ = tx.Respond(sip.NewResponseFromRequest(req, code, reason, nil))
@@ -405,6 +431,45 @@ func (p *Phone) register(req *sip.Request, tx *siptx.ServerTx, conn net.Conn) {
 	case p.registered <- Registration{AOR: aor, Contact: ct.Address, Expires: time.Duration(secs) * time.Second}:
 	default:
 	}
+}
+
+// Ping sends an OPTIONS to the URI on a flow of its own and returns nil on a 2xx: the SIP peer at
+// the URI's address takes requests. A URI with no user part addresses a proxy itself.
+func (p *Phone) Ping(ctx context.Context, uri string) error {
+	var target sip.Uri
+	if err := sip.ParseUri(uri, &target); err != nil {
+		return err
+	}
+	req := sip.NewRequest(sip.OPTIONS, target)
+	conn, err := p.net.Dial("udp", req.Destination())
+	if err != nil {
+		return err
+	}
+	defer conn.Close() //nolint:errcheck
+	go p.serve(conn)
+
+	local := addrPortOf(conn.LocalAddr())
+	req.AppendHeader(via(conn))
+	from := &sip.FromHeader{Address: sip.Uri{Scheme: "sip", User: user, Host: local.Addr().String(),
+		Port: int(local.Port())}, Params: sip.NewParams()}
+	from.Params.Add("tag", randomHex(6))
+	req.AppendHeader(from)
+	req.AppendHeader(&sip.ToHeader{Address: target, Params: sip.NewParams()})
+	cid := sip.CallIDHeader(randomHex(12))
+	req.AppendHeader(&cid)
+	req.AppendHeader(&sip.CSeqHeader{SeqNo: 1, MethodName: sip.OPTIONS})
+	mf := sip.MaxForwardsHeader(70)
+	req.AppendHeader(&mf)
+	req.SetBody(nil)
+
+	res, err := p.txl.Do(ctx, req, conn)
+	if err != nil {
+		return err
+	}
+	if !res.IsSuccess() {
+		return &StatusError{Code: res.StatusCode, Reason: res.Reason}
+	}
+	return nil
 }
 
 // via makes the Via of a request the phone sends on a conn.

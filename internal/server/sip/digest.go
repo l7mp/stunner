@@ -12,7 +12,7 @@ import (
 	sipmsg "github.com/emiago/sipgo/sip"
 	"github.com/icholy/digest"
 
-	"github.com/l7mp/stunner/v2/internal/siptx"
+	"github.com/l7mp/stunner/v2/internal/proto/siptx"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/authentication"
 )

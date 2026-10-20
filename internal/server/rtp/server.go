@@ -15,7 +15,7 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/flow"
-	"github.com/l7mp/stunner/v2/internal/ng"
+	"github.com/l7mp/stunner/v2/internal/proto/ng"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"

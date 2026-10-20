@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/l7mp/stunner/v2/internal/fifo"
+	"github.com/l7mp/stunner/v2/internal/proto/fifo"
 )
 
 func TestBencode(t *testing.T) {

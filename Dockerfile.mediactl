@@ -23,14 +23,14 @@ RUN apk add --no-cache git make
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH make build-bin
 
 ###########
-# SOFTPHONE
+# MEDIACTL
 FROM scratch
 
 WORKDIR /app
 
-COPY --from=builder /app/bin/softphone /usr/bin/
+COPY --from=builder /app/bin/mediactl /usr/bin/
 
 EXPOSE 5060/udp
 
-# answer every call on UDP port 5060 and echo its media; dial with "softphone sip:<user>@<host>"
-CMD [ "softphone", "sip-l:5060" ]
+# answer every call on UDP port 5060 and echo its media; dial with "mediactl sip call sip:<user>@<host>"
+CMD [ "mediactl", "sip", "answer", ":5060" ]

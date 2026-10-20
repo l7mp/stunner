@@ -1,4 +1,4 @@
-package softphone
+package sip
 
 import (
 	"crypto/md5"

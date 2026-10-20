@@ -17,7 +17,8 @@ import (
 	sipsrv "github.com/l7mp/stunner/v2/internal/server/sip"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
-	"github.com/l7mp/stunner/v2/pkg/softphone"
+	"github.com/l7mp/stunner/v2/pkg/mediactl"
+	"github.com/l7mp/stunner/v2/pkg/mediactl/sip"
 )
 
 /********************************************
@@ -25,7 +26,7 @@ import (
  *  SIP gateway: a stateful SIP proxy and an RTP media proxy over vnet
  *
  *  Topology:
- *     trunk 203.0.113.10 ---+                 +--- "livekit-sip" softphone 1.2.3.5:5060
+ *     trunk 203.0.113.10 ---+                 +--- "livekit-sip" phone 1.2.3.5:5060
  *                           |--- gw router ---|
  *     stranger 198.51.100.66+                 +--- stunnerd 1.2.3.4: SIP 5060, media 30000
  *
@@ -114,11 +115,11 @@ func sipGatewayConfig() *stnrv2.StunnerConfig {
 type sipFixture struct {
 	net     *sipNet
 	stunner *Stunner
-	trunk   *softphone.Phone
-	peer    *softphone.Phone
+	trunk   *sip.Phone
+	peer    *sip.Phone
 }
 
-func newSIPFixture(t *testing.T, peerCfg softphone.Config) *sipFixture {
+func newSIPFixture(t *testing.T, peerCfg sip.Config) *sipFixture {
 	t.Helper()
 	n := newSIPNet(t)
 	s := NewStunner(Options{Name: "sip-gateway", Net: n.pod,
@@ -127,22 +128,26 @@ func newSIPFixture(t *testing.T, peerCfg softphone.Config) *sipFixture {
 	require.NoError(t, s.Reconcile(sipGatewayConfig()))
 
 	lf := logger.NewLoggerFactory(stunnerTestLoglevel)
-	trunk, err := softphone.New(softphone.Config{Net: n.trunk, LoggerFactory: lf})
+	trunk, err := sip.New(sip.Config{Net: n.trunk, LoggerFactory: lf})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = trunk.Close() })
 
 	peerCfg.Net, peerCfg.Addr, peerCfg.LoggerFactory = n.pod, sipPeerIP+":5060", lf
-	peer, err := softphone.New(peerCfg)
+	peer, err := sip.New(peerCfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = peer.Close() })
 	return &sipFixture{net: n, stunner: s, trunk: trunk, peer: peer}
 }
 
-// answered waits for the call the peer answered.
-func answered(t *testing.T, ctx context.Context, p *softphone.Phone) *softphone.Call {
+// sipMedia is the media of a dialed call: 20 ms frames of G.711.
+var sipMedia = mediactl.Config{Length: 160, Rate: 50}
+
+// answered waits for the call the peer answered, and echoes its media.
+func answered(t *testing.T, ctx context.Context, p *sip.Phone) *sip.Call {
 	t.Helper()
 	select {
 	case c := <-p.Incoming():
+		go mediactl.Echo(c, true)
 		return c
 	case <-ctx.Done():
 		t.Fatal("the call was never answered")
@@ -150,9 +155,11 @@ func answered(t *testing.T, ctx context.Context, p *softphone.Phone) *softphone.
 	return nil
 }
 
-// assertEcho checks that the media of a call comes back through the gateway, RTCP included.
-func assertEcho(t *testing.T, call *softphone.Call, packets int) {
+// assertEcho sends the media of a dialed call, until the call ends, and checks that it comes back
+// through the gateway, RTCP included.
+func assertEcho(t *testing.T, call *sip.Call, packets int) {
 	t.Helper()
+	go mediactl.Stream(context.Background(), call, sipMedia)
 	require.Eventually(t, func() bool {
 		s := call.Stats()
 		return s.Received >= packets && s.RTCPReceived > 0
@@ -173,7 +180,7 @@ func TestSIPGateway(t *testing.T) {
 	uri := "sip:+15551234@" + sipStunnerIP + ":5060"
 
 	t.Run("inbound-call", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -203,7 +210,7 @@ func TestSIPGateway(t *testing.T) {
 	})
 
 	t.Run("bye-from-the-cluster", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		call, err := f.trunk.Dial(ctx, uri)
@@ -221,20 +228,20 @@ func TestSIPGateway(t *testing.T) {
 	})
 
 	t.Run("cancel", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{AnswerDelay: time.Hour})
+		f := newSIPFixture(t, sip.Config{AnswerDelay: time.Hour})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		dctx, dcancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		_, err := f.trunk.Dial(dctx, uri)
 		dcancel()
-		var se *softphone.StatusError
+		var se *sip.StatusError
 		require.True(t, errors.As(err, &se), "the cancelled call gets a final response: %v", err)
 		assert.Equal(t, 487, se.Code)
 		mediaDeleted(t, f.stunner)
 	})
 
 	t.Run("inbound-only", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		// the cluster cannot start a call: the carriers filter of the SIP listener drops it
@@ -245,10 +252,10 @@ func TestSIPGateway(t *testing.T) {
 	})
 
 	t.Run("listener-filter", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		stranger, err := softphone.New(softphone.Config{Net: f.net.stranger})
+		stranger, err := sip.New(sip.Config{Net: f.net.stranger})
 		require.NoError(t, err)
 		defer stranger.Close()
 
@@ -280,7 +287,7 @@ func TestSIPGateway(t *testing.T) {
 	})
 
 	t.Run("call-quota", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		// the quota caps the parallel calls of the media proxy
@@ -291,7 +298,7 @@ func TestSIPGateway(t *testing.T) {
 		call, err := f.trunk.Dial(ctx, uri)
 		require.NoError(t, err)
 		in := answered(t, ctx, f.peer)
-		var se *softphone.StatusError
+		var se *sip.StatusError
 		_, err = f.trunk.Dial(ctx, uri)
 		require.ErrorAs(t, err, &se, "a call over the quota is refused")
 		assert.Equal(t, 503, se.Code)
@@ -309,7 +316,7 @@ func TestSIPGateway(t *testing.T) {
 	})
 
 	t.Run("digest-auth", func(t *testing.T) {
-		f := newSIPFixture(t, softphone.Config{})
+		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		// a carrier the filter admits must also answer the digest challenge of the server's auth
@@ -320,13 +327,13 @@ func TestSIPGateway(t *testing.T) {
 		conf.Servers[0].SIP.Auth = "carriers"
 		require.NoError(t, f.stunner.Reconcile(conf))
 
-		var se *softphone.StatusError
+		var se *sip.StatusError
 		_, err := f.trunk.Dial(ctx, uri)
 		require.ErrorAs(t, err, &se, "a carrier without credentials is challenged")
 		assert.Equal(t, 407, se.Code)
 
 		lf := logger.NewLoggerFactory(stunnerTestLoglevel)
-		carrier, err := softphone.New(softphone.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5070",
+		carrier, err := sip.New(sip.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5070",
 			LoggerFactory: lf, Username: "carrier", Password: "secret"})
 		require.NoError(t, err)
 		defer carrier.Close()
@@ -337,7 +344,7 @@ func TestSIPGateway(t *testing.T) {
 		require.NoError(t, call.Hangup(ctx))
 		<-in.Done()
 
-		impostor, err := softphone.New(softphone.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5080",
+		impostor, err := sip.New(sip.Config{Net: f.net.trunk, Addr: sipTrunkIP + ":5080",
 			LoggerFactory: lf, Username: "carrier", Password: "guess"})
 		require.NoError(t, err)
 		defer impostor.Close()
@@ -360,10 +367,11 @@ func TestSIPGatewayLoad(t *testing.T) {
 	defer lim.Stop()
 
 	const calls = 50
-	f := newSIPFixture(t, softphone.Config{})
+	f := newSIPFixture(t, sip.Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
+	go func() { _ = mediactl.Serve(f.peer, true, nil) }()
 	var wg sync.WaitGroup
 	errs := make(chan error, calls)
 	for i := 0; i < calls; i++ {
@@ -375,6 +383,7 @@ func TestSIPGatewayLoad(t *testing.T) {
 				errs <- fmt.Errorf("call %d: %w", i, err)
 				return
 			}
+			go mediactl.Stream(ctx, call, sipMedia)
 			deadline := time.Now().Add(20 * time.Second)
 			for call.Stats().Received < 100 && time.Now().Before(deadline) {
 				time.Sleep(100 * time.Millisecond)
@@ -406,11 +415,11 @@ func TestSIPRegistration(t *testing.T) {
 
 	n := newSIPNet(t)
 	lf := logger.NewLoggerFactory(stunnerTestLoglevel)
-	carrier, err := softphone.New(softphone.Config{Net: n.trunk, Addr: sipTrunkIP + ":5060",
+	carrier, err := sip.New(sip.Config{Net: n.trunk, Addr: sipTrunkIP + ":5060",
 		Registrar: true, LoggerFactory: lf})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = carrier.Close() })
-	peer, err := softphone.New(softphone.Config{Net: n.pod, Addr: sipPeerIP + ":5060", LoggerFactory: lf})
+	peer, err := sip.New(sip.Config{Net: n.pod, Addr: sipPeerIP + ":5060", LoggerFactory: lf})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = peer.Close() })
 
@@ -428,7 +437,7 @@ func TestSIPRegistration(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	registered := func() softphone.Registration {
+	registered := func() sip.Registration {
 		t.Helper()
 		select {
 		case r := <-carrier.Registered():
@@ -436,7 +445,7 @@ func TestSIPRegistration(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("no REGISTER reached the carrier")
 		}
-		return softphone.Registration{}
+		return sip.Registration{}
 	}
 
 	// the REGISTER binds the AOR to the flow: the Contact is the flow's own address, marked outbound

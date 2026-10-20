@@ -12,8 +12,8 @@ import (
 
 	"github.com/pion/transport/v5"
 
-	"github.com/l7mp/stunner/v2/internal/fifo"
 	"github.com/l7mp/stunner/v2/internal/offload"
+	"github.com/l7mp/stunner/v2/internal/proto/fifo"
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/telemetry"
 	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"

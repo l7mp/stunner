@@ -1,4 +1,4 @@
-package softphone
+package sip
 
 import (
 	"context"
@@ -10,6 +10,8 @@ import (
 	"github.com/pion/transport/v5/vnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/l7mp/stunner/v2/pkg/mediactl"
 )
 
 // twoNets makes a virtual network with two hosts, 10.0.0.1 and 10.0.0.2.
@@ -29,6 +31,24 @@ func twoNets(t *testing.T) (*vnet.Net, *vnet.Net) {
 	return a, b
 }
 
+func TestPing(t *testing.T) {
+	na, nb := twoNets(t)
+	peer, err := New(Config{Net: nb, Addr: "10.0.0.2:5060"})
+	require.NoError(t, err)
+	defer peer.Close()
+	p, err := New(Config{Net: na})
+	require.NoError(t, err)
+	defer p.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	assert.NoError(t, p.Ping(ctx, "sip:10.0.0.2:5060"), "the peer answers the OPTIONS")
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), time.Second)
+	defer cancel2()
+	assert.Error(t, p.Ping(ctx2, "sip:10.0.0.2:5070"), "nobody answers on another port")
+}
+
 func TestCall(t *testing.T) {
 	na, nb := twoNets(t)
 	callee, err := New(Config{Net: nb, Addr: "10.0.0.2:5060"})
@@ -40,22 +60,26 @@ func TestCall(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	call, err := caller.Dial(ctx, "sip:echo@10.0.0.2:5060")
+	conn, err := caller.DialContext(ctx, "udp", "sip:echo@10.0.0.2:5060")
 	require.NoError(t, err)
-	var answered *Call
-	select {
-	case answered = <-callee.Incoming():
-	case <-ctx.Done():
-		t.Fatal("the callee never answered")
-	}
+	call := conn.(*Call)
+	in, err := callee.Accept()
+	require.NoError(t, err, "the callee answered")
+	answered := in.(*Call)
+	go mediactl.Echo(answered, true)
 
-	require.Eventually(t, func() bool {
-		s := call.Stats()
-		return s.Received >= 50 && s.RTCPReceived > 0
-	}, 5*time.Second, 50*time.Millisecond, "the silence comes back: %s", call.Stats())
-	assert.Zero(t, call.Stats().Lost)
+	// a call is a conn of its media: a stream runs over it, here 50 packets of 20 ms G.711
+	sctx, scancel := context.WithTimeout(ctx, time.Second)
+	defer scancel()
+	r := mediactl.Stream(sctx, call, mediactl.Config{Length: 160, Rate: 50, Echo: true}).Result()
+	assert.InDelta(t, 50, r.Sent, 2)
+	assert.Zero(t, r.Lost, "the echo came back: %+v", r)
+	assert.NotZero(t, r.RTTMax, "the round trip through the RTP payloads")
+	s := call.Stats()
+	assert.Equal(t, int(r.Sent), s.Sent, "every write is an RTP packet")
+	assert.Positive(t, s.RTCPReceived, "the echo sends its own sender reports: %s", s)
 
-	require.NoError(t, call.Hangup(ctx))
+	// the stream closed the call: a BYE
 	select {
 	case <-answered.Done():
 		assert.Equal(t, "remote hangup", answered.EndReason())

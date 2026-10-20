@@ -1,4 +1,4 @@
-package softphone
+package sip
 
 import (
 	"context"
@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo/sip"
-	"github.com/pion/rtcp"
-	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
+
+	mediartp "github.com/l7mp/stunner/v2/pkg/mediactl/rtp"
 )
 
 // The G.711 payload types the phone speaks.
@@ -22,22 +22,6 @@ const (
 	payloadPCMU uint8 = 0
 	payloadPCMA uint8 = 8
 )
-
-// Stats are the media statistics of a call.
-type Stats struct {
-	// Sent and Received count the RTP packets.
-	Sent, Received int
-	// Lost is the number of RTP packets missing from the received sequence.
-	Lost int
-	// RTCPSent and RTCPReceived count the RTCP packets.
-	RTCPSent, RTCPReceived int
-}
-
-// String summarizes the statistics.
-func (s Stats) String() string {
-	return fmt.Sprintf("sent=%d received=%d lost=%d rtcp-sent=%d rtcp-received=%d",
-		s.Sent, s.Received, s.Lost, s.RTCPSent, s.RTCPReceived)
-}
 
 // stream is the audio stream of an SDP.
 type stream struct {
@@ -47,8 +31,9 @@ type stream struct {
 	payloads       []uint8 // the G.711 ones, in order
 }
 
-// Call is a call of a phone. A dialed call sends silence, an answered one echoes every RTP and
-// RTCP packet it receives, both on a single socket.
+// Call is a call of a phone, and a net.Conn of its media: its writes leave as the payloads of RTP
+// packets to the peer's media address, its reads return the payloads of the RTP packets received,
+// both on a single socket. Closing it hangs up.
 type Call struct {
 	p        *Phone
 	id       string
@@ -67,14 +52,14 @@ type Call struct {
 	cseq         uint32
 	inviteSeq    uint32
 	remote       stream
-	stats        Stats
-	firstSeq     int64
-	maxSeq       int64 // extended over wraps
+	media        *mediartp.Conn // the RTP session, once the call is answered
 	acknowledged bool
 	endReason    string
 
 	ended   chan struct{}
 	endOnce sync.Once
+	hangup  sync.Once // one BYE, however many hang up
+	byeErr  error
 }
 
 // newCall makes a call over the SIP conn of a peer, its media bound at the conn's local address.
@@ -105,15 +90,56 @@ func (c *Call) EndReason() string {
 	return c.endReason
 }
 
-// Stats returns the media statistics of the call.
-func (c *Call) Stats() Stats {
+// Stats returns the RTP and RTCP counters of the call.
+func (c *Call) Stats() mediartp.Stats {
+	c.mu.Lock()
+	media := c.media
+	c.mu.Unlock()
+	if media == nil {
+		return mediartp.Stats{}
+	}
+	return media.Stats()
+}
+
+// Read returns the payload of the next RTP packet of the call.
+func (c *Call) Read(p []byte) (int, error) { return c.session().Read(p) }
+
+// Write sends p as the payload of the next RTP packet of the call.
+func (c *Call) Write(p []byte) (int, error) { return c.session().Write(p) }
+
+// Close hangs up the call, bounded by CloseTimeout, unless it has ended already.
+func (c *Call) Close() error {
+	select {
+	case <-c.ended:
+		return nil
+	default:
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), CloseTimeout)
+	defer cancel()
+	return c.Hangup(ctx)
+}
+
+// LocalAddr returns the address of the call's media socket.
+func (c *Call) LocalAddr() net.Addr { return c.conn.LocalAddr() }
+
+// RemoteAddr returns the peer's RTP address.
+func (c *Call) RemoteAddr() net.Addr { return net.UDPAddrFromAddrPort(c.RemoteMedia()) }
+
+// SetDeadline sets the deadlines of the media socket.
+func (c *Call) SetDeadline(t time.Time) error { return c.conn.SetDeadline(t) }
+
+// SetReadDeadline sets the read deadline of the media socket.
+func (c *Call) SetReadDeadline(t time.Time) error { return c.conn.SetReadDeadline(t) }
+
+// SetWriteDeadline sets the write deadline of the media socket.
+func (c *Call) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
+
+// session returns the RTP session of the call; one is made when the call is answered, before the
+// call is handed out.
+func (c *Call) session() *mediartp.Conn {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	s := c.stats
-	if s.Received > 0 {
-		s.Lost = max(0, int(c.maxSeq-c.firstSeq+1)-s.Received)
-	}
-	return s
+	return c.media
 }
 
 // RemoteMedia returns the address the call sends RTP to.
@@ -137,7 +163,7 @@ func (c *Call) sdp(payloads []uint8, mux bool) []byte {
 		family = "IP6"
 	}
 	b := &strings.Builder{}
-	fmt.Fprintf(b, "v=0\r\no=- %d 1 IN %s %s\r\ns=softphone\r\nc=IN %s %s\r\nt=0 0\r\nm=audio %d RTP/AVP",
+	fmt.Fprintf(b, "v=0\r\no=- %d 1 IN %s %s\r\ns=phone\r\nc=IN %s %s\r\nt=0 0\r\nm=audio %d RTP/AVP",
 		time.Now().UnixNano()>>1, family, addr, family, addr, port)
 	for _, pt := range payloads {
 		fmt.Fprintf(b, " %d", pt)
@@ -243,95 +269,14 @@ func (c *Call) acked() {
 	}
 }
 
-// startMedia starts reading, and for a dialed call sending, the media of the call.
+// startMedia makes the RTP session of the call, to the peer's media address in the first payload
+// type the peer offered.
 func (c *Call) startMedia() {
-	go c.readMedia()
-	if c.outbound {
-		go c.sendSilence()
-	}
-}
-
-func (c *Call) readMedia() {
-	buf := make([]byte, 1500)
-	for {
-		n, _, err := c.conn.ReadFrom(buf)
-		if err != nil {
-			return
-		}
-		// RFC 5761: the second octet of RTCP is 192-223
-		isRTCP := n >= 2 && buf[1] >= 192 && buf[1] <= 223
-		var h rtp.Header
-		if _, err := h.Unmarshal(buf[:n]); !isRTCP && err != nil {
-			continue
-		}
-		c.mu.Lock()
-		dst := netip.AddrPortFrom(c.remote.addr, uint16(c.remote.port))
-		if isRTCP {
-			c.stats.RTCPReceived++
-			dst = netip.AddrPortFrom(c.remote.addr, uint16(c.remote.rtcpPort))
-		} else {
-			seq := int64(h.SequenceNumber)
-			if c.stats.Received == 0 {
-				c.firstSeq, c.maxSeq = seq, seq
-			} else if ext := c.maxSeq + int64(int16(h.SequenceNumber-uint16(c.maxSeq))); ext > c.maxSeq {
-				c.maxSeq = ext
-			}
-			c.stats.Received++
-		}
-		if !c.outbound {
-			if _, err := c.conn.WriteTo(buf[:n], net.UDPAddrFromAddrPort(dst)); err == nil && isRTCP {
-				c.stats.RTCPSent++
-			} else if err == nil {
-				c.stats.Sent++
-			}
-		}
-		c.mu.Unlock()
-	}
-}
-
-// sendSilence sends a packet of G.711 silence every 20 ms and a sender report every second.
-func (c *Call) sendSilence() {
 	c.mu.Lock()
-	pt := c.remote.payloads[0]
-	rtpAddr := net.UDPAddrFromAddrPort(netip.AddrPortFrom(c.remote.addr, uint16(c.remote.port)))
-	rtcpAddr := net.UDPAddrFromAddrPort(netip.AddrPortFrom(c.remote.addr, uint16(c.remote.rtcpPort)))
-	c.mu.Unlock()
-	fill := byte(0xff)
-	if pt == payloadPCMA {
-		fill = 0xd5
-	}
-	silence := make([]byte, 160)
-	for i := range silence {
-		silence[i] = fill
-	}
-	pkt := rtp.Packet{Header: rtp.Header{Version: 2, PayloadType: pt, SSRC: uint32(time.Now().UnixNano())},
-		Payload: silence}
-	t := time.NewTicker(20 * time.Millisecond)
-	defer t.Stop()
-	for {
-		select {
-		case <-c.ended:
-			return
-		case <-t.C:
-		}
-		pkt.SequenceNumber++
-		pkt.Timestamp += uint32(len(silence))
-		b, _ := pkt.Marshal()
-		if _, err := c.conn.WriteTo(b, rtpAddr); err == nil {
-			c.mu.Lock()
-			c.stats.Sent++
-			c.mu.Unlock()
-		}
-		if pkt.SequenceNumber%50 != 0 {
-			continue
-		}
-		b, _ = rtcp.Marshal([]rtcp.Packet{&rtcp.SenderReport{SSRC: pkt.SSRC, RTPTime: pkt.Timestamp}})
-		if _, err := c.conn.WriteTo(b, rtcpAddr); err == nil {
-			c.mu.Lock()
-			c.stats.RTCPSent++
-			c.mu.Unlock()
-		}
-	}
+	defer c.mu.Unlock()
+	rtpTo := net.UDPAddrFromAddrPort(netip.AddrPortFrom(c.remote.addr, uint16(c.remote.port)))
+	rtcpTo := net.UDPAddrFromAddrPort(netip.AddrPortFrom(c.remote.addr, uint16(c.remote.rtcpPort)))
+	c.media = mediartp.NewConn(c.conn, rtpTo, rtcpTo, c.remote.payloads[0])
 }
 
 // inDialog makes an in-dialog request of the call.
@@ -374,14 +319,23 @@ func (c *Call) ack() {
 	}
 }
 
-// Hangup ends the call with a BYE.
+// Hangup ends the call with a BYE, unless the call has ended. A hangup while another is in flight
+// waits for that one and returns its result.
 func (c *Call) Hangup(ctx context.Context) error {
-	res, err := c.p.txl.Do(ctx, c.inDialog(sip.BYE), c.sig)
-	c.end("local hangup")
-	if err == nil && !res.IsSuccess() {
-		err = &StatusError{Code: res.StatusCode, Reason: res.Reason}
-	}
-	return err
+	c.hangup.Do(func() {
+		select {
+		case <-c.ended:
+			return
+		default:
+		}
+		res, err := c.p.txl.Do(ctx, c.inDialog(sip.BYE), c.sig)
+		c.end("local hangup")
+		if err == nil && !res.IsSuccess() {
+			err = &StatusError{Code: res.StatusCode, Reason: res.Reason}
+		}
+		c.byeErr = err
+	})
+	return c.byeErr
 }
 
 // end ends the call locally.
@@ -390,6 +344,8 @@ func (c *Call) end(reason string) {
 		c.mu.Lock()
 		c.endReason = reason
 		c.mu.Unlock()
+		// ended before the media closes: a reader that fails on it sees the call over
+		close(c.ended)
 		_ = c.conn.Close()
 		if c.ownsSig {
 			_ = c.sig.Close()
@@ -399,7 +355,6 @@ func (c *Call) end(reason string) {
 			delete(c.p.calls, c.id)
 		}
 		c.p.mu.Unlock()
-		close(c.ended)
 	})
 }
 
