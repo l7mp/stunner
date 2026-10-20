@@ -1,4 +1,4 @@
-package server
+package flow
 
 import "github.com/l7mp/stunner/v2/internal/api"
 

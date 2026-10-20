@@ -8,9 +8,9 @@ import (
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/server"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	a12n "github.com/l7mp/stunner/v2/pkg/authentication"
 )
@@ -162,7 +162,7 @@ type offloadPair struct {
 }
 
 // eventHandler returns the allocation lifecycle callbacks.
-func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
+func (s *Server) eventHandler(ct *flow.Conntrack) turn.EventHandler {
 	return turn.EventHandler{
 		OnAuth: func(src, dst net.Addr, proto, username, realm string, method string, verdict bool) {
 			status := "REJECTED"
@@ -175,7 +175,7 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 		OnAllocationCreated: func(src, dst net.Addr, proto, username, realm string, relayAddr net.Addr, reqPort int) {
 			s.log.Debugf("allocation created: client=%s, relay-address=%s, requested-port=%d",
 				dumpClient(src, dst, proto, username, realm), relayAddr.String(), reqPort)
-			if e, ok := ct.Get(server.Key(src, dst)); ok {
+			if e, ok := ct.Get(flow.Key(src, dst)); ok {
 				e.Disarm()
 			}
 			s.quota.AllocationHandler(src, dst, proto, username, realm, AllocationCreated)
@@ -183,7 +183,7 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 		OnAllocationDeleted: func(src, dst net.Addr, proto, username, realm string) {
 			s.log.Debugf("allocation deleted: client=%s", dumpClient(src, dst, proto, username, realm))
 			s.quota.AllocationHandler(src, dst, proto, username, realm, AllocationDeleted)
-			ct.Remove(server.Key(src, dst))
+			ct.Remove(flow.Key(src, dst))
 		},
 		OnAllocationError: func(src, dst net.Addr, proto, message string) {
 			s.log.Debugf("allocation error: client=%s-%s:%s, error=%s", src, dst, proto, message)
@@ -204,7 +204,7 @@ func (s *Server) eventHandler(ct *server.Conntrack) turn.EventHandler {
 			// Only a plain UDP client conn relaying through a local UDP socket is offloadable.
 			// pion reports every client 5-tuple as UDP (DTLS, TCP and TLS included), so the
 			// transport is read from the conn's tag.
-			e, found := ct.Get(server.Key(src, dst))
+			e, found := ct.Get(flow.Key(src, dst))
 			if !found || e.Client.Tag().Proto != stnrv2.ProtocolUDP {
 				return
 			}

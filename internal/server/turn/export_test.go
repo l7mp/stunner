@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/l7mp/stunner/v2/internal/api"
-	"github.com/l7mp/stunner/v2/internal/server"
+	"github.com/l7mp/stunner/v2/internal/flow"
 )
 
 // PermissionHandler exposes the permission handler to the external tests.
@@ -17,7 +17,7 @@ func (s *Server) Conn(remote, local net.Addr) (api.Conn, bool) {
 	s.mu.RLock()
 	ct := s.conntrack
 	s.mu.RUnlock()
-	e, ok := ct.Get(server.Key(remote, local))
+	e, ok := ct.Get(flow.Key(remote, local))
 	if !ok {
 		return nil, false
 	}

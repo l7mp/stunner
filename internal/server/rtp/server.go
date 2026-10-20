@@ -14,6 +14,7 @@ import (
 	"github.com/pion/sdp/v3"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	"github.com/l7mp/stunner/v2/internal/ng"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
@@ -51,7 +52,7 @@ type Server struct {
 	sources   map[netip.AddrPort]*stream // trunk media source -> its stream
 	changed   chan struct{}              // closed and replaced on every change of sources
 	controls  map[api.Conn]bool
-	conntrack *server.Conntrack // the trunk media conns
+	conntrack *flow.Conntrack // the trunk media conns
 	stop      chan struct{}
 	unmatched int // the trunk media conns waiting for their call
 
@@ -192,7 +193,7 @@ func (s *Server) Start() error {
 	s.running = true
 	s.calls, s.sources = map[string]*call{}, map[netip.AddrPort]*stream{}
 	s.changed, s.controls = make(chan struct{}), map[api.Conn]bool{}
-	s.conntrack, s.stop = server.NewConntrack(MediaTimeout), make(chan struct{})
+	s.conntrack, s.stop = flow.NewConntrack(MediaTimeout), make(chan struct{})
 	stop := s.stop
 	s.mu.Unlock()
 	go s.reap(stop)
@@ -502,7 +503,7 @@ func (s *Server) serveMedia(c api.Conn) {
 	}
 	matched()
 
-	e := &server.Entry{Client: c}
+	e := &flow.Entry{Client: c}
 	e.Hooks.OnClose = func(string) {
 		s.mu.Lock()
 		if st.extRTP == c {

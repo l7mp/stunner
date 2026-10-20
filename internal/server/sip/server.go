@@ -25,6 +25,7 @@ import (
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	"github.com/l7mp/stunner/v2/internal/ng"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
@@ -68,7 +69,7 @@ type Server struct {
 	peers   map[uint64]*peer
 	// dialed are the dialed peers by remote address, reused by the requests to that address
 	dialed    map[netip.AddrPort]*peer
-	conntrack *server.Conntrack
+	conntrack *flow.Conntrack
 	media     *ng.Client
 	calls     map[string]*call // the calls the server admitted, by Call-ID
 	stop      chan struct{}
@@ -120,7 +121,7 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (objruntime.Object, 
 // its conntrack entry alive.
 type peer struct {
 	api.Conn
-	e      *server.Entry
+	e      *flow.Entry
 	id     uint64
 	dialed bool
 	// registration names the registration the peer's flow carries, empty for none
@@ -236,7 +237,7 @@ func (s *Server) Start() error {
 	s.mu.Lock()
 	s.running = true
 	s.peers, s.dialed = map[uint64]*peer{}, map[netip.AddrPort]*peer{}
-	s.conntrack = server.NewConntrack(PeerTimeout)
+	s.conntrack = flow.NewConntrack(PeerTimeout)
 	s.calls, s.stop = map[string]*call{}, make(chan struct{})
 	stop := s.stop
 	s.mu.Unlock()
@@ -291,7 +292,7 @@ func (s *Server) addPeer(c api.Conn, dialed bool) *peer {
 	}
 	ct := s.conntrack
 	s.lastID++
-	e := &server.Entry{Client: c}
+	e := &flow.Entry{Client: c}
 	p := &peer{Conn: c, e: e, id: s.lastID, dialed: dialed, done: make(chan struct{})}
 	if !dialed {
 		// a listener labels the flows a registration runs over

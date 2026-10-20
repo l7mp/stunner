@@ -13,6 +13,7 @@ import (
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
@@ -40,7 +41,7 @@ type Server struct {
 	queue *server.AcceptQueue // the listener pion accepts from
 	// conntrack tracks the served conns for the offload bookkeeping, and to close and reap the
 	// ones pion never allocated (pion closes only allocated conns)
-	conntrack *server.Conntrack
+	conntrack *flow.Conntrack
 	offloads  sync.Map // offload key -> offloadPair
 }
 
@@ -122,7 +123,7 @@ func (s *Server) Start() error {
 		t, _ := stnrv2.NewAuthType(auth.Type)
 		realm, stun = auth.Realm, t == stnrv2.AuthTypeNone
 	}
-	queue, ct := server.NewAcceptQueue(server.Backlog), server.NewConntrack(PreAllocationTimeout)
+	queue, ct := server.NewAcceptQueue(server.Backlog), flow.NewConntrack(PreAllocationTimeout)
 	pion, err := turn.NewServer(turn.ServerConfig{
 		Realm:        realm,
 		AuthHandler:  s.AuthHandler(),
@@ -181,7 +182,7 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 		return nil, api.Consumed, server.ErrNotServing
 	}
 
-	e := &server.Entry{Client: c}
+	e := &flow.Entry{Client: c}
 	if !ct.Add(e) {
 		return nil, api.Consumed, server.ErrNotServing
 	}
@@ -195,12 +196,12 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 		conn = turn.NewSTUNStreamConn(conn)
 	case stnrv2.ProtocolUDP, stnrv2.ProtocolDTLS:
 	default:
-		ct.Remove(server.Key(c.RemoteAddr(), c.LocalAddr()))
+		ct.Remove(flow.Key(c.RemoteAddr(), c.LocalAddr()))
 		return nil, api.Consumed, fmt.Errorf("server %s: cannot serve a %s conn of listener %s "+
 			"as TURN", s.Name(), c.Tag().Proto.String(), c.Tag().Name)
 	}
 	if err := queue.Push(conn); err != nil {
-		ct.Remove(server.Key(c.RemoteAddr(), c.LocalAddr()))
+		ct.Remove(flow.Key(c.RemoteAddr(), c.LocalAddr()))
 		return nil, api.Consumed, err
 	}
 	return nil, api.Consumed, nil
@@ -209,7 +210,7 @@ func (s *Server) Serve(c api.Conn) (api.Conn, api.Verdict, error) {
 // trackedConn closes its conntrack entry, and the client conn with it, when it closes.
 type trackedConn struct {
 	api.Conn
-	entry *server.Entry
+	entry *flow.Entry
 }
 
 func (c *trackedConn) Close() error {

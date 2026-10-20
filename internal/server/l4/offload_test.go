@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	"github.com/l7mp/stunner/v2/internal/netconn"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/server"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
@@ -113,7 +113,7 @@ func TestOffloadPairShape(t *testing.T) {
 
 	client, leg := net.Pipe()
 	f := &Flow{
-		Entry: server.Entry{
+		Entry: flow.Entry{
 			Client: netconn.NewConn(client, api.Tag{Name: "li", Proto: stnrv2.ProtocolUDP}, nil),
 			Leg: netconn.NewConn(leg, api.Tag{Name: "upstream", Proto: stnrv2.ProtocolUDP},
 				stubWire{server: serverAddr, local: wireAddr, chanID: 0x4000, framed: true}),

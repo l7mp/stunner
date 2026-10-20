@@ -14,6 +14,7 @@ import (
 	"github.com/pion/turn/v5"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/flow"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
 	"github.com/l7mp/stunner/v2/internal/server/balancer"
@@ -45,7 +46,7 @@ type Server struct {
 	lbPolicy    stnrv2.LBPolicy     // the load-balancing policy of lb
 	lb          balancer.Balancer   // chooses the peer of a new flow among the targets of the clusters
 	acceptQueue *server.AcceptQueue // nil while stopped
-	conntrack   *server.Conntrack
+	conntrack   *flow.Conntrack
 }
 
 var (
@@ -113,7 +114,7 @@ func (s *Server) Status() stnrv2.Status {
 func (s *Server) Start() error {
 	q := server.NewAcceptQueue(server.Backlog)
 	s.mu.Lock()
-	s.acceptQueue, s.conntrack = q, server.NewConntrack(s.idle)
+	s.acceptQueue, s.conntrack = q, flow.NewConntrack(s.idle)
 	s.mu.Unlock()
 	go s.accept(q)
 	s.log.Infof("server %s: L4 server running", s.Name())
@@ -134,7 +135,7 @@ func (s *Server) accept(q *server.AcceptQueue) {
 				_ = c.Close()
 				return
 			}
-			server.Forward(&f.Entry)
+			flow.Forward(&f.Entry)
 		}(c.(api.Conn))
 	}
 }
@@ -216,7 +217,7 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		}
 	}
 
-	f := &Flow{Entry: server.Entry{Client: client, Leg: leg}}
+	f := &Flow{Entry: flow.Entry{Client: client, Leg: leg}}
 	f.Event = FlowEvent{
 		SrcAddr:      client.RemoteAddr(),
 		DstAddr:      client.LocalAddr(),
@@ -235,7 +236,7 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		f.Event.ServerAddr = nil
 	}
 
-	f.Hooks = server.EntryHooks{
+	f.Hooks = flow.EntryHooks{
 		Active: func() (bool, bool) { return s.offload.Active(f) },
 		OnError: func(msg string) {
 			s.events.OnFlowError(client.RemoteAddr(), f.Event.Protocol, msg)
