@@ -19,6 +19,7 @@ const (
 	DefaultClusterType                   = "STATIC"
 	DefaultLBPolicy                      = "ROUND_ROBIN"
 	DefaultSIPRegistrationExpires        = "600s"
+	DefaultSRTLinger                     = "30s"
 	DefaultAdminName                     = "default-admin-config"
 	DefaultAuthName                      = "default"
 	DefaultHealthName                    = "default-health"

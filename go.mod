@@ -3,6 +3,7 @@ module github.com/l7mp/stunner/v2
 go 1.27.0
 
 require (
+	github.com/datarhei/gosrt v0.12.0
 	github.com/emiago/sipgo v1.6.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/getkin/kin-openapi v0.149.0
@@ -49,6 +50,7 @@ require (
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20260914234754-15785f84ba1c // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

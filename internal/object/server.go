@@ -7,6 +7,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/server/l4"
 	"github.com/l7mp/stunner/v2/internal/server/rtp"
 	"github.com/l7mp/stunner/v2/internal/server/sip"
+	"github.com/l7mp/stunner/v2/internal/server/srt"
 	"github.com/l7mp/stunner/v2/internal/server/turn"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
@@ -38,6 +39,8 @@ func NewServer(conf stnrv2.Config, rt *runtime.Runtime) (runtime.Object, error) 
 		return sip.New(req, rt)
 	case stnrv2.ServerTypeRTP:
 		return rtp.New(req, rt)
+	case stnrv2.ServerTypeSRT:
+		return srt.New(req, rt)
 	}
 	return nil, fmt.Errorf("unsupported server type %q", req.Type)
 }

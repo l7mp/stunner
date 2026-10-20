@@ -335,6 +335,9 @@ const (
 	ServerTypeSIP
 	// ServerTypeRTP is a media proxy relaying the RTP and RTCP of the calls a SIP proxy sets up.
 	ServerTypeRTP
+	// ServerTypeSRT routes every SRT flow by the stream it names to the endpoint holding the
+	// stream, and relays it.
+	ServerTypeSRT
 )
 
 const (
@@ -342,6 +345,7 @@ const (
 	serverTypeL4Str   = "L4"
 	serverTypeSIPStr  = "SIP"
 	serverTypeRTPStr  = "RTP"
+	serverTypeSRTStr  = "SRT"
 )
 
 // NewServerType parses a server type.
@@ -355,6 +359,8 @@ func NewServerType(raw string) (ServerType, error) {
 		return ServerTypeSIP, nil
 	case serverTypeRTPStr:
 		return ServerTypeRTP, nil
+	case serverTypeSRTStr:
+		return ServerTypeSRT, nil
 	default:
 		return ServerTypeUnknown, fmt.Errorf("unknown server type: %q", raw)
 	}
@@ -371,6 +377,8 @@ func (t ServerType) String() string {
 		return serverTypeSIPStr
 	case ServerTypeRTP:
 		return serverTypeRTPStr
+	case ServerTypeSRT:
+		return serverTypeSRTStr
 	default:
 		return "<unknown>"
 	}

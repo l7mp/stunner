@@ -12,7 +12,7 @@ import (
 type ServerSpec struct {
 	// Name of the server.
 	Name string `json:"name"`
-	// Type is TURN (default), L4, SIP or RTP.
+	// Type is TURN (default), L4, SIP, RTP or SRT.
 	Type string `json:"type,omitempty"`
 	// Clusters lists the names of the clusters the server uses, in order.
 	Clusters []string `json:"clusters,omitempty"`
@@ -30,6 +30,8 @@ type ServerConfig struct {
 	SIP *SIPServerConfig `json:"sip,omitempty"`
 	// RTP holds the options of an RTP server.
 	RTP *RTPServerConfig `json:"rtp,omitempty"`
+	// SRT holds the options of an SRT server.
+	SRT *SRTServerConfig `json:"srt,omitempty"`
 }
 
 // TURNServerConfig holds the options of a TURN server.
@@ -94,6 +96,18 @@ type RTPServerConfig struct {
 	PublicAddr string `json:"public_address,omitempty"`
 	// PublicPort is the port the carriers send media to.
 	PublicPort int `json:"public_port,omitempty"`
+}
+
+// SRTServerConfig holds the options of an SRT server: the first flow naming a stream places the
+// stream on an endpoint of the server's clusters, and every later flow naming it, publisher or
+// reader, goes to the same endpoint.
+type SRTServerConfig struct {
+	// Linger is how long a stream keeps its endpoint after its last flow ended, as a duration
+	// string, so a publisher reconnecting returns to its readers. Default is 30s.
+	Linger string `json:"linger,omitempty"`
+	// LBPolicy is how the server places a new stream among the targets of its clusters. Default
+	// is ROUND_ROBIN.
+	LBPolicy string `json:"lb_policy,omitempty"`
 }
 
 // RoleLabel is the listener label telling a server what the conns of the listener are for:
@@ -180,6 +194,24 @@ func (req *ServerConfig) Validate() error {
 		if req.RTP == nil {
 			req.RTP = &RTPServerConfig{}
 		}
+	case ServerTypeSRT:
+		if req.SRT == nil {
+			req.SRT = &SRTServerConfig{}
+		}
+		if req.SRT.Linger == "" {
+			req.SRT.Linger = DefaultSRTLinger
+		}
+		if d, err := time.ParseDuration(req.SRT.Linger); err != nil || d < 0 {
+			return fmt.Errorf("invalid linger %q in SRT server %q", req.SRT.Linger, req.Name)
+		}
+		if req.SRT.LBPolicy == "" {
+			req.SRT.LBPolicy = DefaultLBPolicy
+		}
+		p, err := NewLBPolicy(req.SRT.LBPolicy)
+		if err != nil {
+			return err
+		}
+		req.SRT.LBPolicy = p.String()
 	}
 	return nil
 }
@@ -216,6 +248,10 @@ func (req *ServerConfig) DeepCopyInto(dst Config) {
 	if req.RTP != nil {
 		rtp := *req.RTP
 		ret.RTP = &rtp
+	}
+	if req.SRT != nil {
+		srt := *req.SRT
+		ret.SRT = &srt
 	}
 }
 
@@ -256,6 +292,9 @@ func (req *ServerConfig) String() string {
 	}
 	if rtp := req.RTP; rtp != nil {
 		opts += fmt.Sprintf(",public=%s:%d", rtp.PublicAddr, rtp.PublicPort)
+	}
+	if srt := req.SRT; srt != nil {
+		opts += ",linger=" + srt.Linger + ",lb_policy=" + srt.LBPolicy
 	}
 	return fmt.Sprintf("%q:{type=%s,clusters=[%s]%s}", n, req.Type, strings.Join(req.Clusters, ","),
 		opts)

@@ -119,6 +119,12 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"unknown load-balancing policy", func(c *StunnerConfig) {
 			c.Servers[1].L4 = &L4ServerConfig{LBPolicy: "RANDOM"}
 		}},
+		{"invalid SRT linger", func(c *StunnerConfig) {
+			c.Servers[1].Type, c.Servers[1].SRT = "SRT", &SRTServerConfig{Linger: "forever"}
+		}},
+		{"unknown SRT load-balancing policy", func(c *StunnerConfig) {
+			c.Servers[1].Type, c.Servers[1].SRT = "SRT", &SRTServerConfig{LBPolicy: "LEAST_LOADED"}
+		}},
 		{"SIP registration without a name", func(c *StunnerConfig) {
 			c.Servers[0].Type = "SIP"
 			c.Servers[0].SIP = &SIPServerConfig{Registrations: []SIPRegistrationConfig{
