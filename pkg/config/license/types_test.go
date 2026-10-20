@@ -38,7 +38,6 @@ func TestFeatureCatalog(t *testing.T) {
 
 	for _, s := range AllSubscriptionTypes() {
 		assert.Equal(t, s, NewSubscriptionType(s.String()), "%s does not parse back", s)
-		assert.Equal(t, Limits{SIPGateways: 1, Calls: 5}, GetLimits(s), "the SIP limits of %s", s)
 	}
 	assert.Equal(t, FeatureNone, NewFeature("tcproute"), "a removed feature parses to none")
 }

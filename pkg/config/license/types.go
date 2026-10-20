@@ -143,20 +143,6 @@ func Features(t SubscriptionType) []Feature {
 	}
 }
 
-// Limits are the usage limits of a subscription type; 0 means unlimited.
-type Limits struct {
-	// SIPGateways is the number of Gateways the operator renders a SIP gateway for.
-	SIPGateways int
-	// Calls is the number of parallel calls of a SIP gateway.
-	Calls int
-}
-
-// GetLimits returns the usage limits of a subscription type. The SIP gateway is experimental, so
-// every tier has the same limits.
-func GetLimits(_ SubscriptionType) Limits {
-	return Limits{SIPGateways: 1, Calls: 5}
-}
-
 // helper
 func ToStringSlice[T fmt.Stringer](items []T) []string {
 	result := make([]string, len(items))
