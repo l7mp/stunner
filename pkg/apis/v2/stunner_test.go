@@ -3,6 +3,7 @@ package v2
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,6 +88,7 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 	}{
 		{"bad version", func(c *StunnerConfig) { c.ApiVersion = "v1" }},
 		{"TURN listener protocol", func(c *StunnerConfig) { c.Listeners[0].Protocol = "TURN-UDP" }},
+		{"SRT listener protocol", func(c *StunnerConfig) { c.Listeners[0].Protocol = "SRT" }},
 		{"invalid port", func(c *StunnerConfig) { c.Listeners[0].Port = 70000 }},
 		{"missing port", func(c *StunnerConfig) { c.Listeners[1].Port = 0 }},
 		{"connect address without a port", func(c *StunnerConfig) {
@@ -312,6 +314,20 @@ func TestFifoConfig(t *testing.T) {
 
 // TestServerTypeBlocks pins that Validate fills in the block of the server's own type and leaves
 // the others alone.
+// TestProtocolStrings pins the protocol tokens: every protocol parses back from its string, in any
+// case.
+func TestProtocolStrings(t *testing.T) {
+	for p := ProtocolUDP; p <= ProtocolSRT; p++ {
+		for _, raw := range []string{p.String(), strings.ToLower(p.String())} {
+			got, err := NewProtocol(raw)
+			require.NoError(t, err, raw)
+			assert.Equal(t, p, got, raw)
+		}
+	}
+	_, err := NewProtocol("RTSP")
+	assert.Error(t, err, "an unknown protocol")
+}
+
 func TestServerTypeBlocks(t *testing.T) {
 	for _, typ := range []string{"turn", "l4", "sip", "rtp"} {
 		s := ServerConfig{ServerSpec: ServerSpec{Name: "s", Type: typ}}

@@ -112,6 +112,7 @@ const (
 	ProtocolTURNDTLS
 	ProtocolSTDIN
 	ProtocolFIFO
+	ProtocolSRT
 )
 
 const (
@@ -125,6 +126,7 @@ const (
 	protocolTURNDTLSStr = "TURN-DTLS"
 	protocolSTDINStr    = "STDIN"
 	protocolFIFOStr     = "FIFO"
+	protocolSRTStr      = "SRT"
 )
 
 // NewProtocol parses a protocol name into a Protocol. It is permissive: it accepts any known
@@ -151,6 +153,8 @@ func NewProtocol(raw string) (Protocol, error) {
 		return ProtocolSTDIN, nil
 	case protocolFIFOStr:
 		return ProtocolFIFO, nil
+	case protocolSRTStr:
+		return ProtocolSRT, nil
 	default:
 		return ProtocolUnknown, fmt.Errorf("unknown protocol: \"%s\"", raw)
 	}
@@ -179,6 +183,8 @@ func (p Protocol) String() string {
 		return protocolSTDINStr
 	case ProtocolFIFO:
 		return protocolFIFOStr
+	case ProtocolSRT:
+		return protocolSRTStr
 	default:
 		return "<unknown>"
 	}
