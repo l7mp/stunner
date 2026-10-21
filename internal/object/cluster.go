@@ -231,6 +231,16 @@ func (c *Cluster) Protocol() stnrv2.Protocol {
 	return c.protocol
 }
 
+// Tag returns the tag of the conns the cluster's dialer makes, only the name before it has one.
+func (c *Cluster) Tag() api.Tag {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.dialer == nil {
+		return api.Tag{Name: c.name}
+	}
+	return c.dialer.Tag()
+}
+
 var errNotRunning = errors.New("cluster is not running")
 
 // runningDialer returns the dialer of a running cluster.

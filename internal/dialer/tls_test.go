@@ -81,9 +81,7 @@ func TestTLSDialer(t *testing.T) {
 		require.NoError(t, err)
 		defer c.Close() //nolint:errcheck
 		echo(t, c, "hello")
-		assert.Equal(t, api.Tag{Name: "tls", Proto: stnrv2.ProtocolTCP}, c.Tag())
-		_, framed := c.Channel(ln.Addr())
-		assert.False(t, framed, "a secured conn reports no wire")
+		assert.Equal(t, api.Tag{Name: "tls", Proto: stnrv2.ProtocolTLS}, c.Tag(), "tagged TLS")
 	})
 
 	t.Run("verified against the SNI", func(t *testing.T) {
@@ -145,15 +143,14 @@ func TestDTLSDialer(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	echo(t, c, "hello")
+	assert.Equal(t, stnrv2.ProtocolDTLS, c.Tag().Proto, "tagged DTLS")
 
-	// DTLS through a TURN tunnel: the leg must not report the channel, or the offload would
-	// relay past the encryption
+	// DTLS through a TURN tunnel: the tag keeps the offload from relaying past the encryption
 	tunnelled := startDialer(t, rt, &stnrv2.ClusterConfig{Name: "dtls-tunnel", Protocol: "UDP",
 		Tunnel: turnServer(t, rt), TLS: &stnrv2.TLSConfig{CA: ca}})
 	tc, err := tunnelled.Dial(context.Background(), nil, ln.Addr().String())
 	require.NoError(t, err)
 	defer tc.Close() //nolint:errcheck
 	echo(t, tc, "hello")
-	_, framed := tc.Channel(ln.Addr())
-	assert.False(t, framed, "a secured conn reports no wire")
+	assert.Equal(t, stnrv2.ProtocolDTLS, tc.Tag().Proto, "tagged DTLS")
 }

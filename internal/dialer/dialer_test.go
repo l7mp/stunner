@@ -227,7 +227,9 @@ func TestTunnelDialer(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close() //nolint:errcheck
 	echo(t, c, "hello")
-	assert.Equal(t, api.Tag{Name: "upstream", Proto: stnrv2.ProtocolUDP}, c.Tag())
+	assert.Equal(t, api.Tag{Name: "upstream", Proto: stnrv2.ProtocolTURNUDP}, c.Tag(),
+		"tagged with the tunnel's transport")
+	assert.Equal(t, cl.Tag(), c.Tag(), "the dialer's tag is its conns'")
 	assert.Equal(t, peer.LocalAddr().String(), c.RemoteAddr().String())
 	u, err := stnrv2.ParseURI(tunnel.URL)
 	require.NoError(t, err)

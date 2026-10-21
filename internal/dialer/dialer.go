@@ -56,18 +56,27 @@ func newDialer(conf *stnrv2.ClusterConfig, rt *runtime.Runtime, admit func(net.A
 		log:   rt.Logger.NewLogger(fmt.Sprintf("cluster-%s", conf.Name)),
 		addrs: slices.Clone(conf.Addrs),
 	}
-	if conf.TLS != nil && proto != stnrv2.ProtocolFIFO {
-		if b.tls, err = conf.TLS.DialConfig(""); err != nil {
-			return nil, err
-		}
-	}
-
 	if conf.Tunnel != nil {
 		u, err := stnrv2.ParseURI(conf.Tunnel.URL)
 		if err != nil {
 			return nil, err
 		}
 		b.tunnel, b.transport = conf.Tunnel.DeepCopy(), u.Protocol
+		// the tag names the protocol on the wire: a datagram conn travels in the tunnel's
+		// transport, a stream conn (RFC 6062) stays a TCP conn to its peer
+		if proto == stnrv2.ProtocolUDP {
+			b.tag.Proto = u.Protocol
+		}
+	}
+	if conf.TLS != nil && proto != stnrv2.ProtocolFIFO {
+		// a secured conn is TLS or DTLS on the wire, as a listener's
+		b.tag.Proto = stnrv2.ProtocolDTLS
+		if proto == stnrv2.ProtocolTCP {
+			b.tag.Proto = stnrv2.ProtocolTLS
+		}
+		if b.tls, err = conf.TLS.DialConfig(""); err != nil {
+			return nil, err
+		}
 	}
 	switch proto {
 	case stnrv2.ProtocolTCP:
@@ -97,12 +106,12 @@ type base struct {
 
 func (b *base) Name() string              { return b.name }
 func (b *base) Protocol() stnrv2.Protocol { return b.proto }
+func (b *base) Tag() api.Tag              { return b.tag }
 func (b *base) Start() error              { return nil }
 func (b *base) Close(bool) error          { return nil }
 
 // establish completes a conn dialed to addr into the conn the dialer returns: the TLS or DTLS
-// handshake if the dialer secures its conns, then the accounting and the tag. A secured conn
-// reports no wire: its traffic must never be offloaded past the encryption.
+// handshake if the dialer secures its conns, then the accounting and the tag.
 func (b *base) establish(ctx context.Context, c net.Conn, w netconn.Wire, addr string) (api.Conn, error) {
 	if b.tls != nil {
 		conf := b.tls.Clone()
@@ -133,7 +142,6 @@ func (b *base) establish(ctx context.Context, c net.Conn, w netconn.Wire, addr s
 			_ = c.Close()
 			return nil, fmt.Errorf("%s handshake with %s failed: %w", b.name, addr, err)
 		}
-		w = nil
 	}
 	accounted := account.Conn(b.rt.Telemetry, c, b.name, b.kind)
 	return netconn.NewConn(accounted, b.tag, w), nil

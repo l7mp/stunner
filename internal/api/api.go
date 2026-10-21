@@ -18,8 +18,10 @@ type Named interface {
 	Name() string
 }
 
-// Tag names the listener or cluster that created a conn, and its protocol. Labels are the labels
-// of the listener, nil for none.
+// Tag names the listener or cluster that created a conn, and the protocol its packets travel on:
+// the listener's protocol, or for a cluster's conn TLS or DTLS when the cluster secures it and the
+// TURN transport of the tunnel (TURN-UDP, TURN-TCP, TURN-TLS, TURN-DTLS) for a datagram conn
+// through one. Labels are the labels of the listener, nil for none.
 type Tag struct {
 	Name   string
 	Proto  stnrv2.Protocol
@@ -68,6 +70,8 @@ type Dialer interface {
 	Close(shutdown bool) error
 	// Protocol is the network the peers are reached over.
 	Protocol() stnrv2.Protocol
+	// Tag is the tag of the conns the dialer makes.
+	Tag() Tag
 	// Dial connects to addr, from local if not nil.
 	Dial(ctx context.Context, local net.Addr, addr string) (Conn, error)
 	// ListenPacket makes a relay socket and returns the address it is advertised at.

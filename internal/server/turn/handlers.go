@@ -1,6 +1,7 @@
 package turn
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -209,13 +210,13 @@ func (s *Server) eventHandler(ct *flow.Conntrack) turn.EventHandler {
 				return
 			}
 			c := e.Client
-			// the cluster that made the relay socket must be direct
+			// the cluster that made the relay socket must relay plain UDP
 			rc, found := s.relayDialer()
-			if !found {
+			if !found || rc.Tag().Proto != stnrv2.ProtocolUDP {
 				return
 			}
 			conf := s.rt.ClusterConfig(rc.Name())
-			if conf == nil || conf.Tunnel != nil {
+			if conf == nil {
 				return
 			}
 			if _, isUDP := peer.(*net.UDPAddr); !isUDP {
@@ -231,6 +232,10 @@ func (s *Server) eventHandler(ct *flow.Conntrack) turn.EventHandler {
 				peer: offload.Connection{RemoteAddr: peer, LocalAddr: relayAddr, Protocol: proto},
 			}
 			if err := s.rt.OffloadEngine.Upsert(pair.client, pair.peer, c.Tag().Name, rc.Name()); err != nil {
+				if errors.Is(err, offload.ErrOffloadLimit) {
+					s.log.Debugf("channel %s stays in user space: %s", pair.client.String(), err)
+					return
+				}
 				s.log.Errorf("could not create offload %s(listener:%s)->%s(cluster:%s): %s",
 					pair.client.String(), c.Tag().Name, pair.peer.String(), rc.Name(), err.Error())
 				return
