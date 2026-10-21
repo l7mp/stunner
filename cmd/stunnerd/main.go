@@ -71,7 +71,7 @@ func main() {
 	var sni = flag.String("sni", "", "Server name (SNI) for the TURN/TLS and TURN/DTLS transports (tunnel mode)")
 	var insecure = flag.Bool("insecure", false, "Accept self-signed TURN server TLS certificates (tunnel mode, default: false)")
 	var licenseArg = flag.String("license", "", `License config as the JSON licensegen writes, {"license_config":{"key":"...","hmac":"..."}}, or just {"key":"...","hmac":"..."} (overrides the config's)`)
-	var offload = flag.String("offload", "", `Offload engine on every interface: "none", "xdp", "tc" or "auto" (overrides the config's)`)
+	var offload = flag.String("offload", "", `Offload engine and the interfaces to offload on: "none", "xdp", "tc" or "auto", optionally followed by a colon and a comma-separated list of interfaces, e.g. "tc:eth1" (default: every interface; overrides the config's)`)
 	var udpConnect = flag.Bool("enable-udp-listener-connect", false, "Connect a socket back to every client of a UDP listener so the kernel demuxes the clients instead of the read loops, where reuse-port is available (default: false)")
 
 	// Kubernetes config flags
@@ -108,8 +108,9 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	offloadEngine, offloadInterfaces, _ := strings.Cut(*offload, ":")
 	if *offload != "" {
-		if _, err := stnrv2.NewOffloadEngine(*offload); err != nil {
+		if _, err := stnrv2.NewOffloadEngine(offloadEngine); err != nil {
 			fmt.Fprintf(os.Stderr, "invalid --offload: %s\n", err.Error())
 			os.Exit(1)
 		}
@@ -307,7 +308,10 @@ func main() {
 				c.Admin.LicenseConfig = license
 			}
 			if *offload != "" {
-				c.Admin.OffloadEngine, c.Admin.OffloadInterfaces = *offload, nil
+				c.Admin.OffloadEngine, c.Admin.OffloadInterfaces = offloadEngine, nil
+				if offloadInterfaces != "" {
+					c.Admin.OffloadInterfaces = strings.Split(offloadInterfaces, ",")
+				}
 			}
 			log.Infof("new configuration available: %q", c.String())
 
