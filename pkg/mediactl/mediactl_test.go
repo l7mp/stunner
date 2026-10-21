@@ -103,3 +103,15 @@ func TestEcho(t *testing.T) {
 	assert.Equal(t, r.SentBytes, r.ReceivedBytes, "every byte came back")
 	assert.Zero(t, r.Expected, "a byte stream judges no loss")
 }
+
+func TestCheck(t *testing.T) {
+	echo := Config{Rate: 50, Echo: true}
+	assert.NoError(t, Check(Result{Sent: 100, Received: 99, Expected: 100, Lost: 1}, echo, 5, 0))
+	assert.ErrorIs(t, Check(Result{Sent: 100}, echo, -1, 0), ErrNothingReceived, "no echo")
+	assert.Error(t, Check(Result{Sent: 100, Received: 90, Expected: 100, Lost: 10}, echo, 5, 0), "too much loss")
+	assert.NoError(t, Check(Result{Sent: 100, Received: 90, Expected: 100, Lost: 10}, echo, -1, 0), "loss not judged")
+	assert.Error(t, Check(Result{Received: 1, RTTAvg: time.Second}, echo, -1, time.Millisecond), "too slow")
+	publisher := Config{Rate: 50}
+	assert.NoError(t, Check(Result{Sent: 10}, publisher, 0, 0), "a publisher expects nothing back")
+	assert.Error(t, Check(Result{}, publisher, 0, 0), "nothing sent")
+}

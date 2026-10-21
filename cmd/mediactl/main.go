@@ -30,9 +30,6 @@ import (
 // --timeout.
 const env = "MEDIACTL"
 
-// errNothingReceived fails a run that got nothing.
-var errNothingReceived = errors.New("nothing received")
-
 // app is one run of mediactl: its settings, from the flags, the environment and the config file in
 // this order, its logger, and the resolver of its k8s:// addresses.
 type app struct {
@@ -94,8 +91,8 @@ func newRootCmd() *cobra.Command {
 	f.BoolP("verbose", "v", false, "verbose logging, identical to <-l all:DEBUG>")
 	f.String("log-format", "text", `log format: "text" or "json"`)
 	f.DurationP("timeout", "t", 0, "stop after this long; 0 runs until interrupted")
-	f.Int("length", 160, "bytes per packet a sender sends")
-	f.Float64P("send-rate", "k", 50, "packets per second a sender sends (writes per second over TCP)")
+	f.Int("length", mediactl.DefaultLength, "bytes per packet a sender sends")
+	f.Float64P("send-rate", "k", mediactl.DefaultRate, "packets per second a sender sends (writes per second over TCP)")
 	f.IntP("parallel", "P", 1, "the number of streams a sender runs at once")
 	f.StringP("output", "o", "text", `the results of a sender: "text" (logged) or "json" (on stdout)`)
 	f.Float64("max-loss", -1, "fail a sender losing more than this percent of its packets; negative: never")
@@ -125,15 +122,11 @@ func (a *app) config() mediactl.Config {
 // address resolves a k8s:// Gateway address to the listener's public host:port; any other
 // address is returned as it is.
 func (a *app) address(ctx context.Context, addr string) (string, error) {
-	if !k8s.IsAddress(addr) {
-		return addr, nil
+	res, err := a.k8s.Address(ctx, addr)
+	if err == nil && res != addr {
+		a.log.Infof("%s is %s", addr, res)
 	}
-	l, err := a.k8s.Listener(ctx, addr)
-	if err != nil {
-		return "", err
-	}
-	a.log.Infof("%s is %s", addr, l.Addr)
-	return l.Addr, nil
+	return res, err
 }
 
 // send runs --parallel streams of a dialer to an address at once, then reports them, on the log
@@ -197,23 +190,7 @@ func (a *app) send(ctx context.Context, d mediactl.Dialer, network, address stri
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
-	if !c.Echo && c.Rate > 0 {
-		if total.Sent == 0 {
-			return errors.New("nothing sent")
-		}
-		return nil
-	}
-	if total.Received == 0 {
-		return errNothingReceived
-	}
-	if max := a.v.GetFloat64("max-loss"); max >= 0 && total.Expected > 0 &&
-		100*float64(total.Lost)/float64(total.Expected) > max {
-		return fmt.Errorf("lost %d of %d packets, more than %.2f%%", total.Lost, total.Expected, max)
-	}
-	if max := a.v.GetDuration("max-rtt"); max > 0 && total.RTTAvg > max {
-		return fmt.Errorf("average round trip %s, longer than %s", total.RTTAvg, max)
-	}
-	return nil
+	return mediactl.Check(total, c, a.v.GetFloat64("max-loss"), a.v.GetDuration("max-rtt"))
 }
 
 // looping reads a file from the start again at its end.

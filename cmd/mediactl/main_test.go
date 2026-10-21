@@ -57,7 +57,7 @@ func TestTCP(t *testing.T) {
 
 func TestNothingReceived(t *testing.T) {
 	err := run(context.Background(), "udp", "send", "127.0.0.1:27003", "--timeout", "100ms")
-	assert.ErrorIs(t, err, errNothingReceived, "no echo is a failure")
+	assert.ErrorIs(t, err, mediactl.ErrNothingReceived, "no echo is a failure")
 }
 
 func TestSIP(t *testing.T) {
@@ -95,7 +95,7 @@ func TestEnv(t *testing.T) {
 	t.Setenv("MEDIACTL_TIMEOUT", "100ms")
 	start := time.Now()
 	err := run(context.Background(), "udp", "send", "127.0.0.1:27007")
-	assert.ErrorIs(t, err, errNothingReceived)
+	assert.ErrorIs(t, err, mediactl.ErrNothingReceived)
 	assert.Less(t, time.Since(start), 5*time.Second, "the environment sets the timeout")
 }
 

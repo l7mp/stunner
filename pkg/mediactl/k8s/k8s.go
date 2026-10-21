@@ -25,6 +25,7 @@ import (
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
+	"github.com/l7mp/stunner/v2/pkg/mediactl/turn"
 	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 )
 
@@ -63,14 +64,16 @@ func (r Resolver) Listener(ctx context.Context, addr string) (Listener, error) {
 	if err != nil {
 		return Listener{}, fmt.Errorf("cannot find the config discovery server: %w", err)
 	}
-	client, err := cdsclient.NewCDSClient(pod.Addr, ns+"/"+gw, nil, r.Log)
+	// the config as served, as stunnerctl config shows it
+	api, err := cdsclient.NewConfigNamespaceNameAPI(pod.Addr, ns, gw, nil, r.Log)
 	if err != nil {
 		return Listener{}, err
 	}
-	conf, err := client.Load()
-	if err != nil {
-		return Listener{}, fmt.Errorf("cannot read the config of Gateway %s/%s: %w", ns, gw, err)
+	confs, err := api.Get(ctx)
+	if err != nil || len(confs) != 1 {
+		return Listener{}, fmt.Errorf("cannot read the config of Gateway %s/%s: %v", ns, gw, err)
 	}
+	conf := confs[0]
 
 	var l stnrv2.ListenerConfig
 	switch {
@@ -105,6 +108,32 @@ func (r Resolver) Listener(ctx context.Context, addr string) (Listener, error) {
 		res.TURN = &uris[0]
 	}
 	return res, nil
+}
+
+// Address resolves a k8s:// Gateway address to the listener's public host:port; any other address
+// is returned as it is.
+func (r Resolver) Address(ctx context.Context, addr string) (string, error) {
+	if !IsAddress(addr) {
+		return addr, nil
+	}
+	l, err := r.Listener(ctx, addr)
+	if err != nil {
+		return "", err
+	}
+	return l.Addr, nil
+}
+
+// TURNDialer resolves a k8s:// Gateway TURN listener to a dialer through it, with the listener's
+// credentials.
+func (r Resolver) TURNDialer(ctx context.Context, addr string) (turn.Dialer, error) {
+	l, err := r.Listener(ctx, addr)
+	if err != nil {
+		return turn.Dialer{}, err
+	}
+	if l.TURN == nil {
+		return turn.Dialer{}, fmt.Errorf("%s is not a TURN listener", addr)
+	}
+	return turn.Dialer{URI: l.TURN.String(), Username: l.TURN.Username, Password: l.TURN.Password}, nil
 }
 
 // Peer resolves k8s://svc/<namespace>/<service>:<port> to the address of a ready pod of the

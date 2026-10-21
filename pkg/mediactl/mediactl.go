@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -23,6 +24,16 @@ import (
 // number and the send time, so the receiver can count the loss and the sender the round trip of
 // the echo.
 const HeaderLen = 12
+
+// The stream of a sender by default: a packet of 160 bytes 50 times a second, the size and the
+// rate of 20 ms G.711 frames.
+const (
+	DefaultLength = 160
+	DefaultRate   = 50
+)
+
+// ErrNothingReceived fails a stream that expected packets and got none.
+var ErrNothingReceived = errors.New("nothing received")
 
 // The timers of the streams and the echo servers, variables so the tests can shorten them.
 var (
@@ -214,6 +225,29 @@ func Rate(bytes int64, d time.Duration) string {
 
 // String reports what the stream measured.
 func (s *Stats) String() string { return s.Result().String() }
+
+// Check judges the result of a sender streaming by c: a publisher fails when it sent nothing, a
+// stream expecting packets when it got nothing, or lost more than maxLoss percent of its packets
+// (a negative maxLoss never fails), or its average round trip is longer than maxRTT (0 never
+// fails).
+func Check(r Result, c Config, maxLoss float64, maxRTT time.Duration) error {
+	if !c.Echo && c.Rate > 0 {
+		if r.Sent == 0 {
+			return errors.New("nothing sent")
+		}
+		return nil
+	}
+	if r.Received == 0 {
+		return ErrNothingReceived
+	}
+	if maxLoss >= 0 && r.Expected > 0 && 100*float64(r.Lost)/float64(r.Expected) > maxLoss {
+		return fmt.Errorf("lost %d of %d packets, more than %.2f%%", r.Lost, r.Expected, maxLoss)
+	}
+	if maxRTT > 0 && r.RTTAvg > maxRTT {
+		return fmt.Errorf("average round trip %s, longer than %s", r.RTTAvg, maxRTT)
+	}
+	return nil
+}
 
 // Stream sends a packet every 1/Rate seconds on conn and counts what it reads, until the context
 // ends or the conn fails, then closes the conn. An echoing stream waits EchoDrain for the echoes

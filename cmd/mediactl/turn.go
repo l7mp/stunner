@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/l7mp/stunner/v2/pkg/mediactl/k8s"
@@ -25,22 +23,18 @@ func (a *app) turnCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := a.context(cmd)
 			defer cancel()
-			d := turn.Dialer{URI: args[0], Username: a.v.GetString("username"),
-				Password: a.v.GetString("password"), Insecure: a.v.GetBool("insecure"), LoggerFactory: a.lf}
+			d := turn.Dialer{URI: args[0]}
 			if k8s.IsAddress(args[0]) {
-				l, err := a.k8s.Listener(ctx, args[0])
-				if err != nil {
+				var err error
+				if d, err = a.k8s.TURNDialer(ctx, args[0]); err != nil {
 					return err
-				}
-				if l.TURN == nil {
-					return fmt.Errorf("%s is not a TURN listener", args[0])
-				}
-				d.URI = l.TURN.String()
-				if d.Username == "" {
-					d.Username, d.Password = l.TURN.Username, l.TURN.Password
 				}
 				a.log.Infof("%s is %s", args[0], d.URI)
 			}
+			if u := a.v.GetString("username"); u != "" {
+				d.Username, d.Password = u, a.v.GetString("password")
+			}
+			d.Insecure, d.LoggerFactory = a.v.GetBool("insecure"), a.lf
 			peer := args[1]
 			if k8s.IsAddress(peer) {
 				var err error
