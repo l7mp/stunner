@@ -51,8 +51,8 @@ type Options struct {
 // NewDefaultConfig builds a default configuration from a TURN server URI. Example: the URI
 // `turn://user:pass@127.0.0.1:3478?transport=udp` will be parsed into a STUNner configuration with
 // a TURN server listening at UDP port 3478 on every address and advertising its relays at
-// 127.0.0.1, with plain-text authentication using the username/password pair `user:pass`.
-// Health-checking is enabled at the default endpoint, metric scraping is disabled.
+// 127.0.0.1, with plain-text authentication using the username/password pair `user:pass`, relaying
+// to every peer. Health-checking is enabled at the default endpoint, metric scraping is disabled.
 func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 	u, err := stnrv2.ParseURI(uri)
 	if err != nil {
@@ -97,6 +97,12 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 				Name:     "default-server",
 				Type:     stnrv2.ServerTypeTURN.String(),
 				Clusters: []string{"allow-any"}},
+			TURN: &stnrv2.TURNServerConfig{PermissionFilters: []string{"allow-any"}},
+		}},
+		// a rule with no address block matches every peer
+		Filters: []stnrv2.FilterConfig{{
+			Name:  "allow-any",
+			Rules: []stnrv2.FilterRule{{Action: stnrv2.FilterActionAllow.String()}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
 			Name:     "allow-any",

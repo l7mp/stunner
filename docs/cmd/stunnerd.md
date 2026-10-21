@@ -43,6 +43,9 @@ The below command will open a TURN server listener at `127.0.0.1:5000` over UDP,
 ./stunnerd --log=all:TRACE --log-format=json turn://user1:passwd1@127.0.0.1:5000
 ```
 
+> [!WARNING]
+> The standalone TURN server is not secure at all. Apart from the username and the password, nothing restricts clients from relay to any peer the server can reach, including the services and the loopback of the host it runs on. Use the standalone TURN server for quick tests only.
+
 ### Tunnel mode
 
 The tunnel mode tunnels a local client socket through a TURN server to a remote peer. The general CLI shape for the tunnel mode invocation is as below:

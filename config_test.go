@@ -99,7 +99,7 @@ func TestStunnerDefaultServerVNet(t *testing.T) {
 			})
 
 			log.Debug("starting stunnerd")
-			require.NoError(t, stunner.Reconcile(allowPeers(c)), "starting server")
+			require.NoError(t, stunner.Reconcile(c), "starting server: the default relays to any peer")
 
 			log.Debug("creating a client")
 			lconn, err := v.wan.ListenPacket("udp4", "0.0.0.0:0")
@@ -626,6 +626,11 @@ func checkDefaultConfig(t *testing.T, c *stnrv2.StunnerConfig, proto string) {
 	assert.Len(t, c.Servers, 1, "servers len")
 	assert.Equal(t, "TURN", c.Servers[0].Type, "server type")
 	assert.Equal(t, []string{"allow-any"}, c.Servers[0].Clusters, "server clusters")
+	assert.Equal(t, []string{"allow-any"}, c.Servers[0].TURN.PermissionFilters, "permission filters")
+	require.Len(t, c.Filters, 1, "filters len")
+	require.Len(t, c.Filters[0].Rules, 1, "filter rules len")
+	r := c.Filters[0].Rules[0]
+	assert.True(t, r.Action == "ALLOW" && r.IPBlock == nil && len(r.Ports) == 0, "allow any peer")
 	assert.Len(t, c.Clusters, 1, "clusters len")
 	assert.Equal(t, "STATIC", c.Clusters[0].Type, "cluster type")
 	assert.Empty(t, c.Clusters[0].Endpoints, "cluster has no endpoints")

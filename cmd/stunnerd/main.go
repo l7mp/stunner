@@ -44,6 +44,7 @@ Usage (the positional argument count selects the mode):
     stunnerd [options] <turn-listener-uri>
         Run a standalone TURN server with a default configuration, e.g.
         stunnerd turn://user:pass@127.0.0.1:3478?transport=udp
+        INSECURE: anyone with the credentials can relay to any peer.
     stunnerd [options] <client-addr> <turn-server-addr> <peer-addr>
         Tunnel a local client to a peer through a remote TURN server:
         client-addr: <udp|tcp>://<addr>:<port>, or "-" to tunnel stdin/stdout
