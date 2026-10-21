@@ -163,11 +163,11 @@ export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}"
 Next, set up a tunnel to listen on `UDP:127.0.0.1:5000` and relay connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `stunnerd` is clever enough to [parse the running STUNner configuration](../../cmd/stunnerd.md#tunnel-mode) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
 
 ``` console
-bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener \
+bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway/udp-listener \
      udp://$IPERF_ADDR:5001
 ```
 
-The most important part here is the TURN meta-URI: `k8s://stunner/udp-gateway:udp-listener` instructs the tunnel to look for the Gateway called `udp-gateway` in the `stunner` namespace and create a connection to the TURN listener called `udp-listener` of the Gateway.
+The most important part here is the TURN meta-URI: `k8s://stunner/udp-gateway/udp-listener` instructs the tunnel to look for the Gateway called `udp-gateway` in the `stunner` namespace and create a connection to the TURN listener called `udp-listener` of the Gateway.
 
 Fire up an iperf client from another terminal that will connect to STUNner via the tunnel and start the benchmark.
 
@@ -192,10 +192,10 @@ UDP buffer size:  208 KByte (default)
 
 The results show that we have managed to send 1000 packets/sec through STUNner to the iperf server without packet loss, at an average one-way latency of 14.2 ms and 1.426 ms jitter. Not bad from a Kubernetes cluster running in some remote datacenter!
 
-Repeating the test, this time with a STUN/TURN over TCP, casts a somewhat different picture. Notice the new meta-URI: `k8s://stunner/tcp-gateway:tcp-listener` to select the TURN server exposed on TCP for the tunnel.
+Repeating the test, this time with a STUN/TURN over TCP, casts a somewhat different picture. Notice the new meta-URI: `k8s://stunner/tcp-gateway/tcp-listener` to select the TURN server exposed on TCP for the tunnel.
 
 ``` console
-bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/tcp-gateway:tcp-listener \
+bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/tcp-gateway/tcp-listener \
      udp://$IPERF_ADDR:5001
 ```
 

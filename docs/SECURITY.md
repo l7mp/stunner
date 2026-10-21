@@ -40,16 +40,10 @@ spec:
           namespace: kube-system
 ```
 
-Learn the virtual IP address (`ClusterIP`) assigned by Kubernetes to the cluster DNS service:
+Build [`stunnerd`](cmd/stunnerd.md), fire up a tunnel with a UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service through STUNner. The peer `k8s://kube-system/kube-dns:dns` is the first ready DNS pod at the `dns` port of the `kube-dns` Service, looked up through your kubeconfig.
 
 ```console
-export KUBE_DNS_IP=$(kubectl get svc -n kube-system -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.clusterIP}')
-```
-
-Build [`stunnerd`](cmd/stunnerd.md), fire up a tunnel with a UDP listener on `localhost:5000`, and forward all received packets to the cluster DNS service through STUNner.
-
-```console
-./stunnerd --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/udp-gateway:udp-listener udp://${KUBE_DNS_IP}:53
+./stunnerd --log=all:DEBUG udp://127.0.0.1:5000 k8s://stunner/udp-gateway/udp-listener k8s://kube-system/kube-dns:dns
 ```
 
 Now, in another terminal query the Kubernetes DNS service through the tunnel.

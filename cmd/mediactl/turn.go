@@ -13,7 +13,7 @@ func (a *app) turnCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "turn", Short: "Streams relayed through a TURN server (client only)"}
 
 	send := &cobra.Command{
-		Use:   "send <turn-uri>|k8s://<namespace>/<gateway>[/<listener>] <host>:<port>|k8s://svc/<namespace>/<service>:<port>",
+		Use:   "send <turn-uri>|k8s://<namespace>/<gateway>[/<listener>] <host>:<port>|k8s://<namespace>/<service>:<port>",
 		Short: "Send packets to the peer through a TURN relay and measure the echo",
 		Long: "Send packets to the peer through a TURN relay and measure the echo. The TURN URI is " +
 			"turn:<host>:<port>?transport=udp|tcp, or turns: for TLS and DTLS; a STUNner Gateway " +
@@ -38,7 +38,7 @@ func (a *app) turnCmd() *cobra.Command {
 			peer := args[1]
 			if k8s.IsAddress(peer) {
 				var err error
-				if peer, err = a.k8s.Peer(ctx, peer); err != nil {
+				if _, peer, err = a.k8s.Peer(ctx, peer); err != nil {
 					return err
 				}
 				a.log.Infof("%s is %s", args[1], peer)

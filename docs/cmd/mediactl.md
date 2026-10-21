@@ -64,14 +64,16 @@ Instead of an address, a sender takes `k8s://<namespace>/<gateway>[/<listener>]`
 of a listener of a STUNner Gateway, read from the dataplane config the operator serves, through
 your kubeconfig. The listener may be left out when the Gateway has one. A TURN listener brings its
 TURN URI and the credentials of its auth policy, ephemeral ones included. A TURN peer may be
-`k8s://svc/<namespace>/<service>:<port>`, a ready pod of a Service: TURN relays to pod addresses.
+`k8s://<namespace>/<service>:<port>`, the first ready pod of a Service at the target port of the
+Service port of that number or name: TURN relays to pod addresses. An empty namespace
+(`k8s:///...`) is the namespace of the kubeconfig context.
 The standard kubeconfig flags (`--kubeconfig`, `--context`, `-n`, ...) and the config discovery
 flags of `stunnerctl` apply.
 
 Ten seconds of TURN through the UDP listener of a Gateway to an echo pod, no credentials typed:
 
 ```console
-mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://svc/stunner/udp-echo:9001
+mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://stunner/udp-echo:9001
 ```
 
 A SIP call through a SIP Gateway (the user part of the URI is `--to`, `echo` by default; see the

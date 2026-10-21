@@ -89,7 +89,7 @@ step by step, and `mediactl` streams packets through a TURN allocation to a UDP 
 measures the loss and the round trip:
 
 ```console
-mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://svc/stunner/udp-echo:9001
+mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://stunner/udp-echo:9001
 ```
 
 `mediactl` finds the public address and the credentials of the listener and a pod of the echo

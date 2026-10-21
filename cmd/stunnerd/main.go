@@ -1,27 +1,21 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
-	"regexp"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/l7mp/stunner/v2/pkg/mediactl/k8s"
 	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 	"github.com/pion/logging"
 
 	flag "github.com/spf13/pflag"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
 
 	// Register the bundled Mozilla CA roots as the fallback verification pool: the stunnerd
 	// image is built from scratch with no system CA bundle, and upstream turn-tls/turn-dtls
@@ -54,7 +48,7 @@ Usage (the positional argument count selects the mode):
         Tunnel a local client to a peer through a remote TURN server:
         client-addr: <udp|tcp>://<addr>:<port>, or "-" to tunnel stdin/stdout
         turn-server-addr: turn://<auth>@<addr>:<port>[?transport=udp|tcp|tls|dtls],
-                          or k8s://<gw-namespace>/<gw-name>:<listener>
+                          or k8s://<gw-namespace>/<gw-name>[/<listener>]
         peer-addr: <udp|tcp>://<addr>:<port>, or k8s://<namespace>/<service>:<port-name-or-number>
         auth: <username:password|secret>
 
@@ -414,15 +408,10 @@ func tunnelConfig(clientArg string, server *stnrv2.URI, peerProto stnrv2.Protoco
 }
 
 // resolveServer resolves the TURN server argument of the tunnel mode into a TURN URI with the
-// credentials the tunnel presents: a TURN URI with the credentials as its userinfo, or
-// "k8s://<namespace>/<gateway>:<listener>", the TURN URI of the Gateway listener from the
-// Gateway's dataplane config on the CDS server.
+// credentials the tunnel presents: a TURN URI with the credentials as its userinfo, or a k8s://
+// Gateway listener address, the TURN URI of the listener from the Gateway's dataplane config.
 func resolveServer(arg string, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlags *discovery.CDSConfigFlags, loggerFactory logging.LoggerFactory) (*stnrv2.URI, error) {
-	u, ok, err := parseK8sURI(arg, k8sConfigFlags)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
+	if !k8s.IsAddress(arg) {
 		uri, err := stnrv2.ParseURI(arg)
 		if err != nil {
 			return nil, fmt.Errorf("invalid TURN server URI %q: %w", arg, err)
@@ -432,42 +421,23 @@ func resolveServer(arg string, k8sConfigFlags *cliopt.ConfigFlags, cdsConfigFlag
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cdsAddr, err := discovery.DiscoverK8sCDSServer(ctx, k8sConfigFlags, cdsConfigFlags,
-		loggerFactory.NewLogger("cds-fwd"))
-	if err != nil {
-		return nil, fmt.Errorf("error searching for CDS server: %w", err)
-	}
-	cds, err := cdsclient.NewConfigNamespaceNameAPI(cdsAddr.Addr, u.Namespace, u.Name, nil,
-		loggerFactory.NewLogger("cds-client"))
-	if err != nil {
-		return nil, fmt.Errorf("error creating CDS client: %w", err)
-	}
-	confs, err := cds.Get(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error obtaining the config of gateway %s/%s: %w",
-			u.Namespace, u.Name, err)
-	}
-	if len(confs) != 1 {
-		return nil, fmt.Errorf("no config found for gateway %s/%s", u.Namespace, u.Name)
-	}
-	uris, err := confs[0].GetTURNURIForListener(u.Namespace+"/"+u.Name+"/"+u.Component, "",
-		time.Time{})
+	r := k8s.Resolver{K8s: k8sConfigFlags, CDS: cdsConfigFlags, Log: loggerFactory.NewLogger("k8s")}
+	l, err := r.Listener(ctx, arg)
 	if err != nil {
 		return nil, err
 	}
-	return &uris[0], nil
+	if l.TURN == nil {
+		return nil, fmt.Errorf("%s is not a TURN listener", arg)
+	}
+	return l.TURN, nil
 }
 
 // resolvePeer resolves the peer argument of the tunnel mode into the transport and the endpoint
 // of the peer: "<udp|tcp>://<host>:<port>", the host possibly a DNS name resolvable only where
-// the tunnel runs, or "k8s://<namespace>/<service>:<port-name-or-number>", the cluster IP and
-// port of the Service with the transport of the Service port.
+// the tunnel runs, or a k8s:// Service address, the first ready pod of the Service with the
+// transport of the Service port.
 func resolvePeer(arg string, k8sConfigFlags *cliopt.ConfigFlags) (stnrv2.Protocol, string, error) {
-	u, ok, err := parseK8sURI(arg, k8sConfigFlags)
-	if err != nil {
-		return stnrv2.ProtocolUnknown, "", err
-	}
-	if !ok {
+	if !k8s.IsAddress(arg) {
 		scheme, hostport, _ := strings.Cut(arg, "://")
 		proto, err := stnrv2.NewClusterProtocol(scheme)
 		if err != nil {
@@ -486,68 +456,7 @@ func resolvePeer(arg string, k8sConfigFlags *cliopt.ConfigFlags) (stnrv2.Protoco
 		return proto, hostport, nil
 	}
 
-	restConf, err := k8sConfigFlags.ToRESTConfig()
-	if err != nil {
-		return stnrv2.ProtocolUnknown, "", err
-	}
-	cs, err := kubernetes.NewForConfig(restConf)
-	if err != nil {
-		return stnrv2.ProtocolUnknown, "", err
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	svc, err := cs.CoreV1().Services(u.Namespace).Get(ctx, u.Name, metav1.GetOptions{})
-	if err != nil {
-		return stnrv2.ProtocolUnknown, "", err
-	}
-	if svc.Spec.ClusterIP == "" || svc.Spec.ClusterIP == corev1.ClusterIPNone {
-		return stnrv2.ProtocolUnknown, "", fmt.Errorf("service %s/%s has no cluster IP",
-			u.Namespace, u.Name)
-	}
-	for _, p := range svc.Spec.Ports {
-		if p.Name != u.Component && strconv.Itoa(int(p.Port)) != u.Component {
-			continue
-		}
-		proto, err := stnrv2.NewClusterProtocol(cmp.Or(string(p.Protocol), "UDP"))
-		if err != nil {
-			return stnrv2.ProtocolUnknown, "", fmt.Errorf("unsupported protocol %q on "+
-				"port %q of service %s/%s", p.Protocol, u.Component, u.Namespace, u.Name)
-		}
-		return proto, net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(int(p.Port))), nil
-	}
-	return stnrv2.ProtocolUnknown, "", fmt.Errorf("no port %q on service %s/%s",
-		u.Component, u.Namespace, u.Name)
-}
-
-// k8sName is a parsed "k8s://<namespace>/<name>:<component>" meta-URI: a gateway and its
-// listener in a TURN server URI, a Service and its port in a peer URI.
-type k8sName struct {
-	Namespace, Name, Component string
-}
-
-// k8sURIRe matches the body of a k8s:// meta-URI; the namespace may be empty (the
-// "k8s:///<name>:<component>" form).
-var k8sURIRe = regexp.MustCompile(`^([0-9A-Za-z_.-]*)/([0-9A-Za-z_.-]+):([0-9A-Za-z_.-]+)$`)
-
-// parseK8sURI reports whether the argument is a k8s:// meta-URI and parses it, defaulting an
-// empty namespace to the namespace of the kubeconfig context.
-func parseK8sURI(arg string, k8sConfigFlags *cliopt.ConfigFlags) (k8sName, bool, error) {
-	def, ok := strings.CutPrefix(arg, "k8s://")
-	if !ok {
-		return k8sName{}, false, nil
-	}
-	xs := k8sURIRe.FindStringSubmatch(def)
-	if xs == nil {
-		return k8sName{}, true, fmt.Errorf("cannot parse k8s:// URI %q: expecting "+
-			"k8s://<namespace>/<name>:<component>", arg)
-	}
-	u := k8sName{Namespace: xs[1], Name: xs[2], Component: xs[3]}
-	if u.Namespace == "" {
-		u.Namespace, _, _ = k8sConfigFlags.ToRawKubeConfigLoader().Namespace()
-	}
-	if u.Namespace == "" {
-		return k8sName{}, true, fmt.Errorf("no namespace in k8s:// URI %q and none in "+
-			"the kubeconfig context", arg)
-	}
-	return u, true, nil
+	return k8s.Resolver{K8s: k8sConfigFlags}.Peer(ctx, arg)
 }

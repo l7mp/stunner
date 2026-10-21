@@ -138,7 +138,7 @@ func TestTS(t *testing.T) {
 func TestK8sAddress(t *testing.T) {
 	err := run(context.Background(), "udp", "send", "k8s://only-namespace", "-t", "100ms")
 	assert.ErrorContains(t, err, "invalid Gateway address")
-	err = run(context.Background(), "turn", "send", "turn:127.0.0.1:3478", "k8s://svc/ns", "-t", "100ms")
+	err = run(context.Background(), "turn", "send", "turn:127.0.0.1:3478", "k8s://ns/svc", "-t", "100ms")
 	assert.ErrorContains(t, err, "invalid Service address")
 }
 

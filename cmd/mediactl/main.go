@@ -56,7 +56,7 @@ func newRootCmd() *cobra.Command {
 		Long: "mediactl sends packets and measures what comes back, or answers and echoes: SIP calls " +
 			"with RTP media, UDP and TCP streams (RTSP is TCP), TURN relayed streams and SRT streams. " +
 			"An address may be k8s://<namespace>/<gateway>[/<listener>], the public address of a STUNner " +
-			"Gateway listener, and a TURN peer k8s://svc/<namespace>/<service>:<port>, a ready pod of a Service.",
+			"Gateway listener, and a TURN peer k8s://<namespace>/<service>:<port>, the first ready pod of a Service.",
 		SilenceUsage:      true,
 		DisableAutoGenTag: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

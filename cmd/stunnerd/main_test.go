@@ -6,8 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
-
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
@@ -61,29 +59,4 @@ func TestTunnelConfig(t *testing.T) {
 	_, err = tunnelConfig("udp://127.0.0.1:5000", "turn://1.2.3.4:3478", "udp://10.0.0.1:9000",
 		"turn.example.com", false)
 	assert.Error(t, err, "--sni on a non-TLS transport")
-}
-
-// TestParseK8sURI pins the k8s:// meta-URI parser of the tunnel mode.
-func TestParseK8sURI(t *testing.T) {
-	flags := cliopt.NewConfigFlags(false)
-	ns := "media"
-	flags.Namespace = &ns
-
-	u, ok, err := parseK8sURI("k8s://stunner/udp-gateway:udp-listener", flags)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, k8sName{Namespace: "stunner", Name: "udp-gateway", Component: "udp-listener"}, u)
-
-	u, ok, err = parseK8sURI("k8s:///media-server:5001", flags)
-	require.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, "media", u.Namespace, "the kubeconfig namespace")
-
-	_, ok, err = parseK8sURI("turn://1.2.3.4:3478", flags)
-	assert.NoError(t, err)
-	assert.False(t, ok, "not a k8s:// URI")
-
-	_, ok, err = parseK8sURI("k8s://stunner/udp-gateway", flags)
-	assert.True(t, ok)
-	assert.Error(t, err, "no component")
 }

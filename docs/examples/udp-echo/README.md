@@ -228,14 +228,14 @@ standard input and send everything it receives to STUNner. Type any input and pr
 should see a nice greeting from your cluster!
 
 ```console
-./stunnerd - k8s://stunner/udp-gateway:udp-listener udp://${PEER_IP}:9001
+./stunnerd - k8s://stunner/udp-gateway/udp-listener udp://${PEER_IP}:9001
 Hello STUNner
 Greetings from STUNner!
 ```
 
 Note that we haven't specified the public IP address and port: the tunnel is clever enough to parse
 the running [STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the
-special STUNner URI `k8s://stunner/udp-gateway:udp-listener`, using the namespace (`stunner` here)
+special STUNner URI `k8s://stunner/udp-gateway/udp-listener`, using the namespace (`stunner` here)
 and the name of the Gateway (`udp-gateway`) plus the listener you want to connect to
 (`udp-listener`), and `stunnerd` will do the heavy lifting.
 
@@ -316,8 +316,8 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
    self-signed TLS certificate; this will not be needed when using a real signed certificate.
 
    ```console
-   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway:tls-listener udp://${PEER_IP}:9001
-   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway:tls-listener -> udp://10.104.175.57:9001
+   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway/tls-listener udp://${PEER_IP}:9001
+   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway/tls-listener -> udp://10.104.175.57:9001
    [...]
    Hello STUNner
    Greetings from STUNner!
