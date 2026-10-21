@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 
 	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 
@@ -23,43 +20,17 @@ func runAuth(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("error searching for auth service: %w", err)
 	}
 
-	u := url.URL{
-		Scheme: "http",
-		Host:   pod.Addr,
-		Path:   "/ice",
-	}
-	if authConfigFlags.TurnAuth {
-		// enforce TURN credential format
-		u.Path = ""
-	}
-
-	q := u.Query()
-	q.Set("service", "turn")
-	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
-		q.Set("namespace", *k8sConfigFlags.Namespace)
-	}
-	if username != "" {
-		q.Set("username", username)
+	q := discovery.AuthQuery{Username: username, TURNCredential: authConfigFlags.TurnAuth}
+	if k8sConfigFlags.Namespace != nil {
+		q.Namespace = *k8sConfigFlags.Namespace
 	}
 	if len(args) > 0 {
-		q.Set("gateway", args[0])
+		q.Gateway = args[0]
 	}
-	u.RawQuery = q.Encode()
-
-	log.Debugf("querying to authentication server %s using URL %q", pod.String(), u.String())
-	res, err := http.Get(u.String())
+	log.Debugf("querying authentication server %s", pod.String())
+	b, err := discovery.GetAuth(ctx, pod.Addr, q)
 	if err != nil {
-		return fmt.Errorf("error querying auth service %s: %w", pod.String(), err)
-	}
-	defer res.Body.Close() //nolint:errcheck
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP error querying auth service %s: expected status %d, got %d",
-			pod.String(), http.StatusOK, res.StatusCode)
-	}
-
-	b, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("cannot read HTTP response: %w", err)
+		return err
 	}
 
 	fmt.Println(string(b))

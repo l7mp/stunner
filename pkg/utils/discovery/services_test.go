@@ -43,3 +43,25 @@ func TestGetStunnerdStatus(t *testing.T) {
 	_, err = GetStunnerdStatus(context.Background(), "127.0.0.1:1")
 	assert.Error(t, err)
 }
+
+func TestGetAuth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("service") != "turn" {
+			http.Error(w, "no service", http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(r.URL.Path + "?" + r.URL.RawQuery))
+	}))
+	defer srv.Close()
+	addr := strings.TrimPrefix(srv.URL, "http://")
+
+	b, err := GetAuth(context.Background(), addr, AuthQuery{Namespace: "ns", Gateway: "gw"})
+	require.NoError(t, err)
+	assert.Equal(t, "/ice?gateway=gw&namespace=ns&service=turn", string(b), "an ICE server config, empty fields left out")
+	b, err = GetAuth(context.Background(), addr, AuthQuery{Username: "u", TURNCredential: true})
+	require.NoError(t, err)
+	assert.Equal(t, "/?service=turn&username=u", string(b), "a TURN credential, at the root")
+
+	_, err = GetAuth(context.Background(), "127.0.0.1:1", AuthQuery{})
+	assert.Error(t, err, "no auth service")
+}
