@@ -13,16 +13,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/l7mp/stunner/v2/internal/icetester"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	"github.com/l7mp/stunner/v2/pkg/icetester"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
-const DefaultTestNamespace = "icetest"
-
 func runICETest(_ *cobra.Command, args []string) error {
-	ns := DefaultTestNamespace
-	if k8sConfigFlags.Namespace != nil && *k8sConfigFlags.Namespace != "" {
+	ns := ""
+	if k8sConfigFlags.Namespace != nil {
 		ns = *k8sConfigFlags.Namespace
 	}
 
@@ -59,9 +57,8 @@ func runICETest(_ *cobra.Command, args []string) error {
 	bufferedLoggerFactory := logger.NewLoggerFactory("all:TRACE") // hardcode highest loglevel
 	bufferedLoggerFactory.SetWriter(logBuffer)
 
-	eventCh := make(chan icetester.Event, 12)
-	defer close(eventCh)
-	tester, err := icetester.NewICETester(icetester.Config{
+	eventCh := make(chan icetester.Event)
+	tester := icetester.New(icetester.Config{
 		EventChannel: eventCh,
 
 		K8sConfigFlags:  k8sConfigFlags,
@@ -70,7 +67,7 @@ func runICETest(_ *cobra.Command, args []string) error {
 
 		Namespace:      ns,
 		TURNTransports: turnTransports,
-		ICETesterImage: iceTesterImage,
+		Image:          iceTesterImage,
 		ForceCleanup:   forceCleanup,
 		PacketRate:     iceTesterPacketRate,
 		OffloadEngine:  offloadEngine,
@@ -78,56 +75,35 @@ func runICETest(_ *cobra.Command, args []string) error {
 
 		Logger: bufferedLoggerFactory,
 	})
-	if err != nil {
-		return fmt.Errorf("failed to create ICE tester: %w", err)
-	}
 
-	// run for at most 5 minutes
+	// run for at most the timeout, and stop on interrupt
 	ctx, cancel := context.WithTimeout(context.Background(), iceTesterTimeout)
-
-	// stop on interrupt as well
+	defer cancel()
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
 	defer stop()
 
-	// event handler
+	// the printer drains the events until the test ends
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case e := <-eventCh:
-				printEvent(e, logBuffer)
-
-			case <-ctx.Done():
-				return
-			}
+	wg.Go(func() {
+		for e := range eventCh {
+			printEvent(e, logBuffer)
 		}
-	}()
-
-	err = tester.Start(ctx)
-	if err == nil {
-		err = ctx.Err()
-	}
-
-	if err != nil {
-		switch ctx.Err() {
-		case context.DeadlineExceeded:
-			fmt.Printf("\nICE tester timed out after %s\n", iceTesterTimeout)
-			printLogs(logBuffer)
-			err = fmt.Errorf("ICE test timed out after %s", iceTesterTimeout)
-		case context.Canceled:
-			fmt.Printf("\nICE tester stopped due to user interrupt\n")
-			err = errors.New("ICE test interrupted")
-		default:
-			fmt.Printf("\nICE tester error: %s\n", err.Error())
-		}
-	}
-
-	cancel()
-
-	// wait until the printer finishes
+	})
+	err = tester.Run(ctx)
+	close(eventCh)
 	wg.Wait()
+
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded):
+		fmt.Printf("\nICE tester timed out after %s\n", iceTesterTimeout)
+		printLogs(logBuffer)
+		err = fmt.Errorf("ICE test timed out after %s", iceTesterTimeout)
+	case errors.Is(ctx.Err(), context.Canceled):
+		fmt.Printf("\nICE tester stopped due to user interrupt\n")
+		err = errors.New("ICE test interrupted")
+	case err != nil:
+		fmt.Printf("\nICE tester error: %s\n", err.Error())
+	}
 
 	// A non-nil error makes stunnerctl exit non-zero, so scripts can rely on the exit status.
 	return err
@@ -136,45 +112,36 @@ func runICETest(_ *cobra.Command, args []string) error {
 func printEvent(e icetester.Event, logbuf io.ReadWriter) {
 	// started
 	if e.InProgress {
-		proto := ""
-		if arg, ok := e.Args["ICETransport"]; ok {
-			if p, ok := arg.(string); ok {
-				proto = fmt.Sprintf(" over %s", p)
-			}
+		over := ""
+		if e.Transport != "" {
+			over = " over " + e.Transport
 		}
-
-		fmt.Printf("%s: %s%s... ", e.Timestamp.Format(time.RFC822), e.Type.String(), proto)
+		fmt.Printf("%s: %s%s... ", e.Timestamp.Format(time.RFC822), e.Type.String(), over)
 		return
 	}
 
 	// completed successfully
 	if e.Error == nil {
 		fmt.Println("completed")
-		if arg, ok := e.Args["Stats"]; ok {
-			if s, ok := arg.(*icetester.Stats); ok {
-				fmt.Printf("\tStatistics: rate=%0.2fpps, loss=%d/%dpkts=%0.2f%%, "+
-					"RTT:mean=%0.2fms/median=%0.2fms/P95=%0.2fms/P99=%0.2fms\n",
-					s.SendRate, s.PacketsSent-s.PacketsReceived, s.PacketsSent,
-					s.LossRate, s.MeanLatency, s.MedianLatency, s.P95Latency,
-					s.P99Latency)
-			}
+		if e.Result != nil {
+			fmt.Printf("\tStatistics: %s\n", e.Result.String())
 		}
-
-		for _, ctype := range []string{"LocalICECandidates", "RemoteICECandidates"} {
-			if arg, ok := e.Args[ctype]; ok {
-				if cs, ok := arg.([]icetester.CandidateDesc); ok {
-					fmt.Printf("\t%s:\n", ctype)
-					for _, c := range cs {
-						sel := "  "
-						if c.Selected {
-							sel = "* "
-						}
-						fmt.Printf("\t  %s%s\n", sel, c.Candidate)
-					}
+		for _, cs := range []struct {
+			name  string
+			cands []icetester.Candidate
+		}{{"LocalICECandidates", e.Local}, {"RemoteICECandidates", e.Remote}} {
+			if len(cs.cands) == 0 {
+				continue
+			}
+			fmt.Printf("\t%s:\n", cs.name)
+			for _, c := range cs.cands {
+				sel := "  "
+				if c.Selected {
+					sel = "* "
 				}
+				fmt.Printf("\t  %s%s\n", sel, c.Candidate)
 			}
 		}
-
 		return
 	}
 

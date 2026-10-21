@@ -10,13 +10,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 const (
 	icetesterDataplaneName = "icetester-dataplane"
+	// listenerPort is the port of the TURN listener of every test Gateway
+	listenerPort = 3478
 )
 
 func newICETesterNamespace(name string) *unstructured.Unstructured {
@@ -87,7 +89,7 @@ func newICETesterUDPGateway(namespace string) *unstructured.Unstructured {
 				"listeners": []any{
 					map[string]any{
 						"name":     "icetest-udp-listener",
-						"port":     int64(3478),
+						"port":     int64(listenerPort),
 						"protocol": "TURN-UDP",
 					},
 				},
@@ -110,7 +112,7 @@ func newICETesterTCPGateway(namespace string) *unstructured.Unstructured {
 				"listeners": []any{
 					map[string]any{
 						"name":     "icetest-tcp-listener",
-						"port":     int64(3478),
+						"port":     int64(listenerPort),
 						"protocol": "TURN-TCP",
 					},
 				},
@@ -248,24 +250,22 @@ func newICETesterICETesterResources(ns, iceTesterImage string, protos []stnrv2.P
 	return l
 }
 
-func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructured, error) {
-	obj := &unstructured.Unstructured{
-		Object: map[string]any{
-			"apiVersion": "stunner.l7mp.io/v1",
-			"kind":       "Dataplane",
-			"metadata": map[string]any{
-				"name": "default",
-			},
-		},
-	}
-	d, err := t.get(ctx, obj, metav1.GetOptions{})
+// makeDataplane creates the test Dataplane, a copy of the default one with the resources, the
+// grace period and the offload engine of the test.
+func (t *Tester) makeDataplane(ctx context.Context) (*unstructured.Unstructured, error) {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "stunner.l7mp.io/v1",
+		"kind":       "Dataplane",
+		"metadata":   map[string]any{"name": "default"},
+	}}
+	d, err := t.get(ctx, obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query default Dataplane: %w", err)
 	}
 
-	// customize
 	d.SetName(icetesterDataplaneName)
 	d.SetResourceVersion("")
+	d.SetUID("")
 	for _, s := range []struct {
 		path  []string
 		value any
@@ -275,159 +275,90 @@ func (t *iceTester) makeDataplane(ctx context.Context) (*unstructured.Unstructur
 		{path: []string{"spec", "resources", "requests", "memory"}, value: "256Mi"},
 		{path: []string{"spec", "resources", "limits", "cpu"}, value: "250m"},
 		{path: []string{"spec", "resources", "limits", "memory"}, value: "256Mi"},
-		{path: []string{"spec", "offloadEngine"}, value: t.offloadEngine.String()},
+		{path: []string{"spec", "offloadEngine"}, value: t.cfg.OffloadEngine.String()},
 	} {
 		if err := unstructured.SetNestedField(d.Object, s.value, s.path...); err != nil {
 			return nil, fmt.Errorf("failed to set field <%s> to %s: %w",
 				strings.Join(s.path, "."), s.value, err)
 		}
 	}
-
-	// offload customizations
-	if t.offloadEngine != stnrv2.OffloadEngineNone {
+	if t.cfg.OffloadEngine != stnrv2.OffloadEngineNone {
 		if err := unstructured.SetNestedSlice(d.Object, []any{"NET_ADMIN", "SYS_ADMIN", "SYS_MODULE"},
 			"spec", "containerSecurityContext", "capabilities", "add"); err != nil {
 			return nil, fmt.Errorf("failed to enable NET_ADMIN capabilities: %w", err)
 		}
 	}
 
-	if err := t.createOrUpdate(ctx, d, metav1.GetOptions{}, metav1.CreateOptions{}, metav1.UpdateOptions{}); err != nil {
-		return nil, fmt.Errorf("failed to create/update tester Dataplane: %w", err)
+	// the test Dataplane of an earlier run is replaced
+	cur, err := t.get(ctx, d)
+	switch {
+	case apierrors.IsNotFound(err):
+		err = t.create(ctx, d)
+	case err == nil:
+		d.SetResourceVersion(cur.GetResourceVersion())
+		var r dynamic.ResourceInterface
+		if r, err = t.resource(d); err == nil {
+			_, err = r.Update(ctx, d, metav1.UpdateOptions{})
+		}
 	}
-
+	if err != nil {
+		return nil, fmt.Errorf("failed to create or update the test Dataplane: %w", err)
+	}
 	return d, nil
 }
 
-// k8s client funcs
-func (t *iceTester) create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions) error {
-	gvr, err := getGVR(t.k8sConfig, obj)
+// resource returns the dynamic client of the kind of an object, in its namespace if any.
+func (t *Tester) resource(obj *unstructured.Unstructured) (dynamic.ResourceInterface, error) {
+	gvk := obj.GroupVersionKind()
+	mapping, err := t.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+	if obj.GetNamespace() != "" {
+		return t.dyn.Resource(mapping.Resource).Namespace(obj.GetNamespace()), nil
+	}
+	return t.dyn.Resource(mapping.Resource), nil
+}
+
+func (t *Tester) create(ctx context.Context, obj *unstructured.Unstructured) error {
+	r, err := t.resource(obj)
 	if err != nil {
 		return err
 	}
-
-	if obj.GetNamespace() != "" {
-		// For namespaced resources
-		_, err = t.Resource(gvr).Namespace(obj.GetNamespace()).Create(ctx, obj, opts)
-	} else {
-		// For cluster-scoped resources
-		_, err = t.Resource(gvr).Create(ctx, obj, opts)
-	}
-
+	_, err = r.Create(ctx, obj, metav1.CreateOptions{})
 	return err
 }
 
-func (t *iceTester) get(ctx context.Context, obj *unstructured.Unstructured, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	gvr, err := getGVR(t.k8sConfig, obj)
+func (t *Tester) get(ctx context.Context, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	r, err := t.resource(obj)
 	if err != nil {
 		return nil, err
 	}
-
-	var getObj *unstructured.Unstructured
-	if obj.GetNamespace() != "" {
-		// For namespaced resources
-		getObj, err = t.Resource(gvr).Namespace(obj.GetNamespace()).Get(ctx, obj.GetName(), opts)
-	} else {
-		// For cluster-scoped resources
-		getObj, err = t.Resource(gvr).Get(ctx, obj.GetName(), opts)
-	}
-
-	return getObj, err
+	return r.Get(ctx, obj.GetName(), metav1.GetOptions{})
 }
 
-func (t *iceTester) getCRD(ctx context.Context, name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
-	gvr := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  "v1",
-		Resource: "customresourcedefinitions",
-	}
-
-	return t.Resource(gvr).Get(ctx, name, opts)
-}
-
-func (t *iceTester) list(ctx context.Context, obj *unstructured.Unstructured, opts metav1.ListOptions) ([]*unstructured.Unstructured, error) {
-	gvr, err := getGVR(t.k8sConfig, obj)
-	if err != nil {
-		return nil, err
-	}
-
-	var listObj *unstructured.UnstructuredList
-	if obj.GetNamespace() != "" {
-		// For namespaced resources
-		listObj, err = t.Resource(gvr).Namespace(obj.GetNamespace()).List(ctx, opts)
-	} else {
-		// For cluster-scoped resources
-		listObj, err = t.Resource(gvr).List(ctx, opts)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var list = make([]*unstructured.Unstructured, len(listObj.Items))
-	for i, o := range listObj.Items {
-		list[i] = &o
-	}
-
-	return list, err
-}
-
-func (t *iceTester) delete(ctx context.Context, obj *unstructured.Unstructured, opts metav1.DeleteOptions) error {
-	gvr, err := getGVR(t.k8sConfig, obj)
+// delete deletes an object, an absent one included.
+func (t *Tester) delete(ctx context.Context, obj *unstructured.Unstructured) error {
+	r, err := t.resource(obj)
 	if err != nil {
 		return err
 	}
-
-	if obj.GetNamespace() != "" {
-		// For namespaced resources
-		return t.Resource(gvr).Namespace(obj.GetNamespace()).Delete(ctx, obj.GetName(), opts)
-	} else {
-		// For cluster-scoped resources
-		return t.Resource(gvr).
-			Delete(ctx, obj.GetName(), opts)
+	if err := r.Delete(ctx, obj.GetName(), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		return err
 	}
+	return nil
 }
 
-func (t *iceTester) update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
-	gvr, err := getGVR(t.k8sConfig, obj)
-	if err != nil {
-		return nil, err
+// remove deletes an object and waits until it is gone.
+func (t *Tester) remove(ctx context.Context, obj *unstructured.Unstructured) error {
+	if err := t.delete(ctx, obj); err != nil {
+		return err
 	}
-
-	current, err := t.get(ctx, obj, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// Copy the ResourceVersion to ensure proper update
-	obj.SetResourceVersion(current.GetResourceVersion())
-
-	// Perform the update
-	if obj.GetNamespace() != "" {
-		return t.Resource(gvr).Namespace(obj.GetNamespace()).Update(ctx, obj, opts)
-	}
-
-	return t.Resource(gvr).Update(ctx, obj, opts)
-}
-
-func (t *iceTester) createOrUpdate(ctx context.Context, obj *unstructured.Unstructured, gopts metav1.GetOptions, copts metav1.CreateOptions, uopts metav1.UpdateOptions) error {
-	if _, err := t.get(ctx, obj, gopts); err != nil {
+	return eventually(ctx, 30*time.Second, func(ctx context.Context) (bool, error) {
+		_, err := t.get(ctx, obj)
 		if apierrors.IsNotFound(err) {
-			return t.create(ctx, obj, copts)
-		} else {
-			_, err := t.update(ctx, obj, uopts)
-			return err
-		}
-	} else {
-		return err
-	}
-}
-
-func (t *iceTester) safelyRemove(ctx context.Context, obj *unstructured.Unstructured, gopts metav1.GetOptions, dopts metav1.DeleteOptions) error {
-	_ = t.delete(ctx, obj, dopts) // nolint:errcheck
-	return eventually(ctx, func(ctx context.Context) (bool, error) {
-		if _, err := t.get(ctx, obj, gopts); err != nil && apierrors.IsNotFound(err) {
 			return true, nil
-		} else {
-			return false, err
 		}
-	}, 30*time.Second, 250*time.Millisecond)
+		return false, err
+	})
 }

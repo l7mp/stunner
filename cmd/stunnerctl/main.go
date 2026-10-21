@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	cliopt "k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/l7mp/stunner/v2/internal/icetester"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	"github.com/l7mp/stunner/v2/pkg/icetester"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 	"github.com/l7mp/stunner/v2/pkg/utils/discovery"
 )
@@ -151,11 +151,11 @@ func init() {
 	authConfigFlags.AddFlags(iceTestCmd.Flags())
 
 	// ICE test timeout
-	iceTestCmd.Flags().IntVarP(&iceTesterPacketRate, "packet-rate", "r", 50,
+	iceTestCmd.Flags().IntVarP(&iceTesterPacketRate, "packet-rate", "r", icetester.DefaultPacketRate,
 		"Packet rate [pkts/sec], 0 means flood test (Default: 50)")
-	iceTestCmd.Flags().DurationVarP(&iceTesterTimeout, "timeout", "t", icetester.DefaultICETesterTimeout,
+	iceTestCmd.Flags().DurationVarP(&iceTesterTimeout, "timeout", "t", icetester.DefaultTimeout,
 		"Timeout")
-	iceTestCmd.Flags().StringVar(&iceTesterImage, "ice-tester-image", icetester.DefaultICETesterImage,
+	iceTestCmd.Flags().StringVar(&iceTesterImage, "ice-tester-image", icetester.DefaultImage,
 		"Icetester container image")
 	iceTestCmd.Flags().StringVar(&iceTesterOffloadEngine, "offload-mode", stnrv2.OffloadEngineNone.String(),
 		"TURN (UDP) offload mode")

@@ -40,7 +40,6 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20261011195143-3b414e3e8284
 	golang.org/x/time v0.16.0
-	gonum.org/v1/gonum v0.17.0
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/cli-runtime v0.37.1
