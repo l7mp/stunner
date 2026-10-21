@@ -74,10 +74,10 @@ func runLicense(_ *cobra.Command, args []string) error {
 
 	case "summary":
 		fmt.Print(status.Summary())
-		fmt.Printf("\tLimits (Gateways/calls or streams): %s\n", limits)
+		fmt.Printf("\tLimits: %s\n", limits)
 
 	default:
-		fmt.Printf("%s limits=%s\n", status.String(), limits)
+		fmt.Printf("%s limits: %s\n", status.String(), limits)
 	}
 
 	return nil
