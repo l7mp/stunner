@@ -15,6 +15,7 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/flow"
+	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/proto/ng"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
@@ -94,6 +95,8 @@ type stream struct {
 	// of its RTP and RTCP sources once they sent anything.
 	ext             endpoint
 	extRTP, extRTCP api.Conn
+	// rtpEntry and rtcpEntry are the conntrack entries of extRTP and extRTCP, which offload them
+	rtpEntry, rtcpEntry *flow.Entry
 	// sock carries RTP, and RTCP when the internal party muxes, to and from the internal party;
 	// rtcpSock carries its RTCP otherwise.
 	sock, rtcpSock         net.PacketConn
@@ -374,6 +377,7 @@ func (s *Server) negotiate(req *ng.Request) (string, error) {
 		} else {
 			st.in = e
 			st.flushIn()
+			s.offloadLocked(st)
 			// the trunk sends RTP and RTCP to the public address, demuxed by source
 			addrs[i], rtcp[i] = public, public
 			mux[i] = offer || st.ext.mux
@@ -507,10 +511,10 @@ func (s *Server) serveMedia(c api.Conn) {
 	e.Hooks.OnClose = func(string) {
 		s.mu.Lock()
 		if st.extRTP == c {
-			st.extRTP = nil
+			st.extRTP, st.rtpEntry = nil, nil
 		}
 		if st.extRTCP == c {
-			st.extRTCP = nil
+			st.extRTCP, st.rtcpEntry = nil, nil
 		}
 		s.mu.Unlock()
 	}
@@ -528,6 +532,15 @@ func (s *Server) serveMedia(c api.Conn) {
 		_ = c.Close()
 		return
 	}
+	s.mu.Lock()
+	if st.extRTP == c {
+		st.rtpEntry = e
+	}
+	if st.extRTCP == c {
+		st.rtcpEntry = e
+	}
+	s.offloadLocked(st)
+	s.mu.Unlock()
 
 	buf := make([]byte, bufferSize)
 	for {
@@ -598,7 +611,18 @@ func (s *Server) reap(stop chan struct{}) {
 		}
 		s.mu.Lock()
 		for id, c := range s.calls {
-			if time.Since(time.Unix(0, c.last.Load())) > MediaTimeout {
+			// the media of an offloaded stream moves in the kernel, which its entries know
+			last := time.Unix(0, c.last.Load())
+			for _, st := range c.streams {
+				for _, e := range []*flow.Entry{st.rtpEntry, st.rtcpEntry} {
+					if e != nil {
+						if t := e.LastActive(); t.After(last) {
+							last = t
+						}
+					}
+				}
+			}
+			if time.Since(last) > MediaTimeout {
 				s.log.Infof("call %s timed out", id)
 				s.deleteLocked(id)
 			}
@@ -606,6 +630,66 @@ func (s *Server) reap(stop chan struct{}) {
 		s.mu.Unlock()
 	}
 }
+
+// offloadLocked offloads the pairs of a stream whose ends are both known: the trunk's RTP source
+// with the internal party's RTP endpoint, RTCP left to user space when exactly one side muxes it,
+// and, when neither does, the trunk's RTCP source with the internal party's RTCP endpoint. The
+// legs carry the tag of the stream's cluster, which must be plain UDP: the socket of a tunnelled
+// cluster is a relay on the TURN server, not a wire the kernel can match. The caller holds mu.
+func (s *Server) offloadLocked(st *stream) {
+	d, ok := s.rt.Dialer(st.cluster)
+	if !ok || d.Tag().Proto != stnrv2.ProtocolUDP {
+		return
+	}
+	type pair struct {
+		e    *flow.Entry
+		sock net.PacketConn
+		to   netip.AddrPort
+		punt []offload.PuntRule
+	}
+	var pairs []pair
+	if st.rtpEntry != nil && st.in.rtp.IsValid() {
+		var punt []offload.PuntRule
+		if st.ext.mux != st.in.mux {
+			punt = []offload.PuntRule{rtcpRule}
+		}
+		pairs = append(pairs, pair{st.rtpEntry, st.sock, st.in.rtp, punt})
+	}
+	if !st.ext.mux && !st.in.mux && st.rtcpEntry != nil && st.in.rtcp.IsValid() {
+		pairs = append(pairs, pair{st.rtcpEntry, st.rtcpSock, st.in.rtcp, nil})
+	}
+	for _, p := range pairs {
+		leg := &legConn{local: p.sock.LocalAddr(), remote: net.UDPAddrFromAddrPort(p.to), tag: d.Tag()}
+		if cur, ok := p.e.Leg.(*legConn); ok && cur.remote.String() == leg.remote.String() {
+			continue // offloaded already
+		}
+		p.e.SetLeg(leg)
+		go func() {
+			if err := p.e.Offload(s.rt.OffloadEngine, p.punt...); err != nil && !errors.Is(err, net.ErrClosed) {
+				s.log.Debugf("media from %s stays in user space: %s", p.e.Client.RemoteAddr(), err)
+			}
+		}()
+	}
+}
+
+// rtcpRule matches RTCP by the packet type in the second byte, 192 to 223 (RFC 5761 section 4).
+var rtcpRule = offload.PuntRule{Mask: 0x00e00000, Value: 0x00c00000}
+
+// legConn is the internal side of a stream as the leg of a trunk conn's conntrack entry: the
+// stream socket towards the internal party. The stream relays the socket itself, so the conntrack
+// only offloads with the leg and never reads, writes or closes it.
+type legConn struct {
+	net.Conn      // nil: never read or written
+	local, remote net.Addr
+	tag           api.Tag
+}
+
+func (c *legConn) LocalAddr() net.Addr                      { return c.local }
+func (c *legConn) RemoteAddr() net.Addr                     { return c.remote }
+func (c *legConn) Close() error                             { return nil }
+func (c *legConn) Tag() api.Tag                             { return c.tag }
+func (c *legConn) TransportAddrs() (local, remote net.Addr) { return c.local, c.remote }
+func (c *legConn) Channel(net.Addr) (uint16, bool)          { return 0, false }
 
 // isRTCP tells RTCP from RTP by the packet type (RFC 5761 section 4).
 func isRTCP(b []byte) bool { return len(b) >= 2 && b[1] >= 192 && b[1] <= 223 }

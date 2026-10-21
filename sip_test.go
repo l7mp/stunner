@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/offload"
 	sipsrv "github.com/l7mp/stunner/v2/internal/server/sip"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/logger"
@@ -207,6 +209,33 @@ func TestSIPGateway(t *testing.T) {
 		assert.Eventually(t, func() bool {
 			return f.stunner.GetServer("sip").(api.Server).Sessions() == 0
 		}, 5*time.Second, 50*time.Millisecond, "the call is gone")
+	})
+
+	t.Run("media-offload", func(t *testing.T) {
+		f := newSIPFixture(t, sip.Config{})
+		rec := &recordingOffload{NullEngine: offload.NewNullEngine()}
+		f.stunner.rt.OffloadEngine = rec
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		call, err := f.trunk.Dial(ctx, uri)
+		require.NoError(t, err)
+		in := answered(t, ctx, f.peer)
+		assertEcho(t, call, 10)
+		// the trunk's RTP source with the peer's RTP endpoint, both raw
+		require.Eventually(t, func() bool { return len(rec.flows()) == 1 }, 5*time.Second,
+			50*time.Millisecond, "the media is offloaded")
+		pair := rec.flows()[0]
+		port := func(a net.Addr) int { return a.(*net.UDPAddr).Port }
+		assert.Equal(t, port(call.LocalAddr()), port(pair[0].RemoteAddr), "the trunk side")
+		assert.Equal(t, port(in.LocalAddr()), port(pair[1].RemoteAddr), "the peer side")
+		assert.Zero(t, pair[0].ChannelID+pair[1].ChannelID, "raw both ways")
+
+		require.NoError(t, call.Hangup(ctx))
+		<-in.Done()
+		mediaDeleted(t, f.stunner)
+		assert.Eventually(t, func() bool { return len(rec.flows()) == 0 }, 5*time.Second,
+			50*time.Millisecond, "the call end removes the offload")
 	})
 
 	t.Run("bye-from-the-cluster", func(t *testing.T) {
@@ -471,4 +500,38 @@ func TestSIPRegistration(t *testing.T) {
 	// the registration is refreshed before it expires, over the same flow
 	refreshed := registered()
 	assert.Equal(t, r.Contact.String(), refreshed.Contact.String(), "the same flow")
+}
+
+// recordingOffload records the flows offloaded and removed.
+type recordingOffload struct {
+	*offload.NullEngine
+	mu   sync.Mutex
+	live map[string][2]offload.Connection
+}
+
+func (r *recordingOffload) Upsert(a, b offload.Connection, _, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.live == nil {
+		r.live = map[string][2]offload.Connection{}
+	}
+	r.live[a.String()+"/"+b.String()] = [2]offload.Connection{a, b}
+	return nil
+}
+
+func (r *recordingOffload) Remove(a, b offload.Connection) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.live, a.String()+"/"+b.String())
+	return nil
+}
+
+func (r *recordingOffload) flows() [][2]offload.Connection {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ret := [][2]offload.Connection{}
+	for _, f := range r.live {
+		ret = append(ret, f)
+	}
+	return ret
 }
