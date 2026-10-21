@@ -2,6 +2,7 @@ package license
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -142,6 +143,44 @@ func Features(t SubscriptionType) []Feature {
 		return []Feature{}
 	}
 }
+
+// Limits are the usage limits of a subscription type: the SIP and SRT Gateways served and the
+// parallel calls of a SIP Gateway and streams of an SRT Gateway. 0 means unlimited, a negative
+// value unknown.
+type Limits struct {
+	SIPGateways int `json:"sipGateways"`
+	Calls       int `json:"calls"`
+	SRTGateways int `json:"srtGateways"`
+	Streams     int `json:"streams"`
+}
+
+// String returns the limits as SIP and SRT Gateways/calls or streams, e.g., "sip=3/100,srt=3/100";
+// an unknown limit is "-", an unlimited one "unlimited".
+func (l Limits) String() string {
+	limit := func(n int) string {
+		switch {
+		case n < 0:
+			return "-"
+		case n == 0:
+			return "unlimited"
+		}
+		return strconv.Itoa(n)
+	}
+	return fmt.Sprintf("sip=%s/%s,srt=%s/%s", limit(l.SIPGateways), limit(l.Calls),
+		limit(l.SRTGateways), limit(l.Streams))
+}
+
+// getLimits returns the limits of a subscription type: unknownLimits by default.
+var getLimits = unknownLimits
+
+// unknownLimits are the limits of the open-source build, which does not know the limits of any
+// tier.
+func unknownLimits(_ SubscriptionType) Limits {
+	return Limits{SIPGateways: -1, Calls: -1, SRTGateways: -1, Streams: -1}
+}
+
+// GetLimits returns the usage limits of a subscription type.
+func GetLimits(t SubscriptionType) Limits { return getLimits(t) }
 
 // helper
 func ToStringSlice[T fmt.Stringer](items []T) []string {

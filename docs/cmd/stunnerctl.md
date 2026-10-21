@@ -109,9 +109,10 @@ License status:
     Subscription type: member
     Enabled features: DaemonSet, STUNServer, ...
     Last updated: ...
+    Limits (Gateways/calls or streams): sip=3/100,srt=3/100
 ```
 
-This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license.
+This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license, and the limits of your subscription.
 
 ### Authentication
 
@@ -160,25 +161,25 @@ diagnostics that to help troubleshooting.
   Checking Gateway... completed
   Obtaining ICE server configuration... completed
   Running asymmetric ICE test over TURN-UDP... completed
-  	Statistics: rate=48.65pps, loss=0/973pkts=0.00%, RTT:mean=20.67ms/median=20.54ms/P95=22.23ms/P99=23.34ms
+  	Statistics: 20.0s, sent 1000 pkts 100000 bytes 40.00 kbit/s, received 1000 pkts 100000 bytes 40.00 kbit/s, lost 0/1000 (0.00%), rtt min/avg/max 18.904ms/20.671ms/23.340ms
   	LocalICECandidates:
   	  * udp4 relay 10.244.0.24:43988 related 0.0.0.0:43716 (resolved: 10.244.0.24:43988)
   	RemoteICECandidates:
   	  * udp4 host 10.244.0.163:35242 (resolved: 10.244.0.163:35242)
   Running asymmetric ICE test over TURN-TCP... completed
-  	Statistics: rate=48.55pps, loss=0/971pkts=0.00%, RTT:mean=21.00ms/median=20.89ms/P95=22.45ms/P99=23.47ms
+  	Statistics: 20.0s, sent 1000 pkts 100000 bytes 40.00 kbit/s, received 1000 pkts 100000 bytes 40.00 kbit/s, lost 0/1000 (0.00%), rtt min/avg/max 19.233ms/21.004ms/23.470ms
   	LocalICECandidates:
   	  * udp4 relay 10.244.0.162:45090 related 0.0.0.0:45654 (resolved: 10.244.0.162:45090)
   	RemoteICECandidates:
   	  * udp4 host 10.244.0.163:51653 (resolved: 10.244.0.163:51653)
   Running symmetric ICE test over TURN-UDP... completed
-  	Statistics: rate=48.65pps, loss=0/973pkts=0.00%, RTT:mean=20.63ms/median=20.47ms/P95=21.85ms/P99=23.01ms
+  	Statistics: 20.0s, sent 1000 pkts 100000 bytes 40.00 kbit/s, received 1000 pkts 100000 bytes 40.00 kbit/s, lost 0/1000 (0.00%), rtt min/avg/max 18.876ms/20.633ms/23.010ms
   	LocalICECandidates:
   	  * udp4 relay 10.244.0.24:47282 related 0.0.0.0:55122 (resolved: 10.244.0.24:47282)
   	RemoteICECandidates:
   	  * udp4 relay 10.244.0.24:47367 related 0.0.0.0:51777 (resolved: 10.244.0.24:47367)
   Running symmetric ICE test over TURN-TCP... completed
-  	Statistics: rate=48.60pps, loss=0/972pkts=0.00%, RTT:mean=24.61ms/median=20.56ms/P95=39.96ms/P99=133.40ms
+  	Statistics: 20.0s, sent 1000 pkts 100000 bytes 40.00 kbit/s, received 1000 pkts 100000 bytes 40.00 kbit/s, lost 0/1000 (0.00%), rtt min/avg/max 19.012ms/24.610ms/133.401ms
   	LocalICECandidates:
   	  * udp4 relay 10.244.0.162:56555 related 0.0.0.0:42600 (resolved: 10.244.0.162:56555)
   	RemoteICECandidates:

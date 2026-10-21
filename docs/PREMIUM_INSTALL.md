@@ -110,9 +110,10 @@ License status:
    Subscription type: member
    Enabled features: DaemonSet, RelayAddressDiscovery, ...
    Last updated: ...
+   Limits (Gateways/calls or streams): sip=3/100,srt=3/100
 ```
 
-This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license.
+This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license, and the limits of your subscription.
 
 It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/docs/cmd/stunnerctl.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
 

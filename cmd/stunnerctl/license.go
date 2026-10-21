@@ -10,7 +10,9 @@ import (
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	cdsclient "github.com/l7mp/stunner/v2/pkg/config/client"
+	"github.com/l7mp/stunner/v2/pkg/config/license"
 )
 
 func runLicense(_ *cobra.Command, args []string) error {
@@ -41,24 +43,30 @@ func runLicense(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// the limits of the subscription the operator reports, from the catalog of this binary
+	limits := license.GetLimits(license.NewSubscriptionType(status.SubscriptionType))
+	report := struct {
+		stnrv2.LicenseStatus
+		Limits license.Limits `json:"limits"`
+	}{status, limits}
 
 	switch output {
 	case "yaml":
-		if out, err := yaml.Marshal(status); err != nil {
+		if out, err := yaml.Marshal(report); err != nil {
 			return err
 		} else {
 			fmt.Print(string(out))
 		}
 
 	case "json":
-		if out, err := json.Marshal(status); err != nil {
+		if out, err := json.Marshal(report); err != nil {
 			return err
 		} else {
 			fmt.Println(string(out))
 		}
 
 	case "jsonpath":
-		res, err := jsonQuery.Evaluate(status)
+		res, err := jsonQuery.Evaluate(report)
 		if err != nil {
 			return err
 		}
@@ -66,9 +74,10 @@ func runLicense(_ *cobra.Command, args []string) error {
 
 	case "summary":
 		fmt.Print(status.Summary())
+		fmt.Printf("\tLimits (Gateways/calls or streams): %s\n", limits)
 
 	default:
-		fmt.Println(status.String())
+		fmt.Printf("%s limits=%s\n", status.String(), limits)
 	}
 
 	return nil
