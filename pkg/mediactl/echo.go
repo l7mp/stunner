@@ -16,8 +16,8 @@ type Dialer interface {
 }
 
 // Echo sends back everything it reads on a conn until the conn fails or, for a datagram conn,
-// stays silent for FlowIdle; then it closes the conn and returns what it received. A datagram
-// conn's headers are read, so a receiver alone sees the loss.
+// stays silent for FlowIdle; then it closes the conn and returns what it received. It counts the
+// packets and the bytes only: the sender measures the loss and the round trip.
 func Echo(conn net.Conn, datagram bool) *Stats {
 	s := NewStats()
 	buf := make([]byte, 65536)
@@ -29,7 +29,7 @@ func Echo(conn net.Conn, datagram bool) *Stats {
 		if err != nil {
 			break
 		}
-		s.Received(buf[:n], datagram)
+		s.Received(buf[:n], false)
 		if _, err := conn.Write(buf[:n]); err != nil {
 			break
 		}

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/pion/logging"
 )
 
@@ -171,15 +172,16 @@ func Total(rs []Result) Result {
 func (r Result) String() string {
 	parts := []string{fmt.Sprintf("%.1fs", r.Duration.Seconds())}
 	if r.Sent > 0 {
-		parts = append(parts, fmt.Sprintf("sent %d pkts %d bytes %s", r.Sent, r.SentBytes, Rate(r.SentBytes, r.Duration)))
+		parts = append(parts, fmt.Sprintf("sent %s pkts %s %s", count(r.Sent), humanize.Bytes(uint64(r.SentBytes)),
+			Rate(r.SentBytes, r.Duration)))
 	}
 	// a publisher receives nothing, and expects nothing back
 	if r.Received > 0 || r.Sent == 0 || r.Expected > 0 {
-		parts = append(parts, fmt.Sprintf("received %d pkts %d bytes %s", r.Received, r.ReceivedBytes,
-			Rate(r.ReceivedBytes, r.Duration)))
+		parts = append(parts, fmt.Sprintf("received %s pkts %s %s", count(r.Received),
+			humanize.Bytes(uint64(r.ReceivedBytes)), Rate(r.ReceivedBytes, r.Duration)))
 	}
 	if r.Expected > 0 {
-		parts = append(parts, fmt.Sprintf("lost %d/%d (%.2f%%)", r.Lost, r.Expected,
+		parts = append(parts, fmt.Sprintf("lost %s/%s (%.2f%%)", count(r.Lost), count(r.Expected),
 			100*float64(r.Lost)/float64(r.Expected)))
 	}
 	if r.RTTMax > 0 {
@@ -214,13 +216,14 @@ func (s *Stats) Result() Result {
 	return r
 }
 
-// Rate formats bytes over a duration as a bitrate.
+// Rate formats bytes over a duration as a bitrate with an SI prefix: 75.64 kbit/s, 7.56 Mbit/s.
 func Rate(bytes int64, d time.Duration) string {
-	bps := float64(bytes*8) / d.Seconds()
-	if bps >= 1e6 {
-		return fmt.Sprintf("%.2f Mbit/s", bps/1e6)
-	}
-	return fmt.Sprintf("%.2f kbit/s", bps/1e3)
+	return humanize.SIWithDigits(float64(bytes*8)/d.Seconds(), 2, "bit/s")
+}
+
+// count formats a number of packets with an SI prefix: 500, 9.4k, 5.9M.
+func count(n int64) string {
+	return strings.ReplaceAll(humanize.SIWithDigits(float64(n), 1, ""), " ", "")
 }
 
 // String reports what the stream measured.
@@ -292,10 +295,10 @@ loop:
 			break loop
 		case now := <-report:
 			r := s.Result()
-			c.Logger.Infof("interval %4.1f-%4.1fs: sent %d pkts %s, received %d pkts %s",
+			c.Logger.Infof("interval %4.1f-%4.1fs: sent %s pkts %s, received %s pkts %s",
 				prevAt.Sub(s.start).Seconds(), now.Sub(s.start).Seconds(),
-				r.Sent-prev.Sent, Rate(r.SentBytes-prev.SentBytes, now.Sub(prevAt)),
-				r.Received-prev.Received, Rate(r.ReceivedBytes-prev.ReceivedBytes, now.Sub(prevAt)))
+				count(r.Sent-prev.Sent), Rate(r.SentBytes-prev.SentBytes, now.Sub(prevAt)),
+				count(r.Received-prev.Received), Rate(r.ReceivedBytes-prev.ReceivedBytes, now.Sub(prevAt)))
 			prev, prevAt = r, now
 		case <-tick:
 			out := pkt

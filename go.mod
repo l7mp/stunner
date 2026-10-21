@@ -4,6 +4,7 @@ go 1.27.0
 
 require (
 	github.com/datarhei/gosrt v0.12.0
+	github.com/dustin/go-humanize v1.1.0
 	github.com/emiago/sipgo v1.6.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/getkin/kin-openapi v0.149.0
