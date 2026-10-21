@@ -33,13 +33,12 @@ var (
 // Server is an L4 server object.
 type Server struct {
 	server.Base
-	rt      *objruntime.Runtime
-	log     logging.LeveledLogger
-	idle    time.Duration
-	quota   *turnsrv.Quota
-	gate    turn.QuotaHandler
-	events  EventHandler
-	offload *OffloadHandler
+	rt     *objruntime.Runtime
+	log    logging.LeveledLogger
+	idle   time.Duration
+	quota  *turnsrv.Quota
+	gate   turn.QuotaHandler
+	events EventHandler
 
 	mu          sync.RWMutex
 	auth        string              // the policy whose realm scopes the quota of the flows
@@ -60,13 +59,12 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	// the quota machinery is shared with the TURN server
 	q := turnsrv.NewQuotaHandler(rt)
 	s := &Server{
-		rt:      rt,
-		log:     log,
-		idle:    FlowTimeout,
-		quota:   q,
-		gate:    q.QuotaHandler(),
-		events:  NewEventHandler(rt, log, q),
-		offload: NewOffloadHandler(rt, log),
+		rt:     rt,
+		log:    log,
+		idle:   FlowTimeout,
+		quota:  q,
+		gate:   q.QuotaHandler(),
+		events: NewEventHandler(rt, log, q),
 	}
 	s.Init(conf)
 	if err := s.Reconcile(conf); err != nil {
@@ -210,13 +208,6 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		return nil, err
 	}
 
-	tunnel := stnrv2.ProtocolUnknown
-	if conf := s.rt.ClusterConfig(cluster); conf != nil && conf.Tunnel != nil {
-		if u, err := stnrv2.ParseURI(conf.Tunnel.URL); err == nil {
-			tunnel = u.Protocol
-		}
-	}
-
 	f := &Flow{Entry: flow.Entry{Client: client, Leg: leg}}
 	f.Event = FlowEvent{
 		SrcAddr:      client.RemoteAddr(),
@@ -225,25 +216,15 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		Peer:         leg.RemoteAddr(),
 		PeerProtocol: leg.Tag().Proto,
 		Cluster:      cluster,
-		Tunnel:       tunnel,
 		Username:     user,
 		Realm:        realm,
 	}
-	// a leg reports its own wire: a direct leg leaves from its socket towards the peer, a leg
-	// through an upstream TURN server from the session's transport socket towards the server
-	f.Event.RelayAddr, f.Event.ServerAddr = leg.TransportAddrs()
-	if f.Event.Tunnel == stnrv2.ProtocolUnknown {
-		f.Event.ServerAddr = nil
-	}
-
 	f.Hooks = flow.EntryHooks{
-		Active: func() (bool, bool) { return s.offload.Active(f) },
 		OnError: func(msg string) {
 			s.events.OnFlowError(client.RemoteAddr(), f.Event.Protocol, msg)
 		},
 		OnClose: func(reason string) {
 			s.log.Debugf("closing flow from client %s: %s", client.RemoteAddr().String(), reason)
-			s.offload.Remove(f)
 			s.events.OnFlowDeleted(f.Event)
 		},
 	}
@@ -256,6 +237,11 @@ func (s *Server) newFlow(client api.Conn) (*Flow, error) {
 		return nil, net.ErrClosed
 	}
 	s.events.OnFlowCreated(f.Event)
-	s.offload.Upsert(f)
+	// a tunnelled leg binds its channel after the first write: the offload waits for it
+	go func() {
+		if err := f.Offload(s.rt.OffloadEngine); err != nil && !errors.Is(err, net.ErrClosed) {
+			s.log.Debugf("flow from client %s stays in user space: %s", client.RemoteAddr(), err)
+		}
+	}()
 	return f, nil
 }

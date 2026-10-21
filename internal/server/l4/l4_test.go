@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/l7mp/stunner/v2/internal/object"
+	"github.com/l7mp/stunner/v2/internal/offload"
 	quotapkg "github.com/l7mp/stunner/v2/internal/quota"
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
@@ -58,6 +59,7 @@ type setup struct {
 	proto     string
 	endpoints []string
 	quota     objruntime.QuotaHandler
+	engine    offload.Engine
 }
 
 type testServer struct {
@@ -77,7 +79,8 @@ func newTestServer(t *testing.T, c setup) *testServer {
 	nw, err := stdnet.NewNet()
 	require.NoError(t, err)
 	rt := objruntime.New(objruntime.Config{Logger: log, Telemetry: tm, Net: nw,
-		QuotaHandler: c.quota, Resolver: resolver.NewMockResolver(map[string][]string{}, log)})
+		QuotaHandler: c.quota, Resolver: resolver.NewMockResolver(map[string][]string{}, log),
+		OffloadEngine: c.engine})
 	if rt.QuotaHandler == nil {
 		rt.QuotaHandler = quotapkg.New()
 	}

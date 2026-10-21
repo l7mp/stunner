@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"net"
 	"net/netip"
@@ -9,6 +11,8 @@ import (
 	"time"
 
 	"github.com/l7mp/stunner/v2/internal/api"
+	"github.com/l7mp/stunner/v2/internal/offload"
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // Conntrack tracks the client conns of a server, keyed by their 5-tuple, each with an idle timer.
@@ -46,20 +50,20 @@ func addrPort(a net.Addr) netip.AddrPort {
 
 // EntryHooks are a server's callbacks on one entry.
 type EntryHooks struct {
-	// Active reports, on an idle check, whether the entry moved traffic outside the
-	// forwarder (the kernel offload); known is false when nobody knows.
-	Active func() (moved, known bool)
 	// OnError is called by the forwarder on a failed write, before the entry closes.
 	OnError func(msg string)
 	// OnClose is called once, when the entry closes, before its conns close.
 	OnClose func(reason string)
 }
 
-// Entry is a tracked client conn and, when forwarded, its leg.
+// Entry is a tracked client conn and, when forwarded or offloaded, its leg.
 type Entry struct {
 	Client api.Conn
-	Leg    api.Conn // nil for a conn a server hands on, like TURN
-	Hooks  EntryHooks
+	// Leg is the conn the client conn is relayed to: set before Add for a forwarded entry, by
+	// SetLeg later for an entry the server relays itself; nil for a conn a server hands on, like
+	// TURN.
+	Leg   api.Conn
+	Hooks EntryHooks
 
 	key       AddrPair
 	t         *Conntrack
@@ -68,6 +72,24 @@ type Entry struct {
 	last      atomic.Int64 // UnixNano of the last activity
 	timer     *time.Timer
 	closeOnce sync.Once
+
+	offMu sync.Mutex // guards a leg set by SetLeg, and the offload
+	off   *offloaded // the kernel offload of the entry, nil if not offloaded
+}
+
+// SetLeg sets the leg of an entry the server relays itself, so that it can be offloaded.
+func (e *Entry) SetLeg(leg api.Conn) {
+	e.offMu.Lock()
+	e.Leg = leg
+	e.offMu.Unlock()
+}
+
+// offloaded is an entry handed to the kernel offload engine: its two sides as registered, and the
+// engine's packet counter as of the last idle check.
+type offloaded struct {
+	engine offload.Engine
+	a, b   offload.Connection
+	pkts   uint64
 }
 
 // Add tracks an entry under its client's key and arms its idle timer, replacing a stale entry of
@@ -152,12 +174,19 @@ func (e *Entry) Close(reason string) {
 	e.closeOnce.Do(func() {
 		e.timer.Stop()
 		e.closed.Store(true)
+		e.offMu.Lock()
+		if o := e.off; o != nil {
+			e.off = nil
+			_ = o.engine.Remove(o.a, o.b)
+		}
+		leg := e.Leg
+		e.offMu.Unlock()
 		if e.Hooks.OnClose != nil {
 			e.Hooks.OnClose(reason)
 		}
 		_ = e.Client.Close()
-		if e.Leg != nil {
-			_ = e.Leg.Close()
+		if leg != nil {
+			_ = leg.Close()
 		}
 		e.t.mu.Lock()
 		if e.t.entries[e.key] == e {
@@ -173,17 +202,86 @@ func (e *Entry) checkIdle() {
 	if e.disarmed.Load() {
 		return
 	}
-	elapsed := time.Duration(time.Now().UnixNano() - e.last.Load())
-	if elapsed < e.t.idle {
+	if elapsed := time.Since(e.LastActive()); elapsed < e.t.idle {
 		e.timer.Reset(e.t.idle - elapsed)
 		return
 	}
-	if e.Hooks.Active != nil {
-		if moved, known := e.Hooks.Active(); known && moved {
+	e.Close("idle timeout")
+}
+
+// LastActive returns the time of the entry's last activity, in user space or, for an offloaded
+// entry, in the kernel: the kernel's traffic since the last call counts as activity now.
+func (e *Entry) LastActive() time.Time {
+	e.offMu.Lock()
+	if o := e.off; o != nil {
+		if pkts, known := o.engine.Packets(o.a, o.b); known && pkts != o.pkts {
+			o.pkts = pkts
 			e.Touch()
-			e.timer.Reset(e.t.idle)
-			return
 		}
 	}
-	e.Close("idle timeout")
+	e.offMu.Unlock()
+	return time.Unix(0, e.last.Load())
+}
+
+// ErrNotOffloadable is the error of Offload on an entry the kernel cannot carry.
+var ErrNotOffloadable = errors.New("not offloadable")
+
+// OffloadBackoff and OffloadAttempts pace Offload on a leg tunnelled through TURN-UDP: the TURN
+// client assigns the channel towards the peer at the first write and binds it a round trip later.
+var (
+	OffloadBackoff  = 100 * time.Millisecond
+	OffloadAttempts = 5
+)
+
+// Offload hands the entry's datagrams to the kernel engine, both directions: a packet from the
+// client goes out on the leg's wire and back, the packets matching the punt rules excepted. It
+// takes a UDP client conn and a UDP or TURN-UDP leg, the latter once its channel towards the peer
+// is bound, which Offload waits for, so it may block for a few seconds. Anything else, and a
+// refusal of the engine (such as the offload limit), leaves the entry in user space. Offloading an
+// offloaded entry again replaces its offload, for a leg that changed. An offloaded entry's idle
+// check counts the kernel's traffic too, and closing the entry removes it from the engine.
+func (e *Entry) Offload(engine offload.Engine, punt ...offload.PuntRule) error {
+	e.offMu.Lock()
+	leg := e.Leg
+	e.offMu.Unlock()
+	if leg == nil || e.Client.Tag().Proto != stnrv2.ProtocolUDP ||
+		leg.Tag().Proto != stnrv2.ProtocolUDP && leg.Tag().Proto != stnrv2.ProtocolTURNUDP {
+		return fmt.Errorf("%w: not a UDP client conn relayed through a UDP or TURN-UDP leg",
+			ErrNotOffloadable)
+	}
+	cl, cr := e.Client.TransportAddrs()
+	ll, lr := leg.TransportAddrs()
+	var ch uint16
+	// a tunnelled leg's wire runs to the TURN server, framed by the channel towards the peer
+	if leg.Tag().Proto == stnrv2.ProtocolTURNUDP {
+		bound := false
+		for backoff, i := OffloadBackoff, 0; i < OffloadAttempts && !bound; backoff, i = backoff*2, i+1 {
+			time.Sleep(backoff)
+			if e.closed.Load() {
+				return net.ErrClosed
+			}
+			ch, bound = leg.Channel(leg.RemoteAddr())
+		}
+		if !bound {
+			return fmt.Errorf("%w: no channel bound towards the peer", ErrNotOffloadable)
+		}
+	}
+	o := &offloaded{engine: engine,
+		a: offload.Connection{RemoteAddr: cr, LocalAddr: cl, Protocol: offload.ProtocolUDP, Punt: punt},
+		b: offload.Connection{RemoteAddr: lr, LocalAddr: ll, Protocol: offload.ProtocolUDP,
+			ChannelID: uint32(ch), Punt: punt}}
+	e.offMu.Lock()
+	defer e.offMu.Unlock()
+	if e.closed.Load() {
+		return net.ErrClosed
+	}
+	if old := e.off; old != nil {
+		e.off = nil
+		_ = old.engine.Remove(old.a, old.b)
+	}
+	if err := engine.Upsert(o.a, o.b, e.Client.Tag().Name, leg.Tag().Name); err != nil {
+		return err
+	}
+	e.off = o
+	return nil
 }

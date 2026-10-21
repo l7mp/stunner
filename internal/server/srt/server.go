@@ -26,6 +26,7 @@ import (
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/flow"
+	"github.com/l7mp/stunner/v2/internal/offload"
 	objruntime "github.com/l7mp/stunner/v2/internal/runtime"
 	"github.com/l7mp/stunner/v2/internal/server"
 	"github.com/l7mp/stunner/v2/internal/server/balancer"
@@ -292,7 +293,20 @@ func (s *Server) splice(c api.Conn, conclusion []byte, hs *packet.CIFHandshake) 
 		return
 	}
 	s.log.Debugf("SRT flow from %s for stream %q relayed to %s", c.RemoteAddr(), resource, endpoint)
+	go func() {
+		if err := e.Offload(s.rt.OffloadEngine, puntRules...); err != nil && !errors.Is(err, net.ErrClosed) {
+			s.log.Debugf("SRT flow from %s stays in user space: %s", c.RemoteAddr(), err)
+		}
+	}()
 	flow.Forward(e)
+}
+
+// puntRules keep the handshakes and the shutdowns of an offloaded flow in user space: a repeated
+// conclusion needs the endpoint's cookie, a shutdown ends the flow. They match the first 16 bits of
+// a packet: the control flag and the control type, 0 for a handshake and 5 for a shutdown.
+var puntRules = []offload.PuntRule{
+	{Mask: 0xffff0000, Value: 0x80000000},
+	{Mask: 0xffff0000, Value: 0x80050000},
 }
 
 // handshakeEndpoint runs the caller's handshake with the endpoint: an induction made from the

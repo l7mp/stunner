@@ -98,3 +98,29 @@ func TestCallerConn(t *testing.T) {
 	_, err = c.Read(buf)
 	assert.ErrorIs(t, err, io.EOF, "and ends the stream")
 }
+
+// TestPuntRules pins the packets an offloaded flow keeps in user space: the handshakes and the
+// shutdowns, by their wire encoding, and nothing else.
+func TestPuntRules(t *testing.T) {
+	punted := func(p []byte) bool {
+		for _, r := range puntRules {
+			if r.Match(p) {
+				return true
+			}
+		}
+		return false
+	}
+	assert.True(t, punted(conclusion(t, "#!::r=a", 7)), "a conclusion")
+	assert.True(t, punted(control(packet.CTRLTYPE_SHUTDOWN)), "a shutdown")
+	for _, typ := range []packet.CtrlType{packet.CTRLTYPE_KEEPALIVE, packet.CTRLTYPE_ACK,
+		packet.CTRLTYPE_NAK, packet.CTRLTYPE_ACKACK} {
+		assert.False(t, punted(control(typ)), "control type %d", typ)
+	}
+	data := packet.NewPacket(nil)
+	defer data.Decommission()
+	data.Header().PacketSequenceNumber = data.Header().PacketSequenceNumber.Inc()
+	data.SetData([]byte("media"))
+	var b bytes.Buffer
+	require.NoError(t, data.Marshal(&b))
+	assert.False(t, punted(b.Bytes()), "a data packet")
+}

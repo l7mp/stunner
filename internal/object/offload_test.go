@@ -24,10 +24,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/l7mp/stunner/v2/internal/flow"
 	"github.com/l7mp/stunner/v2/internal/object"
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/runtime"
-	"github.com/l7mp/stunner/v2/internal/server/l4"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/utils/turnclient"
 )
@@ -94,17 +94,16 @@ func (e *recordingEngine) registered(listener string) []string {
 }
 
 // TestOffloadMatrix drives a session through every server type, cluster protocol and client
-// transport, and checks which ones are registered with the offload engine against the table of
-// docs/cmd/stunnerd.md. The engines accelerate exactly one leg shape, plaintext ChannelData on
-// one side and raw datagrams on the other, which leaves two mirror-image cases: a TURN server
-// relaying a plain UDP client through a plain UDP cluster, and an L4 server tunnelling a plain UDP
-// client through a TURN-UDP cluster.
+// transport, and checks which ones are registered with the offload engine. Only plaintext UDP on
+// both sides is offloaded: a TURN server relaying a plain UDP client through a direct UDP cluster
+// (ChannelData towards the client), and an L4 server relaying a plain UDP client through a direct
+// UDP cluster (raw both ways) or a TURN-UDP tunnel (ChannelData towards the upstream server).
 func TestOffloadMatrix(t *testing.T) {
 	// the L4 server learns the upstream channel asynchronously; a short backoff lets a rejected
 	// registration be told from a slow one without waiting out the real pacing
-	backoff := l4.ChannelPollBackoff
-	l4.ChannelPollBackoff = 5 * time.Millisecond
-	t.Cleanup(func() { l4.ChannelPollBackoff = backoff })
+	backoff := flow.OffloadBackoff
+	flow.OffloadBackoff = 5 * time.Millisecond
+	t.Cleanup(func() { flow.OffloadBackoff = backoff })
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -134,7 +133,7 @@ func TestOffloadMatrix(t *testing.T) {
 		{stnrv2.ServerTypeTURN, stnrv2.ProtocolTURNTCP, [4]bool{false, false, false, false}},
 		{stnrv2.ServerTypeTURN, stnrv2.ProtocolTURNTLS, [4]bool{false, false, false, false}},
 		{stnrv2.ServerTypeTURN, stnrv2.ProtocolTURNDTLS, [4]bool{false, false, false, false}},
-		{stnrv2.ServerTypeL4, stnrv2.ProtocolUDP, [4]bool{false, false, false, false}},
+		{stnrv2.ServerTypeL4, stnrv2.ProtocolUDP, [4]bool{true, false, false, false}},
 		{stnrv2.ServerTypeL4, stnrv2.ProtocolTCP, [4]bool{false, false, false, false}},
 		{stnrv2.ServerTypeL4, stnrv2.ProtocolTURNUDP, [4]bool{true, false, false, false}},
 		{stnrv2.ServerTypeL4, stnrv2.ProtocolTURNTCP, [4]bool{false, false, false, false}},
