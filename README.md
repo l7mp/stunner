@@ -114,11 +114,12 @@ authentication service, the Helm chart and the tools are all public on GitHub. T
 images and the `stunner/stunner` Helm chart are built by [l7mp.io](https://l7mp.io) from the same
 code, plus a few premium additions. Without a customer key you get the **free tier**: unlimited
 TURN Gateways and connections, a single SIP/RTP or SRT Gateway with at most 10 parallel
-calls/streams. The **member tier**, aimed at small and medium-scale operations, unlocks a number of
-premium features and 10x call limits: 3 SIP and SRT Gateways with 100 calls/streams each. The fully
-featured **enterprise tier**, optimized for large-scale deployments, adds unlimited Gateways, calls
-and streams and unlocks STUNner's industry-leading [Linux/eBPF TURN acceleration
-engine](/docs/PREMIUM_REFERENCE.md#turn-offload). See [here](https://l7mp.io/pricing) for
+sessions, and 10 flows per dataplane pod in STUNner's industry-leading [Linux/eBPF kernel
+offload engine](/docs/PREMIUM_REFERENCE.md#kernel-offload). The **member tier**, aimed at small
+and medium-scale operations, unlocks a number of premium features and 10x limits: 3 SIP and SRT
+Gateways with 100 sessions each and 100 offloaded flows per pod. The fully featured
+**enterprise tier**, optimized for large-scale deployments, has no limits on the Gateways, the
+calls, the streams and the offloaded flows. See [here](https://l7mp.io/pricing) for
 up-to-date info on how to purchase a license. Note that SIP/RTP and SRT are in beta and there is
 absolutely no support at any tier: use the beta features at your own risk.
 
@@ -182,9 +183,9 @@ VoIP, SRT for live video contribution, plain UDP and TCP for everything else.
 
 * **Carrier-grade performance.** Written in pure Go using the battle-tested
   [pion/webrtc](https://github.com/pion/webrtc) framework, even STUNner's open-source tier is
-  already extremely fast and scalable. But with STUNner's industry-leading [Linux/eBPF TURN
-  acceleration engine](/docs/PREMIUM_REFERENCE.md#turn-offload) enabled (available in the
-  enterprise tier), you can get up to 10 Gbps TURN/UDP performance per CPU core(!) at
+  already extremely fast and scalable. But with STUNner's industry-leading [Linux/eBPF kernel
+  offload engine](/docs/PREMIUM_REFERENCE.md#kernel-offload) enabled (on every tier, up to the
+  offload limit of the tier), you can get up to 10 Gbps TURN/UDP performance per CPU core(!) at
   microsecond-scale latency.
 
 ## Getting Started

@@ -12,6 +12,7 @@ clients themselves. This is the original STUNner use case, and the one every tut
 1. [A TURN Gateway](#a-turn-gateway)
 1. [Client configuration](#client-configuration)
 1. [Testing](#testing)
+1. [Kernel offload](#kernel-offload)
 
 ## Concepts
 
@@ -95,3 +96,11 @@ mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://stunner/u
 `mediactl` finds the public address and the credentials of the listener and a pod of the echo
 Service through your kubeconfig; see the [mediactl manual](cmd/mediactl.md) for plain addresses and
 more.
+
+## Kernel offload
+
+STUNner can relay the UDP channels of a TURN/UDP listener in the Linux kernel instead of in user
+space, up to the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits
+may change). The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane
+pods the capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload)
+reference.

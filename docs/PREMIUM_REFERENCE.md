@@ -10,7 +10,7 @@ STUNner's premium features are designed to help medium to large scale enterprise
 1. [Dual-stack TURN](#dual-stack-turn)
 1. [High-availability operator](#high-availability-operator)
 1. [Post-quantum TLS](#post-quantum-tls)
-1. [TURN offload](#turn-offload)
+1. [Kernel offload](#kernel-offload)
 
 ## User quota
 
@@ -191,19 +191,26 @@ Below is the set of steps to enable post-quantum TLS:
    ...
    ```
 
-## TURN offload
+## Kernel offload
 
-**Feature:** `TURNOffload`. **Availability:** only the enterprise tier.
+**Feature:** `KernelOffload`. **Availability:** every tier, up to the offload limit of the tier: 10 offloaded flows per dataplane pod on the free tier, 100 on the member tier, unlimited on the enterprise tier (see [here](https://l7mp.io/pricing); the limits may change). [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status) prints the limit of your tier (`offload=...`).
 
-User plane TURN message processing may be costly. To cut down CPU usage and latency, STUNner can offload TURN message processing to one of its Linux/eBPF-based kernel packet processing engines. The offload engines support TURN channel processing for UDP, and provide massive bandwidth, delay, and jitter performance boost and can cut down CPU usage by several orders of magnitude.  TURN acceleration is available in your tier if the `TURNOffload` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
+Relaying media in user space costs CPU and latency. STUNner can offload the relaying of UDP flows to its Linux/eBPF kernel packet processing engines, which provide a massive bandwidth, delay and jitter boost and can cut CPU usage by orders of magnitude. The engines relay:
 
-STUNner's eBPF offload requires Kubernetes nodes running Linux and elevated privilege access to interact with the eBPF/tc (`TC`) or eBPF/XDP (`XDP`) kernel framework. Both provide outstanding performance: `TC` is supported in most Kubernetes environments (e.g., public clouds), while `XDP` is faster but it is typically limited to bare metal clusters. For more info on the TURN offload implementation, see the [pion/turn PR](https://github.com/pion/turn/pull/360).
+- **TURN:** the UDP channels of a TURN/UDP listener relaying to a UDPRoute backend.
+- **L4:** a UDP flow relayed to a UDP backend, directly or through an upstream TURN/UDP server, as in the [tunnel mode](/docs/cmd/stunnerd.md#tunnel-mode).
+- **SRT:** the streams of an [SRT Gateway](SRT.md); the handshakes and the shutdowns stay in user space.
+- **SIP:** the RTP and RTCP media of the calls of a [SIP Gateway](SIP.md); RTCP stays in user space when only one of the parties multiplexes it with RTP.
 
-To use the TURN offload feature of STUNner, set the `spec.offloadEngine` in the `Dataplane` custom resource: `TC` means eBPF/TC, `XDP` is eBPF/XDP, `None` falls back to user-space TURN processing, and `Auto` will let STUNner to pick the best offload engine for your platform. You can also manually configure the network interfaces on which STUNner will enable TURN offload via the `spec.offloadInterfaces` in the `Dataplane` spec. This parameter assumes a list of network interface names and an empty list means to enable offload on all interfaces (this is the default). To use eBPF offload, you must also enable elevated rights in your STUNner pods. To achieve this, edit the `spec.containerSecurityContext` field and add the necessary `NET_ADMIN`, `SYS_ADMIN`, `SYS_MODULE` capabilities.
+One offloaded flow is one TURN channel or one L4, SRT or RTP flow; the limit counts the flows of a dataplane pod at a time, and a flow beyond the limit is relayed in user space as usual. STUN messages always stay in user space.
+
+STUNner's eBPF offload requires Kubernetes nodes running Linux and elevated privileges to load programs into the eBPF/tc (`TC`) or eBPF/XDP (`XDP`) kernel framework. `TC` is supported in most Kubernetes environments (e.g., public clouds), `XDP` is about three times faster but needs a network driver with native XDP support, typical on bare metal; where XDP cannot attach, STUNner falls back to `TC`.
+
+Kernel offload is opt-in: set `spec.offloadEngine` in the `Dataplane` custom resource: `TC` means eBPF/TC, `XDP` is eBPF/XDP, `Auto` lets STUNner pick the best engine for your platform, and `None` (the default) relays everything in user space. `spec.offloadInterfaces` lists the network interfaces to offload on, every interface if empty (the default). The dataplane pods also need the `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE` capabilities in `spec.containerSecurityContext`.
 
 ### Configuration
 
-The below will set the dataplane for all gateways using the `default` Dataplane to use the TURN offload on all available network interfaces and select the optimal offload mode.
+The below will set the dataplane for all gateways using the `default` Dataplane to use the kernel offload on all available network interfaces and select the optimal offload mode.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -241,7 +248,7 @@ stunnerd INFO: Starting stunnerd id "icetest/icetest-udp-gateway", STUNner versi
 ...
 offload INFO: TC init complete on interfaces: [lo eth0]
 ...
-stunner INFO: New dataplane status: ... admin:{...,license-info={tier=enterprise,unlocked-features=[TURNOffload,UserQuota,DaemonSet,STUNServer,RelayAddressDiscovery]...
+stunner INFO: New dataplane status: ... admin:{...,license-info={tier=enterprise,unlocked-features=[KernelOffload,UserQuota,DaemonSet,RelayAddressDiscovery,...]...
 ...
 offload INFO: Created TC offload udp:local:[::]:3478-remote:...:...-chan:16384->udp:local:....:...-remote:...:...-chan:0
 ...
@@ -256,10 +263,9 @@ You can also directly check the eBPF maps created by the offload engine on the h
 
 ### Limitations
 
-Effective TURN protocol offload requires some low-level tweaking of the underlying OS kernel. As such, some Kubernetes deployments may support only a limited TURN offload functionality, or even no TURN acceleration at all:
+Kernel offload requires some low-level tweaking of the underlying OS kernel. As such, some Kubernetes deployments may support only a limited offload, or none at all:
 
-- The offload engine relies on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
-- Loading the eBPF program requires elevated admin privileges that might be not available on arbitrary Kubernetes clusters. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
-- Offload applies only to a leg between a TURN client and a TURN server, where plaintext ChannelData arrives on one side and raw traffic leaves on the other: a client of a TURN/UDP listener relaying to a UDPRoute backend, and a UDP client of the [tunnel mode](/docs/cmd/stunnerd.md#tunnel-mode) tunnelling over TURN/UDP. TURN over TCP, TLS or DTLS, TCPRoute backends and TURN relay chaining stay in user space.
-- Currently TURN offload only supports UDP TURN channels. Implementing TURN/TCP acceleration and offloading TURN send indications are on the TODO list, reach out to us if you need these features.
-- TURN/XDP offload is disabled for host-local redirects (except the lo interface). Use the TURN/TC engine when host-local redirect is important, like accelerated symmetric ICE mode deployment.
+- The offload engines rely on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
+- Loading the eBPF programs requires elevated privileges that might not be available on every Kubernetes cluster. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
+- Only plaintext UDP over IPv4 is offloaded. TURN over TCP, TLS or DTLS, TCP and TLS backends, DTLS-secured clusters and tunnels, IPv6 and fragmented packets stay in user space, as do TURN send indications and TURN relay chaining.
+- XDP offload is disabled for host-local redirects (except the lo interface). Use the TC engine when host-local redirects are important, like in an accelerated symmetric ICE mode deployment.

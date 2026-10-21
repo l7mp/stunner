@@ -109,7 +109,7 @@ License status:
     Subscription type: member
     Enabled features: DaemonSet, STUNServer, ...
     Last updated: ...
-    Limits (Gateways/calls or streams): sip=3/100,srt=3/100
+    Limits: TURN: Gateways=unlimited: unlimited sessions, SIP: Gateways=3: 100 sessions, SRT: Gateways=3: 100 sessions, total offloads: 100
 ```
 
 This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license, and the limits of your subscription.

@@ -1,12 +1,12 @@
 # Introduction
 
-STUNner is *the Kubernetes real-time media gateway*. All words matter here: it is for *real-time
-media*, so it is specifically designed to deal with the intricacies of the STUN/TURN protocol for
-WebRTC services, SIP and RTP for Voice over IP, and SRT and RTSP for live video; it is a *media
-gateway* so its job is to ingest audio and video streams into a virtualized media plane; and it is *opinionated towards Kubernetes*,
-so everything around STUNner is designed and built to fit into the Kubernetes ecosystem. That being
-said, STUNner can easily be used outside of this context (e.g., as a regular STUN/TURN server), but
-this is not the main focus.
+STUNner is *the Kubernetes real-time media gateway*. All words matter here. First, it is for
+*real-time media*, so it is specifically designed to deal with the intricacies of the STUN/TURN
+protocol for WebRTC, SIP and RTP for Voice over IP, and SRT and RTSP for live video. Second, it is
+a *media gateway* so its job is to ingest audio and video streams into a virtualized media
+plane. And third, it is *opinionated towards Kubernetes*, so everything around STUNner is designed
+and built to fit into the Kubernetes ecosystem. That being said, STUNner can easily be used outside
+of this context (e.g., as a regular STUN/TURN server), but this is not the main focus.
 
 ## The problem
 
@@ -41,9 +41,10 @@ The current stance is that the only way to deploy a real-time media server into 
 exploit a [well-documented Kubernetes
 anti-pattern](https://kubernetes.io/docs/concepts/configuration/overview): *running the media
 server pods in the host network namespace* of Kubernetes nodes (using the `hostNetwork=true`
-setting in the pod's container template). This way the media server shares the network namespace of
-the host (i.e., the Kubernetes node) it is running on, inheriting the public address (if any) of
-the host and (hopefully) sidestepping the private pod network with the involved NATs.
+setting in the pod's container template) and *opening practically all transport ports of the node*
+for external access. This way the media server shares the network namespace of the host (i.e., the
+Kubernetes node) it is running on, inheriting the public address (if any) of the host and
+(hopefully) sidestepping the private pod network with the involved NATs.
 
 There are *lots* of reasons why this deployment model is less than ideal:
 

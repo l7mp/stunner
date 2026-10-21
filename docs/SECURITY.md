@@ -220,7 +220,7 @@ make sure only SIP trunks can place calls in the cluster:
   the source addresses in their SDP; anything else arriving at the media port is dropped.
 - **Keep the credentials in Secrets.** Registration credentials live in the Secret the
   registration's `authRef` names, in the namespace of the SIPTrunk.
-- **Cap the calls.** Every tier caps the parallel calls per SIP Gateway (10 free, 100 member), and
+- **Cap the sessions.** Every tier caps the parallel sessions per SIP Gateway (10 free, 100 member), and
   a GatewayConfig `userQuota` below the cap lowers it: the cap also bounds what a misconfigured
   trunk can cost.
 

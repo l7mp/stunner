@@ -5,7 +5,7 @@
 > Please test and report issues, but in any way, use it at your own risk.
 
 The SRT gateway is a beta feature: its API may change in any release, it comes with no support on
-any tier, and the number of SRT Gateways and parallel streams depends on the tier (see
+any tier, and the number of SRT Gateways and parallel sessions depends on the tier (see
 [Limitations](#limitations)). Within these limits, STUNner ingests
 [SRT](https://github.com/Haivision/srt) streams into Kubernetes: encoders, drones and cameras
 publish their streams to one public UDP port, decoders and players read them from the same port, and
@@ -18,6 +18,7 @@ Services.
 1. [Concepts](#concepts)
 1. [Streaming with MediaMTX](#streaming-with-mediamtx)
 1. [Testing](#testing)
+1. [Kernel offload](#kernel-offload)
 1. [Limitations](#limitations)
 
 ## Concepts
@@ -50,10 +51,10 @@ reference](GATEWAY.md#srt-gateways).
 
 The encryption is end to end: STUNner never sees the passphrase, the media server checks it. A
 stream ID that names no stream (`#!::m=publish`), a stream with no backend, and a stream over the
-tier's limit of parallel streams are rejected in the handshake, so the caller sees a clean refusal, not
-a timeout. A stream ID outside the `#!::` syntax names the stream with the whole string, so use the
-`#!::` syntax with media servers that take several syntaxes: MediaMTX's own `publish:live/van7` and
-`read:live/van7` name two different streams for STUNner.
+tier's limit of parallel sessions are rejected in the handshake, so the caller sees a clean
+refusal, not a timeout. A stream ID outside the `#!::` syntax names the stream with the whole
+string, so use the `#!::` syntax with media servers that take several syntaxes: MediaMTX's own
+`publish:live/van7` and `read:live/van7` name two different streams for STUNner.
 
 ## Streaming with MediaMTX
 
@@ -161,11 +162,19 @@ MediaMTX and stream packets through the Gateway with `mediactl srt publish
 k8s://streaming/srt-gateway live/test` and `mediactl srt read k8s://streaming/srt-gateway live/test`:
 `mediactl` finds the Gateway's public address through your kubeconfig, and measures the loss.
 
+## Kernel offload
+
+STUNner can relay the streams of an SRT Gateway in the Linux kernel instead of in user space, up to
+the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits may change).
+The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane pods the
+capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload) reference. The
+handshakes and the shutdowns of a stream stay in user space.
+
 ## Limitations
 
-- The free tier serves one SRT Gateway with at most 10 parallel streams, the member tier three
-  with at most 100 each, the enterprise tier any number. When the GatewayConfig sets a
-  `userQuota`, the lower of the two caps the streams.
+- The free tier serves one SRT Gateway with at most 10 parallel sessions (streams), the member
+  tier three with at most 100 each, the enterprise tier any number. When the GatewayConfig sets a
+  `userQuota`, the lower of the two caps the sessions.
 - One dataplane replica per Gateway: the placement of the streams is kept per dataplane pod.
 - Callers only: STUNner takes the connections of SRT callers, it does not call SRT listeners
   (pulling an encoder in listener mode) and does not take rendezvous connections.

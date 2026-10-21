@@ -1,11 +1,12 @@
 # Authentication
 
-STUNner authentication depends on whether it is used as a TURN/STUN server for WebRTC or a SIP/RTP proxy for VoIP.
+STUNner authentication depends on whether it is used as a TURN/STUN server for WebRTC, a SIP/RTP proxy for VoIP or an SRT gateway for live streaming.
 
 ## Table of Contents
 
 1. [TURN authentication](#turn-authentication)
 1. [SIP authentication](#sip-authentication)
+1. [SRT authentication](#srt-authentication)
 
 ## TURN authentication
 
@@ -205,3 +206,42 @@ SIP server behind STUNner (for instance the credentials of a [LiveKit SIP inboun
 trunk](https://docs.livekit.io/sip/trunk-inbound)): STUNner passes the challenge and the answer
 through unchanged.
 
+## SRT authentication
+
+> [!WARNING]
+> The SRT gateway is in beta: the API may change in any release and there is no support on any tier.
+> Please test and report issues, but in any way, use it at your own risk.
+
+STUNner does not authenticate SRT callers itself: it relays the handshake to the media server
+behind it unchanged, and the media server admits or rejects the caller, its rejection reaching
+the caller as is. The media server can authenticate a caller two ways:
+- **By passphrase.** SRT encrypts a stream end to end with a key derived from a passphrase the
+  caller and the media server share (10 to 79 characters): a caller without the right passphrase
+  fails the handshake. STUNner never sees the passphrase or the key. A media server may take
+  different passphrases for publishers and readers.
+- **By the stream ID.** The `#!::` access control syntax of the stream ID carries the user
+  (`u=`) and other keys next to the stream (`r=`). STUNner reads only `r=` to place the stream
+  and passes the whole stream ID to the media server, which may authenticate the caller by it.
+  Keep to the `#!::` syntax: STUNner places a stream ID outside it by the whole string, user
+  included.
+
+Below is an example for [MediaMTX](https://github.com/bluenviron/mediamtx) with one passphrase for
+the publishers and another one for the readers of every stream (the environment of the MediaMTX
+container of the [SRT tutorial](SRT.md#streaming-with-mediamtx)), and a publisher that knows the
+publishers' passphrase:
+
+```yaml
+          env:
+            - name: MTX_PATHDEFAULTS_SRTPUBLISHPASSPHRASE
+              value: "<publisher-passphrase>"
+            - name: MTX_PATHDEFAULTS_SRTREADPASSPHRASE
+              value: "<reader-passphrase>"
+```
+
+```console
+ffmpeg -re -f lavfi -i testsrc=size=1280x720:rate=30 -c:v libx264 -preset veryfast -f mpegts \
+    "srt://${SRT_IP}:9000?streamid=#!::r=live/test,m=publish&passphrase=<publisher-passphrase>"
+```
+
+A reader with the publishers' passphrase, or with none, is rejected by MediaMTX: only
+`passphrase=<reader-passphrase>` reads the stream.

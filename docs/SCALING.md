@@ -8,7 +8,10 @@ Further factors to autoscale your WebRTC workload are:
 
 Autoscaling a production service, especially one as sensitive to latency and performance as WebRTC, can be challenging. This guide will provide the basics on autoscaling; see the [official docs](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) for more detail.
 
-Note that SIP Gateways cannot be scaled beyond a single dataplane pod at the moment. Please file a whislist issue if you critically depend on SIP/RTP server scaling.
+> [!WARNING]
+> SIP/RTP and SRT gateways cannot be scaled beyond a single Gateway and a single dataplane pod at
+> the moment. Please file a wishlist issue if you critically depend on SIP/RTP and SRT server
+> scaling.
 
 ## Horizontal scaling
 

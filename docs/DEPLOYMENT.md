@@ -23,7 +23,9 @@ traffic into a media server pool deployed *behind* STUNner.
 In the *headless deployment model* STUNner acts as a simple scalable STUN/TURN server that can be
 used for real-time media clients and servers as a NAT traversal facility for establishing media
 connections between themselves. This is not that much different from a standard public STUN/TURN
-server setup, but in this case the STUN/TURN servers are deployed into Kubernetes.
+server setup, but in this case the STUN/TURN servers are deployed into Kubernetes. This is useful
+mostly only for WebRTC: SIP/VoIP and SRT/RTSP live streaming generally do not use the TURN
+protocol.
 
 ![STUNner headless deployment architecture](img/stunner_standalone_arch.svg)
 
@@ -37,8 +39,8 @@ server setup, but in this case the STUN/TURN servers are deployed into Kubernete
 
 In the fully fledged *media-plane deployment model*, STUNner implements an ingress gateway service
 that real-time media clients can use to open a relay connection to the media servers running
-*inside* the Kubernetes cluster. This makes it possible to deploy WebRTC and SIP/VoIP services into
-ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
+*inside* the Kubernetes cluster. This makes it possible to deploy WebRTC, SIP/VoIP and SRT services
+into ordinary Kubernetes pods, taking advantage of Kubernetes's excellent tooling to manage, scale,
 monitor and troubleshoot media services like any other cloud-bound workload.
 
 ![STUNner media-plane deployment architecture](img/stunner_arch.svg)
@@ -136,16 +138,17 @@ you from adopting STUNner.
 > The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
 > Please test and report issues, but in any way, use it at your own risk.
 
-A SIP trunk connects a carrier, owning the phone numbers and the connection to the public phone
-network, to your Kubernetes-bound SIP server pool. STUNner sits between the two as a gateway: it
-proxies the SIP signaling to the SIP servers running in the cluster and relays RTP media between
-the carrier and the SIP servers. This allows SIP/RTP servers to run without a public address and a
-public RTP port range. STUNner supports two kinds of carrier trunks.
+SIP trunks handle the connection to the public phone network and route phone numbers, and STUNner
+lets you connect the SIP carrier to your Kubernetes-bound SIP server pool. STUNner sits between the
+trunk and the in-cluster SIP server pool as a gateway: it proxies the SIP signaling to the SIP
+servers running in the cluster and relays RTP media between the carrier and the SIP servers. This
+allows SIP/RTP servers to run without a public address and a public RTP port range. STUNner
+supports two kinds of carrier trunks.
 
-In both models the carrier sends the media of a call to the public media port of the Gateway, and
-STUNner matches packets to calls by the source IP address. This requires a load balancer that
-preserves the carriers' source addresses: most Kubernetes load-balancer integrations provide
-excellent support for this mode (`externalTrafficPolicy: Local` on the Gateway's Service).
+In both models the carrier sends the RTP media to the public media port of the Gateway, and STUNner
+matches packets to calls by the source IP address. This requires a load balancer that preserves the
+carriers' source addresses: most Kubernetes load-balancer integrations provide excellent support
+for this mode (`externalTrafficPolicy: Local` on the Gateway's Service).
 
 ### IP-authenticated SIP trunk
 
@@ -190,9 +193,10 @@ guide](SRT.md).
 > is no support on any tier, and only RTSP interleaved over TCP is supported. Please test and report
 > issues, but in any way, use it at your own risk.
 
-IP cameras are RTSP servers that answer whoever pulls them, so a restreamer in the cluster (e.g.,
-MediaMTX) pulls every camera over its own outgoing connection, and the viewers watch what the
-restreamer re-serves: browsers over WebRTC with STUNner as the TURN server, RTSP clients over a
-plain TCP listener of STUNner. See the [RTSP streaming guide](RTSP.md).
+IP cameras generally act as RTSP servers that can be connected to get the live video feed. In order
+for multiple viewers to watch the same feed, typically a Kubernetes-based streamer (e.g., MediaMTX)
+pulls the camera and serves the feed to viewers over WebRTC. With STUNner, RTSP clients are run
+over a plain TCP listener and the viewers connect via a STUNner TURN listener. See the [RTSP
+streaming guide](RTSP.md).
 
 ![STUNner RTSP deployment model](img/stunner_rtsp.svg)

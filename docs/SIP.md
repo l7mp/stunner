@@ -5,11 +5,16 @@
 > Please test and report issues, but in any way, use it at your own risk.
 
 The SIP gateway is a beta feature: its API may change in any release, it comes with no support on
-any tier, and the number of SIP Gateways and parallel calls depends on the tier (see
-[Limitations](#limitations)). Within these limits, STUNner ingests SIP trunks into Kubernetes:
-carriers send SIP and RTP to one public address, STUNner proxies the SIP signaling to an in-cluster
-SIP backend (e.g., [LiveKit SIP](https://docs.livekit.io/sip/)) and relays the media of every call
-between the carrier and the in-cluster media peers, with no host networking and no per-pod Services.
+any tier, and the number of SIP Gateways and parallel sessions depends on the tier (see
+[Limitations](#limitations)). Within these limits, 
+
+The SIP/RTP gateway is the VoIP leg of STUNner: it lets you ingest SIP/RTP traffic from a SIP trunk
+into Kubernetes.  Carriers send SIP signaling and RTP media to STUNner's public address and it
+proxies the SIP signaling to an in-cluster SIP backend (e.g., [LiveKit
+SIP](https://docs.livekit.io/sip/)) and relays the media of every call between the carrier and the
+in-cluster media peers. No host networking and no zillions of open UDP ports.
+
+The [SIP echo tutorial](examples/sip-echo/README.md) shows the whole path with a simple SIP phone.
 
 ## Table of Contents
 
@@ -17,13 +22,15 @@ between the carrier and the in-cluster media peers, with no host networking and 
 1. [IP-authenticated trunks](#ip-authenticated-trunks)
 1. [Registration-based trunks](#registration-based-trunks)
 1. [Separate SIP and media servers](#separate-sip-and-media-servers)
+1. [Kernel offload](#kernel-offload)
 1. [Limitations](#limitations)
 
 ## Concepts
 
-A SIP gateway is a plain Gateway whose `spec.infrastructure.parametersRef` names a `SIPTrunk` in
-the namespace of the Gateway. The SIPTrunk names the listener of the Gateway that carries the media
-and tells how the carriers connect. STUNner supports the two common trunk models:
+A SIP gateway is a plain Gateway whose `spec.infrastructure.parametersRef` names a
+[`SIPTrunk`](GATEWAY.md#siptrunk) in the namespace of the Gateway. The SIPTrunk specifies the
+details for connecting to the SIP trunk and names the listener of the Gateway that carries the
+media. STUNner supports the two common trunk models:
 
 - *IP-authenticated trunks*: the carriers send SIP to the Gateway from known address ranges, as
   Twilio Elastic SIP Trunking, Telnyx IP connections or DIDWW do;
@@ -31,34 +38,35 @@ and tells how the carriers connect. STUNner supports the two common trunk models
   takes the inbound calls over the same connection, as the SIP accounts of most SMB and ISP
   carriers work.
 
-The [deployment models](DEPLOYMENT.md#sip-deployment-models) show both, the
-[reference](GATEWAY.md#siptrunk) lists every SIPTrunk field, and the [SIP echo
-tutorial](examples/sip-echo/README.md) tries the whole path with a SIP phone.
+A Gateway whose `parametersRef` names a missing or malformed SIPTrunk, or a kind the operator does
+not support, is not accepted and gets no dataplane. Note that depending on your license tier you
+may have access to only a limited number of SIP Gatteways, see the defails
+[here](https://l7mp.io/pricing). When you deploy more SIP Gateways than your tier allows, the
+oldest ones are served and the the rest are rejected.
 
-Every listener of the Gateway other than the media listener is a SIP listener. The listener
-protocols are plain transports: `UDP`, `TCP` or `TLS` for SIP, `UDP` for the media. The media
-listener is a single UDP port carrying the RTP and RTCP of every call.
+SIP/RTP gateways typically have two types of listeners: a single `UDP` *media listener* carrying
+the RTP and RTCP of every call, and any number of additional *SIP listeners* (typically `UDP`,
+`TCP` or `TLS`). The media listener is identified in the SIPTrunk spec as `mediaListener`.
 
-UDPRoutes attach to the listeners of a SIP Gateway as to any Gateway: a UDPRoute on a SIP listener
-is the SIP next hop (STUNner proxies the calls to the backend pods at the backend port, round robin),
-a UDPRoute on the media listener lists the media peers (the pods STUNner relays the media to). A
-UDPRoute with no `sectionName` attaches to every listener, so a single route serves both roles when
-the SIP backend also terminates the media, as LiveKit SIP does. A SIP server with a media server of
-its own, like Kamailio with rtpengine, takes a route on each (see the [deployment
-models](DEPLOYMENT.md#separate-sip-and-media-servers)); a backend with a `port` and an `endPort`
-restricts the media peers to that port range.
+UDPRoutes attach to the listeners of a SIP Gateway as to any Gateway. A UDPRoute that attaches to a
+SIP listener (by using the `sectionName` of the SIP listener) is considered as a SIP next hop:
+STUNner will proxy the calls to the backend pods at the backend port with round robin). Likewise, a
+UDPRoute attaching to the media listener (again, by using the `sectionName` of the SIP listener)
+lists the media peers (the pods STUNner relays the media to). This is the useful model when you
+have a separate SIP server pool and media server pool (e.g., Kamailio with rtpengine). In this
+case, the SIP servers and the media servers need 2 UDPRoutes, both with specific `sectionNames`
+(see [Separate SIP and media servers](#separate-sip-and-media-servers)). In contrast, a
+UDPRoute with no `sectionName` attaches to *every* listener, so a single route can serve both
+roles. This is useful when the SIP backend also terminates media (e.g., LiveKit SIP). Note also
+that a backend with a `port` and an `endPort` restricts the media peers to that port range.
 
 Carriers match the media of a call by the exact source address of the media they receive, so the
 Gateway's load balancer must preserve the client source address: the
 `stunner.l7mp.io/external-traffic-policy: local` annotation sets the Service's
-`externalTrafficPolicy` to `Local` (see [load balancer configuration](GATEWAY.md#load-balancer-configuration)).
-A load balancer that rewrites the source address (e.g., a full proxy) breaks the media of every
-call.
+`externalTrafficPolicy` to `Local` (see [load balancer
+configuration](GATEWAY.md#load-balancer-configuration)).  A load balancer that rewrites the source
+address (e.g., a full proxy) breaks the media of every call.
 
-A Gateway whose `parametersRef` names a missing or malformed SIPTrunk, or a kind the operator does
-not support, is not accepted and gets no dataplane. Of more SIP Gateways than the tier serves, the
-oldest ones by creation time are served, the others are not accepted, with the reason in their
-status.
 
 ## IP-authenticated trunks
 
@@ -214,11 +222,20 @@ spec:
 The `port` of a backend is the SIP port STUNner dials; a `port` with an `endPort` restricts the
 media peers to that range, here rtpengine's media port range.
 
+## Kernel offload
+
+STUNner can relay the RTP and RTCP media of the calls in the Linux kernel instead of in user space,
+up to the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits may
+change). The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane pods
+the capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload) reference.
+The SIP signaling stays in user space, and so does RTCP when only one of the parties multiplexes it
+with RTP.
+
 ## Limitations
 
-- The free tier serves one SIP Gateway with at most 10 parallel calls, the member tier three with
-  at most 100 each, the enterprise tier any number. When the GatewayConfig sets a `userQuota`, the
-  lower of the two caps the calls. One dataplane replica per Gateway.
+- The free tier serves one SIP Gateway with at most 10 parallel sessions (calls), the member tier
+  three with at most 100 each, the enterprise tier any number. When the GatewayConfig sets a
+  `userQuota`, the lower of the two caps the sessions. One dataplane replica per Gateway.
 - A lost registration connection ends the calls over it; STUNner dials and registers again.
 - No outbound calls.
 - The media of a carrier is matched by the address in its SDP: carriers behind a NAT that rewrites
