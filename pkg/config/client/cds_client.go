@@ -53,10 +53,5 @@ func (p *CDSClient) Load() (*stnrv2.StunnerConfig, error) {
 		return nil, fmt.Errorf("expected exactly one config, got %d", len(configs))
 	}
 
-	c := configs[0]
-	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
-	}
-
-	return c, nil
+	return configs[0], nil
 }

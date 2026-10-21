@@ -9,15 +9,6 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// decodeConfig decodes a config served by the CDS server, of either version.
-func decodeConfig(r []byte) ([]*stnrv2.StunnerConfig, error) {
-	c, err := ParseConfig(r)
-	if err != nil {
-		return nil, err
-	}
-	return []*stnrv2.StunnerConfig{c}, nil
-}
-
 // decodeConfigList decodes a config list served by the CDS server, each item of either version.
 func decodeConfigList(r []byte) ([]*stnrv2.StunnerConfig, error) {
 	l := ConfigList{}

@@ -132,22 +132,46 @@ func (s *Stunner) GetConfig() *stnrv2.StunnerConfig {
 	return &stnrv2.StunnerConfig{ApiVersion: s.version}
 }
 
-// LoadConfig loads a configuration from an origin. This is a shim wrapper around configclient.Load.
+// LoadConfig loads a configuration from an origin, with the environment of this process
+// substituted into it.
 func (s *Stunner) LoadConfig(origin string) (*stnrv2.StunnerConfig, error) {
-	client, err := client.New(origin, s.name, s.cdsLabels, s.logger)
+	cl, err := client.New(origin, s.name, s.cdsLabels, s.logger)
 	if err != nil {
 		return nil, err
 	}
-
-	return client.Load()
+	c, err := cl.Load()
+	if err != nil {
+		return nil, err
+	}
+	return client.Substitute(c)
 }
 
-// WatchConfig watches a configuration from an origin. This is a shim wrapper around configclient.Watch.
+// WatchConfig watches a configuration from an origin, with the environment of this process
+// substituted into every update.
 func (s *Stunner) WatchConfig(ctx context.Context, origin string, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
-	client, err := client.New(origin, s.name, s.cdsLabels, s.logger)
+	cl, err := client.New(origin, s.name, s.cdsLabels, s.logger)
 	if err != nil {
 		return err
 	}
-
-	return client.Watch(ctx, ch, suppressDelete)
+	in := make(chan *stnrv2.StunnerConfig)
+	go func() {
+		for {
+			select {
+			case c := <-in:
+				sc, err := client.Substitute(c)
+				if err != nil {
+					s.log.Warnf("ignoring config update: %s", err.Error())
+					continue
+				}
+				select {
+				case ch <- sc:
+				case <-ctx.Done():
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return cl.Watch(ctx, in, suppressDelete)
 }

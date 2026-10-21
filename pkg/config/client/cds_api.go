@@ -241,7 +241,11 @@ func (a *ConfigNamespaceNameAPI) Get(ctx context.Context) ([]*stnrv2.StunnerConf
 			r.HTTPResponse.Status, body)
 	}
 
-	return decodeConfig(r.Body)
+	c, err := ParseConfig(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	return []*stnrv2.StunnerConfig{c}, nil
 }
 
 func (a *ConfigNamespaceNameAPI) Watch(ctx context.Context, ch chan<- *stnrv2.StunnerConfig, suppressDelete bool) error {
@@ -378,11 +382,6 @@ func poll(ctx context.Context, a CdsApi, ch chan<- *stnrv2.StunnerConfig, suppre
 			if err != nil {
 				// assume it is a YAML/JSON syntax error: report and ignore
 				a.Warnf("could not parse config: %s", err.Error())
-				continue
-			}
-
-			if err := c.Validate(); err != nil {
-				a.Warnf("invalid config: %s", err.Error())
 				continue
 			}
 

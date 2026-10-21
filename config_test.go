@@ -30,11 +30,13 @@ import (
 // var testerLogLevel = zapcore.DebugLevel
 var testerLogLevel = zapcore.ErrorLevel
 
+// mustReadConfig reads the next config of a watch and validates it, as the reconciler would.
 func mustReadConfig(t *testing.T, ch <-chan *stnrv2.StunnerConfig, timeout time.Duration) *stnrv2.StunnerConfig {
 	t.Helper()
 
 	select {
 	case c := <-ch:
+		require.NoError(t, c.Validate(), "validate config update")
 		return c
 	case <-time.After(timeout):
 		t.Fatalf("timeout while waiting for config update")
@@ -161,7 +163,7 @@ func TestStunnerConfigFileRoundTrip(t *testing.T) {
 // TestStunnerConfigFileWatcher tests the config file watcher
 // - init watcher with nonexistent config file
 // - write the default config to the config file and check
-// - write a wrong config file: we should not receive anything
+// - write a wrong config file: it arrives and does not validate
 // - update the config file and check
 func TestStunnerConfigFileWatcher(t *testing.T) {
 	lim := test.TimeOut(time.Second * 10)
@@ -226,7 +228,7 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	c2 := mustReadConfig(t, conf, 2*cdsclient.RetryPeriod)
 	checkDefaultConfig(t, c2, "UDP")
 
-	log.Debug("write a wrong config file: WatchConfig validates")
+	log.Debug("write a wrong config file: the reconciler rejects it, the watch goes on")
 
 	c2.Listeners[0].Protocol = "dummy"
 	y, err = yaml.Marshal(c2)
@@ -241,8 +243,12 @@ func TestStunnerConfigFileWatcher(t *testing.T) {
 	// this makes sure that we do not share anything with ConfigWatch
 	c2.Listeners[0].PublicAddr = "AAAAAAAAAAAAAa"
 
-	// wrong config file must not trigger an update, nor stop the watch.
-	mustNotReadConfig(t, conf, 50*time.Millisecond)
+	select {
+	case wrong := <-conf:
+		assert.Error(t, wrong.Validate(), "wrong config must not validate")
+	case <-time.After(2 * cdsclient.RetryPeriod):
+		t.Fatalf("timeout while waiting for the wrong config")
+	}
 
 	log.Debug("update the config file and check")
 	c2.Listeners[0].Protocol = "TCP"
@@ -559,7 +565,7 @@ func TestStunnerConfigPatcher(t *testing.T) {
 	}
 }
 
-// make sure credentials are excempt from env-substitution in ParseConfig
+// make sure credentials are exempt from env-substitution
 func TestCredentialParser(t *testing.T) {
 	lim := test.TimeOut(time.Second * 30)
 	defer lim.Stop()
@@ -569,6 +575,10 @@ func TestCredentialParser(t *testing.T) {
 
 	loggerFactory := logger.NewLoggerFactory(stunnerTestLoglevel)
 	log := loggerFactory.NewLogger("test")
+
+	for _, v := range []string{"user", "pass", "secret", "ss", "ret", "er"} {
+		t.Setenv(v, "substituted")
+	}
 
 	for _, testConf := range []struct {
 		name               string
@@ -594,6 +604,8 @@ func TestCredentialParser(t *testing.T) {
 			log.Debugf("-------------- Running test: %s -------------", testName)
 			c, err := cdsclient.ParseConfig(testConf.config)
 			assert.NoError(t, err, "parser")
+			c, err = cdsclient.Substitute(c)
+			assert.NoError(t, err, "substitute")
 			assert.Equal(t, testConf.user, c.Auths[0].Credentials["username"], "username")
 			assert.Equal(t, testConf.pass, c.Auths[0].Credentials["password"], "password")
 			assert.Equal(t, testConf.secret, c.Auths[0].Credentials["secret"], "secret")
@@ -642,8 +654,8 @@ func checkEchoServerConfig(t *testing.T, c *stnrv2.StunnerConfig) {
 	assert.Equal(t, []string{"1.2.3.5"}, c.Clusters[0].Endpoints, "cluster endpoints")
 }
 
-// TestSampleConfigs keeps the sample configs in deploy/config parsing, valid, and free of unknown
-// fields.
+// TestSampleConfigs keeps the sample configs in deploy/config parsing, valid once substituted, and
+// free of unknown fields.
 func TestSampleConfigs(t *testing.T) {
 	files, err := filepath.Glob("deploy/config/*.yaml")
 	require.NoError(t, err)
@@ -657,6 +669,8 @@ func TestSampleConfigs(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, yaml.UnmarshalStrict(raw, &stnrv2.StunnerConfig{}), "%s: no unknown fields", f)
 		c, err := cdsclient.ParseConfig(raw)
+		require.NoError(t, err, f)
+		c, err = cdsclient.Substitute(c)
 		require.NoError(t, err, f)
 		require.NoError(t, c.Validate(), f)
 	}

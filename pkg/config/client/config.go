@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"regexp"
-	"strconv"
 
 	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1" //nolint:staticcheck // loads deprecated v1 configs
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
@@ -57,73 +55,31 @@ func IsZeroConfig(req *stnrv2.StunnerConfig) bool {
 	return req.DeepEqual(c)
 }
 
-// ParseConfig parses a raw buffer holding a configuration, substituting environment variables for
-// placeholders in the configuration. Returns the new configuration or error if parsing fails.
-func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
-	// substitute environment variables
-	// default port: STUNNER_PUBLIC_PORT -> STUNNER_PORT
-	re := regexp.MustCompile(`^[0-9]+$`)
-	port, ok := os.LookupEnv("STUNNER_PORT")
-	if !ok || port == "" || !re.Match([]byte(port)) {
-		publicPort := stnrv2.DefaultPort
-		publicPortStr, ok := os.LookupEnv("STUNNER_PUBLIC_PORT")
-		if ok {
-			if p, err := strconv.Atoi(publicPortStr); err == nil {
-				publicPort = p
-			}
-		}
-		os.Setenv("STUNNER_PORT", fmt.Sprintf("%d", publicPort)) //nolint:errcheck
-	}
-
-	// save the credentials before env substitution so that substitution does not affect them;
-	// only the credentials are parsed here, as other fields (say, a numeric port) may hold
-	// placeholders that parse only after substitution
-	type creds struct {
-		Credentials map[string]string `json:"credentials"`
-	}
-	credRaw := struct {
-		Auth  creds   `json:"auth"`  // v1
-		Auths []creds `json:"auths"` // v2
-	}{}
-	if err := unmarshal(c, &credRaw); err != nil {
-		return nil, err
-	}
-
-	// apply env substitution and parse again
-	e := os.ExpandEnv(string(c))
-	confExp, err := parseRaw([]byte(e))
+// Substitute substitutes the environment of this process into a config with os.ExpandEnv, as a
+// dataplane does with its own config: the placeholders stand for the environment of the dataplane
+// pod. The credentials are taken as they are, so a password holding a "$" stays intact.
+func Substitute(c *stnrv2.StunnerConfig) (*stnrv2.StunnerConfig, error) {
+	b, err := json.Marshal(c)
 	if err != nil {
 		return nil, err
 	}
-
-	// restore credentials: a v1 auth converts to the first policy
-	if credRaw.Auths == nil && credRaw.Auth.Credentials != nil {
-		credRaw.Auths = []creds{credRaw.Auth}
+	s := &stnrv2.StunnerConfig{}
+	if err := json.Unmarshal([]byte(os.ExpandEnv(string(b))), s); err != nil {
+		return nil, fmt.Errorf("invalid config after substituting the environment: %w", err)
 	}
-	for i := range confExp.Auths {
-		if i < len(credRaw.Auths) {
-			if confExp.Auths[i].Credentials == nil {
-				confExp.Auths[i].Credentials = map[string]string{}
-			}
-			maps.Copy(confExp.Auths[i].Credentials, credRaw.Auths[i].Credentials)
-		}
+	for i := range s.Auths {
+		s.Auths[i].Credentials = maps.Clone(c.Auths[i].Credentials)
 	}
-
-	return confExp, nil
+	return s, nil
 }
 
-// parseRaw parses a v1 or a v2 config, returning it as v2: a v1 config is converted. The v1 config
-// API is deprecated.
-func parseRaw(c []byte) (*stnrv2.StunnerConfig, error) {
-	// try to parse only the config version first
+// ParseConfig parses a YAML or JSON config of either version as it is, returning it as v2: a v1
+// config is converted. The v1 config API is deprecated.
+func ParseConfig(c []byte) (*stnrv2.StunnerConfig, error) {
 	k := ConfigSkeleton{}
-	if err := yaml.Unmarshal(c, &k); err != nil {
-		if errJ := json.Unmarshal(c, &k); errJ != nil {
-			return nil, fmt.Errorf("could not parse config file API version: "+
-				"YAML parse error: %s, JSON parse error: %s", err.Error(), errJ.Error())
-		}
+	if err := unmarshal(c, &k); err != nil {
+		return nil, err
 	}
-
 	switch k.ApiVersion {
 	case stnrv2.ApiVersion:
 		s := stnrv2.StunnerConfig{}
@@ -161,10 +117,10 @@ func IsConfigDeleted(conf *stnrv2.StunnerConfig) bool {
 	if conf == nil {
 		return false
 	}
-	zeroConf := ZeroConfig(conf.Admin.Name)
-	// zeroconfs have to be explicitly validated before deepEq (the cds client validates)
-	if err := zeroConf.Validate(); err != nil {
+	// configs compare only validated: the clients return them as parsed
+	c, zeroConf := conf.DeepCopy(), ZeroConfig(conf.Admin.Name)
+	if c.Validate() != nil || zeroConf.Validate() != nil {
 		return false
 	}
-	return conf.DeepEqual(zeroConf)
+	return c.DeepEqual(zeroConf)
 }

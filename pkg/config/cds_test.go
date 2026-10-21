@@ -30,6 +30,12 @@ var testerLogLevel = zapcore.ErrorLevel
 const stunnerLogLevel = "all:ERROR"
 
 // run on random port
+
+// podNodeAddr is the relay address a config carries for a node without an address: the
+// placeholder of the node address in the dataplane pod's environment, which the dataplane
+// substitutes.
+const podNodeAddr = "$" + stnrv2.DefaultEnvVarNodeAddr
+
 func getRandCDSAddr() string {
 	rndPort := rand.Intn(10000) + 20000
 	return fmt.Sprintf(":%d", rndPort)
@@ -116,9 +122,11 @@ func TestServerLoad(t *testing.T) {
 	testLog.Debug("load: config ok")
 	c, err = client1.Load()
 	assert.NoError(t, err, "load")
+	assert.NoError(t, c.Validate(), "valid") // the client does not validate
 	assert.True(t, c.DeepEqual(sc1.Config), "deepeq")
 	c, err = client2.Load()
 	assert.NoError(t, err, "load")
+	assert.NoError(t, c.Validate(), "valid") // the client does not validate
 	assert.True(t, c.DeepEqual(sc2.Config), "deepeq")
 	c, err = client3.Load()
 	assert.Error(t, err, "load")
@@ -1532,7 +1540,6 @@ func relayAddrs(t *testing.T, c *stnrv2.StunnerConfig) []string {
 // and a whole sub-object alike, and the marker left as it is where the patcher leaves it (a
 // single read substitutes no environment).
 func TestCDSPatchLoad(t *testing.T) {
-	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
 	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1"})
 	srv, addr := startPatchServer(t, nodes)
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
@@ -1542,8 +1549,8 @@ func TestCDSPatchLoad(t *testing.T) {
 		addr, realm string
 	}{
 		{nodeLabels("node1"), "1.1.1.1", "realm1"},
-		{nodeLabels("node2"), "9.9.9.9", "realm1"}, // no node address: the pod environment
-		{nil, "9.9.9.9", "realm1"},                 // no labels: the pod environment
+		{nodeLabels("node2"), podNodeAddr, "realm1"}, // no node address: the placeholder for the pod environment
+		{nil, podNodeAddr, "realm1"},                 // no labels: the placeholder for the pod environment
 		{map[string]string{stnrv2.DefaultCDSNodeLabel: "node1", "tenant": "t1"}, "1.1.1.1", "t1"},
 	} {
 		c, err := client.New(addr, "ns1/gw1", tc.labels, logger.NewLoggerFactory(stunnerLogLevel))
@@ -1562,7 +1569,6 @@ func TestCDSPatchLoad(t *testing.T) {
 // TestCDSPatchWatch pins a watch: the config patched for the labels of the client, and a marker
 // the patcher leaves falling back to the client's environment, credentials excepted.
 func TestCDSPatchWatch(t *testing.T) {
-	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
 	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2"})
 	srv, addr := startPatchServer(t, nodes)
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
@@ -1570,8 +1576,8 @@ func TestCDSPatchWatch(t *testing.T) {
 	for _, tc := range []struct{ node, want string }{
 		{"node1", "1.1.1.1"},
 		{"node2", "2.2.2.2"},
-		{"node3", "9.9.9.9"}, // a node without an address: the pod environment
-		{"", "9.9.9.9"},      // no labels: the pod environment
+		{"node3", podNodeAddr}, // a node without an address: the placeholder for the pod environment
+		{"", podNodeAddr},      // no labels: the placeholder for the pod environment
 	} {
 		c := watchConfig(watchClient(t, addr, "ns1/gw1", nodeLabels(tc.node)), time.Second)
 		assert.Equal(t, []string{tc.want}, relayAddrs(t, c), "node %q", tc.node)
@@ -1589,7 +1595,6 @@ func TestCDSPatchWatch(t *testing.T) {
 // only the clients whose node changed, nothing reaches a client whose config did not change, and a
 // changed config, a deletion and a re-addition reach every client, specialized for its node.
 func TestCDSRefresh(t *testing.T) {
-	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
 	nodes := newNodeTable(map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2"})
 	srv, addr := startPatchServer(t, nodes)
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
@@ -1615,7 +1620,7 @@ func TestCDSRefresh(t *testing.T) {
 	}
 
 	expect("initial", map[string]string{"node1": "1.1.1.1", "node2": "2.2.2.2",
-		"node3": "9.9.9.9", "": "9.9.9.9"})
+		"node3": podNodeAddr, "": podNodeAddr})
 
 	srv.Refresh()
 	expect("a refresh with nothing changed", map[string]string{})
@@ -1630,14 +1635,14 @@ func TestCDSRefresh(t *testing.T) {
 
 	nodes.set("node2", "")
 	srv.Refresh()
-	expect("a node lost its address", map[string]string{"node2": "9.9.9.9"})
+	expect("a node lost its address", map[string]string{"node2": podNodeAddr})
 
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm1")}))
 	expect("the same config again", map[string]string{})
 
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm2")}))
-	expect("a changed config", map[string]string{"node1": "1.1.1.2", "node2": "9.9.9.9",
-		"node3": "3.3.3.3", "": "9.9.9.9"})
+	expect("a changed config", map[string]string{"node1": "1.1.1.2", "node2": podNodeAddr,
+		"node3": "3.3.3.3", "": podNodeAddr})
 
 	require.NoError(t, srv.UpdateConfig([]server.Config{}))
 	for _, n := range names {
@@ -1648,15 +1653,14 @@ func TestCDSRefresh(t *testing.T) {
 	expect("a refresh after the deletion", map[string]string{})
 
 	require.NoError(t, srv.UpdateConfig([]server.Config{patchConfig(t, "ns1/gw1", "realm2")}))
-	expect("the re-added config", map[string]string{"node1": "1.1.1.2", "node2": "9.9.9.9",
-		"node3": "3.3.3.3", "": "9.9.9.9"})
+	expect("the re-added config", map[string]string{"node1": "1.1.1.2", "node2": podNodeAddr,
+		"node3": "3.3.3.3", "": podNodeAddr})
 }
 
 // TestCDSNoSwallowedUpdate races config updates against node address changes and refreshes, and
 // pins that no client ever goes back to an older config and that every client ends up with the
 // last config, specialized for the last address of its node.
 func TestCDSNoSwallowedUpdate(t *testing.T) {
-	t.Setenv(stnrv2.DefaultEnvVarNodeAddr, "9.9.9.9")
 	nodes := newNodeTable(map[string]string{"node1": "10.0.1.0", "node2": "10.0.2.0",
 		"node3": "10.0.3.0"})
 	srv, addr := startPatchServer(t, nodes)
@@ -1708,7 +1712,7 @@ func TestCDSNoSwallowedUpdate(t *testing.T) {
 	}()
 	wg.Wait()
 
-	final := map[string]string{"": "9.9.9.9"}
+	final := map[string]string{"": podNodeAddr}
 	for _, n := range []string{"node1", "node2", "node3"} {
 		final[n] = nodes.nodeAddr(n)
 	}
@@ -1782,10 +1786,11 @@ func testConfig(id, realm string) server.Config {
 	return server.Config{Namespace: namespace, Name: name, Config: c}
 }
 
-// wait for some configurable time for a watch element
+// wait for some configurable time for a watch element, validated as the reconciler would
 func watchConfig(ch chan *stnrv2.StunnerConfig, d time.Duration) *stnrv2.StunnerConfig {
 	select {
 	case c := <-ch:
+		_ = c.Validate() // the client does not validate, compare only validated configs
 		return c
 	case <-time.After(d):
 		return nil

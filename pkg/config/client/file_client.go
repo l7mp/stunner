@@ -57,10 +57,6 @@ func (w *ConfigFileClient) Load() (*stnrv2.StunnerConfig, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
-	}
-
 	return c, nil
 }
 
