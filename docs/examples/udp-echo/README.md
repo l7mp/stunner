@@ -6,7 +6,7 @@ In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
 * configure STUNner to expose the service to clients,
 * use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to connect to the UDP service via STUNner,
-* benchmark your cloud-setup with [`iperfv2`](https://iperf.fr).
+* measure the path with [`mediactl`](../../cmd/mediactl.md).
 
 ## Prerequisites
 
@@ -175,9 +175,9 @@ modifications and update the underlying dataplane. Kubernetes is beautiful, isn'
 ## Fire up a backend service
 
 We have successfully configured STUNner to route client connections to the `media-plane` service
-but at the moment there is no backend there that would respond. Below we use a simplistic UDP
-greeter service for testing: every time you send some input, the greeter service will respond with
-a heartwarming welcome message.
+but at the moment there is no backend there that would respond. Below we use a simple UDP echo
+service for testing, `mediactl udp echo`: every time you send some input, the echo service sends
+it right back.
 
 The below manifest spawns the service in the `default` namespace and wraps it in a Kubernetes
 service called `media-plane`. Recall, this is the target service in our UDPRoute. Note that the
@@ -185,7 +185,7 @@ type of the `media-plane` service is `ClusterIP`, which means that Kubernetes wi
 to the outside world: the only way for clients to obtain a response is via STUNner.
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-greeter.yaml
+kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
 ```
 
 ## Check your config
@@ -204,7 +204,7 @@ Listeners:
     Server: stunner/udp-gateway/udp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/iperf-server/udp]
+    Clusters: [stunner/media-plane/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
@@ -213,31 +213,33 @@ STUN/TURN credentials based on the GatewayConfig.
 
 ## Testing
 
-Now we are ready to test our UDP greeter service.
+Now we are ready to test our UDP echo service.
 
-First we need the ClusterIP assigned by Kubernetes to the `media-plane` service.
-
-```console
-export PEER_IP=$(kubectl get svc media-plane -o jsonpath='{.spec.clusterIP}')
-```
-
-We also need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy
-STUN/TURN client, the [tunnel mode of `stunnerd`](/docs/cmd/stunnerd.md#tunnel-mode), for this
-purpose. Once installed, you can fire up a tunnel to listen on the
-standard input and send everything it receives to STUNner. Type any input and press Enter, and you
-should see a nice greeting from your cluster!
+We need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy STUN/TURN
+client, the [tunnel mode of `stunnerd`](/docs/cmd/stunnerd.md#tunnel-mode), for this purpose. Once
+installed, you can fire up a tunnel to listen on the standard input and send everything it receives
+to STUNner. Type any input and press Enter, and you should see it come back from your cluster!
 
 ```console
-./stunnerd - k8s://stunner/udp-gateway/udp-listener udp://${PEER_IP}:9001
+./stunnerd - k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:9001
 Hello STUNner
-Greetings from STUNner!
+Hello STUNner
 ```
 
-Note that we haven't specified the public IP address and port: the tunnel is clever enough to parse
-the running [STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the
-special STUNner URI `k8s://stunner/udp-gateway/udp-listener`, using the namespace (`stunner` here)
-and the name of the Gateway (`udp-gateway`) plus the listener you want to connect to
-(`udp-listener`), and `stunnerd` will do the heavy lifting.
+Note that we haven't specified any IP address: the tunnel is clever enough to parse the running
+[STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the special
+STUNner URI `k8s://stunner/udp-gateway/udp-listener`, using the namespace (`stunner` here) and the
+name of the Gateway (`udp-gateway`) plus the listener you want to connect to (`udp-listener`), and
+the peer `k8s://default/media-plane:9001`, at port 9001 of the `media-plane` Service in the
+`default` namespace. Then, `stunnerd` will do the heavy lifting of translating this to concrete IPs
+and ports.
+
+To measure the path, let [`mediactl`](/docs/cmd/mediactl.md) send packets through STUNner for ten
+seconds, the same way, and report the loss and the round trip of the echo:
+
+```console
+mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:9001
+```
 
 Note that your actual WebRTC clients will *not* need a tunnel to reach the cluster: all
 modern Web browsers and WebRTC clients come with a STUN/TURN client built in. Here, the tunnel is
@@ -253,7 +255,7 @@ an enterprise NAT on the client network path has gone berserk and actively filte
 TLS/443. The below steps will do just that: open another gateway on STUNner, this time on the
 TLS/TCP port 443, and reattach the UDPRoute to both Gateways so that no matter which protocol a
 client may choose the connection will be routed to the `media-plane` service (i.e., the UDP
-greeter) by STUNner. (Note that you could also add the TLS listener to the *existing* Gateway
+echo service) by STUNner. (Note that you could also add the TLS listener to the *existing* Gateway
 instead of creating a *new* one, here we just use the simpler approach for brevity.)
 
 1. Store your TLS certificate in a Kubernetes Secret. Below we create a self-signed certificate for
@@ -316,16 +318,16 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
    self-signed TLS certificate; this will not be needed when using a real signed certificate.
 
    ```console
-   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway/tls-listener udp://${PEER_IP}:9001
-   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway/tls-listener -> udp://10.104.175.57:9001
+   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway/tls-listener k8s://default/media-plane:9001
+   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway/tls-listener -> k8s://default/media-plane:9001
    [...]
    Hello STUNner
-   Greetings from STUNner!
+   Hello STUNner
    ```
 
    We have set the loglevel to INFO to learn that this time the tunnel has connected via
    the TURN server `tls://10.96.55.200:443`. And that's it: STUNner automatically routes the
-   incoming TLS/TCP connection to the UDP greeter service, silently converting from TLS/TCP to UDP
+   incoming TLS/TCP connection to the UDP echo service, silently converting from TLS/TCP to UDP
    in the background and back again on return.
 
 ## Cleaning up
@@ -333,7 +335,7 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
 Stop the tunnel and wipe all Kubernetes configuration.
 
 ```console
-kubectl delete -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-greeter.yaml
+kubectl delete -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
 kubectl delete gatewayclass stunner-gatewayclass
 kubectl -n stunner delete secret stunner-auth-secret
 kubectl -n stunner delete gatewayconfig stunner-gatewayconfig

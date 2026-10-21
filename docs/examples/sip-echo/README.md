@@ -64,26 +64,23 @@ In this tutorial you will learn how to:
 
    ```console
    kubectl -n stunner get gateway sip-gateway
-   export SIP_IP=$(kubectl -n stunner get gateway sip-gateway -o jsonpath='{.status.addresses[0].value}')
    ```
 
-   The `PROGRAMMED` column should read `True` and `SIP_IP` should hold the load balancer address.
+   The `PROGRAMMED` column should read `True` and `ADDRESS` should hold the load balancer address.
    A Gateway that is not accepted says why in its status: `kubectl -n stunner get gateway
    sip-gateway -o yaml`.
 
 ## Test
 
-Call the echo service for ten seconds:
-
-```console
-mediactl sip call -t 10s sip:echo@${SIP_IP}:5060
-```
-
-or, letting `mediactl` find the address of the Gateway through your kubeconfig:
+Call the echo service for ten seconds, letting `mediactl` find the address of the Gateway through
+your kubeconfig:
 
 ```console
 mediactl sip call -t 10s k8s://stunner/sip-gateway/sip
 ```
+
+Without a kubeconfig, call the address of the Gateway: `mediactl sip call -t 10s
+sip:echo@<address>:5060`.
 
 `mediactl` logs the connected call, sends audio for ten seconds and hangs up, logging what it
 sent and what came back:

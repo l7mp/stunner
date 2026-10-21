@@ -1,22 +1,22 @@
-# STUNner Tutorial: STUNner benchmark with iperf
+# STUNner Tutorial: Opening a UDP tunnel via STUNner
 
-This tutorial shows how to make a simple benchmark via STUNner to evaluate your cloud provider's UDP and TCP stack.
+This tutorial shows how to tunnel a local UDP client through STUNner to a UDP service in the cluster, and how to measure the loss and the round trip of the path to evaluate your cloud provider's UDP and TCP stack.
 
 In this tutorial you will learn how to:
 * configure a UDP service in Kubernetes,
 * configure STUNner to expose the service to clients,
 * use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to connect to the UDP service via STUNner,
-* benchmark your cloud-setup with [`iperfv2`](https://iperf.fr).
+* measure the path with [`mediactl`](../../cmd/mediactl.md).
 
 ## Installation
 
 ### Prerequisites
 
-The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. You must have [`iperfv2`](https://iperf.fr) installed locally to run this tutorial.
+The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. Issue `make build` to build `stunnerd`, `stunnerctl` and `mediactl` in the `bin/` directory.
 
 ### Setup
 
-In this tutorial we perform a quick Kubernetes/STUNner benchmark: we fire up an iperf server inside the cluster and perform a speed test from the local console. We will use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to tunnel test traffic to the iperf server via STUNner acting as a STUN/TURN gateway.
+In this tutorial we perform a quick Kubernetes/STUNner test: we fire up a `mediactl` UDP echo server inside the cluster and measure the path to it from the local console. We will use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to tunnel test traffic to the echo server via STUNner acting as a STUN/TURN gateway.
 
 ![STUNner benchmarks setup](../../img/stunner_benchmark.svg)
 
@@ -24,30 +24,30 @@ You can easily implement a makeshift VPN with STUNner using a similar setup.
 
 ### Server configuration
 
-Set up an iperf server in the `default` Kubernetes namespace and wrap it in a Kubernetes
-service called `iperf-server`.
+Set up a UDP echo server in the `default` Kubernetes namespace and wrap it in a Kubernetes
+service called `echo-server`.
 ```console
 cd stunner
-kubectl apply -f docs/examples/simple-tunnel/iperf-server.yaml
+kubectl apply -f docs/examples/simple-tunnel/echo-server.yaml
 ```
 
-This will start an Deployment that runs the iperf server and wraps it in a Kubernetes service called `iperf-server` of type ClusterIP. Check this service and make sure that it is not exposed to the outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes sure that the only way to reach this service from the local iperf speed-test client is through STUNner.
+This will start a Deployment that runs `mediactl udp echo` on UDP port 9001 and wraps it in a Kubernetes service called `echo-server` of type ClusterIP. Check this service and make sure that it is not exposed to the outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes sure that the only way to reach this service from the local test client is through STUNner.
 
 ```console
-kubectl get service iperf-server  -o wide
-NAME           TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)             AGE   SELECTOR
-iperf-server   ClusterIP   10.120.5.36   <none>        5001/UDP,5001/TCP   19s   app=iperf-server
+kubectl get service echo-server -o wide
+NAME          TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+echo-server   ClusterIP   10.120.5.36   <none>        9001/UDP   19s   app=echo-server
 ```
 
 ### STUNner configuration
 
-Expose the service via the STUNner. The pre-compiled manifest below will create the required GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on TCP:3478, and route client connections received on the gateways to the `iperf-server` service.
+Expose the service via the STUNner. The pre-compiled manifest below will create the required GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on TCP:3478, and route client connections received on the gateways to the `echo-server` service.
 
 ```console
-kubectl apply -f docs/examples/simple-tunnel/iperf-stunner.yaml
+kubectl apply -f docs/examples/simple-tunnel/tunnel-stunner.yaml
 ```
 
-For convenience, below is a dump of the Gateway and UDPRoute resources the manifests create. Note that the UDPRoute specifies the `iperf-server` service as the `backendRef`, which makes sure that STUNner will forward the client connections received in any of the Gateways to the iperf server.
+For convenience, below is a dump of the Gateway and UDPRoute resources the manifests create. Note that the UDPRoute specifies the `echo-server` service as the `backendRef`, which makes sure that STUNner will forward the client connections received in any of the Gateways to the echo server.
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -79,7 +79,7 @@ spec:
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
-  name: iperf-server
+  name: echo-server
   namespace: stunner
 spec:
   parentRefs:
@@ -87,7 +87,7 @@ spec:
     - name: tcp-gateway
   rules:
     - backendRefs:
-        - name: iperf-server
+        - name: echo-server
           namespace: default
 ```
 
@@ -105,10 +105,10 @@ gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass   35.187.97
 gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass   35.205.10.190   True         139m
 
 NAME                                    AGE
-udproute.stunner.l7mp.io/iperf-server   139m
+udproute.stunner.l7mp.io/echo-server    139m
 ```
 
-You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration for the UDP gateway. Make sure to issue `make build` first to build `stunnerctl`, along with a set of other handy STUNner utilities, in the `bin/` directory. 
+You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration for the UDP gateway.
 
 ``` console
 bin/stunnerctl -n stunner config udp-gateway
@@ -120,7 +120,7 @@ Listeners:
     Server: stunner/udp-gateway/udp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/iperf-server/udp]
+    Clusters: [stunner/echo-server/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
@@ -136,7 +136,7 @@ Listeners:
     Server: stunner/tcp-gateway/tcp-listener (TURN)
     Address:port: <none>:3478
     Public address:port: 34.116.180.89:3478
-    Clusters: [stunner/iperf-server/udp]
+    Clusters: [stunner/echo-server/udp]
     Endpoints: [10.76.1.4, 10.80.4.47]
 ```
 
@@ -152,70 +152,77 @@ tcp-gateway   LoadBalancer   10.0.3.91     35.187.97.94    3478:31781/TCP   143m
 udp-gateway   LoadBalancer   10.0.14.218   35.205.10.190   3478:31048/UDP   143m
 ```
 
-### Run the benchmark
+### Run the test
 
-We will need to learn the ClusterIP assigned by Kubernetes to the `iperf-server` service: this will be the peer address to which the tunnel will ask STUNner to relay the iperf test traffic.
-
-``` console
-export IPERF_ADDR=$(kubectl get svc iperf-server -o jsonpath="{.spec.clusterIP}")
-```
-
-Next, set up a tunnel to listen on `UDP:127.0.0.1:5000` and relay connections from this listener via the STUNner STUN/TURN listener `udp-listener` to the iperf server. Luckily, `stunnerd` is clever enough to [parse the running STUNner configuration](../../cmd/stunnerd.md#tunnel-mode) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly.
+Set up a tunnel to listen on `UDP:127.0.0.1:5000` and relay the packets from this listener via the STUNner STUN/TURN listener `udp-listener` to the echo server. Luckily, `stunnerd` is clever enough to [parse the running STUNner configuration](../../cmd/stunnerd.md#tunnel-mode) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly, and to find the echo server from its Service.
 
 ``` console
 bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway/udp-listener \
-     udp://$IPERF_ADDR:5001
+     k8s://default/echo-server:udp
 ```
 
-The most important part here is the TURN meta-URI: `k8s://stunner/udp-gateway/udp-listener` instructs the tunnel to look for the Gateway called `udp-gateway` in the `stunner` namespace and create a connection to the TURN listener called `udp-listener` of the Gateway.
+The two meta-URIs do the heavy lifting: `k8s://stunner/udp-gateway/udp-listener` instructs the tunnel to look for the Gateway called `udp-gateway` in the `stunner` namespace and create a connection to the TURN listener called `udp-listener` of the Gateway, and `k8s://default/echo-server:udp` is the first ready pod of the `echo-server` Service in the `default` namespace, at the port of the Service port called `udp`.
 
-Fire up an iperf client from another terminal that will connect to STUNner via the tunnel and start the benchmark.
-
-```console
-iperf -c localhost -p 5000 -u -i 1 -l 100 -b 800000 -t 10
-```
-
-If successful, the iperf server logs should contain the benchmark results.
+From another terminal, send packets through the tunnel for 10 seconds and measure the echo. By default `mediactl` sends 50 packets of 160 bytes a second, the 20 ms frames of a G.711 call.
 
 ```console
-kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}')
-------------------------------------------------------------
-Server listening on UDP port 5001 with pid 1
-Read buffer size: 1.44 KByte (Dist bin width= 183 Byte)
-UDP buffer size:  208 KByte (default)
-------------------------------------------------------------
-[  1] local 10.116.2.30%eth0 port 5001 connected with 10.116.1.21 port 56439 (peer 2.1.7)
-[ ID] Interval            Transfer     Bandwidth        Jitter   Lost/Total   Latency avg/min/max/stdev PPS  inP NetPwr
+bin/mediactl udp send -t 10s 127.0.0.1:5000
+14:31:02.897379 mediactl.go:298: mediactl INFO: interval  0.0- 1.0s: sent 50 pkts 63.99 kbit/s, received 49 pkts 62.71 kbit/s
+14:31:03.897349 mediactl.go:298: mediactl INFO: interval  1.0- 2.0s: sent 50 pkts 64 kbit/s, received 50 pkts 64 kbit/s
 ...
-[  1] 0.0000-9.9204 sec   977 KBytes   807 Kbits/sec    1.426 ms 0/10003 (0%) 14.256/10.791/97.428/ 4.993 ms 1008 pps 1.40 KByte 7.07
+14:31:12.398291 mediactl.go:344: mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 63.99 kbit/s, received 500 pkts 80 kB 63.99 kbit/s, lost 0/500 (0.00%), rtt min/avg/max 215µs/460µs/2.367ms
 ```
 
-The results show that we have managed to send 1000 packets/sec through STUNner to the iperf server without packet loss, at an average one-way latency of 14.2 ms and 1.426 ms jitter. Not bad from a Kubernetes cluster running in some remote datacenter!
+Every packet carries a sequence number and a timestamp, so `mediactl` reports the loss and the round trip of the whole path: the tunnel, STUNner and the echo server. Add `--max-loss` or `--max-rtt` to make `mediactl` fail above a threshold, or `-o json` for a machine-readable report. The echo server logs every flow it echoed:
 
-Repeating the test, this time with a STUN/TURN over TCP, casts a somewhat different picture. Notice the new meta-URI: `k8s://stunner/tcp-gateway/tcp-listener` to select the TURN server exposed on TCP for the tunnel.
+```console
+kubectl logs deploy/echo-server
+14:31:01.876212 net.go:52: mediactl INFO: echoing UDP at [::]:9001
+14:31:01.896914 echo.go:51: mediactl INFO: echoing 10.116.1.21:34475
+14:31:14.898450 echo.go:56: mediactl INFO: flow 10.116.1.21:34475: 10.0s, received 500 pkts 80 kB 64.13 kbit/s
+```
+
+Repeat the test, this time with STUN/TURN over TCP. Notice the new meta-URI: `k8s://stunner/tcp-gateway/tcp-listener` to select the TURN server exposed on TCP for the tunnel.
 
 ``` console
 bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/tcp-gateway/tcp-listener \
-     udp://$IPERF_ADDR:5001
+     k8s://default/echo-server:udp
 ```
 
-Run the benchmark again at 10kpps and watch the logs.
+Run the same test and compare the round trip of the two transports: TURN over TCP retransmits lost packets and holds back everything behind them, which shows up as a growing round trip on a lossy path. That's why you should [avoid TCP at all cost](https://bloggeek.me/why-you-should-prefer-udp-over-tcp-for-your-webrtc-sessions) in real-time communications.
 
-``` console
-iperf -c localhost -p 5000 -u -l 100 -b 8000000 -o /dev/null -t 10 && \
-    kubectl logs $(kubectl get pods -l app=iperf-server -o jsonpath='{.items[0].metadata.name}') | tail -n 1
-[  3] 0.0000-9.9365 sec  9.41 MBytes  7.94 Mbits/sec   0.085 ms 1361/100003 (1.4%) 148.261/21.098/454.266/73.704 ms 9927 pps  144 KByte 6.70
+`mediactl` can also relay through STUNner by itself, with no tunnel: it reads the TURN server and the credentials from the Gateway and the peer from the Service the same way.
+
+```console
+bin/mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
 ```
 
-It seems that average latency has jumped to 148 ms, with a max latency of close to 460 ms! That's why you should [avoid TCP at all cost](https://bloggeek.me/why-you-should-prefer-udp-over-tcp-for-your-webrtc-sessions) in real-time communications.
+### Measuring under load
+
+For more load, run several streams in parallel with `-P` and set the packet rate per stream with `-k` and the packet size with `--length`; `mediactl` reports every stream and their total. A stream paces its packets in user space and falls short of high rates, so keep `-k` moderate and add streams instead. Five streams of 250 packets of 1000 bytes a second, 10 Mbit/s in total:
+
+```console
+bin/mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+```
+
+To learn how much of the round trip the cluster adds, take a local baseline: the same streams through a [standalone TURN server](../../cmd/stunnerd.md#usage) on the loopback to a local echo server.
+
+```console
+bin/mediactl udp echo 127.0.0.1:9001 &
+bin/stunnerd "turn://user-1:pass-1@127.0.0.1:3478?transport=udp" &
+bin/mediactl turn send -P 5 -t 10s -k 250 --length 1000 --username user-1 --password pass-1 \
+    "turn:127.0.0.1:3478?transport=udp" 127.0.0.1:9001
+```
+
+Repeat the measurements with a few packet sizes, say 64, 256, 512 and 1200 bytes: small packets yield a lower throughput at the same packet rate.
 
 ### Cleaning up
 
 Stop the tunnel and wipe all Kubernetes configuration.
 
 ```console
-kubectl delete -f docs/examples/simple-tunnel/iperf-server.yaml
-kubectl delete -f docs/examples/simple-tunnel/iperf-stunner.yaml
+kubectl delete -f docs/examples/simple-tunnel/echo-server.yaml
+kubectl delete -f docs/examples/simple-tunnel/tunnel-stunner.yaml
 ```
 
 # Help

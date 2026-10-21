@@ -233,8 +233,8 @@ WebRTC service in 5-10 minutes using a purely declarative configuration.
   connects `mediactl`, a SIP phone among other things, through a STUNner SIP Gateway to a SIP echo
   service in the cluster, the smallest end-to-end test of the beta SIP gateway.
 * [Opening a UDP tunnel via STUNner](/docs/examples/simple-tunnel/README.md): This tutorial shows
-  how to tunnel an external UDP client via STUNner to a standard iperf server deployed into
-  Kubernetes. The demo can be used to benchmark your STUNner installation.
+  how to tunnel an external UDP client via STUNner to a UDP echo server deployed into
+  Kubernetes, and measure the path with `mediactl`.
 * [Direct one to one video call via STUNner](/docs/examples/direct-one2one-call/README.md): This
   tutorial showcases STUNner acting as a TURN server for two WebRTC clients to establish
   connections between themselves, without the mediation of a media server.

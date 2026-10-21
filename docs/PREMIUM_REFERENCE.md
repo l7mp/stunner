@@ -222,7 +222,7 @@ spec:
 
 ### Testing
 
-The simplest way to test whether eBPF offload was successfully enabled is to deploy a simple STUNner tutorial (like the [iperf-test](/docs/examples/simple-tunnel/README.md) example) and watch for the offload statistics in the output or [`stunnerctl status`](/docs/cmd/stunnerctl.md#status):
+The simplest way to test whether eBPF offload was successfully enabled is to deploy a simple STUNner tutorial (like the [simple tunnel](/docs/examples/simple-tunnel/README.md) example) and watch for the offload statistics in the output or [`stunnerctl status`](/docs/cmd/stunnerctl.md#status):
 
 ```console
 stunnerctl -n <gateway-namespace> status <gateway-name>

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server
+  namespace: default
+  labels:
+    app: echo-server
+spec:
+  selector:
+    matchLabels:
+      app: echo-server
+  template:
+    metadata:
+      labels:
+        app: echo-server
+    spec:
+      containers:
+      - image: docker.io/l7mp/mediactl:latest
+        name: mediactl
+        command: ["mediactl", "udp", "echo", ":9001"]
+        ports:
+        - name: udp
+          containerPort: 9001
+          protocol: UDP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-server
+  namespace: default
+  labels:
+    app: echo-server
+spec:
+  ports:
+  - name: udp
+    port: 9001
+    protocol: UDP
+  selector:
+    app: echo-server
+  type: ClusterIP

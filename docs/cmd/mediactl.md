@@ -40,8 +40,8 @@ A sender sends `--length` (160) bytes `-k/--send-rate` (50) times a second until
 (default: until Ctrl-C); the defaults are the 20 ms frames of a G.711 call. Over UDP, TURN, SRT
 and the RTP of a SIP call every packet starts with a sequence number and a timestamp, so the
 receiving side measures the loss and an echoing sender the round trip; over TCP the send rate is
-the rate of the writes and only the bytes count. Like `iperf`, a sender logs the rates of every
-second and a summary, but every side reports only what it measures itself: an echoing sender what
+the rate of the writes and only the bytes count. A sender logs the rates of every second and a
+summary, but every side reports only what it measures itself: an echoing sender what
 it sent, what came back, the loss and the round trip, a publisher what it sent, a reader what it
 received, and the echo servers every flow, once it ends.
 

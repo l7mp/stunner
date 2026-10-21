@@ -68,4 +68,3 @@
 * [`stunnerd` manual](cmd/stunnerd.md)
 * [`stunnerctl` manual](cmd/stunnerctl.md)
 * [`mediactl` manual](cmd/mediactl.md)
-* [Benchmarking](examples/benchmark)

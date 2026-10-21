@@ -33,18 +33,33 @@ spec:
   gatewayClassName: stunner-gatewayclass
   listeners:
     - name: udp-listener
-      port: 9001
+      port: 3478
       protocol: TURN-UDP
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tcp-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: tcp-listener
+      port: 3478
+      protocol: TURN-TCP
+
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute
 metadata:
-  name: iperf-server
+  name: echo-server
   namespace: stunner
 spec:
   parentRefs:
     - name: udp-gateway
+    - name: tcp-gateway
   rules:
     - backendRefs:
-        - name: iperf-server
+        - name: echo-server
           namespace: default
