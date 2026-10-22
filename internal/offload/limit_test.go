@@ -36,6 +36,9 @@ func TestOffloadLimit(t *testing.T) {
 	require.NoError(t, e.Upsert(side(2), peer, "l", "c"), "2nd")
 	assert.ErrorIs(t, e.Upsert(side(3), peer, "l", "c"), ErrOffloadLimit, "3rd beyond the limit")
 	assert.NoError(t, e.Upsert(side(1), peer, "l", "c"), "a refresh keeps its place")
+	live, max := e.Flows()
+	assert.Equal(t, 2, live, "the refused and the refreshed flows are not counted")
+	assert.Equal(t, 2, max)
 
 	require.NoError(t, e.Remove(side(1), peer))
 	assert.NoError(t, e.Upsert(side(3), peer, "l", "c"), "3rd in the freed place")

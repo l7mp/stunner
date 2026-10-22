@@ -175,8 +175,14 @@ type AdminStatus struct {
 	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
 	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
 	UserQuota           string `json:"quota,omitempty"`
-	OffloadStatus       string `json:"offload,omitempty"`
-	LicensingInfo       string `json:"licensing_info,omitempty"`
+	// OffloadStatus is the running offload engine, its interfaces and its flows against its
+	// limit, e.g., "tc[eth0]:3/10", or "null" when no kernel engine runs. OffloadFlows and
+	// OffloadLimit are the flows and the limit of a kernel engine: 0 is unlimited, a negative
+	// limit unknown.
+	OffloadStatus string `json:"offload,omitempty"`
+	OffloadFlows  int    `json:"offload_flows,omitempty"`
+	OffloadLimit  int    `json:"offload_limit,omitempty"`
+	LicensingInfo string `json:"licensing_info,omitempty"`
 }
 
 // String returns a string representation of the administrative status.

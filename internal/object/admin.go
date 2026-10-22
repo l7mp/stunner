@@ -11,6 +11,7 @@ import (
 
 	"github.com/pion/logging"
 
+	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
@@ -140,6 +141,19 @@ func (a *Admin) Status() stnrv2.Status {
 	if conf.OffloadEngine != stnrv2.OffloadEngineNone.String() && len(conf.OffloadInterfaces) > 0 {
 		intfs = strings.Join(conf.OffloadInterfaces, ",")
 	}
+	// the engine that runs, which is the null engine when the configured one could not start
+	engine, flows, limit := a.rt.OffloadEngine.Name(), 0, 0
+	if engine != offload.NullName {
+		flows, limit = a.rt.OffloadEngine.Flows()
+		max := strconv.Itoa(limit)
+		switch {
+		case limit < 0:
+			max = "unknown"
+		case limit == 0:
+			max = "unlimited"
+		}
+		engine = fmt.Sprintf("%s[%s]:%d/%s", engine, intfs, flows, max)
+	}
 	return &stnrv2.AdminStatus{
 		Name:                conf.Name,
 		Build:               a.rt.BuildInfo.Version,
@@ -147,7 +161,9 @@ func (a *Admin) Status() stnrv2.Status {
 		MetricsEndpoint:     conf.MetricsEndpoint,
 		HealthCheckEndpoint: healthEndpoint,
 		UserQuota:           strconv.Itoa(conf.UserQuota),
-		OffloadStatus:       fmt.Sprintf("%s[%s]", conf.OffloadEngine, intfs),
+		OffloadStatus:       engine,
+		OffloadFlows:        flows,
+		OffloadLimit:        limit,
 		LicensingInfo:       a.rt.License.Status(),
 	}
 }

@@ -95,6 +95,12 @@ func (l *limited) Upsert(a, b Connection, listenerName, clusterName string) erro
 	return nil
 }
 
+func (l *limited) Flows() (live, limit int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.live), offloadLimit(l.lic)
+}
+
 func (l *limited) Remove(a, b Connection) error {
 	l.mu.Lock()
 	delete(l.live, a.String()+"/"+b.String())
@@ -127,6 +133,10 @@ type Engine interface {
 	// Packets returns the packet counter of a flow, both directions, and whether the flow is
 	// offloaded. The counter is monotone between upserts; Upsert resets it.
 	Packets(a, b Connection) (uint64, bool)
+	// Flows returns how many flows the engine holds and the offload limit it admits them up to:
+	// 0 is unlimited, a negative value unknown. Only the admission of New counts: a bare engine
+	// reports none.
+	Flows() (live, limit int)
 }
 
 // stats flags.
