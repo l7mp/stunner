@@ -22,18 +22,21 @@ func TestFeatureCatalog(t *testing.T) {
 		assert.Equal(t, f, NewFeature(f.String()),
 			"%s does not parse back from its own name, so a license key carrying it decodes to "+
 				"FeatureNone and the feature silently disappears", f)
+		if f == FeatureKernelOffload {
+			assert.NotContains(t, AllFeatures(), f, "the retired %s is granted by no tier", f)
+			continue
+		}
 		assert.Contains(t, AllFeatures(), f, "%s is missing from AllFeatures", f)
 		assert.Contains(t, Features(SubscriptionTypeEnterprise), f,
 			"%s is granted by no tier", f)
 	}
 
-	assert.ElementsMatch(t, []Feature{FeatureKernelOffload, FeatureUserQuota, FeatureDaemonSet,
+	assert.ElementsMatch(t, []Feature{FeatureUserQuota, FeatureDaemonSet,
 		FeatureRelayAddressDiscovery, FeatureDualStack, FeatureHAOperator, FeaturePQC},
 		Features(SubscriptionTypeMember), "the member tier changed")
 	assert.ElementsMatch(t, AllFeatures(), Features(SubscriptionTypeEnterprise),
 		"enterprise grants everything")
-	assert.Equal(t, []Feature{FeatureKernelOffload}, Features(SubscriptionTypeFree),
-		"free grants the kernel offload only, up to its limit")
+	assert.Empty(t, Features(SubscriptionTypeFree), "free grants no feature")
 
 	for _, s := range AllSubscriptionTypes() {
 		assert.Equal(t, s, NewSubscriptionType(s.String()), "%s does not parse back", s)

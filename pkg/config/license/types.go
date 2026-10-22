@@ -2,8 +2,9 @@ package license
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
 // subscriptionType is an enum of known subscription types.
@@ -63,6 +64,9 @@ var _ Feature = feature(0)
 
 const (
 	FeatureNone feature = iota
+	// FeatureKernelOffload is retired: the license keys in the field carry it, so it parses, but
+	// no tier grants it and nothing checks it; the offload is held to the offload limit of the
+	// tier (Limits) alone.
 	FeatureKernelOffload
 	FeatureUserQuota
 	FeatureDaemonSet
@@ -122,8 +126,8 @@ func (f feature) String() string {
 
 // AllFeatures returns all defined valid features.
 func AllFeatures() []Feature {
-	return []Feature{FeatureKernelOffload, FeatureUserQuota, FeatureDaemonSet,
-		FeatureRelayAddressDiscovery, FeatureDualStack, FeatureHAOperator, FeaturePQC}
+	return []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureRelayAddressDiscovery,
+		FeatureDualStack, FeatureHAOperator, FeaturePQC}
 }
 
 // AllFeaturesString returns all valid features in a string slice.
@@ -131,50 +135,22 @@ func AllFeaturesString() []string {
 	return ToStringSlice(AllFeatures())
 }
 
-// Features returns the features a subscription type grants. Every tier gets the kernel offload, up
-// to the offload limit of the tier.
+// Features returns the features a subscription type grants. What a tier may use of a limited
+// premium service (SIP and SRT Gateways and sessions, the kernel offload) is its Limits.
 func Features(t SubscriptionType) []Feature {
 	switch t {
 	case SubscriptionTypeMember:
-		return []Feature{FeatureKernelOffload, FeatureUserQuota, FeatureDaemonSet,
-			FeatureRelayAddressDiscovery, FeatureDualStack, FeatureHAOperator, FeaturePQC}
+		return []Feature{FeatureUserQuota, FeatureDaemonSet, FeatureRelayAddressDiscovery,
+			FeatureDualStack, FeatureHAOperator, FeaturePQC}
 	case SubscriptionTypeEnterprise:
 		return AllFeatures()
 	default:
-		return []Feature{FeatureKernelOffload}
+		return []Feature{}
 	}
 }
 
-// Limits are the usage limits of a subscription type: the SIP and SRT Gateways served, the
-// parallel sessions of a Gateway (the calls of a SIP Gateway, the streams of an SRT Gateway), and
-// the flows a dataplane pod offloads to the kernel (TURN channels, L4, SRT and RTP flows alike). 0
-// means unlimited, a negative value unknown.
-type Limits struct {
-	SIPGateways int `json:"sipGateways"`
-	SIPSessions int `json:"sipSessions"`
-	SRTGateways int `json:"srtGateways"`
-	SRTSessions int `json:"srtSessions"`
-	Offloads    int `json:"offloads"`
-}
-
-// String returns the limits per protocol and the offloads all protocols share, e.g., "TURN:
-// Gateways=unlimited: unlimited sessions, SIP: Gateways=3: 100 sessions, SRT: Gateways=3: 100
-// sessions, total offloads: 100". TURN has no Gateway or session limit. A limit is a number,
-// "unknown" or "unlimited".
-func (l Limits) String() string {
-	limit := func(n int) string {
-		switch {
-		case n < 0:
-			return "unknown"
-		case n == 0:
-			return "unlimited"
-		}
-		return strconv.Itoa(n)
-	}
-	return fmt.Sprintf("TURN: Gateways=unlimited: unlimited sessions, SIP: Gateways=%s: %s sessions, "+
-		"SRT: Gateways=%s: %s sessions, total offloads: %s", limit(l.SIPGateways), limit(l.SIPSessions),
-		limit(l.SRTGateways), limit(l.SRTSessions), limit(l.Offloads))
-}
+// Limits are the usage limits of a subscription type, as the license status carries them.
+type Limits = stnrv2.LicenseLimits
 
 // getLimits returns the limits of a subscription type: unknownLimits by default.
 var getLimits = unknownLimits
