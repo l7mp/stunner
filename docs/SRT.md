@@ -173,9 +173,8 @@ settings and the monitoring.
 
 ## Limitations
 
-- The free tier serves one SRT Gateway with at most 10 parallel sessions (streams), the member
-  tier three with at most 100 each, the enterprise tier any number. When the GatewayConfig sets a
-  `userQuota`, the lower of the two caps the sessions.
+- Each tier serves a number of SRT Gateways with a number of parallel sessions (streams) each: see
+  [here](https://l7mp.io/pricing) for the limits and pricing at each tier.
 - One dataplane replica per Gateway: the placement of the streams is kept per dataplane pod.
 - Callers only: STUNner takes the connections of SRT callers, it does not call SRT listeners
   (pulling an encoder in listener mode) and does not take rendezvous connections.

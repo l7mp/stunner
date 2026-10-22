@@ -113,14 +113,13 @@ a far-away relay, and it scales like any other Kubernetes service.
 authentication service, the Helm chart and the tools are all public on GitHub. The official STUNner
 images and the `stunner/stunner` Helm chart are built by [l7mp.io](https://l7mp.io) from the same
 code, plus a few premium additions. Without a customer key you get the **free tier**: unlimited
-TURN Gateways and connections, a single SIP/RTP or SRT Gateway with at most 10 parallel
-sessions, and 10 flows per dataplane pod in STUNner's industry-leading [Linux/eBPF kernel
-offload engine](/docs/PREMIUM_REFERENCE.md#kernel-offload). The **member tier**, aimed at small
-and medium-scale operations, unlocks a number of premium features and 10x limits: 3 SIP and SRT
-Gateways with 100 sessions each and 100 offloaded flows per pod. The fully featured
-**enterprise tier**, optimized for large-scale deployments, has no limits on the Gateways, the
-calls, the streams and the offloaded flows. See [here](https://l7mp.io/pricing) for
-up-to-date info on how to purchase a license. Note that SIP/RTP and SRT are in beta and there is
+TURN Gateways and connections, and a limited use of the SIP/RTP and SRT gateways and of STUNner's
+industry-leading [Linux/eBPF kernel offload engine](/docs/PREMIUM_REFERENCE.md#kernel-offload).
+The **member tier**, aimed at small and medium-scale operations, unlocks a number of premium
+features and higher limits. The fully featured **enterprise tier**, optimized for large-scale
+deployments, has no limits on the Gateways, the sessions and the offloaded flows. See
+[here](https://l7mp.io/pricing) for the limits and pricing at each tier, and on how to purchase a
+license. Note that SIP/RTP and SRT are in beta and there is
 absolutely no support at any tier: use the beta features at your own risk.
 
 ## Features

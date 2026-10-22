@@ -193,7 +193,7 @@ Below is the set of steps to enable post-quantum TLS:
 
 ## Kernel offload
 
-**Availability:** every tier, up to the offload limit of the tier: 10 offloaded flows per dataplane pod on the free tier, 100 on the member tier, unlimited on the enterprise tier (see [here](https://l7mp.io/pricing); the limits may change). [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status) prints the limit of your tier (`total offloads`).
+**Availability:** see [here](https://l7mp.io/pricing) for the limits and pricing at each tier. [`stunnerctl status`](/docs/cmd/stunnerctl.md#status) shows the limits of the tier each dataplane pod runs at (`limits={...}`), which the dataplane derives from its license.
 
 Relaying media in user space costs CPU and latency. STUNner can offload the relaying of plaintext UDP flows to its Linux/eBPF kernel packet processing engines, which provide a massive bandwidth, delay and jitter boost and can cut CPU usage by orders of magnitude. A flow is set up in user space as usual, then its packets are relayed in the kernel in both directions. The packets the dataplane still needs to see go to user space: STUN messages always, plus what a protocol needs, such as the handshakes of an SRT stream. What is offloaded, and what stays in user space, depends on the protocol:
 

@@ -108,11 +108,10 @@ stunnerctl license
 License status:
     Subscription type: member
     Enabled features: DaemonSet, RelayAddressDiscovery, ...
-    Limits: TURN: Gateways=unlimited: unlimited sessions, SIP: Gateways=3: 100 sessions, SRT: Gateways=3: 100 sessions, total offloads: 100
     Last updated: ...
 ```
 
-This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license, and the limits of your subscription.
+This command will connect to your STUNner gateway operator and validate your license. It will also report any errors STUNner may have encountered while validating your license. The limits of your subscription are in the dataplane status of `stunnerctl status` (`limits={...}`).
 
 ### Authentication
 

@@ -234,9 +234,8 @@ settings and the monitoring.
 
 ## Limitations
 
-- The free tier serves one SIP Gateway with at most 10 parallel sessions (calls), the member tier
-  three with at most 100 each, the enterprise tier any number. When the GatewayConfig sets a
-  `userQuota`, the lower of the two caps the sessions. One dataplane replica per Gateway.
+- Each tier serves a number of SIP Gateways with a number of parallel sessions (calls) each: see
+  [here](https://l7mp.io/pricing) for the limits and pricing at each tier. 
 - A lost registration connection ends the calls over it; STUNner dials and registers again.
 - No outbound calls.
 - The media of a carrier is matched by the address in its SDP: carriers behind a NAT that rewrites
