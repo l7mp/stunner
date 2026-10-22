@@ -224,12 +224,13 @@ media peers to that range, here rtpengine's media port range.
 
 ## Kernel offload
 
-STUNner can relay the RTP and RTCP media of the calls in the Linux kernel instead of in user space,
-up to the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits may
-change). The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane pods
-the capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload) reference.
-The SIP signaling stays in user space, and so does RTCP when only one of the parties multiplexes it
-with RTP.
+STUNner can relay the RTP and RTCP media of the calls in the Linux kernel instead of in user space:
+once both ends of a media stream are known, its packets are relayed in the kernel, one offloaded
+flow per stream, two when the parties send RTCP on a port of its own. The SIP signaling stays in
+user space, and so does RTCP when only one of the parties multiplexes it with RTP, since STUNner
+moves it between the ports. Media through a tunnelled cluster is not offloaded. See the [kernel
+offload](PREMIUM_REFERENCE.md#kernel-offload) reference for the offload limit of your tier, the
+settings and the monitoring.
 
 ## Limitations
 

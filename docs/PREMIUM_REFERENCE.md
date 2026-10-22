@@ -193,24 +193,28 @@ Below is the set of steps to enable post-quantum TLS:
 
 ## Kernel offload
 
-**Feature:** `KernelOffload`. **Availability:** every tier, up to the offload limit of the tier: 10 offloaded flows per dataplane pod on the free tier, 100 on the member tier, unlimited on the enterprise tier (see [here](https://l7mp.io/pricing); the limits may change). [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status) prints the limit of your tier (`offload=...`).
+**Availability:** every tier, up to the offload limit of the tier: 10 offloaded flows per dataplane pod on the free tier, 100 on the member tier, unlimited on the enterprise tier (see [here](https://l7mp.io/pricing); the limits may change). [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status) prints the limit of your tier (`total offloads`).
 
-Relaying media in user space costs CPU and latency. STUNner can offload the relaying of UDP flows to its Linux/eBPF kernel packet processing engines, which provide a massive bandwidth, delay and jitter boost and can cut CPU usage by orders of magnitude. The engines relay:
+Relaying media in user space costs CPU and latency. STUNner can offload the relaying of plaintext UDP flows to its Linux/eBPF kernel packet processing engines, which provide a massive bandwidth, delay and jitter boost and can cut CPU usage by orders of magnitude. A flow is set up in user space as usual, then its packets are relayed in the kernel in both directions. The packets the dataplane still needs to see go to user space: STUN messages always, plus what a protocol needs, such as the handshakes of an SRT stream. What is offloaded, and what stays in user space, depends on the protocol:
 
-- **TURN:** the UDP channels of a TURN/UDP listener relaying to a UDPRoute backend.
-- **L4:** a UDP flow relayed to a UDP backend, directly or through an upstream TURN/UDP server, as in the [tunnel mode](/docs/cmd/stunnerd.md#tunnel-mode).
-- **SRT:** the streams of an [SRT Gateway](SRT.md); the handshakes and the shutdowns stay in user space.
-- **SIP:** the RTP and RTCP media of the calls of a [SIP Gateway](SIP.md); RTCP stays in user space when only one of the parties multiplexes it with RTP.
+- **TURN:** the UDP channels of a TURN/UDP listener, see the [TURN gateway](TURN.md#kernel-offload).
+- **SRT:** the streams of an SRT Gateway, see the [SRT gateway](SRT.md#kernel-offload).
+- **SIP:** the RTP and RTCP media of the calls of a SIP Gateway, see the [SIP gateway](SIP.md#kernel-offload).
+- **L4:** the flows of a plain UDP [listener](GATEWAY.md#listener-configuration) to a UDP backend, relayed directly or through an upstream TURN/UDP server of a [TURNRoute](ROUTE.md#turnroute).
 
-One offloaded flow is one TURN channel or one L4, SRT or RTP flow; the limit counts the flows of a dataplane pod at a time, and a flow beyond the limit is relayed in user space as usual. STUN messages always stay in user space.
+### Limits
 
-STUNner's eBPF offload requires Kubernetes nodes running Linux and elevated privileges to load programs into the eBPF/tc (`TC`) or eBPF/XDP (`XDP`) kernel framework. `TC` is supported in most Kubernetes environments (e.g., public clouds), `XDP` is about three times faster but needs a network driver with native XDP support, typical on bare metal; where XDP cannot attach, STUNner falls back to `TC`.
-
-Kernel offload is opt-in: set `spec.offloadEngine` in the `Dataplane` custom resource: `TC` means eBPF/TC, `XDP` is eBPF/XDP, `Auto` lets STUNner pick the best engine for your platform, and `None` (the default) relays everything in user space. `spec.offloadInterfaces` lists the network interfaces to offload on, every interface if empty (the default). The dataplane pods also need the `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE` capabilities in `spec.containerSecurityContext`.
+The offload limit counts the flows a dataplane pod offloads at a time, across all its listeners: one TURN channel, one L4 flow, one SRT flow or one RTP flow is one offloaded flow. A flow beyond the limit is relayed in user space as usual, for its lifetime. A flow that ends frees its place for the next one.
 
 ### Configuration
 
-The below will set the dataplane for all gateways using the `default` Dataplane to use the kernel offload on all available network interfaces and select the optimal offload mode.
+Kernel offload is opt-in, set in the `Dataplane` custom resource:
+
+- `spec.offloadEngine`: `TC` for eBPF/TC, `XDP` for eBPF/XDP, `Auto` to let STUNner pick the best engine for the platform, and `None` (the default) to relay everything in user space. `TC` is supported in most Kubernetes environments (e.g., public clouds). `XDP` is about three times faster but needs a network driver with native XDP support, typical on bare metal. `XDP` and `Auto` fall back to `TC` where XDP cannot attach, and every engine falls back to relaying in user space when it cannot start.
+- `spec.offloadInterfaces`: the network interfaces to offload on, every interface if empty (the default).
+- `spec.containerSecurityContext`: loading the eBPF programs needs the `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE` capabilities.
+
+The below sets the dataplanes of all Gateways using the `default` Dataplane to offload on every network interface with the best engine available.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -227,45 +231,35 @@ spec:
   offloadEngine: Auto
 ```
 
-### Testing
+### Monitoring
 
-The simplest way to test whether eBPF offload was successfully enabled is to deploy a simple STUNner tutorial (like the [simple tunnel](/docs/examples/simple-tunnel/README.md) example) and watch for the offload statistics in the output or [`stunnerctl status`](/docs/cmd/stunnerctl.md#status):
+[`stunnerctl status`](/docs/cmd/stunnerctl.md#status) shows the offload of every dataplane pod. The `offload` of the admin status names the engine that runs, the interfaces it offloads on and the flows it offloads against the limit, such as `offload=tc[all]:3/100`; it reads `offload=null` when no kernel engine runs, because the offload is not enabled or the requested engine could not start (the dataplane logs say why). The listeners and clusters count the packets and bytes relayed in the kernel (`offload(rx/tx)`) next to their totals:
 
 ```console
 stunnerctl -n <gateway-namespace> status <gateway-name>
 <gateway-namespace>/<gateway-name>:
-	admin: ...
+	admin:{...,offload=tc[all]:1/100}
 	static-auth: ...
 	listeners: <listener-name>:{...},total(rx/tx): 1160/353 pkts 168912/20554 bytes,offload(rx/tx): 1152/345 pkts 168192/19834 bytes
 	clusters: ...
 	allocs:1/status=READY
 ```
 
-You may also check the dataplane logs. The below was logged by `stunnerd` while running `stunnerctl icetest --offload-mode=TC --force-cleanup`:
+The dataplane logs show the engine starting and the flows it offloads, here from `stunnerctl icetest --offload-mode=TC --force-cleanup`:
 
 ```text
-stunnerd INFO: Starting stunnerd id "icetest/icetest-udp-gateway", STUNner version ... 
-...
 offload INFO: TC init complete on interfaces: [lo eth0]
 ...
-stunner INFO: New dataplane status: ... admin:{...,license-info={tier=enterprise,unlocked-features=[KernelOffload,UserQuota,DaemonSet,RelayAddressDiscovery,...]...
-...
-offload INFO: Created TC offload udp:local:[::]:3478-remote:...:...-chan:16384->udp:local:....:...-remote:...:...-chan:0
-...
+offload INFO: Created TC offload udp:local:[::]:3478-remote:...:...-chan:16384<->udp:local:...:...-remote:...:...-chan:0
 ```
 
-You can also directly check the eBPF maps created by the offload engine on the host using `bpftool`.
-
-<!-- **eBPF maps:** -->
-<!-- TODO -->
-
-<!-- ## Troubleshooting -->
+The eBPF maps of the offload engine can also be inspected on the host with `bpftool`.
 
 ### Limitations
 
 Kernel offload requires some low-level tweaking of the underlying OS kernel. As such, some Kubernetes deployments may support only a limited offload, or none at all:
 
 - The offload engines rely on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
-- Loading the eBPF programs requires elevated privileges that might not be available on every Kubernetes cluster. Make sure to add the required capabilities (at least `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE`) to the dataplane pod security context (see above).
-- Only plaintext UDP over IPv4 is offloaded. TURN over TCP, TLS or DTLS, TCP and TLS backends, DTLS-secured clusters and tunnels, IPv6 and fragmented packets stay in user space, as do TURN send indications and TURN relay chaining.
+- Loading the eBPF programs requires elevated privileges that might not be available on every Kubernetes cluster (see the capabilities above).
+- Only plaintext UDP over IPv4 is offloaded: TCP, TLS and DTLS, IPv6 and fragmented packets stay in user space. The protocol sections list what else stays in user space.
 - XDP offload is disabled for host-local redirects (except the lo interface). Use the TC engine when host-local redirects are important, like in an accelerated symmetric ICE mode deployment.

@@ -100,7 +100,10 @@ more.
 ## Kernel offload
 
 STUNner can relay the UDP channels of a TURN/UDP listener in the Linux kernel instead of in user
-space, up to the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits
-may change). The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane
-pods the capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload)
-reference.
+space: once a client binds a channel to a peer of a UDPRoute backend, the ChannelData from the
+client and the datagrams from the peer are relayed in the kernel, one offloaded flow per channel.
+The allocations, the permissions and the channel bindings stay in user space, and so does the data
+of a client that sends it in Send indications instead of a channel. TURN over TCP, TLS or DTLS, and
+relaying through an upstream TURN server of a [TURNRoute](ROUTE.md#turnroute), are not offloaded.
+See the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload) reference for the offload limit of
+your tier, the settings and the monitoring.

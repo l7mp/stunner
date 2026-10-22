@@ -109,8 +109,8 @@ stunnerctl license
 License status:
    Subscription type: member
    Enabled features: DaemonSet, RelayAddressDiscovery, ...
-   Last updated: ...
    Limits: TURN: Gateways=unlimited: unlimited sessions, SIP: Gateways=3: 100 sessions, SRT: Gateways=3: 100 sessions, total offloads: 100
+   Last updated: ...
 ```
 
 This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license, and the limits of your subscription.
@@ -119,7 +119,7 @@ It is also possible to check the license status of STUNners's dataplane pods. Th
 
 ```console
 stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.name}: {.admin.licensing_info}'
-{tier=enterprise,unlocked-features=[KernelOffload,UserQuota,DaemonSet,RelayAddressDiscovery,DualStack,HAOperator,PQC],valid-until=...}
+{tier=enterprise,unlocked-features=[UserQuota,DaemonSet,RelayAddressDiscovery,DualStack,HAOperator,PQC],valid-until=...}
 ...
 ```
 
@@ -133,7 +133,7 @@ kubectl -n stunner-system logs $(kubectl -n stunner-system get pods -l \
 ...
 license-mgr     license manager client created  {"server": "https://license.l7mp.io:443", "customer-key-status": "set"}
 ...
-license-mgr     new license status      {"subscription-type": "enterprise", "enabled-features": ["DaemonSet", "UserQuota", "KernelOffload"], "last-updated": "..."}
+license-mgr     new license status      {"subscription-type": "enterprise", "enabled-features": ["DaemonSet", "UserQuota", "PQC"], "last-updated": "..."}
 ...
 ```
 <!-- ### Demo video -->

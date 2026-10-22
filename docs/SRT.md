@@ -164,11 +164,12 @@ k8s://streaming/srt-gateway live/test` and `mediactl srt read k8s://streaming/sr
 
 ## Kernel offload
 
-STUNner can relay the streams of an SRT Gateway in the Linux kernel instead of in user space, up to
-the offload limit of your tier (see the [pricing](https://l7mp.io/pricing); the limits may change).
-The offload is opt-in: set `offloadEngine` in the Dataplane and grant the dataplane pods the
-capabilities it needs; see the [kernel offload](PREMIUM_REFERENCE.md#kernel-offload) reference. The
-handshakes and the shutdowns of a stream stay in user space.
+STUNner can relay the streams of an SRT Gateway in the Linux kernel instead of in user space: once
+a caller's handshake has completed, its flow to the media server is relayed in the kernel, one
+offloaded flow per caller. The handshakes and the shutdowns stay in user space, so a repeated
+conclusion is still answered and a shutdown still ends the flow. See the [kernel
+offload](PREMIUM_REFERENCE.md#kernel-offload) reference for the offload limit of your tier, the
+settings and the monitoring.
 
 ## Limitations
 
