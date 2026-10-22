@@ -121,6 +121,11 @@ func main() {
 	}
 
 	logLevel := stnrv2.DefaultLogLevel
+	// the URI modes run on the command line: exit at once and log only the warnings
+	if flag.NArg() > 0 {
+		logLevel = "all:WARN"
+		*noGracefulShutdown = true
+	}
 	if *verbose {
 		logLevel = "all:DEBUG"
 	}
@@ -301,7 +306,7 @@ func main() {
 
 		case c := <-conf:
 			// the command line overrides the config
-			if *verbose || *level != "" {
+			if *verbose || *level != "" || flag.NArg() > 0 {
 				c.Admin.LogLevel = logLevel
 			}
 			if license != nil {
