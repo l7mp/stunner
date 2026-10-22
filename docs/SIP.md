@@ -4,10 +4,6 @@
 > The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
 > Please test and report issues, but in any way, use it at your own risk.
 
-The SIP gateway is a beta feature: its API may change in any release, it comes with no support on
-any tier, and the number of SIP Gateways and parallel sessions depends on the tier (see
-[Limitations](#limitations)). Within these limits, 
-
 The SIP/RTP gateway is the VoIP leg of STUNner: it lets you ingest SIP/RTP traffic from a SIP trunk
 into Kubernetes.  Carriers send SIP signaling and RTP media to STUNner's public address and it
 proxies the SIP signaling to an in-cluster SIP backend (e.g., [LiveKit

@@ -202,12 +202,6 @@ Relaying media in user space costs CPU and latency. STUNner can offload the rela
 - **SIP:** the RTP and RTCP media of the calls of a SIP Gateway, see the [SIP gateway](SIP.md#kernel-offload).
 - **L4:** the flows of a plain UDP [listener](GATEWAY.md#listener-configuration) to a UDP backend, relayed directly or through an upstream TURN/UDP server of a [TURNRoute](ROUTE.md#turnroute).
 
-### Limits
-
-The offload limit counts the flows a dataplane pod offloads at a time, across all its listeners: one TURN channel, one L4 flow, one SRT flow or one RTP flow is one offloaded flow. A flow beyond the limit is relayed in user space as usual, for its lifetime. A flow that ends frees its place for the next one.
-
-### Configuration
-
 Kernel offload is opt-in, set in the `Dataplane` custom resource:
 
 - `spec.offloadEngine`: `TC` for eBPF/TC, `XDP` for eBPF/XDP, `Auto` to let STUNner pick the best engine for the platform, and `None` (the default) to relay everything in user space. `TC` is supported in most Kubernetes environments (e.g., public clouds). `XDP` is about three times faster but needs a network driver with native XDP support, typical on bare metal. `XDP` and `Auto` fall back to `TC` where XDP cannot attach, and every engine falls back to relaying in user space when it cannot start.
@@ -228,10 +222,10 @@ spec:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_MODULE
-  offloadEngine: Auto
+  offloadEngine: TC
 ```
 
-### Monitoring
+Add `offloadInterfaces: ["eth0"]` to select a particular list of interfaces where offload should listen; without it offload works on every interface. For ultra high performance try `offloadEngine: XDP`. Unfortunately, XDP tends to be disabled in Kubernetes pod context. Note that the operator may roll the dataplane pods of all Gateways using the edited `Dataplane` for certain offload setting changes.
 
 [`stunnerctl status`](/docs/cmd/stunnerctl.md#status) shows the offload of every dataplane pod. The `offload` of the admin status names the engine that runs, the interfaces it offloads on and the flows it offloads against the limit, such as `offload=tc[all]:3/100`; it reads `offload=null` when no kernel engine runs, because the offload is not enabled or the requested engine could not start (the dataplane logs say why). The listeners and clusters count the packets and bytes relayed in the kernel (`offload(rx/tx)`) next to their totals:
 
@@ -253,13 +247,9 @@ offload INFO: TC init complete on interfaces: [lo eth0]
 offload INFO: Created TC offload udp:local:[::]:3478-remote:...:...-chan:16384<->udp:local:...:...-remote:...:...-chan:0
 ```
 
-The eBPF maps of the offload engine can also be inspected on the host with `bpftool`.
-
-### Limitations
-
 Kernel offload requires some low-level tweaking of the underlying OS kernel. As such, some Kubernetes deployments may support only a limited offload, or none at all:
 
 - The offload engines rely on the OS to support eBPF TC/XDP. Currently this works on GNU/Linux hosts only.
-- Loading the eBPF programs requires elevated privileges that might not be available on every Kubernetes cluster (see the capabilities above).
+- Loading the eBPF programs requires elevated privileges that might not be available on every Kubernetes cluster.
 - Only plaintext UDP over IPv4 is offloaded: TCP, TLS and DTLS, IPv6 and fragmented packets stay in user space. The protocol sections list what else stays in user space.
 - XDP offload is disabled for host-local redirects (except the lo interface). Use the TC engine when host-local redirects are important, like in an accelerated symmetric ICE mode deployment.

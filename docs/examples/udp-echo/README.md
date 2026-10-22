@@ -221,7 +221,7 @@ installed, you can fire up a tunnel to listen on the standard input and send eve
 to STUNner. Type any input and press Enter, and you should see it come back from your cluster!
 
 ```console
-./stunnerd - k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:9001
+./stunnerd - k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
 Hello STUNner
 Hello STUNner
 ```
@@ -230,15 +230,15 @@ Note that we haven't specified any IP address: the tunnel is clever enough to pa
 [STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the special
 STUNner URI `k8s://stunner/udp-gateway/udp-listener`, using the namespace (`stunner` here) and the
 name of the Gateway (`udp-gateway`) plus the listener you want to connect to (`udp-listener`), and
-the peer `k8s://default/media-plane:9001`, at port 9001 of the `media-plane` Service in the
-`default` namespace. Then, `stunnerd` will do the heavy lifting of translating this to concrete IPs
-and ports.
+the peer `k8s://default/media-plane:media-plane-port`, the `media-plane` Service in the `default`
+namespace at the service-port named `media-plane-port` (numerical port values also work,
+9001). Then, `stunnerd` will do the heavy lifting of translating this to concrete IPs and ports.
 
 To measure the path, let [`mediactl`](/docs/cmd/mediactl.md) send packets through STUNner for ten
 seconds, the same way, and report the loss and the round trip of the echo:
 
 ```console
-mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:9001
+mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
 ```
 
 Note that your actual WebRTC clients will *not* need a tunnel to reach the cluster: all

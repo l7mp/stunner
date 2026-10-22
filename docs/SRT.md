@@ -4,14 +4,11 @@
 > The SRT gateway is in beta: the API may change in any release and there is no support on any tier.
 > Please test and report issues, but in any way, use it at your own risk.
 
-The SRT gateway is a beta feature: its API may change in any release, it comes with no support on
-any tier, and the number of SRT Gateways and parallel sessions depends on the tier (see
-[Limitations](#limitations)). Within these limits, STUNner ingests
-[SRT](https://github.com/Haivision/srt) streams into Kubernetes: encoders, drones and cameras
-publish their streams to one public UDP port, decoders and players read them from the same port, and
-STUNner routes every connection to the media server pod that holds its stream (e.g.,
-[MediaMTX](https://github.com/bluenviron/mediamtx)), with no host networking and no per-pod
-Services.
+STUNner allows to ingest [SRT](https://github.com/Haivision/srt) streams into Kubernetes: encoders,
+drones and cameras publish their streams to one public UDP port, decoders and players read them
+from the same port, and STUNner routes every connection to the media server pod that holds its
+stream (e.g., [MediaMTX](https://github.com/bluenviron/mediamtx)), with no host networking and no
+per-pod Services.
 
 ## Table of Contents
 

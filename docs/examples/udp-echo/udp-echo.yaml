@@ -29,7 +29,8 @@ metadata:
     app: media-plane
 spec:
   ports:
-  - port: 9001
+  - name: media-plane-port
+    port: 9001
     protocol: UDP
   selector:
     app: media-plane
