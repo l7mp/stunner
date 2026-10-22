@@ -14,6 +14,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/offload"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 )
 
 // Admin holds the bits of STUNner administration that aren't carved out into
@@ -154,6 +155,7 @@ func (a *Admin) Status() stnrv2.Status {
 		}
 		engine = fmt.Sprintf("%s[%s]:%d/%s", engine, intfs, flows, max)
 	}
+	limits := licensecfg.GetLimits(a.rt.License.SubscriptionType())
 	return &stnrv2.AdminStatus{
 		Name:                conf.Name,
 		Build:               a.rt.BuildInfo.Version,
@@ -165,6 +167,7 @@ func (a *Admin) Status() stnrv2.Status {
 		OffloadFlows:        flows,
 		OffloadLimit:        limit,
 		LicensingInfo:       a.rt.License.Status(),
+		Limits:              &limits,
 	}
 }
 

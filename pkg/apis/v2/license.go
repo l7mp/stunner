@@ -10,22 +10,16 @@ import (
 type LicenseStatus struct {
 	EnabledFeatures  []string `json:"enabledFeatures"`
 	SubscriptionType string   `json:"subscriptionType"`
-	// Limits are the usage limits of the subscription, nil when the reporter knows none.
-	Limits      *LicenseLimits `json:"limits,omitempty"`
-	LastUpdated string         `json:"lastUpdated"`
-	LastError   string         `json:"lastError"`
+	LastUpdated      string   `json:"lastUpdated"`
+	LastError        string   `json:"lastError"`
 }
 
 func (s LicenseStatus) String() string {
 	if s.LastError != "" {
 		return fmt.Sprintf("{error:%q}", s.LastError)
 	} else {
-		limits := ""
-		if s.Limits != nil {
-			limits = fmt.Sprintf(",limits={%s}", s.Limits.String())
-		}
-		return fmt.Sprintf("{tier=%s,unlocked-features=%s%s,last-updated=%s}", s.SubscriptionType,
-			strings.Join(s.EnabledFeatures, ","), limits, s.LastUpdated)
+		return fmt.Sprintf("{tier=%s,unlocked-features=%s,last-updated=%s}", s.SubscriptionType,
+			strings.Join(s.EnabledFeatures, ","), s.LastUpdated)
 	}
 }
 
@@ -39,12 +33,8 @@ func (s LicenseStatus) Summary() string {
 	if len(s.EnabledFeatures) != 0 {
 		features = strings.Join(s.EnabledFeatures, ", ")
 	}
-	limits := ""
-	if s.Limits != nil {
-		limits = fmt.Sprintf("\tLimits: %s\n", s.Limits.String())
-	}
-	return fmt.Sprintf("License status:\n\tSubscription type: %s\n\tEnabled features: %s\n%s\tLast updated: %s\n",
-		s.SubscriptionType, features, limits, s.LastUpdated)
+	return fmt.Sprintf("License status:\n\tSubscription type: %s\n\tEnabled features: %s\n\tLast updated: %s\n",
+		s.SubscriptionType, features, s.LastUpdated)
 }
 
 func NewEmptyLicenseStatus() LicenseStatus {

@@ -12,6 +12,7 @@ import (
 	"github.com/l7mp/stunner/v2/internal/resolver"
 	"github.com/l7mp/stunner/v2/internal/runtime"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
+	licensecfg "github.com/l7mp/stunner/v2/pkg/config/license"
 	"github.com/l7mp/stunner/v2/pkg/logger"
 )
 
@@ -111,4 +112,21 @@ func TestHealthServerBindsBothFamilies(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		require.NoError(t, resp.Body.Close())
 	}
+}
+
+// TestAdminStatusLimits pins that the admin status carries the limits of the dataplane's own
+// license, whichever build knows them (the open-source one knows none).
+func TestAdminStatusLimits(t *testing.T) {
+	env := newTestEnv()
+	offload, err := object.NewOffload(&object.OffloadConfig{Engine: stnrv2.OffloadEngineNone.String(), Interfaces: []string{}}, env.rt)
+	require.NoError(t, err)
+	mustAdd(t, env, offload)
+	obj, err := object.NewAdmin(&stnrv2.AdminConfig{Name: stnrv2.DefaultStunnerName, OffloadEngine: stnrv2.OffloadEngineNone.String()}, env.rt)
+	require.NoError(t, err)
+
+	status := obj.Status().(*stnrv2.AdminStatus)
+	require.NotNil(t, status.Limits, "the status carries the limits")
+	require.Equal(t, licensecfg.GetLimits(env.rt.License.SubscriptionType()), *status.Limits)
+	require.Equal(t, "null", status.OffloadStatus)
+	require.Contains(t, status.String(), "limits={TURN: Gateways=unlimited")
 }

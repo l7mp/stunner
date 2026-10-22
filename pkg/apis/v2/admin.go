@@ -169,20 +169,17 @@ func LicensingStatus(req *LicenseConfig) string {
 
 // AdminStatus represents the administrative status.
 type AdminStatus struct {
-	Name                string `json:"name,omitempty"`
-	Build               string `json:"build,omitempty"`
-	LogLevel            string `json:"loglevel,omitempty"`
-	MetricsEndpoint     string `json:"metrics_endpoint,omitempty"`
-	HealthCheckEndpoint string `json:"healthcheck_endpoint,omitempty"`
-	UserQuota           string `json:"quota,omitempty"`
-	// OffloadStatus is the running offload engine, its interfaces and its flows against its
-	// limit, e.g., "tc[eth0]:3/10", or "null" when no kernel engine runs. OffloadFlows and
-	// OffloadLimit are the flows and the limit of a kernel engine: 0 is unlimited, a negative
-	// limit unknown.
-	OffloadStatus string `json:"offload,omitempty"`
-	OffloadFlows  int    `json:"offload_flows,omitempty"`
-	OffloadLimit  int    `json:"offload_limit,omitempty"`
-	LicensingInfo string `json:"licensing_info,omitempty"`
+	Name                string         `json:"name,omitempty"`
+	Build               string         `json:"build,omitempty"`
+	LogLevel            string         `json:"loglevel,omitempty"`
+	MetricsEndpoint     string         `json:"metrics_endpoint,omitempty"`
+	HealthCheckEndpoint string         `json:"healthcheck_endpoint,omitempty"`
+	UserQuota           string         `json:"quota,omitempty"`
+	OffloadStatus       string         `json:"offload,omitempty"`
+	OffloadFlows        int            `json:"offload_flows,omitempty"`
+	OffloadLimit        int            `json:"offload_limit,omitempty"`
+	LicensingInfo       string         `json:"licensing_info,omitempty"`
+	Limits              *LicenseLimits `json:"limits,omitempty"`
 }
 
 // String returns a string representation of the administrative status.
@@ -203,6 +200,9 @@ func (a *AdminStatus) String() string {
 	status = append(status, fmt.Sprintf("quota=%s", a.UserQuota))
 	if a.LicensingInfo != "" {
 		status = append(status, fmt.Sprintf("license-info=%s", a.LicensingInfo))
+	}
+	if a.Limits != nil {
+		status = append(status, fmt.Sprintf("limits={%s}", a.Limits.String()))
 	}
 	if a.OffloadStatus != "" {
 		status = append(status, fmt.Sprintf("offload=%s", a.OffloadStatus))
