@@ -1,4 +1,8 @@
-# STUNner Tutorial: Video-conferencing with Janus
+# Video-conferencing with Janus
+
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 This document guides you through the installation of [Janus](https://janus.conf.meetecho.com/) by [Meetecho](https://www.meetecho.com/en/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
@@ -156,7 +160,7 @@ echo https://client-$INGRESS_IP.nip.io
 
 Copy the URL into your browser, and now you should be greeted with the About page. On the landing page navigate to the Video call plugin demo (`/demos/videocall.html`). Register a user, then open the demo in a second tab, register another user and call the first one. If everything is set up correctly, you can enjoy a nice video-conferencing session with yourself, with the twist that all media between the browser tabs is flowing through STUNner and the Janus Gateway server deployed in your Kubernetes cluster.
 
-## Going further: dual-stack TURN
+## Dual-stack TURN (premium tiers)
 
 More and more mobile networks hand out IPv6 addresses only, and an IPv4-only TURN server leaves
 their users out of the call. With a STUNner license, [dual-stack
@@ -171,10 +175,6 @@ kubectl -n stunner get service udp-gateway -o jsonpath='{.spec.ipFamilies}'
 
 See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-The [other media-plane tutorials](../../README.md) put further WebRTC media servers behind STUNner.
 
 ## Clean up
 

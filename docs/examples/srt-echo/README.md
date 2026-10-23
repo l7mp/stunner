@@ -1,7 +1,9 @@
-# STUNner Tutorial: Stream SRT through STUNner with mediactl
+# Stream SRT through STUNner with mediactl
 
-*Beta: no support on any tier. Please test and report issues, but in any case, use it at your own
-risk.*
+> [!WARNING]
+> The SRT gateway is in beta: the API may change in any release and there is no support on any
+> tier. Certain features require premium support: see [here](https://l7mp.io/pricing) for the
+> limits and pricing.
 
 This tutorial streams [SRT](https://github.com/Haivision/srt) through a STUNner SRT Gateway to an
 SRT test service running in Kubernetes, two replicas of the STUNner [`mediactl`](../../cmd/mediactl.md) tool, and measures
@@ -142,7 +144,7 @@ stunnerctl -n stunner status srt-gateway
 * **The Gateway is not accepted.** The open-source operator renders no SRT server: install the
   official STUNner chart. Each tier serves a limited number of SRT Gateways.
 
-## Going further: user quota
+## User quota (premium tiers)
 
 A misconfigured encoder fleet, or a single encoder reconnecting under ever new stream names, can
 open more streams than the media servers can take. Model four encoders, each publishing a stream of
@@ -176,11 +178,6 @@ live/d refused
 
 See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-To stream real video into a real media server, follow the [MediaMTX
-tutorial](../srt-mediamtx/README.md).
 
 ## Clean up
 

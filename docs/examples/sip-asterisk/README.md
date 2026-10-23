@@ -1,7 +1,9 @@
-# STUNner Tutorial: Asterisk behind a STUNner SIP Gateway
+# A PBX behind a STUNner SIP Gateway
 
-*Beta: no support on any tier. Please test and report issues, but in any case, use it at your own
-risk.*
+> [!WARNING]
+> The SIP gateway is in beta: the API may change in any release and there is no support on any
+> tier. Certain features require premium support: see [here](https://l7mp.io/pricing) for the
+> limits and pricing.
 
 This tutorial puts [Asterisk](https://www.asterisk.org), the most popular open-source PBX, behind a
 STUNner SIP Gateway, the way a SIP trunk from a carrier reaches a PBX running in Kubernetes. The
@@ -225,7 +227,7 @@ stunnerctl -n stunner status sip-gateway
 * **The Gateway is not accepted.** The open-source operator supports no SIPTrunk: install the
   official STUNner chart. Each tier serves a limited number of SIP Gateways (see the [pricing](https://l7mp.io/pricing)).
 
-## Going further: user quota
+## User quota (premium tiers)
 
 A misconfigured trunk or a toll-fraud attack can flood the PBX with calls, and every call that gets
 in eats its CPU and may cost you money. Model a burst, ten calls at once: all ten reach Asterisk.
@@ -250,12 +252,6 @@ sipp -sf sipp-call.xml -s echo -r 10 -l 10 -m 10 -i ${MY_IP} -nostdin ${GATEWAY_
 
 See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-To connect a real carrier, point its trunk at the Gateway's address and list its signaling
-addresses in `allowedSources`, or let STUNner register to the carrier: see the [SIP gateway
-guide](../../SIP.md).
 
 ## Clean up
 

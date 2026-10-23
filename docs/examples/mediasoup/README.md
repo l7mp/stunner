@@ -1,6 +1,11 @@
-# STUNner Tutorial: Video-conferencing with mediasoup
+# Video-conferencing with mediasoup
 
-This document guides you through the installation of [mediasoup](https://mediasoup.org/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
+
+This document guides you through the installation of [mediasoup](https://mediasoup.org/) into
+Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
 In this tutorial you will learn how to:
 
@@ -161,7 +166,7 @@ In case you changed something additionally in the STUNner configuration during d
 
 This demo is adopted from [damhau/mediasoup-demo-docker](https://github.com/damhau/mediasoup-demo-docker). Huge thanks to @damhau for the great demo!
 
-## Going further: DaemonSet dataplane
+## DaemonSet dataplane (premium tiers)
 
 A large conference draws clients to every node of the cluster, while a Deployment places the
 STUNner pods wherever the scheduler likes: the load balancer takes an extra hop to reach them, and
@@ -177,10 +182,6 @@ kubectl -n stunner get daemonsets
 
 See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-The [other media-plane tutorials](../../README.md) put further WebRTC media servers behind STUNner.
 
 ## Clean up
 

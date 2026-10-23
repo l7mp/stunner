@@ -1,4 +1,8 @@
-# STUNner Tutorial: Open a UDP tunnel via STUNner
+# Open a UDP tunnel via STUNner
+
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 This tutorial tunnels a local UDP client through STUNner to a UDP echo service in the cluster, and
 measures the loss and the round trip of the path, over TURN on UDP and on TCP and under load: a
@@ -191,11 +195,6 @@ mediactl INFO: total of 5 streams: 9.9s, sent 12.2k pkts 12 MB 9.9 Mbit/s, recei
 The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
 many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see the
 [pricing](https://l7mp.io/pricing) and the [premium installation guide](../../PREMIUM_INSTALL.md).
-
-## Next steps
-
-The [UDP echo tutorial](../udp-echo/README.md) walks through the STUNner configuration step by step,
-and the [media-plane tutorials](../../README.md) put real WebRTC media servers behind STUNner.
 
 ## Clean up
 

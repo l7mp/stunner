@@ -1,7 +1,9 @@
-# STUNner Tutorial: Call a SIP echo service in Kubernetes
+# Call a SIP echo service in Kubernetes
 
-*Beta: no support on any tier. Please test and report issues, but in any case, use it at your own
-risk.*
+> [!WARNING]
+> The SIP gateway is in beta: the API may change in any release and there is no support on any
+> tier. Certain features require premium support: see [here](https://l7mp.io/pricing) for the
+> limits and pricing.
 
 This tutorial connects a SIP phone on your machine through a STUNner SIP Gateway to a SIP echo
 service running in Kubernetes: STUNner proxies the SIP signaling and relays the RTP media, the
@@ -111,7 +113,7 @@ stunnerctl -n stunner status sip-gateway
 * **The Gateway is not accepted.** The open-source operator supports no SIPTrunk: install the
   official STUNner chart. Each tier serves a limited number of SIP Gateways (see the [pricing](https://l7mp.io/pricing)); the oldest ones by creation time win.
 
-## Going further: kernel offload
+## Kernel offload (premium tiers)
 
 In production the dataplane shares its node with busy neighbors, and a traffic spike can leave it
 short of CPU. Model this: give the Gateway a Dataplane of its own, squeezed to 20m CPU, and place
@@ -139,15 +141,6 @@ mediactl INFO: total of 10 streams: 14.9s, ..., lost 0/7k (0.00%), ..., jitter 5
 The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
 many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see the
 [pricing](https://l7mp.io/pricing) and the [premium installation guide](../../PREMIUM_INSTALL.md).
-
-## Next steps
-
-To put a real PBX behind STUNner, follow the [Asterisk tutorial](../sip-asterisk/README.md).
-
-To connect a real carrier, follow the [SIP gateway guide](../../SIP.md): an IP-authenticated
-trunk looks like the SIPTrunk of this tutorial with the carrier's address ranges in
-`allowedSources`, and a registration-based trunk adds a registration with the carrier's
-credentials.
 
 ## Clean up
 

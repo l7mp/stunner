@@ -34,7 +34,7 @@
 
 ## Reference
 
-* [GatewayClass, GatewayConfig and Dataplane](GATEWAYCLASS.md)
+* [GatewayClass](GATEWAYCLASS.md)
 * [Gateway](GATEWAY.md)
 * [Routes](ROUTE.md)
 * [Premium tiers](PREMIUM_REFERENCE.md)
@@ -43,9 +43,9 @@
 
 ### WebRTC gateways
 
-* [Direct one to one video call with headless STUNner](examples/direct-one2one-call)
-* [Deploying a UDP echo service behind STUNner](examples/udp-echo)
 * [Opening a UDP tunnel via STUNner](examples/simple-tunnel)
+* [Deploying a UDP echo service behind STUNner](examples/udp-echo)
+* [Direct one to one video call with headless STUNner](examples/direct-one2one-call)
 * [Video-conferencing with LiveKit](examples/livekit/README.md)
 * [Video-conferencing with mediasoup](examples/mediasoup/README.md)
 * [Video-conferencing with Janus](examples/janus/README.md)

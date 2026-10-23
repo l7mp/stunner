@@ -2,8 +2,7 @@
 
 Routes attach to the listeners of Gateways and name the backends the clients of a listener reach:
 UDPRoute and TCPRoute for backends in the cluster, TURNRoute for peers behind an upstream TURN
-server, and StaticService for backends outside the cluster. The [GatewayClass](GATEWAYCLASS.md)
-and the [Gateway](GATEWAY.md) have pages of their own.
+server, and StaticService for backends outside the cluster.
 
 1. [UDPRoute](#udproute)
 1. [TCPRoute](#tcproute)
@@ -93,10 +92,10 @@ spec:
 
 The `spec` and the backend reference fields are identical to those of the [UDPRoute](#udproute). As with UDPRoutes, the official Gateway API TCPRoute resource can be used instead of STUNner's own; a same-name STUNner-native TCPRoute masks the official one.
 
-> [!NOTE]
-> There is no protocol conversion anywhere: the client's allocation fixes the protocol of the relay leg, so a TCP backend is reachable only through an [RFC 6062](https://datatracker.ietf.org/doc/html/rfc6062) TCP allocation. Browsers do not implement RFC 6062, so TCP backends are not reachable from a browser's relay candidates.
-
 TCPRoute resources are safe for modification, exactly like UDPRoutes.
+
+> [!NOTE]
+> There is no protocol conversion anywhere: the client's allocation fixes the protocol of the relay leg, so a TCP backend is reachable only through an [RFC 6062](https://datatracker.ietf.org/doc/html/rfc6062) TCP allocation. 
 
 ## TURNRoute
 
@@ -145,9 +144,7 @@ Below is a reference of the TURNRoute `spec`.
 The Secret referenced by `tunnel.authRef` holds the key `type`, either `static` (the default) or `ephemeral`, the optional keys `realm` and `lifetime` (the validity of the generated ephemeral credentials, e.g., `1h`), and the credentials: `username` and `password` for static, `secret` for ephemeral authentication.
 
 > [!NOTE]
-> A TURNRoute should be the only route of its TURN listener: with other routes attached, the first route of the listener makes the relay sockets of every client, and the operator logs a warning.
-
-The TURNRoute CRD is optional: the operator runs without it and ignores TURNRoutes until the CRD is installed (and lists TURNRoute among the supported route kinds of a listener only then). A new Helm install installs the CRD, but `helm upgrade` never updates CRDs: to use TURNRoutes on an upgraded install, apply the STUNner CRDs of the chart by hand and restart the operator.
+> If a TURNRoute is attached to a TURN listener then it must be the only route attached to the listener. With more than one route, the first route of the listener is used to create the relay connections and the operator logs a warning.
 
 ## StaticService
 

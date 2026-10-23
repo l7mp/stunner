@@ -1,4 +1,8 @@
-# STUNner Tutorial: Deploy a UDP echo service behind STUNner
+# Deploy a UDP echo service behind STUNner
+
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 This tutorial exposes a UDP service running in Kubernetes to clients outside the cluster through a
 STUNner TURN Gateway, and connects to it with a TURN client from your machine. It introduces the
@@ -274,7 +278,7 @@ service whichever transport they use.
 * **The tunnel gets no echo.** Check the credentials and the endpoints in `stunnerctl config`, and
   the `stunnerd` pod logs: `kubectl -n stunner logs deploy/udp-gateway`.
 
-## Going further: post-quantum TLS
+## Post-quantum TLS (premium tiers)
 
 Data recorded today may be decrypted tomorrow: a large enough quantum computer would break the key
 exchange of today's TLS, which is why regulators start to require post-quantum encryption for
@@ -303,11 +307,6 @@ Hello STUNner
 
 See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-The [UDP tunnel tutorial](../simple-tunnel/README.md) measures the path under load, and the
-[media-plane tutorials](../../README.md) put real WebRTC media servers behind STUNner.
 
 ## Clean up
 

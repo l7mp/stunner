@@ -1,4 +1,8 @@
-# STUNner Tutorial: Direct one to one video call via STUNner
+# Direct one to one video call via STUNner
+
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 This tutorial shows the *headless deployment model* of STUNner: two WebRTC clients call each other
 directly, through STUNner as their TURN server, with no media server in between. A small Node.js
@@ -139,7 +143,7 @@ The console of the page shows the call setup:
   TCP as well. The [TURN troubleshooting guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html)
   helps to track down the rest.
 
-## Going further: relay address discovery
+## Relay address discovery (premium tiers)
 
 The relays above sit on the private addresses of the STUNner pods, which is fine as long as both
 parties of a call use STUNner. A party that does not, say a mobile app with a TURN server of its own,
@@ -157,11 +161,6 @@ kubectl -n stunner annotate --overwrite gateway udp-gateway stunner.l7mp.io/enab
 Register and call again: the relay candidates in the console now carry the public address of the
 node. See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-The [media-plane tutorials](../../README.md) put a WebRTC media server behind STUNner, the way
-multi-party calls are usually built.
 
 ## Clean up
 

@@ -1,4 +1,8 @@
-# STUNner Tutorial: Video-conferencing with LiveKit
+# Video-conferencing with LiveKit
+
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 This document guides you through the installation of [LiveKit](https://livekit.io/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
@@ -167,7 +171,7 @@ another browser tab with another identity (`--identity user2`), and enjoy a vide
 yourself: all the media between the tabs flows through STUNner and the LiveKit server in your
 cluster.
 
-## Going further: high-availability operator
+## High-availability operator (premium tiers)
 
 The STUNner gateway operator serves the configuration of every dataplane, and sooner or later it
 restarts: its node is drained, the cluster is upgraded, a new version is rolled out. A restarted
@@ -183,10 +187,6 @@ takes over the running dataplane pods instead: restart the operator again, and t
 and the calls in the rooms stay as they are. Run two operator replicas with leader election for a
 hot standby that takes over at once. See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
 guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
-
-## Next steps
-
-The [other media-plane tutorials](../../README.md) put further WebRTC media servers behind STUNner.
 
 ## Clean up
 

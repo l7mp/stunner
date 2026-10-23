@@ -1,7 +1,9 @@
-# STUNner Tutorial: Stream SRT video into MediaMTX
+# Stream SRT video into MediaMTX
 
-*Beta: no support on any tier. Please test and report issues, but in any case, use it at your own
-risk.*
+> [!WARNING]
+> The SRT gateway is in beta: the API may change in any release and there is no support on any
+> tier. Certain features require premium support: see [here](https://l7mp.io/pricing) for the
+> limits and pricing.
 
 This tutorial streams [SRT](https://github.com/Haivision/srt) video through a STUNner SRT Gateway
 into [MediaMTX](https://github.com/bluenviron/mediamtx), a popular open-source media server, running
@@ -149,7 +151,7 @@ kubectl logs -l app=mediamtx --prefix | grep "is publishing"
 * **The Gateway is not accepted.** The open-source operator renders no SRT server: install the
   official STUNner chart. Each tier serves a limited number of SRT Gateways.
 
-## Going further: kernel offload
+## Kernel offload (premium tiers)
 
 A live full HD feed at 10 Mbit/s is heavy work for a dataplane that shares its node with busy
 neighbors. Model a dataplane short of CPU: give the Gateway a Dataplane of its own, squeezed to 20m
@@ -189,11 +191,6 @@ timeout 20 ffmpeg -i "srt://${SRT_IP}:9000?streamid=#!::r=live/test,m=request&pa
 The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
 many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see the
 [pricing](https://l7mp.io/pricing) and the [premium installation guide](../../PREMIUM_INSTALL.md).
-
-## Next steps
-
-See the [SRT gateway guide](../../SRT.md) for how STUNner places the streams, the kernel offload of
-SRT flows and the limitations.
 
 ## Clean up
 

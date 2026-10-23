@@ -1,9 +1,9 @@
-# GatewayClass, GatewayConfig and Dataplane
+# GatewayClass
 
 These resources set up a STUNner installation: the GatewayClass is the root of the configuration
 hierarchy, the GatewayConfig holds the settings shared by every Gateway of the class (most
 importantly the TURN authentication credentials), and the Dataplane is the template of the
-[`stunnerd`](cmd/stunnerd.md) pods. The [Gateway](GATEWAY.md) and the [routes](ROUTE.md) have pages of their own.
+[`stunnerd`](cmd/stunnerd.md) pods.
 
 1. [GatewayClass](#gatewayclass)
 1. [GatewayConfig](#gatewayconfig)

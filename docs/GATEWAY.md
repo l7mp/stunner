@@ -2,8 +2,7 @@
 
 A Gateway describes the listeners STUNner exposes to clients, the public face of every use case:
 TURN listeners for WebRTC, plain UDP, TCP, TLS and DTLS listeners, SIP Gateways for SIP trunks and
-SRT listeners for SRT streams. The [GatewayClass](GATEWAYCLASS.md) and the [routes](ROUTE.md) have
-pages of their own.
+SRT listeners for SRT streams.
 
 1. [Gateway](#gateway)
 1. [SIPTrunk](#siptrunk) (beta)
@@ -108,24 +107,17 @@ Each `listener` is defined by a unique name, a protocol and a port. The protocol
 
 For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key. The certificate may come from anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with `--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`. A DNS-01 certificate names a hostname, not the load balancer IP: set `spec.addresses: [{type: Hostname, value: <hostname>}]` on the Gateway so that its listeners advertise the hostname (e.g., `turns:<hostname>:<port>` in the ICE server list) and clients verify the certificate against it, and point a DNS record of the hostname at the load balancer.
 
-### SIP Gateways
+A Gateway whose `spec.infrastructure.parametersRef` names a [SIPTrunk](#siptrunk) is a SIP gateway:
+its media listener carries the RTP of every call and each other listener, `UDP`, `TCP` or `TLS`,
+carries SIP. A Gateway whose `parametersRef` names a missing SIPTrunk, or a kind STUNner does not
+support, is not accepted (reason `InvalidParameters`) and gets no dataplane.  See the [SIP gateway
+guide](SIP.md).
 
-A Gateway whose `spec.infrastructure.parametersRef` names a [SIPTrunk](#siptrunk) is a SIP
-gateway (beta): its media listener carries the RTP of every call and each other listener,
-`UDP`, `TCP` or `TLS`, carries SIP. A Gateway whose `parametersRef` names a missing SIPTrunk, or a
-kind STUNner does not support, is not accepted (reason `InvalidParameters`) and gets no dataplane.
-See the [SIP gateway guide](SIP.md).
-
-### SRT Gateways
-
-A Gateway with an `SRT` listener is an SRT gateway (beta): every listener of the Gateway
-must be `SRT`, a UDP port that takes SRT callers and places each stream on a backend of the
-UDPRoutes attached to the listener, at the `port` of the backend reference. The publisher and the
-readers of a stream reach the same backend. A Gateway that mixes `SRT` with other listener
-protocols is not accepted (reason `ListenersNotValid`). Of more SRT Gateways than the tier serves
-(one free, three member, any number enterprise), the oldest ones by creation time are served, the
-others are not accepted (reason `LicenseLimit`). See the [SRT gateway
-guide](SRT.md).
+A Gateway with an `SRT` listener is an SRT gateway: every listener of the Gateway must be `SRT`, a
+UDP port that takes SRT callers and places each stream on a backend of the UDPRoutes attached to
+the listener, at the `port` of the backend reference. The publisher and the readers of a stream
+reach the same backend. A Gateway that mixes `SRT` with other listener protocols is not accepted
+(reason `ListenersNotValid`). See the [SRT gateway guide](SRT.md).
 
 ### Load balancer configuration
 
@@ -193,22 +185,22 @@ STUNner defines the following special annotations:
              name: tls-secret
    ```
 
-1. **Disabling the exposition of the health-check port:** Some older Kubernetes load-balancer providers required the exposition of the health-check port on LoadBalancer Services for UDP listeners to become externally reachable. Therefore, by default STUNner adds the health-check port (usually set via specific Gateway annotations) to the service-ports in automatically created LoadBalancer services. This has the unfortunate consequence that the health-check port becomes publicly reachable, which is considered a security issue by some, see https://github.com/l7mp/stunner-gateway-operator/issues/49. To prevent STUNner from exposing the health-check port, add the annotation `stunner.l7mp.io/disable-health-check-expose: true` to the corresponding Gateway. Note that this may make TURN/UDP listeners unreachable on the Gateway, so use this only if you know that this setting will work with your Kubernetes provider.
+1. **Disabling the exposition of the health-check port:** Load balancers cannot health-check UDP, so a Gateway with UDP listeners behind an AWS or DigitalOcean load balancer needs a TCP or HTTP health check; set with the `service.beta.kubernetes.io/aws-load-balancer-healthcheck-port` and `-protocol` or the `service.beta.kubernetes.io/do-loadbalancer-healthcheck-port` and `-protocol` annotations (see the example above). These load balancers check the nodes, which reach the health-check port of the dataplane only through a NodePort, so when both annotations are set STUNner adds the health-check port to the LoadBalancer Service of the Gateway. Without these annotations no health-check port is exposed. An exposed health-check port is publicly reachable, which is considered a security issue by some, see https://github.com/l7mp/stunner-gateway-operator/issues/49. To keep the port out of the Service, add the annotation `stunner.l7mp.io/disable-health-check-expose: "true"` to the Gateway; note that this makes every node fail the health check of these load balancers, and the UDP listeners of the Gateway unreachable, unless the load balancer checks the pods directly.
 
 1. **Disabling session affinity:** By default STUNner applies the `sessionAffinity: ClientIP` setting on the LB services it creates to expose Gateways. Normally this setting improves stability by ensuring that each TURN session is safely pinned to the same dataplane pod for its entire lifetime. Certain hosted Kubernetes platforms, however, seem to reject UDP LB services that have this setting on, [breaking STUNner deployments](https://github.com/l7mp/stunner/issues/155) on these systems. In order to prevent STUNner from enforcing session affinity on the LB Service corresponding to a Gateway, just set the `stunner.l7mp.io/disable-session-affinity: true` annotation on the Gateway. Otherwise, session affinity is turned on.
 
 The below table summarizes the Gateway annotations supported by STUNner.
 
-| Key/value                                           | Description                                                                                                                                                | Default        |
+| Key/value                                           | Description                                                                                                                                                |    Default     |
 |:----------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------:|
 | `stunner.l7mp.io/service-type: <svc-type>`          | [Type of the Service](https://kubernetes.io/docs/concepts/services-networking/service) per Gateway, either `ClusterIP`, `NodePort`, or `LoadBalancer`.     | `LoadBalancer` |
-| `stunner.l7mp.io/enable-mixed-protocol-lb: <bool>`  | [Mixed protocol load balancer service](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) support. | False          |
-| `stunner.l7mp.io/external-traffic-policy: <string>` | Set the value to `Local` to preserve clients' source IP at the load balancer.                                                                              | `Cluster`      |
-| `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        | False          |
-| `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            | None           |
-| `stunner.l7mp.io/targetport: <map>`                 | Request a specific target port for particular listeners. Value is a JSON map of listener-targetport key-value pairs.                                       | None           |
-| `stunner.l7mp.io/disable-health-check-expose: true` | Disable the default exposition of the health-check port (if any).                                                                                          | False          |
-| `stunner.l7mp.io/disable-session-affinity: true`    | Disable session affinity for a Gateway.                                                                                                                    | False          |
+| `stunner.l7mp.io/enable-mixed-protocol-lb: <bool>`  | [Mixed protocol load balancer service](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancers-with-mixed-protocol-types) support. |     False      |
+| `stunner.l7mp.io/external-traffic-policy: <string>` | Set the value to `Local` to preserve clients' source IP at the load balancer.                                                                              |   `Cluster`    |
+| `stunner.l7mp.io/disable-managed-dataplane: <bool>` | Switch managed-dataplane support off for a Gateway.                                                                                                        |     False      |
+| `stunner.l7mp.io/nodeport: <map>`                   | Request a specific NodePort for particular listeners. Value is a JSON map of listener-nodeport key-value pairs.                                            |      None      |
+| `stunner.l7mp.io/targetport: <map>`                 | Request a specific target port for particular listeners. Value is a JSON map of listener-targetport key-value pairs.                                       |      None      |
+| `stunner.l7mp.io/disable-health-check-expose: true` | Disable the default exposition of the health-check port (if any).                                                                                          |     False      |
+| `stunner.l7mp.io/disable-session-affinity: true`    | Disable session affinity for a Gateway.                                                                                                                    |     False      |
 
 ## SIPTrunk
 
