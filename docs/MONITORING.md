@@ -6,11 +6,10 @@ STUNner can export various statistics into an external timeseries database like 
 
 1. [Configuration](#configuration)
 1. [Metrics](#metrics)
-1. [Integration with Prometheus](#integration-with-prometheus)
 
 ## Configuration
 
-Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](GATEWAYCLASS.md#dataplane) template. This will configure the `stunnerd` dataplane pods to expose an HTTP metrics endpoint on port 8080 that Prometheus can scrape for metrics.
+Metrics collection is *not* enabled by default. To enable it, set the `enableMetricsEndpoint` field to true in the [Dataplane](GATEWAYCLASS.md#dataplane) template. This will configure the [`stunnerd`](cmd/stunnerd.md) dataplane pods to expose an HTTP metrics endpoint on port 8080 that Prometheus can scrape for metrics.
 
 ## Metrics
 
@@ -18,7 +17,7 @@ STUNner exports two types of metrics: the *Go collector metrics* describe the st
 
 ### Go collector metrics
 
-Each STUNner gateway instance exports a number of standard metrics that describe the state of the current Go process. Some notable metrics as listed below, see more in the [documentation](https://github.com/prometheus/client_golang).
+Each STUNner gateway instance exports a number of standard metrics that describe the state of the current Go process. Some notable metrics are listed below; see more in the [documentation](https://github.com/prometheus/client_golang).
 
 | Metric | Description |
 | :--- | :--- |
@@ -45,99 +44,3 @@ STUNner provides deep visibility into the amount of traffic sent and received on
 | `stunner_cluster_packets_total` | Number of datagrams sent to backends or received from backends of a cluster.  Unreliable for clusters running on a connection-oriented transport protocol (TCP/TLS).| counter | `direction=<rx\|tx>`, `name=<cluster-name>` |
 | `stunner_cluster_bytes_total` | Number of bytes sent to backends or received from backends of a cluster. | counter | `direction=<rx\|tx>`, `name=<cluster-name>` |
 
-## Integration with Prometheus
-
-Collection and visualization of STUNner relies on Prometheus and Grafana services. Your cluster might already have these services installed. If not, a recommended option is to install the [kube-prometheus-stack](https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack).
-
-### Configuration
-
-The STUNner monitoring configuration steps involve enabling monitoring in STUNner, and installing the Prometheus+Grafana components.
-
-1. Install stunner-gateway-operator with Prometheus support:
-
-```console
-helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --set stunnerGatewayOperator.dataplane.spec.enableMetricsEndpoint=true
-```
-
-Alternatively, you can enable it on existing installations by setting `enableMetricsEndpoint: true` in your [Dataplane](GATEWAYCLASS.md#dataplane) objects.
-
-> [!NOTE]
-> Metrics are exposed at `http://:8080/metrics` on each STUNner pod
-
-
-2. Install the Prometheus PodMonitor
-
-The below creates a Prometheus PodMonitor object in the `monitoring` namespace. Replace `kube-prometheus-stack` with your Prometheus helm release name.
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: stunner-podmonitor
-  labels:
-    metrics: stunner
-    release: kube-prometheus-stack
-  namespace: monitoring
-spec:
-  podMetricsEndpoints:
-  - honorLabels: true
-    interval: 5s
-    port: metrics-port
-    path: /metrics
-  selector:
-    matchLabels:
-      app: stunner
-  namespaceSelector:
-    matchNames:
-      - stunner
-      - stunner-system
-      - default
-```
-
-3. Add a Grafana dashboard
-
-As an example, let us plot the STUNner metric `stunner_listener_connections`. The first step, after logging in to Grafana, is to create a new panel, then to configure the plot parameters.
-
-Click on *Add panel* (1), then *Add a new panel* (2):
-
-![Grafana Add New Panel](img/grafana-add-panel-dashboard_0.png)
-
-The *Add a new panel* will open the panel configuration. The configuration steps are the following.
-
-1. Set the datasource: **prometheus**.
-2. Choose a metric. In this example, this is the `stunner_listener_connections`.
-3. Click on *Run queries* (this will update the figure).
-4. Fine-tune plot parameters. For example, set the title.
-5. Click *Apply*.
-
-![Grafana Panel Configuration](img/grafana-add-panel-config_0.png)
-
-The expected outcome is a new panel on the dashboard showing the `stunner_listener_connections` metric.
-
-Below is an example dashboard with data collected from the [simple-tunnel](examples/simple-tunnel/README.md) example:
-
-![Grafana Dashboard with the New Panel](img/grafana-add-panel-dashboard_1.png)
-
-### Troubleshooting
-
-Prometheus and Grafana each provide dashboards to help troubleshoot a running system and verify that metrics flow correctly from STUNner to Prometheus to Grafana.
-
-The Prometheus dashboard is available at the `prometheus` service address (see the kube-prometheus-stack [documentation](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#prometheus) for the correct access method based on your deployment). From there you can inspect the running Prometheus configuration and test metrics collection.
-
-For example, to observe the `stunner_listener_connections` metric on the Prometheus dashboard:
-
-1. Enter `stunner_listener_connections` into the query input field (next to the search icon).
-2. Click on the `Execute` button.
-3. Switch to `Graph` view tab.
-
-![Prometheus Dashboard](img/prometheus-dashboard.png)
-
-Note that some STUNner metrics may not be available when they are inactive (e.g., there is no active cluster).
-
-To check the Prometheus data source in Grafana, first click on *Configuration* (1), then *Data sources* (2), as shown here:
-
-![Grafana Data Source Check Step 1](img/grafana-prom-datasource_0.png)
-
-This will open up the datasources page. Scroll down to the bottom, click button *Save & test* (1), and observe the datasource is working (2):
-
-![Grafana Data Source Check Step 2](img/grafana-prom-datasource_1.png)

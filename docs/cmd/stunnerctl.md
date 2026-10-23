@@ -8,13 +8,13 @@ The prominent use of `stunnerctl` is to load or watch STUNner dataplane configur
 Install the `stunnerctl` binary using the standard Go toolchain and add it to `$PATH`.
 
 ```console
-go install github.com/l7mp/stunner/cmd/stunnerctl@latest
+go install github.com/l7mp/stunner/v2/cmd/stunnerctl@latest
 ```
 
 You can also enforce a specific OS, CPU architecture, and STUNner version:
 
 ```console
-GOOS=windows GOARCH=amd64 go install github.com/l7mp/stunner/cmd/stunnerctl@v0.17.5
+GOOS=windows GOARCH=amd64 go install github.com/l7mp/stunner/cmd/stunnerctl@latest
 ```
 
 Building from source is as easy as it usually gets with Go:
@@ -58,8 +58,8 @@ The `config` sub-command is used to load or watch running dataplane configs from
 
   ```console
   stunnerctl -n stunner config -o json
-  {"version":"v1","admin":{"name":"stunner/tcp-gateway",...}}
-  {"version":"v1","admin":{"name":"stunner/udp-gateway",...}}}
+  {"version":"v2","admin":{"name":"stunner/tcp-gateway",...}}
+  {"version":"v2","admin":{"name":"stunner/udp-gateway",...}}}
   ```
 
 - Watch STUNner configs as they are being refreshed by the operator and dump only the name of the gateway whose config changes:
@@ -73,7 +73,7 @@ The `config` sub-command is used to load or watch running dataplane configs from
 
 ### Status
 
-The `status` sub-command reports the status of the dataplane pods for a gateway, especially the runtime state of the `stunnerd` daemon.
+The `status` sub-command reports the status of the dataplane pods for a gateway, especially the runtime state of the [`stunnerd`](stunnerd.md) daemon.
 
 - Find all dataplane pods for the `udp-gateway` in the `stunner` namespace and dump a status summary:
 
@@ -131,7 +131,7 @@ The `auth` sub-command can be used to obtain a TURN credential or a full ICE ser
   {"password":"pass-1","ttl":86400,"uris":["turn:A.B.C.D:3478?transport=udp"],"username":"user-1"}
 ```
 
-- Obtain an ICE config for the Gateway `stunner/udp-gateway` and setting the user-id to `my-user`
+- Obtain an ICE config for the Gateway `stunner/udp-gateway` and set the user-id to `my-user`
   (useful for ephemeral authentication):
 
   ``` console
@@ -149,7 +149,7 @@ it, makes a PeerConnection to the WHIP server via the gateways, and performs a q
 sending a set of packets via a data channel created over the PeerConnection and measures loss and
 latency using the packets echoed back by the WHIP server. If successful, the tester will output the
 measured statistics, otherwise it reports the error that stopped the ICE test and provides some
-diagnostics that to help troubleshooting.
+diagnostics to help troubleshooting.
 
 - Run a dataplane test over UDP and TCP:
 
@@ -186,10 +186,10 @@ diagnostics that to help troubleshooting.
   ```
 
 - Clean up the Kubernetes resources the tester might have left behind on a previous run and perform
-  the test only on TURN-UDP with at a rate of 100 packets per second using a 2 minute timeout:
+  the test only on TURN-UDP at a rate of 100 packets per second using a 2 minute timeout:
 
   ``` console
-  stunnerctl icetest  --force-cleanup -packet-rate 100 --timeout 2m udp
+  stunnerctl icetest  --force-cleanup --packet-rate 100 --timeout 2m udp
   ```
 
 Run `stunnerctl icetest --help` for further useful command line arguments.

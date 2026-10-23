@@ -36,12 +36,12 @@ The authentication workflow of STUNner is as follows.
    {
      "iceServers": [
        {
-         "username": "1681486023:"
+         "username": "1681486023:",
          "credential": "v+MZOBeGWnk2690oJVL0qwF8YHQ=",
          "urls": [
            "turn:10.98.80.250:3478?transport=udp",
            "turn:10.105.169.152:3478?transport=tcp"
-         ],
+         ]
        }
      ],
      "iceTransportPolicy": "all"
@@ -105,7 +105,7 @@ kubectl -n stunner edit secret stunner-auth-secret
 
 STUNner provides the `ephemeral` authentication mode for production use, which uses per-client time-limited STUN/TURN authentication credentials.  Ephemeral credentials are dynamically generated with a pre-configured lifetime and, once the lifetime expires, the credential cannot be used to authenticate (or refresh) with STUNner any more. This authentication mode is more secure since credentials are not shared between clients and come with a limited lifetime. Configuring `ephemeral` authentication may be more complex though, since credentials must be dynamically generated for each session and properly returned to clients.
 
-STUNner adopts the [quasi-standard time-windowed TURN authentication credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) for ephemeral authentication. The TURN username consists of a colon-delimited combination of the expiration timestamp and the user-id parameter, where the user-id is some application-specific id that is opaque to STUNner and the timestamp specifies the date of expiry of the credential as a UNIX timestamp. The TURN password is computed from the a secret key shared with the TURN server and the returned username value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this scheme somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and the timestamp to appear in any order in the TURN username and it accepts usernames with a plain timestamp, without the colon and/or the user-id.
+STUNner adopts the [quasi-standard time-windowed TURN authentication credential format](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00) for ephemeral authentication. The TURN username consists of a colon-delimited combination of the expiration timestamp and the user-id parameter, where the user-id is some application-specific id that is opaque to STUNner and the timestamp specifies the date of expiry of the credential as a UNIX timestamp. The TURN password is computed from a secret key shared with the TURN server and the returned username value, by performing `base64(HMAC-SHA1(secret key, username))`. STUNner extends this scheme somewhat for maximizing interoperability with WebRTC apps, in that it allows the user-id and the timestamp to appear in any order in the TURN username and it accepts usernames with a plain timestamp, without the colon and/or the user-id.
 
 The advantage of this mechanism is that it is enough to know the shared secret for STUNner to be
 able to check the validity of a credential. 
@@ -140,12 +140,12 @@ curl "http://stunner-auth.stunner-system:8088/ice?service=turn&username=user-id"
 {
   "iceServers": [
     {
-      "username": "1681490135:user-id"
+      "username": "1681490135:user-id",
       "credential": "WSfJZ8QIi8ebu1uWhxlclvyjEPY=",
       "urls": [
         "turn:10.105.169.152:3478?transport=tcp",
         "turn:10.98.80.250:3478?transport=udp"
-      ],
+      ]
     }
   ],
   "iceTransportPolicy": "all"
@@ -214,7 +214,7 @@ through unchanged.
 
 STUNner does not authenticate SRT callers itself: it relays the handshake to the media server
 behind it unchanged, and the media server admits or rejects the caller, its rejection reaching
-the caller as is. The media server can authenticate a caller two ways:
+the caller as is. The media server can authenticate a caller in two ways:
 - **By passphrase.** SRT encrypts a stream end to end with a key derived from a passphrase the
   caller and the media server share (10 to 79 characters): a caller without the right passphrase
   fails the handshake. STUNner never sees the passphrase or the key. A media server may take

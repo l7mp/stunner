@@ -1,0 +1,43 @@
+# MediaMTX: two replicas taking SRT on UDP port 8890, accepting any stream encrypted with the
+# passphrase my-srt-passphrase.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mediamtx
+  namespace: default
+  labels:
+    app: mediamtx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mediamtx
+  template:
+    metadata:
+      labels:
+        app: mediamtx
+    spec:
+      containers:
+        - name: mediamtx
+          image: bluenviron/mediamtx:latest
+          env:
+            - name: MTX_PATHDEFAULTS_SRTPUBLISHPASSPHRASE
+              value: my-srt-passphrase
+            - name: MTX_PATHDEFAULTS_SRTREADPASSPHRASE
+              value: my-srt-passphrase
+          ports:
+            - containerPort: 8890
+              protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mediamtx
+  namespace: default
+spec:
+  selector:
+    app: mediamtx
+  ports:
+    - name: srt
+      port: 8890
+      protocol: UDP

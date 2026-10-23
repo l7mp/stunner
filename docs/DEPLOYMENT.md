@@ -4,7 +4,7 @@ STUNner can be deployed in many different ways, supporting a wide range of opera
 requirements. For WebRTC, STUNner supports multiple [architectural models](#architectural-models)
 where it acts either as a simple headless STUN/TURN server or as a fully fledged ingress gateway in
 front of an entire Kubernetes-based media server pool. If STUNner is configured as an ingress
-gateway then it can run in one of two [ICE models](#ice-models), based on whether only the client
+gateway then it can run in one of two [ICE models](#webrtc-ice-models), based on whether only the client
 connects via STUNner or both clients and media servers use STUNner to set up the media-plane
 connection. For SIP and RTP, STUNner is the gateway between a carrier's SIP trunk and the SIP
 servers in the cluster, in one of two [SIP deployment models](#sip-deployment-models) that follow
@@ -73,7 +73,7 @@ In this model, the client is configured with STUNner as the TURN server so at a 
 the ICE conversation it opens a TURN transport relay connection via STUNner. The IP address of the
 resultant ICE [relay
 candidate](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) is a private pod
-IP address, namely the IP address of the `stunnerd` pod that happens to receive the client
+IP address, namely the IP address of the [`stunnerd`](cmd/stunnerd.md) pod that happens to receive the client
 connection. In contrast, servers run without any STUN/TURN server whatsoever, so they generate
 [host ICE candidates](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type)
 only. Due to servers being deployed into ordinary Kubernetes pods, the server's host candidate will
@@ -82,7 +82,7 @@ can communicate with all other pods on any other node without a
 NAT"](https://kubernetes.io/docs/concepts/services-networking), the client's relay candidate and
 the server's host candidate will have direct connectivity in the Kubernetes private container
 network and the ICE connectivity check will succeed. See more explanation
-[here](examples/kurento-one2one-call/README.md#what-is-going-on-here).
+[here](examples/direct-one2one-call/README.md#test).
 
 Refrain from configuring additional public STUN/TURN servers apart from STUNner itself. The rules
 to follow for setting the [ICE server
@@ -96,7 +96,7 @@ side-effects. For instance, configuring clients and servers with public STUN ser
 unlucky situations may allow them to connect via server-reflexive ICE candidates, completely
 circumventing STUNner. This is on the one hand extremely fragile and, on the other hand, a security
 vulnerability; remember, STUNner should be the *only* external access point to your media plane. It
-is a good advice to set the `iceTransportPolicy` to `relay` on the clients to avoid side-effects:
+is good advice to set the `iceTransportPolicy` to `relay` on the clients to avoid side-effects:
 this will prevent clients from generating host and server-reflexive ICE candidates, leaving STUNner
 as the only option to obtain an ICE candidate from.
 
@@ -105,7 +105,7 @@ as the only option to obtain an ICE candidate from.
 In the symmetric ICE mode both the client and the server obtain an ICE [relay
 candidate](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidate/type) from STUNner and
 the connection occurs directly via STUNner. This is the simplest mode for the headless deployment
-model, but symmetric mode can also be used for the media-plane model as well to connect clients to
+model, but symmetric mode can also be used for the media-plane model to connect clients to
 media servers.
 
 ![STUNner symmetric ICE mode](img/stunner_symmetric_ice.svg)
@@ -121,9 +121,8 @@ The `iceTransportPolicy: relay` setting is mandatory in this case, otherwise the
 back to the asymmetric mode (this is a consequence of the way [ICE assigns
 priorities](https://www.ietf.org/rfc/rfc5245.txt) to different connection types).  Furthermore, it
 is a good practice to configure the STUNner TURN URI in the server-side ICE server configuration
-with the *internal* IP address and port used by STUNner (i.e., the ClusterIP of the `stunner`
-Kubernetes service and the corresponding port), otherwise the server might connect via the external
-LoadBalancer IP causing an unnecessary roundtrip (hairpinning).
+with the *internal* IP address and port used by STUNner, otherwise the server might connect via the
+external LoadBalancer IP causing an unnecessary roundtrip (hairpinning).
 
 The symmetric mode means more overhead compared to the asymmetric mode, since STUNner now performs
 TURN encapsulation/decapsulation for both sides. However, the symmetric mode comes with certain
@@ -195,8 +194,7 @@ guide](SRT.md).
 
 IP cameras generally act as RTSP servers that can be connected to get the live video feed. In order
 for multiple viewers to watch the same feed, typically a Kubernetes-based streamer (e.g., MediaMTX)
-pulls the camera and serves the feed to viewers over WebRTC. With STUNner, RTSP clients are run
-over a plain TCP listener and the viewers connect via a STUNner TURN listener. See the [RTSP
-streaming guide](RTSP.md).
+pulls the camera and serves the feed to viewers over WebRTC or a direct TCP connection via a
+STUNner gateway. See details in the [RTSP streaming guide](RTSP.md).
 
 ![STUNner RTSP deployment model](img/stunner_rtsp.svg)

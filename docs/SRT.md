@@ -1,14 +1,22 @@
 # SRT gateway
 
 > [!WARNING]
-> The SRT gateway is in beta: the API may change in any release and there is no support on any tier.
-> Please test and report issues, but in any way, use it at your own risk.
+> The SRT gateway is in beta: the API may change in any release and there is no support on any
+> tier.  Certain features require premium support: see [here](https://l7mp.io/pricing) for the
+> limits and pricing. Please test and report issues, but in any way, use it at your own risk.
 
-STUNner allows to ingest [SRT](https://github.com/Haivision/srt) streams into Kubernetes: encoders,
+STUNner lets you ingest [SRT](https://github.com/Haivision/srt) streams into Kubernetes: encoders,
 drones and cameras publish their streams to one public UDP port, decoders and players read them
 from the same port, and STUNner routes every connection to the media server pod that holds its
 stream (e.g., [MediaMTX](https://github.com/bluenviron/mediamtx)), with no host networking and no
 per-pod Services.
+
+The [SRT echo tutorial](examples/srt-echo/README.md) shows the whole path with [`mediactl`](cmd/mediactl.md), the
+[MediaMTX tutorial](examples/srt-mediamtx/README.md) with a real media server and FFmpeg.
+
+Note that SRT gateways cannot be scaled beyond a single pod at the moment. STUNner does not support
+outbound calls either and does not take rendezvous connections.  File a wishlist issue if you want
+support.
 
 ## Table of Contents
 
@@ -16,21 +24,20 @@ per-pod Services.
 1. [Streaming with MediaMTX](#streaming-with-mediamtx)
 1. [Testing](#testing)
 1. [Kernel offload](#kernel-offload)
-1. [Limitations](#limitations)
 
 ## Concepts
 
-SRT (Secure Reliable Transport) is the UDP transport of live video contribution: an encoder in the
-field sends an MPEG-TS stream over a lossy network, SRT retransmits what is lost within a fixed
+SRT (Secure Reliable Transport) is the UDP transport of live video contribution. an encoder in the
+field sends an MPEG-TS stream over a lossy network. SRT guarantees retransmits within a fixed
 latency budget and encrypts the stream with a passphrase shared by the two ends. The caller names
-the stream in the *stream ID* of the SRT handshake, by convention
-`#!::r=<stream>,m=publish` to publish a stream and `#!::r=<stream>,m=request` to read one.
+the stream in the *stream ID* of the SRT handshake, by convention `#!::r=<stream>,m=publish` to
+publish a stream and `#!::r=<stream>,m=request` to read one. 
 
-A single SRT stream passes any UDP load balancer. Scaling out is what breaks: with several media
-server pods behind one address, the load balancer spreads the connections over the pods, so the
-encoder publishing `live/van7` lands on one pod and the decoder reading `live/van7` on another one,
-which has no such stream. STUNner reads the stream ID in the handshake and sends every connection
-naming the same stream to the same pod:
+Critically, STUNner makes sure to route every streams to the same session to the same SRT media
+server. This makes sure media servers can be freely scaled to as many server pods as required
+behind one address: STUNner spreads the connections over the pods but it makes sure that the
+encoder publishing `live/van7` and the decoder reading `live/van7` land on one pod. STUNner reads
+the stream ID in the handshake and sends every connection naming the same stream to the same pod:
 
 - the first connection of a stream places it on the backend with the fewest streams, whatever its
   mode, publisher or reader;
@@ -47,18 +54,18 @@ the backend reference. Every listener of an SRT Gateway must be `SRT`, see the [
 reference](GATEWAY.md#srt-gateways).
 
 The encryption is end to end: STUNner never sees the passphrase, the media server checks it. A
-stream ID that names no stream (`#!::m=publish`), a stream with no backend, and a stream over the
-tier's limit of parallel sessions are rejected in the handshake, so the caller sees a clean
-refusal, not a timeout. A stream ID outside the `#!::` syntax names the stream with the whole
-string, so use the `#!::` syntax with media servers that take several syntaxes: MediaMTX's own
-`publish:live/van7` and `read:live/van7` name two different streams for STUNner.
+stream ID that names no stream (`#!::m=publish`), a reader with no backend, and a stream over the
+tier's limit of parallel sessions are rejected in the handshake. A stream ID outside the `#!::`
+syntax names the stream with the whole string, so use the `#!::` syntax with media servers that
+take several syntaxes: MediaMTX's own `publish:live/van7` and `read:live/van7` name two different
+streams for STUNner.
 
 ## Streaming with MediaMTX
 
 The below manifests deploy three MediaMTX replicas taking SRT on UDP port 8890 and accepting any
 stream encrypted with the passphrase `my-srt-passphrase` (MediaMTX takes its settings from `MTX_`
-environment variables too), an SRT Gateway on the public UDP port 9000, and the UDPRoute between
-the two.
+environment variables), an SRT Gateway on the public UDP port 9000, and the UDPRoute between the
+two.
 
 ```yaml
 apiVersion: apps/v1
@@ -167,14 +174,3 @@ offloaded flow per caller. The handshakes and the shutdowns stay in user space, 
 conclusion is still answered and a shutdown still ends the flow. See the [kernel
 offload](PREMIUM_REFERENCE.md#kernel-offload) reference for the offload limit of your tier, the
 settings and the monitoring.
-
-## Limitations
-
-- Each tier serves a number of SRT Gateways with a number of parallel sessions (streams) each: see
-  [here](https://l7mp.io/pricing) for the limits and pricing at each tier.
-- One dataplane replica per Gateway: the placement of the streams is kept per dataplane pod.
-- Callers only: STUNner takes the connections of SRT callers, it does not call SRT listeners
-  (pulling an encoder in listener mode) and does not take rendezvous connections.
-- The streams are placed by the stream ID: a media server that takes the stream name elsewhere (in
-  the passphrase, or after the handshake) gets the streams placed by the whole stream ID.
-- Bonded connections (socket groups) are relayed connection by connection, untested.

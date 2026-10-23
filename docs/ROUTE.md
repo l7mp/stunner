@@ -12,7 +12,7 @@ and the [Gateway](GATEWAY.md) have pages of their own.
 
 ## UDPRoute
 
-UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. An UDPRoute can be attached to a Gateway by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` per each Gateway listener to control which namespaces the listener accepts routes from.
+UDPRoute resources can be attached to Gateways in order to specify the backend services permitted to be reached via the Gateway. Multiple UDPRoutes can attach to the same Gateway, and each UDPRoute can specify multiple backend services; in this case access to *all* backends in *each* of the attached UDPRoutes is allowed. A UDPRoute can be attached to a Gateway by setting the `parentRef` to the Gateway's name and namespace. This is, however, contingent on whether the Gateway accepts routes from the given namespace: customize the `allowedRoutes` per each Gateway listener to control which namespaces the listener accepts routes from.
 
 The below UDPRoute will configure STUNner to route client connections received on the Gateway called `udp-gateway` to *any UDP port* on the pods of the media server pool identified by the Kubernetes service `media-server-pool` in the `media-plane` namespace.
 
@@ -67,7 +67,7 @@ Backend reference configuration is as follows:
 | `port` | `int` | The port an L4 listener dials the backend at: without it an L4 listener has nothing to dial. Also the start of the port range of the backend, effective only with `endPort`: a `port` alone restricts nothing. Default: empty (every port).| No (Yes for L4 listeners) |
 | `endPort` | `int` | End of the port range of the backend, if `port` is also specified: the dataplane drops traffic to the ports of the backend outside the range. Default: empty.| No |
 
-UDPRoute resources are safe for modification: `stunnerd` knows how to reconcile modified routes without restarting any listeners/TURN servers.
+UDPRoute resources are safe for modification: [`stunnerd`](cmd/stunnerd.md) knows how to reconcile modified routes without restarting any listeners/TURN servers.
 
 > [!NOTE]
 > Port ranges are ambiguous on a Gateway listener with several routes attached: the port range of the first route applies to every peer of the listener, so the peers of the other routes are reachable only on the ports the first route admits. 
@@ -145,7 +145,7 @@ Below is a reference of the TURNRoute `spec`.
 The Secret referenced by `tunnel.authRef` holds the key `type`, either `static` (the default) or `ephemeral`, the optional keys `realm` and `lifetime` (the validity of the generated ephemeral credentials, e.g., `1h`), and the credentials: `username` and `password` for static, `secret` for ephemeral authentication.
 
 > [!NOTE]
-> A TURNRoute is best the only route of its TURN listener: with other routes attached, the first route of the listener makes the relay sockets of every client, and the operator logs a warning.
+> A TURNRoute should be the only route of its TURN listener: with other routes attached, the first route of the listener makes the relay sockets of every client, and the operator logs a warning.
 
 The TURNRoute CRD is optional: the operator runs without it and ignores TURNRoutes until the CRD is installed (and lists TURNRoute among the supported route kinds of a listener only then). A new Helm install installs the CRD, but `helm upgrade` never updates CRDs: to use TURNRoutes on an upgraded install, apply the STUNner CRDs of the chart by hand and restart the operator.
 
@@ -167,7 +167,7 @@ spec:
     - "198.51.100.0/24"
 ```
 
-Assigning this StaticService to a UDPRoute will make sure allows access to *any* IP address in the specified ranges.
+Assigning this StaticService to a UDPRoute allows access to *any* IP address in the specified ranges.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -185,7 +185,7 @@ spec:
           name: static-svc
 ```
 
-The StaticService `spec.prefixes` must be a list of proper IPv4 or IPv6 prefixes: any IP address in any of the listed prefixes will be whitelisted. An entry may restrict the ports of the prefix with a port range, written as `<prefix>:<min-max>` (e.g., `192.0.2.0/24:<10000-20000>`), which overrides the `port`/`endPort` of the backend reference. Note that a prefix admits only peers of its own address family, so use the prefix `0.0.0.0/0` to provide wildcard access via an UDPRoute, and add `::/0` next to it on an IPv6-only or dual-stack cluster.
+The StaticService `spec.prefixes` must be a list of proper IPv4 or IPv6 prefixes: any IP address in any of the listed prefixes will be whitelisted. An entry may restrict the ports of the prefix with a port range, written as `<prefix>:<min-max>` (e.g., `192.0.2.0/24:<10000-20000>`), which overrides the `port`/`endPort` of the backend reference. Note that a prefix admits only peers of its own address family, so use the prefix `0.0.0.0/0` to provide wildcard access via a UDPRoute, and add `::/0` next to it on an IPv6-only or dual-stack cluster.
 
 > [!WARNING]
 >

@@ -12,7 +12,7 @@ make bench BENCH=BenchmarkBootstrap BENCHTIME=25x COUNT=1
 ```
 
 Notes:
-- `BENCHTIME=25x` means 25 iterations, and each iteration inserts one full Gateway/GatewayClass/UDPRoute/StaticService combo.
+- `BENCHTIME=25x` means 25 iterations, and each iteration inserts one full Namespace/Gateway/StaticService/UDPRoute combo.
 - The benchmark prints per-iteration timings (`iteration=NN duration=...`) so you can see growth in cost as state size increases.
 
 ### Capture a CPU profile

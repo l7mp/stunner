@@ -3,7 +3,7 @@
 These resources set up a STUNner installation: the GatewayClass is the root of the configuration
 hierarchy, the GatewayConfig holds the settings shared by every Gateway of the class (most
 importantly the TURN authentication credentials), and the Dataplane is the template of the
-`stunnerd` pods. The [Gateway](GATEWAY.md) and the [routes](ROUTE.md) have pages of their own.
+[`stunnerd`](cmd/stunnerd.md) pods. The [Gateway](GATEWAY.md) and the [routes](ROUTE.md) have pages of their own.
 
 1. [GatewayClass](#gatewayclass)
 1. [GatewayConfig](#gatewayconfig)
@@ -112,7 +112,7 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | Field                           | Type       | Description                                                                                                                                                                                                            | Required |
 |:--------------------------------|:----------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|
 | `image`                         | `string`   | The container image.                                                                                                                                                                                                   | Yes      |
-| `imagePullPolicy`               | `string`   | Policy for if/when to pull the [`stunnerd`](/docs/cmd/stunnerd.md), either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if the `latest` tag is specified on the image, `IfNotPresent` otherwise.          | No       |
+| `imagePullPolicy`               | `string`   | Policy for if/when to pull the [`stunnerd`](/docs/cmd/stunnerd.md) image, either `Always`, `Never`, or `IfNotPresent`. Default: `Always` if the `latest` tag is specified on the image, `IfNotPresent` otherwise.          | No       |
 | `imagePullSecrets`              | `list`     | List of Secret references to use for pulling the `stunnerd` image. Each ref is a secret name, namespace is the same as that of the Gateway on behalf of which the dataplane is deployed.                               | No       |
 | `labels`                        | `map`      | Custom labels added to `stunnerd` pods. Mandatory labels override whatever is set here. Changing pod labels triggers full dataplane restart for the affected Gateways.                                                 | No       |
 | `annotations`                   | `map`      | Custom annotations added to `stunnerd` pods. Mandatory annotations override whatever is set here, which in turn override manually added annotations. Changes trigger full dataplane restart for the affected Gateways. | No       |
@@ -128,9 +128,9 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | `securityContext`               | `object`   | Pod-level security attributes for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                        | No       |
 | `containerSecurityContext`      | `object`   | Container-level security attributes for the [dataplane](/docs/cmd/stunnerd.md) pods. Default: none.                                                                                                                  | No       |
 | `topologySpreadConstraints`     | `object`   | Description of how the [dataplane](/docs/cmd/stunnerd.md) pods for a Gateway ought to spread across topology domains. Default: none.                                                                                 | No       |
-| `terminationGracePeriodSeconds` | `duration` | Optional duration in seconds for `stunnerd` to terminate gracefully. Default: 30 seconds.                                                                                                                              | No       |
+| `terminationGracePeriodSeconds` | `duration` | Optional duration in seconds for `stunnerd` to terminate gracefully. Default: 3600 seconds.                                                                                                                              | No       |
 | `hostNetwork`                   | `bool`     | Deploy the [dataplane](/docs/cmd/stunnerd.md) into the host network namespace of Kubernetes nodes. Useful for implementing headless TURN services. May require elevated privileges. Default: false.                  | No       |
-| `disableHealthCheck`            | `bool`     | Disable health-checking. If true, enable HTTP health-checks on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: true.                                | No       |
+| `disableHealthCheck`            | `bool`     | Disable health-checking. If false, HTTP health-checks are enabled on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: false.                                | No       |
 | `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                                                            | No       |
 | `dataplaneResource`             | `string`   | Kubernetes resource type to be used for deploying the dataplane, either a Deployment (default) or DaemonSet (**not supported in the free tier**).                                                                      | No       |
 

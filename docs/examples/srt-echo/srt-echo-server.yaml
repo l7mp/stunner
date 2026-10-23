@@ -1,0 +1,40 @@
+# An SRT test service: two replicas of the STUNner mediactl image, each passing the streams
+# published to it to the readers of the same stream, and echoing every other SRT connection.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: srt-echo
+  namespace: default
+  labels:
+    app: srt-echo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: srt-echo
+  template:
+    metadata:
+      labels:
+        app: srt-echo
+    spec:
+      containers:
+        - name: srt-echo
+          image: docker.io/l7mp/mediactl:latest
+          imagePullPolicy: Always
+          command: ["mediactl", "srt", "serve", ":8890", "--passphrase", "my-srt-passphrase"]
+          ports:
+            - containerPort: 8890
+              protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: srt-echo
+  namespace: default
+spec:
+  selector:
+    app: srt-echo
+  ports:
+    - name: srt
+      port: 8890
+      protocol: UDP

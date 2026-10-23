@@ -1,44 +1,44 @@
 # STUNner Tutorial: Deploy a UDP echo service behind STUNner
 
-This tutorial shows how to tunnel an external connection via STUNner to a UDP service deployed into Kubernetes. The tutorial can also be used as an introduction to the main concepts in STUNner and to quickly check a STUNner installation.
+This tutorial exposes a UDP service running in Kubernetes to clients outside the cluster through a
+STUNner TURN Gateway, and connects to it with a TURN client from your machine. It introduces the
+main concepts of STUNner along the way, so it is also the quickest way to check a STUNner
+installation.
+
+![STUNner UDP echo tutorial](../../img/stunner_udp_echo.svg)
 
 In this tutorial you will learn how to:
-* configure a UDP service in Kubernetes,
-* configure STUNner to expose the service to clients,
-* use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to connect to the UDP service via STUNner,
-* measure the path with [`mediactl`](../../cmd/mediactl.md).
+* configure STUNner with the Gateway API to expose a UDP service to clients,
+* connect to the service through STUNner with the [tunnel mode of
+  `stunnerd`](../../cmd/stunnerd.md#tunnel-mode),
+* measure the path with [`mediactl`](../../cmd/mediactl.md),
+* add a TURN-TLS listener to an existing configuration.
 
 ## Prerequisites
 
-The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration
-guide](../../INSTALL.md).
+* A STUNner installation, see the [installation guide](../../INSTALL.md).
+* The `stunnerd`, `stunnerctl` and `mediactl` tools: download them from the [STUNner
+  releases](https://github.com/l7mp/stunner/releases) or install them with `go install
+  github.com/l7mp/stunner/v2/cmd/<tool>@latest`.
 
 ## Configuration
 
-The standard way to interact with STUNner is via the standard Kubernetes [Gateway
-API](https://gateway-api.sigs.k8s.io). This is much akin to the way you configure *all* Kubernetes
-workloads: specify your intents in YAML files and issue a `kubectl apply`, and the [STUNner gateway
-operator](https://github.com/l7mp/stunner-gateway-operator) will automatically create the STUNner
-dataplane (that is, the `stunnerd` pods that implement the STUN/TURN service) and downloads the new
-configuration to the dataplane pods.
+STUNner is configured through the Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io), like
+any Kubernetes workload: you declare what you want in YAML and apply it with `kubectl`, the [STUNner
+gateway operator](https://github.com/l7mp/stunner-gateway-operator) creates the STUNner dataplane
+(the `stunnerd` pods that run the TURN servers) and keeps it in sync with the configuration. We keep
+the STUNner configuration in the `stunner` namespace:
 
-It is generally a good idea to maintain STUNner configuration into a separate Kubernetes
-namespace. Below we will use the `stunner` namespace; create it with `kubectl create namespace
-stunner` if it does not exist.
+```console
+kubectl create namespace stunner
+```
 
-1. Given a fresh STUNner install, the first step is to register STUNner with the Kubernetes Gateway
-   API. This amounts to creating a
-   [GatewayClass](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.GatewayClass),
-   which serves as the [root level configuration](/docs/GATEWAYCLASS.md#gatewayclass) for your STUNner
-   deployment.
+1. Register STUNner with the Gateway API by creating a GatewayClass, the [root of the STUNner
+   configuration](../../GATEWAYCLASS.md#gatewayclass). Its `controllerName` hands the Gateways of
+   the class to STUNner, and its `parametersRef` names the GatewayConfig with the settings of
+   STUNner.
 
-   Each GatewayClass must specify a controller that will manage the Gateway objects created under
-   the class hierarchy. This must be set to `stunner.l7mp.io/gateway-operator` in order for STUNner
-   to pick up the GatewayClass. In addition, a GatewayClass can refer to further
-   implementation-specific configuration via a reference called `parametersRef`; in our case, this
-   will be a GatewayConfig object to be specified next.
-
-   ``` console
+   ```console
    kubectl apply -f - <<EOF
    apiVersion: gateway.networking.k8s.io/v1
    kind: GatewayClass
@@ -55,13 +55,10 @@ stunner` if it does not exist.
    EOF
    ```
 
-1. The next step is to set some [general configuration](/docs/GATEWAYCLASS.md#gatewayconfig) for STUNner,
-   most importantly the STUN/TURN authentication [credentials](/docs/AUTH.md). This requires loading
-   a GatewayConfig custom resource into Kubernetes.
-
-   Below example will set the authentication realm `stunner.l7mp.io` and refer STUNner to take the
-   TURN authentication credentials from the Kubernetes Secret called `stunner-auth-secret` in the
-   `stunner` namespace.
+1. Create the GatewayConfig with the [general settings](../../GATEWAYCLASS.md#gatewayconfig) of
+   STUNner, most importantly the [TURN credentials](../../AUTH.md): the realm `stunner.l7mp.io`, and
+   the credentials kept in the Secret `stunner-auth-secret`, the [`static`
+   authentication](../../AUTH.md) with the username `user-1` and the password `pass-1`.
 
    ```console
    kubectl apply -f - <<EOF
@@ -72,18 +69,10 @@ stunner` if it does not exist.
      namespace: stunner
    spec:
      realm: stunner.l7mp.io
-     logLevel: "all:DEBUG"
      authRef:
        name: stunner-auth-secret
        namespace: stunner
-   EOF
-   ```
-
-   Setting the Secret as below will set the [`static` authentication](/docs/AUTH.md) mechanism for
-   STUNner using the username/password pair `user-1/pass-1`.
-
-   ```console
-   kubectl apply -f - <<EOF
+   ---
    apiVersion: v1
    kind: Secret
    metadata:
@@ -97,20 +86,13 @@ stunner` if it does not exist.
    EOF
    ```
 
-   Note that these steps are required only once per STUNner installation.
+   The GatewayClass and the GatewayConfig are needed only once per STUNner installation: every
+   Gateway of the class shares them.
 
-1. At this point, we are ready to [expose STUNner](/docs/GATEWAY.md#gateway) to clients! This occurs
-   by loading a
-   [Gateway](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.Gateway)
-   resource into Kubernetes.
-
-   In the below example, we open a STUN/TURN listener service on the UDP port 3478.  STUNner will
-   automatically create the STUN/TURN server that will run the Gateway and expose it on a public IP
-   address and port. Then clients can connect to this listener and, once authenticated, STUNner
-   will forward client connections to an arbitrary service backend *inside* the cluster. Make sure
-   to set the `gatewayClassName` to the name of the above GatewayClass; this is the way STUNner
-   will know how to assign the Gateway with the settings from the GatewayConfig (e.g., the
-   STUN/TURN credentials).
+1. Expose STUNner to the clients with a [Gateway](../../GATEWAY.md#gateway): the one below opens a
+   TURN listener on UDP port 3478. STUNner starts a TURN server for it and exposes it on a public
+   address through a LoadBalancer Service; clients that authenticate with the credentials above may
+   then reach the backends the routes of the Gateway name.
 
    ```console
    kubectl apply -f - <<EOF
@@ -128,16 +110,9 @@ stunner` if it does not exist.
    EOF
    ```
 
-1. The final step is to tell STUNner what to do with the client connections received on the
-   Gateway. This occurs by attaching a
-   [UDPRoute](/docs/ROUTE.md#udproute)
-   resource to the Gateway by setting the `parentRef` to the Gateway's name and specifying the
-   target service in the `backendRef`.
-
-   The below UDPRoute will configure STUNner to [route client
-   connections](/docs/ROUTE.md#udproute) received on the Gateway called `udp-gateway` to the
-   WebRTC media server pool identified by the Kubernetes service `media-plane` in the `default`
-   namespace.
+1. Tell STUNner where to send the client connections with a [UDPRoute](../../ROUTE.md#udproute):
+   the one below attaches to the Gateway (`parentRefs`) and lets the clients reach the pods of the
+   `media-plane` Service in the `default` namespace (`backendRefs`).
 
    ```console
    kubectl apply -f - <<EOF
@@ -156,43 +131,22 @@ stunner` if it does not exist.
    EOF
    ```
 
-Note that STUNner deviates somewhat from the way Kubernetes handles ports in Services. In
-Kubernetes each Service is associated with one or more protocol-port pairs and connections via the
-Service can be made to only these specific protocol-port pairs. WebRTC media servers, however,
-usually open lots of different ports, typically one per each client connection, and it would be
-cumbersome to create a separate backend Service and UDPRoute per each port. In order to simplify
-this, STUNner **ignores the protocol and port specified in the backend service** and allows
-connections to the backend pods via *any* protocol-port pair. STUNner can therefore use only a
-*single* backend Service to reach any port exposed on a WebRTC media server.
+   STUNner treats backend Services differently from Kubernetes: WebRTC media servers open a port
+   per client, so STUNner lets the clients reach the backend pods at *any* port, not only at the
+   ports of the Service. A single Service and a single UDPRoute thus cover every port of a media
+   server.
 
-And that's all. You don't need to worry about client-side NAT traversal and WebRTC media routing
-because STUNner has you covered!  Even better, every time you change a Gateway API resource in
-Kubernetes, say, you update the GatewayConfig to reset the STUN/TURN credentials or change the
-protocol or port in a Gateway, the [STUNner gateway
-operator](https://github.com/l7mp/stunner-gateway-operator) will automatically pick up your
-modifications and update the underlying dataplane. Kubernetes is beautiful, isn't it?
+1. Deploy the backend: `mediactl udp echo`, which sends back every packet it receives, in the
+   `default` namespace, behind the `media-plane` Service on UDP port 9001. The Service is of type
+   `ClusterIP`, unreachable from outside the cluster: the only way in is through STUNner.
 
-## Fire up a backend service
-
-We have successfully configured STUNner to route client connections to the `media-plane` service
-but at the moment there is no backend there that would respond. Below we use a simple UDP echo
-service for testing, `mediactl udp echo`: every time you send some input, the echo service sends
-it right back.
-
-The below manifest spawns the service in the `default` namespace and wraps it in a Kubernetes
-service called `media-plane`. Recall, this is the target service in our UDPRoute. Note that the
-type of the `media-plane` service is `ClusterIP`, which means that Kubernetes will *not* expose it
-to the outside world: the only way for clients to obtain a response is via STUNner.
-
-```console
-kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
-```
+   ```console
+   kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
+   ```
 
 ## Check your config
 
-The current STUNner dataplane configuration is always made available via the convenient
-[`stunnerctl`](/docs/cmd/stunnerctl.md) CLI utility. The below will dump the config of the UDP
-gateway in human readable format.
+[`stunnerctl`](../../cmd/stunnerctl.md) shows the configuration STUNner runs for a Gateway:
 
 ```console
 stunnerctl -n stunner config udp-gateway
@@ -205,74 +159,62 @@ Listeners:
     Address:port: <none>:3478
     Public address:port: 34.118.88.91:3478
     Clusters: [stunner/media-plane/udp]
-    Endpoints: [10.76.1.4, 10.80.4.47]
+    Endpoints: [10.76.1.4]
 ```
 
-As it turns out, STUNner has successfully assigned a public IP and port to our Gateway and set the
-STUN/TURN credentials based on the GatewayConfig.
+STUNner has received a public address for the Gateway, the credentials of the GatewayConfig and the
+pod address of the echo service.
 
-## Testing
+## Test
 
-Now we are ready to test our UDP echo service.
-
-We need a STUN/TURN client to actually initiate a connection. STUNner comes with a handy STUN/TURN
-client, the [tunnel mode of `stunnerd`](/docs/cmd/stunnerd.md#tunnel-mode), for this purpose. Once
-installed, you can fire up a tunnel to listen on the standard input and send everything it receives
-to STUNner. Type any input and press Enter, and you should see it come back from your cluster!
+Clients reach the echo service through STUNner with a TURN client. The [tunnel mode of
+`stunnerd`](../../cmd/stunnerd.md#tunnel-mode) is one: the command below relays the standard input
+through the TURN listener to the echo service, so type a line and press Enter, and it comes back
+from your cluster.
 
 ```console
-./stunnerd - k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
+stunnerd - k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
 Hello STUNner
 Hello STUNner
 ```
 
-Note that we haven't specified any IP address: the tunnel is clever enough to parse the running
-[STUNner configuration](#check-your-config) from Kubernetes directly. Just specify the special
-STUNner URI `k8s://stunner/udp-gateway/udp-listener`, using the namespace (`stunner` here) and the
-name of the Gateway (`udp-gateway`) plus the listener you want to connect to (`udp-listener`), and
-the peer `k8s://default/media-plane:media-plane-port`, the `media-plane` Service in the `default`
-namespace at the service-port named `media-plane-port` (numerical port values also work,
-9001). Then, `stunnerd` will do the heavy lifting of translating this to concrete IPs and ports.
+No IP address or credential is needed: `k8s://stunner/udp-gateway/udp-listener` names the TURN
+listener `udp-listener` of the Gateway `udp-gateway` in the `stunner` namespace, and
+`k8s://default/media-plane:media-plane-port` the `media-plane` Service in the `default` namespace
+at its port `media-plane-port`; `stunnerd` reads the addresses and the credentials from your cluster
+through your kubeconfig.
 
-To measure the path, let [`mediactl`](/docs/cmd/mediactl.md) send packets through STUNner for ten
-seconds, the same way, and report the loss and the round trip of the echo:
+To measure the path, let `mediactl` send packets through STUNner the same way for ten seconds and
+report the loss and the round trip of the echo:
 
 ```console
 mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
+mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 64 kbit/s, received 500 pkts 80 kB 64 kbit/s, lost 0/500 (0.00%), rtt min/avg/max ...
 ```
 
-Note that your actual WebRTC clients will *not* need a tunnel to reach the cluster: all
-modern Web browsers and WebRTC clients come with a STUN/TURN client built in. Here, the tunnel is
-used only to *simulate* what a real WebRTC client would do when trying to reach STUNner.
+Your WebRTC clients need no tunnel: every browser and WebRTC client has a TURN client built in. The
+tunnel only does what they do.
 
-## Reconcile
+## Add a TLS listener
 
-Any time you see fit, you can update the STUNner configuration through the Gateway API: STUNner
-will automatically reconcile the dataplane for the new configuration.
+You can change the configuration any time, and STUNner reconciles the dataplane to it. Say, an
+enterprise firewall on the way of your clients lets nothing but TLS on port 443 through: add a
+TURN-TLS Gateway, and attach the UDPRoute to both Gateways, so that the clients reach the echo
+service whichever transport they use.
 
-For instance, you may decide to open up your WebRTC infrastructure on TLS/TCP as well; say, because
-an enterprise NAT on the client network path has gone berserk and actively filters anything except
-TLS/443. The below steps will do just that: open another gateway on STUNner, this time on the
-TLS/TCP port 443, and reattach the UDPRoute to both Gateways so that no matter which protocol a
-client may choose the connection will be routed to the `media-plane` service (i.e., the UDP
-echo service) by STUNner. (Note that you could also add the TLS listener to the *existing* Gateway
-instead of creating a *new* one, here we just use the simpler approach for brevity.)
-
-1. Store your TLS certificate in a Kubernetes Secret. Below we create a self-signed certificate for
-   testing, make sure to substitute this with a valid certificate.
+1. Store a TLS certificate in a Secret. Below is a self-signed one for testing; use a valid
+   certificate in production.
 
    ```console
-   openssl genrsa -out ca.key 2048
-   openssl req -x509 -new -nodes -days 365 -key ca.key -out ca.crt -subj "/CN=yourdomain.com"
-   kubectl -n stunner create secret tls tls-secret --key ca.key --cert ca.crt
+   openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout tls.key -out tls.crt -subj "/CN=stunner.example.com"
+   kubectl -n stunner create secret tls tls-secret --key tls.key --cert tls.crt
    ```
 
-1. Add the new TLS Gateway. Notice how the `tls-listener` now contains a `tls` object that refers
-   the above Secret, this way assigning the TLS certificate to use with our TURN-TLS listener.
+1. Add the TURN-TLS Gateway: its listener names the Secret in `tls.certificateRefs`.
 
    ```console
    kubectl apply -f - <<EOF
-   apiVersion: gateway.networking.k8s.io/v1beta1
+   apiVersion: gateway.networking.k8s.io/v1
    kind: Gateway
    metadata:
      name: tls-gateway
@@ -292,7 +234,7 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
    EOF
    ```
 
-1. Update the UDPRoute to attach it to both Gateways.
+1. Attach the UDPRoute to both Gateways.
 
    ```console
    kubectl apply -f - <<EOF
@@ -312,35 +254,76 @@ instead of creating a *new* one, here we just use the simpler approach for brevi
    EOF
    ```
 
-1. Fire up the tunnel again, but this time let it connect through TLS. This is achieved by
-   specifying the name of the TLS listener (`tls-listener`) in the STUNner URI. The `-i` command
-   line argument (`--insecure`) is added to prevent the TURN client from rejecting our insecure
-   self-signed TLS certificate; this will not be needed when using a real signed certificate.
+1. Tunnel through the TLS listener this time. `--insecure` accepts the self-signed certificate; a
+   valid certificate needs no such flag.
 
    ```console
-   ./stunnerd --insecure -l all:INFO - k8s://stunner/tls-gateway/tls-listener k8s://default/media-plane:9001
-   [...] stunnerd INFO: starting stunnerd in tunnel mode: - -> k8s://stunner/tls-gateway/tls-listener -> k8s://default/media-plane:9001
-   [...]
+   stunnerd --insecure - k8s://stunner/tls-gateway/tls-listener k8s://default/media-plane:media-plane-port
    Hello STUNner
    Hello STUNner
    ```
 
-   We have set the loglevel to INFO to learn that this time the tunnel has connected via
-   the TURN server `tls://10.96.55.200:443`. And that's it: STUNner automatically routes the
-   incoming TLS/TCP connection to the UDP echo service, silently converting from TLS/TCP to UDP
-   in the background and back again on return.
+   STUNner takes the TURN connection over TLS and relays it to the UDP echo service: the conversion
+   between TLS and UDP happens in STUNner.
 
-## Cleaning up
+## Troubleshooting
 
-Stop the tunnel and wipe all Kubernetes configuration.
+* **The Gateway has no public address.** It takes up to a minute for a cloud load balancer to assign
+  one; until then `stunnerctl config` shows no public address. Check the Service of the Gateway:
+  `kubectl -n stunner get service udp-gateway`.
+* **The tunnel gets no echo.** Check the credentials and the endpoints in `stunnerctl config`, and
+  the `stunnerd` pod logs: `kubectl -n stunner logs deploy/udp-gateway`.
+
+## Going further: post-quantum TLS
+
+Data recorded today may be decrypted tomorrow: a large enough quantum computer would break the key
+exchange of today's TLS, which is why regulators start to require post-quantum encryption for
+sensitive traffic. Out of the box, the TLS listener admits any client, classical key exchange
+included:
+
+```console
+export TLS_IP=$(kubectl -n stunner get gateway tls-gateway -o jsonpath='{.status.addresses[0].value}')
+openssl s_client -connect ${TLS_IP}:443 -groups X25519 < /dev/null 2>&1 | grep -E "^Server Temp Key|handshake failure"
+Server Temp Key: X25519, 253 bits
+```
+
+With a STUNner license, the [post-quantum TLS](../../PREMIUM_REFERENCE.md#post-quantum-tls) of
+STUNner enforces a key exchange quantum computers cannot break, per Gateway. Enforce it, and the
+classical client is refused, while the tunnel, which offers the post-quantum key exchange, still
+gets through:
+
+```console
+kubectl -n stunner annotate --overwrite gateway tls-gateway stunner.l7mp.io/pqc-mode=enforced
+openssl s_client -connect ${TLS_IP}:443 -groups X25519 < /dev/null 2>&1 | grep -E "^Server Temp Key|handshake failure"
+... handshake failure ...
+stunnerd --insecure - k8s://stunner/tls-gateway/tls-listener k8s://default/media-plane:media-plane-port
+Hello STUNner
+Hello STUNner
+```
+
+See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
+guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
+
+## Next steps
+
+The [UDP tunnel tutorial](../simple-tunnel/README.md) measures the path under load, and the
+[media-plane tutorials](../../README.md) put real WebRTC media servers behind STUNner.
+
+## Clean up
+
+Stop the tunnel and remove everything the tutorial created:
 
 ```console
 kubectl delete -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
-kubectl delete gatewayclass stunner-gatewayclass
-kubectl -n stunner delete secret stunner-auth-secret
+kubectl -n stunner delete udproute.stunner.l7mp.io media-plane
+kubectl -n stunner delete gateway udp-gateway tls-gateway
 kubectl -n stunner delete gatewayconfig stunner-gatewayconfig
-kubectl -n stunner delete gateway udp-gateway
-kubectl -n stunner delete gateway tls-gateway
-kubectl -n stunner delete secret tls-secret
-kubectl -n stunner delete udproutes.stunner.l7mp.io media-plane
+kubectl -n stunner delete secret stunner-auth-secret tls-secret
+kubectl delete gatewayclass stunner-gatewayclass
+kubectl delete namespace stunner
+rm -f tls.key tls.crt
 ```
+
+The dataplane shuts down gracefully, serving its live TURN sessions to the end, so deleting the
+namespace may take a while: a session whose client went away without releasing it ends when it
+times out, within ten minutes.

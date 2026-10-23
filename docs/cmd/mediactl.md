@@ -48,7 +48,7 @@ received, and the echo servers every flow, once it ends.
 
 | Option | Effect |
 |:--|:--|
-| `-P/--parallel <n>` | Run `n` streams at once; every stream and the total is reported. |
+| `-P/--parallel <n>` | Run `n` streams at once; every stream and the total are reported. |
 | `-o/--output json` | Print the results of every stream and the total on the standard output as JSON. |
 | `--max-loss <percent>` | Fail when more than this percent of the packets is lost. |
 | `--max-rtt <duration>` | Fail when the average round trip is longer. |
@@ -56,7 +56,7 @@ received, and the echo servers every flow, once it ends.
 | `--ts <file>` | Send the bytes of a file, an MPEG-TS file say, instead of measured packets, from the start again at its end; only the bitrate is measured. |
 
 A sender fails (exits non-zero) when nothing came back that should have, or a threshold is
-crossed. `-l/--log` sets the log level as in `stunnerd` (`all:INFO` by default), `-v/--verbose`
+crossed. `-l/--log` sets the log level as in [`stunnerd`](stunnerd.md) (`all:INFO` by default), `-v/--verbose`
 is `-l all:DEBUG`. Every flag can also be set in a config file (`--config`, YAML, JSON or TOML) or
 in an environment variable: `MEDIACTL_TIMEOUT=10s` sets `--timeout`.
 
@@ -117,26 +117,6 @@ Without Kubernetes, the same commands take plain addresses:
 mediactl turn send -t 10s --username user-1 --password pass-1 "turn:${GATEWAY_IP}:3478?transport=udp" ${ECHO_POD_IP}:9001
 mediactl sip call -t 10s sip:echo@${SIP_IP}:5060
 ```
-
-## The library
-
-Every sender and answerer is also a Go library for writing tests,
-[`pkg/mediactl`](https://pkg.go.dev/github.com/l7mp/stunner/v2/pkg/mediactl). Its model: every
-protocol is a dialer of the `net.Conn`s of a sender and a `net.Listener` of the `net.Conn`s of an
-answerer, and one stream engine runs over any of them. `mediactl.Stream(ctx, conn, config)` sends
-and measures, `mediactl.Echo` and `mediactl.Serve` answer, and the protocols come from the standard
-library and the subpackages:
-
-| Protocol | Dialer | Listener |
-|:--|:--|:--|
-| UDP, TCP | `net.Dialer` | `pkg/udp`, `net.Listen` |
-| SIP and RTP | `sip.Phone` (`DialContext` calls a SIP URI) | `sip.Phone` (`Accept` returns the next answered call) |
-| SRT | `srt.Dialer` (a stream and a mode) | `srt.Listen` (publishers to readers inside, the rest echoed) |
-| TURN | `turn.Dialer` (the TURN server; network `tcp` for RFC 6062) | |
-
-A SIP call is a `net.Conn` of its media: `rtp.Conn` frames its writes as RTP packets and returns
-the payloads of the RTP packets it reads, with an RTCP sender report every second, so the same
-stream engine measures a call. `k8s.Resolver` resolves the `k8s://` addresses.
 
 ## License
 

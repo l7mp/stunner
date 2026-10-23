@@ -1,18 +1,18 @@
 # TLS
 
-This documentation sums up the TLS and certificate issues you will encounter deploying the examples.
+This documentation sums up the TLS and certificate issues you will encounter when deploying the examples.
 
 ## The issue
 
-Some client-side application must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. In the demos, we will aim to obtain a proper CA-signed certificate (self-signed certificates haven't been tested). Obtaining a valid TLS certificate is a challenge. Thus, the majority of the installation guides will be about securing client connections to the client-side apps and the WebRTC mediaservers over TLS. Once HTTPS is correctly working, integrating the mediaservers with STUNner is very simple.
+Some client-side applications must work over a secure HTTPS connection, because [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#browser_compatibility) is available only in secure contexts. This implies that the client-server signaling connection must be secure too. In the demos, we will aim to obtain a proper CA-signed certificate (self-signed certificates haven't been tested). Obtaining a valid TLS certificate is a challenge. Thus, the majority of the installation guides will be about securing client connections to the client-side apps and the WebRTC mediaservers over TLS. Once HTTPS is correctly working, integrating the mediaservers with STUNner is very simple.
 
 ## TLS certificates
 
-Some WebRTC servers will need a valid TLS cert, which means it must run behind an existing DNS domain name backed by a CA signed TLS certificate. This is simple if you have your own domain, but if you don't, we still have a solution for that.
+Some WebRTC servers will need a valid TLS cert, which means they must run behind an existing DNS domain name backed by a CA signed TLS certificate. This is simple if you have your own domain, but if you don't, we still have a solution for that.
 
 > [!NOTE]
 >
-> By default, the examples and commands snippets assume you don't own a domain.
+> By default, the examples and command snippets assume you don't own a domain.
 
 ### If you don't have your own domain
 
@@ -54,15 +54,15 @@ Store the Ingress IP address Kubernetes assigned to our Ingress; this will be ne
 
 ```console
 kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-export INGRESSIP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-export INGRESSIP=$(echo $INGRESSIP | sed 's/\./-/g')
+export INGRESS_IP=$(kubectl get service ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export INGRESS_IP=$(echo $INGRESS_IP | sed 's/\./-/g')
 ```
 
 ### Cert manager
 
 We use the official [cert-manager](https://cert-manager.io) to automate TLS certificate management.
 
-Add the Helm repository, which contains the cert-manager Helm chart, and install the charts:
+Add the Helm repository, which contains the cert-manager Helm chart, and install the chart:
 
 ```console
 helm repo add jetstack https://charts.jetstack.io

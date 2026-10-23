@@ -1,0 +1,51 @@
+# A STUNner SRT Gateway: SRT callers reach the srt listener on UDP port 9000, and STUNner sends
+# every connection naming the same stream to the same MediaMTX pod.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is the Kubernetes real-time media gateway"
+---
+apiVersion: stunner.l7mp.io/v1
+kind: GatewayConfig
+metadata:
+  name: stunner-gatewayconfig
+  namespace: stunner
+spec:
+  realm: stunner.l7mp.io
+  authType: static
+  userName: "user-1"
+  password: "pass-1"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: srt-gateway
+  namespace: stunner
+spec:
+  gatewayClassName: stunner-gatewayclass
+  listeners:
+    - name: srt
+      protocol: SRT
+      port: 9000
+---
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: mediamtx
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: srt-gateway
+  rules:
+    - backendRefs:
+        - name: mediamtx
+          namespace: default
+          port: 8890

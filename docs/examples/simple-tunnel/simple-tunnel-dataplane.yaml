@@ -1,0 +1,23 @@
+# A Dataplane of its own for the Gateways of the tutorial, so that the kernel offload demo leaves
+# the default Dataplane alone: stunnerd squeezed to 20m CPU, with the capabilities the kernel offload
+# needs, and the offload off to start with.
+apiVersion: stunner.l7mp.io/v1
+kind: Dataplane
+metadata:
+  name: simple-tunnel
+spec:
+  image: docker.io/l7mp/stunnerd:latest
+  command: ["stunnerd"]
+  args: ["-w"]
+  replicas: 1
+  resources:
+    limits:
+      cpu: 20m
+      memory: 512Mi
+    requests:
+      cpu: 20m
+      memory: 128Mi
+  containerSecurityContext:
+    capabilities:
+      add: ["NET_ADMIN", "SYS_ADMIN", "SYS_MODULE"]
+  offloadEngine: None

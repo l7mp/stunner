@@ -39,3 +39,14 @@ go.work
 /icetester
 AGENTS.md
 /mediactl
+
+# Unmaintained tutorials, kept out of the repository but not deleted from working copies
+docs/examples/cloudretro/
+docs/examples/elixir-webrtc/
+docs/examples/jitsi/
+docs/examples/kurento-magic-mirror/
+docs/examples/kurento-one2one-call/
+docs/examples/neko/
+docs/img/stunner_cloudretro.svg
+docs/img/stunner_jitsi.svg
+docs/img/stunner_kurento_one2one_arch.svg

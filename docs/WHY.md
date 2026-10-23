@@ -10,7 +10,7 @@ of this context (e.g., as a regular STUN/TURN server), but this is not the main 
 
 ## The problem
 
-The pain points STUNner is trying to solve are all related to that Kubernetes and real-time
+The pain points STUNner is trying to solve are all related to the fact that Kubernetes and real-time
 communications services are currently foes, not friends.
 
 Kubernetes has been designed and optimized for the typical HTTP/TCP Web workload, which makes
@@ -32,7 +32,7 @@ only "semi-stable" connection identifier real-time communications media servers 
 a client is by expecting the client's packets to arrive from a negotiated IP source address and
 source port. When the IP 5-tuple changes, for instance because there is a NAT in the datapath, then
 real-time media connections break. Due to reasons which are mostly historical at this point,
-*UDP/RTP connections do not survive not even a single NAT step*, let alone the 2-3 rounds of NATs a
+*UDP/RTP connections do not survive even a single NAT step*, let alone the 2-3 rounds of NATs a
 packet regularly undergoes in the Kubernetes dataplane.
 
 ## The state-of-the-art
@@ -57,7 +57,7 @@ There are *lots* of reasons why this deployment model is less than ideal:
   same node would easily result in hard-to-debug port clashes.
 
 - **It inhibits elastic scaling.** Kubernetes scales workloads at the per-pod granularity. When
-  each node occupies an entire Kubernetes node, scaling the media plane equals adding/removing
+  each media server occupies an entire Kubernetes node, scaling the media plane equals adding/removing
   Kubernetes nodes, which is a cumbersome, lengthy, and most importantly, costly process. In
   addition, it becomes very difficult to provision the resource requests and limits of each media
   server node: a `t2.small` (1 vCPU/2 GB mem) may be too small for a large video-conferencing room,
@@ -73,22 +73,22 @@ There are *lots* of reasons why this deployment model is less than ideal:
   private IP?
 
 - **It is a terrible waste of resources.** Think about this: when you use Kubernetes you pay a
-  double virtualization price. Namely, the node itself is usually just regular VM on a physical
+  double virtualization price. Namely, the node itself is usually just a regular VM on a physical
   server, which means a first layer of virtualization, on top of which the pod runs in another
-  container virtualization layer. It is only worth paying this prize if you amortize the cost of
-  the VM across many containers/pods. If you run a single media server per node then why using
+  container virtualization layer. It is only worth paying this price if you amortize the cost of
+  the VM across many containers/pods. If you run a single media server per node then why use
   Kubernetes at all? Just use a simple VM instead, and pay the virtualization cost only once.
 
 - **You still need a STUN/TURN server for WebRTC clients to reach the cluster.** Putting the media
   server over a public IP solves only half of the problem: the server side. For the client side you
-  still need a costly NAT traversal service to let clients behind a NAT to connect to your media
-  servers. But why not putting the NAT-traversal facilities right into your Kubernetes cluster and
+  still need a costly NAT traversal service to let clients behind a NAT connect to your media
+  servers. But why not put the NAT-traversal facilities right into your Kubernetes cluster and
   share the same facility for the client and the server side?
 
 - **Kubernetes nodes might not even have a public IP address.** There are lots of locked-down
   hosted Kubernetes offerings (e.g., GKE private clusters) where nodes run without a public IP
   address for security reasons. This then precludes the host-networking hack. But even if nodes are
-  publicly available, many Kubernetes services simply disable host-networking all together (e.g.,
+  publicly available, many Kubernetes services simply disable host-networking altogether (e.g.,
   [GKE Autopilot](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-overview))
   exactly because it is such an intrusive hack.
 

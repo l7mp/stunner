@@ -16,11 +16,11 @@ STUNner's premium features are designed to help medium to large scale enterprise
 
 **Feature:** `UserQuota`. **Availability:** member and enterprise tiers.
 
-Once a client has obtained a valid TURN authentication credential, they can open any number of TURN connections by reusing the same credential. Since TURN credentials are available in plain text at clients (this is by WebRTC JavaScript API design), malicious clients can launch a Denial-of-Service (DoS) attack by creating excess of TURN allocations in quick succession. Unfortunately, even an [`ephemeral` credential](AUTH.md) leaves a time window open for a DoS attack before it expires.
+Once a client has obtained a valid TURN authentication credential, they can open any number of TURN connections by reusing the same credential. Since TURN credentials are available in plain text at clients (this is by WebRTC JavaScript API design), malicious clients can launch a Denial-of-Service (DoS) attack by creating an excess of TURN allocations in quick succession. Unfortunately, even an [`ephemeral` credential](AUTH.md) leaves a time window open for a DoS attack before it expires.
 
 STUNner's `UserQuota` feature allows to set an upper limit on the number of simultaneous allocations that can be made with the same TURN credential. This feature is available in your tier if the `UserQuota` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)).
 
-Note that STUNner's quotas are per per-user-id. This means that if you obtain multiple different credentials for the same user-id (e.g., by using `stunnerctl auth --username my-user`) then the credentials map to the same quota: the TURN allocations authenticated with the same credential add up when imposing the quota. Also note that stale TURN allocations also count towards the quota. If a client fails to close unused TURN allocations (which TURN clients routinely do) then these stale allocations will be active until they time out (usually after 5 mins). This may prevent clients from re-connecting when an overly restrictive user quota is in effect. Quotas are per-dataplane-pod: if you [scale](SCALING.md) STUNner then the quota multiplies by as much as there are dataplane pods.
+Note that STUNner's quotas are per user-id. This means that if you obtain multiple different credentials for the same user-id (e.g., by using `stunnerctl auth --username my-user`) then the credentials map to the same quota: the TURN allocations authenticated with the same credential add up when imposing the quota. Also note that stale TURN allocations also count towards the quota. If a client fails to close unused TURN allocations (which TURN clients routinely do) then these stale allocations will be active until they time out (usually after 5 mins). This may prevent clients from re-connecting when an overly restrictive user quota is in effect. Quotas are per-dataplane-pod: if you [scale](SCALING.md) STUNner then the quota multiplies by the number of dataplane pods.
 
 Configure a user quota for a Gateway by setting the `userQuota` field in the GatewayConfig:
 
@@ -40,18 +40,18 @@ This will set the quota to 10. Setting the quota to zero means no quota (the def
 You can query the configured user quota using [`stunnerctl`](/docs/cmd/stunnerctl.md). Suppose you deployed a TURN/UDP gateway called `udp-gateway` in the `stunner` namespace. The current quota can be obtained as follows:
 
 ```console
-stunnerctl -n <gateway-namespace> status <gateway-name> -o jsonpath='{.admin.quota}'
+stunnerctl -n stunner status udp-gateway -o jsonpath='{.admin.quota}'
 10
 ```
 
-Alternatively, You can query the gateway's quota from the corresponding dataplane config:
+Alternatively, you can query the gateway's quota from the corresponding dataplane config:
 
 ```console
-stunnerctl -n stunner config udp-gateway -o jsonpath='{.admin.user_quota}' -->
+stunnerctl -n stunner config udp-gateway -o jsonpath='{.admin.user_quota}'
 10
 ```
 
-Once the number of allocations created for a user-id reach the configured quota, new allocations will be rejected with an `error 486: Allocation Quota Exceeded` status.
+Once the number of allocations created for a user-id reach the configured quota, new allocations will be rejected with an `error 486: Allocation Quota Reached` status.
 
 ## Deploying into a DaemonSet
 
@@ -79,9 +79,9 @@ Set `dataplaneResource: Deployment` to return to the default deployment mode.
 
 **Feature:** `RelayAddressDiscovery`. **Availability:** member and enterprise tiers.
 
-STUNner was designed for a specific use case: ingest real-time media into a Kubernetes cluster and forward incoming connections to a pool of WebRTC media servers deployed into the same cluster. This, however, does not prevent you from leveraging STUNner for other purposes, like as a public TURN server, but this may need some tweaking.
+STUNner was designed for a specific use case: ingest real-time media into a Kubernetes cluster and forward incoming connections to a pool of WebRTC media servers deployed into the same cluster. This, however, does not prevent you from leveraging STUNner for other purposes, such as a public TURN server, but this may need some tweaking.
 
-Public TURN servers typically run on a public IP address, which makes it possible for both clients and peers to connect via the server. However, STUNner's TURN servers (the `stunnerd` pods) are by default deployed over private IPs. This is perfectly fine when peers, e.g., WebRTC media servers, are deployed into the same cluster (the pivotal use case for STUNner), but this pretty much makes it impossible to deploy STUNner as a public TURN server since peers will not be able to connect to the private IP of STUNner's TURN servers. (Note that ["symmetric ICE mode"](DEPLOYMENT.md#symmetric-ice-mode) would still work but it may increase STUNner's resource consumption.)
+Public TURN servers typically run on a public IP address, which makes it possible for both clients and peers to connect via the server. However, STUNner's TURN servers (the [`stunnerd`](cmd/stunnerd.md) pods) are by default deployed over private IPs. This is perfectly fine when peers, e.g., WebRTC media servers, are deployed into the same cluster (the pivotal use case for STUNner), but this pretty much makes it impossible to deploy STUNner as a public TURN server since peers will not be able to connect to the private IP of STUNner's TURN servers. (Note that ["symmetric ICE mode"](DEPLOYMENT.md#symmetric-ice-mode) would still work but it may increase STUNner's resource consumption.)
 
 <!-- You can experiment with [deploying STUNner into the host-network namespace](GATEWAYCLASS.md#dataplane), but most of the time this would not solve the issue either because either Kubernetes will deploy pods running in host-network mode over a private IP address. -->
 
@@ -134,7 +134,7 @@ Below is the set of steps to enable relay address discovery:
    clusters: "<cluster-name>":{...,addresses=[<relay-address>]}
    ```
 
-   Note that depending on your Kubernetes provider's platform your nodes may run without a public IP, or host-networking may not be available at all. Symmetric ICE mode is still be usable as a fallback in such cases.
+   Note that depending on your Kubernetes provider's platform your nodes may run without a public IP, or host-networking may not be available at all. Symmetric ICE mode is still usable as a fallback in such cases.
 
 ## Dual-stack TURN
 
@@ -157,7 +157,7 @@ Dual-stack TURN is available in your tier if the `DualStack` feature is enabled 
 
 In a production STUNner deployment the gateway operator, which is responsible for providing the dataplane configuration over the config discovery service (CDS), may unavoidably go offline. Sometimes the node the operator is scheduled at is removed, sometimes it is a planned restart, sometimes it may even be a genuine operator bug. 
 
-A solution to this is to run multiple operator pods side by side: enabling leader election (`--leader-elect`) makes sure only one operator instance is active (i.e., updates Kubernetes and emits dataplane configurations) at a time, the rest are the hot standby. Once the leader operator terminates, a new leader is selected that takes over the responsibilities of the former leader. By default, however, this involves the restarting of the running dataplane pods and the disconnection of all active clients.
+A solution to this is to run multiple operator pods side by side: enabling leader election (`--leader-elect`) makes sure only one operator instance is active (i.e., updates Kubernetes and emits dataplane configurations) at a time, the rest are hot standbys. Once the leader operator terminates, a new leader is selected that takes over the responsibilities of the former leader. By default, however, this involves the restarting of the running dataplane pods and the disconnection of all active clients.
 
 When using the high-availability mode, operator failovers become seamless: the new replica takes over the control of the running dataplane pods and makes sure there is no stale config emitted along the way. If only a single operator replica is run, the high-availability mode makes sure the restarted operator will not cause a dataplane churn. Note that the finalizer (`--enable-finalizer`) mode is incompatible with leader election: a replica losing the lease must not tear down resources the new leader keeps serving.
 
@@ -167,7 +167,7 @@ High-availability operator mode is available in your tier if the `HAOperator` fe
 
 **Feature:** `PQC`. **Availability:** member and enterprise tiers.
 
-A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows for STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
+A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
 
 The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TLS listeners of a Gateway (TURN-TLS and plain TLS). There are three modes: `default` (or a missing annotation) serves the standard TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
 
@@ -197,7 +197,7 @@ Below is the set of steps to enable post-quantum TLS:
 
 Relaying media in user space costs CPU and latency. STUNner can offload the relaying of plaintext UDP flows to its Linux/eBPF kernel packet processing engines, which provide a massive bandwidth, delay and jitter boost and can cut CPU usage by orders of magnitude. A flow is set up in user space as usual, then its packets are relayed in the kernel in both directions. The packets the dataplane still needs to see go to user space: STUN messages always, plus what a protocol needs, such as the handshakes of an SRT stream. What is offloaded, and what stays in user space, depends on the protocol:
 
-- **TURN:** the UDP channels of a TURN/UDP listener, see the [TURN gateway](TURN.md#kernel-offload).
+- **TURN:** the UDP channels of a TURN/UDP listener, see the [WebRTC gateway](WebRTC.md#kernel-offload).
 - **SRT:** the streams of an SRT Gateway, see the [SRT gateway](SRT.md#kernel-offload).
 - **SIP:** the RTP and RTCP media of the calls of a SIP Gateway, see the [SIP gateway](SIP.md#kernel-offload).
 - **L4:** the flows of a plain UDP [listener](GATEWAY.md#listener-configuration) to a UDP backend, relayed directly or through an upstream TURN/UDP server of a [TURNRoute](ROUTE.md#turnroute).
@@ -208,7 +208,7 @@ Kernel offload is opt-in, set in the `Dataplane` custom resource:
 - `spec.offloadInterfaces`: the network interfaces to offload on, every interface if empty (the default).
 - `spec.containerSecurityContext`: loading the eBPF programs needs the `NET_ADMIN`, `SYS_ADMIN` and `SYS_MODULE` capabilities.
 
-The below sets the dataplanes of all Gateways using the `default` Dataplane to offload on every network interface with the best engine available.
+The below sets the dataplanes of all Gateways using the `default` Dataplane to offload on every network interface with the TC engine.
 
 ```yaml
 apiVersion: stunner.l7mp.io/v1
@@ -231,7 +231,7 @@ Add `offloadInterfaces: ["eth0"]` to select a particular list of interfaces wher
 
 ```console
 stunnerctl -n <gateway-namespace> status <gateway-name>
-<gateway-namespace>/<gateway-name>:
+<gateway-namespace>/<gateway-pod>:
 	admin:{...,offload=tc[all]:1/100}
 	static-auth: ...
 	listeners: <listener-name>:{...},total(rx/tx): 1160/353 pkts 168912/20554 bytes,offload(rx/tx): 1152/345 pkts 168192/19834 bytes

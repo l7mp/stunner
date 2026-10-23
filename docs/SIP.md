@@ -1,8 +1,9 @@
 # SIP gateway
 
 > [!WARNING]
-> The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
-> Please test and report issues, but in any way, use it at your own risk.
+> The SIP gateway is in beta: the API may change in any release and there is no support on any
+> tier.  Please test and report issues, but in any way, use it at your own risk. Certain features
+> require premium support: see [here](https://l7mp.io/pricing) for the limits and pricing.
 
 The SIP/RTP gateway is the VoIP leg of STUNner: it lets you ingest SIP/RTP traffic from a SIP trunk
 into Kubernetes.  Carriers send SIP signaling and RTP media to STUNner's public address and it
@@ -10,7 +11,11 @@ proxies the SIP signaling to an in-cluster SIP backend (e.g., [LiveKit
 SIP](https://docs.livekit.io/sip/)) and relays the media of every call between the carrier and the
 in-cluster media peers. No host networking and no zillions of open UDP ports.
 
-The [SIP echo tutorial](examples/sip-echo/README.md) shows the whole path with a simple SIP phone.
+The [SIP echo tutorial](examples/sip-echo/README.md) shows the whole path with a simple SIP phone,
+the [Asterisk tutorial](examples/sip-asterisk/README.md) with a real PBX.
+
+Note that SIP/RTP gateways cannot be scaled beyond a single pod at the moment. STUNner does not
+support outbound calls either. File a wishlist issue if you want support.
 
 ## Table of Contents
 
@@ -19,7 +24,6 @@ The [SIP echo tutorial](examples/sip-echo/README.md) shows the whole path with a
 1. [Registration-based trunks](#registration-based-trunks)
 1. [Separate SIP and media servers](#separate-sip-and-media-servers)
 1. [Kernel offload](#kernel-offload)
-1. [Limitations](#limitations)
 
 ## Concepts
 
@@ -36,9 +40,9 @@ media. STUNner supports the two common trunk models:
 
 A Gateway whose `parametersRef` names a missing or malformed SIPTrunk, or a kind the operator does
 not support, is not accepted and gets no dataplane. Note that depending on your license tier you
-may have access to only a limited number of SIP Gatteways, see the defails
+may have access to only a limited number of SIP Gateways, see the details
 [here](https://l7mp.io/pricing). When you deploy more SIP Gateways than your tier allows, the
-oldest ones are served and the the rest are rejected.
+oldest ones are served and the rest are rejected.
 
 SIP/RTP gateways typically have two types of listeners: a single `UDP` *media listener* carrying
 the RTP and RTCP of every call, and any number of additional *SIP listeners* (typically `UDP`,
@@ -62,7 +66,6 @@ Gateway's load balancer must preserve the client source address: the
 `externalTrafficPolicy` to `Local` (see [load balancer
 configuration](GATEWAY.md#load-balancer-configuration)).  A load balancer that rewrites the source
 address (e.g., a full proxy) breaks the media of every call.
-
 
 ## IP-authenticated trunks
 
@@ -165,7 +168,7 @@ and the host of `registrar`. An inbound trunk and registrations may share a SIPT
 
 Some SIP servers use a dedicated media server pool to handle real-time traffic, like Kamailio with
 rtpengine. In such cases the SIP next hop and the media peers are different Services. STUNner
-allows to enforce this distinction via attaching a separate UDPRoute for the SIP backends and
+lets you enforce this distinction by attaching a separate UDPRoute for the SIP backends and
 another one for the media server backends: the UDPRoute pointing to the SIP servers attaches to the
 SIP listeners by the `sectionName`, while the UDPRoute for media attaches to the media listener,
 again by `sectionName`. Other SIP servers terminate the media themselves (LiveKit SIP): a single
@@ -175,7 +178,7 @@ address in the SDP the SIP server returns, which must be an address of the media
 LiveKit SIP runs with a single shared UDPRoute for both SIP signaling and media. Configure the
 STUNner UDPRoute with no `sectionName`, and LiveKit SIP with its pod address in the SDP it sends:
 no external IP, no host networking, no public RTP port range. Since LiveKit SIP will see the calls
-to arrive from the STUNner pods instead of from the carriers, its inbound trunk's
+arrive from the STUNner pods instead of from the carriers, its inbound trunk's
 `allowed_addresses` cannot filter the carriers; STUNner instead filters carrier traffic by
 configuring `allowedSources` in the SIPTrunk. An inbound trunk that lists its `numbers` may leave
 `allowed_addresses` empty, a trunk with no `numbers` can set it to the pod address range of the
@@ -183,7 +186,7 @@ cluster.
 
 When SIP servers and media servers are separate, STUNner must be configured with two UDPRoutes, one
 attaching to the SIP listener by the `sectionName` and pointing to the cluster's SIP server pool
-(e.g., Kamailio), while the other attaching to the RTP media listener and pointing to the
+(e.g., Kamailio), while the other attaches to the RTP media listener and pointing to the
 in-cluster media server pool (e.g., rtpengine), again by `sectionName`:
 
 ```yaml
@@ -227,12 +230,3 @@ user space, and so does RTCP when only one of the parties multiplexes it with RT
 moves it between the ports. Media through a tunnelled cluster is not offloaded. See the [kernel
 offload](PREMIUM_REFERENCE.md#kernel-offload) reference for the offload limit of your tier, the
 settings and the monitoring.
-
-## Limitations
-
-- Each tier serves a number of SIP Gateways with a number of parallel sessions (calls) each: see
-  [here](https://l7mp.io/pricing) for the limits and pricing at each tier. 
-- A lost registration connection ends the calls over it; STUNner dials and registers again.
-- No outbound calls.
-- The media of a carrier is matched by the address in its SDP: carriers behind a NAT that rewrites
-  their media source are not supported.

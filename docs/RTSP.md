@@ -2,55 +2,47 @@
 
 > [!WARNING]
 > RTSP streaming through STUNner is in beta: the deployment model may change in any release, there
-> is no support on any tier, and only RTSP interleaved over TCP is supported. Please test and report
-> issues, but in any way, use it at your own risk.
+> is no support on any tier, and only RTSP interleaved over TCP is supported. Certain features
+> require premium support: see [here](https://l7mp.io/pricing) for the limits and pricing. Please
+> test and report issues, but in any way, use it at your own risk.
 
-RTSP streaming through STUNner is a beta deployment model: it may change in any release, it comes
-with no support on any tier, and it supports RTSP interleaved over TCP only. Within these limits,
 STUNner lets the viewers outside the cluster watch IP cameras through a media server running in
-ordinary Kubernetes pods (e.g., [MediaMTX](https://github.com/bluenviron/mediamtx)): browsers over
-WebRTC, RTSP clients like VLC or a video management system over TCP, with no host networking and no
-public camera addresses.
+ordinary Kubernetes pods (e.g., [MediaMTX](https://github.com/bluenviron/mediamtx)). This allows
+browsers over WebRTC, RTSP clients like VLC or a video management system over TCP, to obtain a feed
+video with no host networking and no public camera addresses.
 
 ## Table of Contents
 
 1. [Concepts](#concepts)
 1. [Watching cameras with MediaMTX](#watching-cameras-with-mediamtx)
 1. [Testing](#testing)
-1. [Limitations](#limitations)
 
 ## Concepts
 
 IP cameras, NVRs and video management systems speak RTSP: HTTP-like requests on TCP port 554 set up
 the session, and the media is RTP, either over UDP or interleaved in the TCP control connection. A
-camera is an RTSP server: it calls nobody, it answers whoever pulls it, and it sends its UDP media
-to the address the request came from. Two consequences shape the deployment:
-
-- Something in the cluster pulls every camera, continuously, one session each: a restreamer like
-  MediaMTX or go2rtc, an NVR like Frigate, or an AI pipeline. This is outgoing traffic, which
-  reaches a camera without STUNner. Pull over TCP: the camera's UDP media would go to the egress
-  address of the cluster, which forwards nothing back to the pod.
-- The viewers watch what the media server re-serves, the regular direction of a gateway: requests
-  and media come in from outside. This is where STUNner comes in.
+camera is an RTSP server: it either streams via TCP in-band or sends UDP media to the address the
+request came from. A media server deployed into the cluster (e.g., MediaMTX or go2rtc, an NVR like
+Frigate) pulls camera streams continuously; this is outgoing traffic, which reaches a camera
+without STUNner. Viewers then watch the feeds the media server re-serves via STUNner.
 
 ![STUNner RTSP viewers model](img/stunner_rtsp.svg)
 
-Viewers reach the media server through STUNner in two ways:
+Viewers may reach the media server through STUNner in two ways:
 
-- *Browsers*: the media server serves the cameras over WebRTC (WHEP in MediaMTX and go2rtc), and
-  STUNner is its TURN server, as for any WebRTC media server in the [media-plane deployment
-  model](DEPLOYMENT.md#media-plane-deployment-model): a [TURN Gateway](TURN.md) with a UDPRoute to
-  the media server, and the TURN URI and credentials of the Gateway in the ICE server
-  configuration of the media server. The HTTP signaling goes through your usual HTTP ingress.
-- *RTSP clients*: a plain `TCP` listener with a TCPRoute to the RTSP port of the media server: STUNner
-  relays every client connection, the RTSP requests and the interleaved media together, to a pod
-  of the media server.
+- *Browsers*: the media server serves the cameras over WebRTC (WHEP in MediaMTX and go2rtc) and
+  STUNner acts as a WebRTC/TURN gateway in [media-plane deployment
+  model](DEPLOYMENT.md#media-plane-deployment-model). See the [WebRTC gateway](WebRTC.md) tutorial
+  for how to configure STUNner as a TURN server.
+- *RTSP clients*: a plain STUNner `TCP` listener with a TCPRoute to the RTSP port of the media
+  server relays client connections, the RTSP requests and the interleaved media, to a pod of the
+  media server.
 
 ## Watching cameras with MediaMTX
 
-The below manifests deploy MediaMTX pulling one camera over TCP into the path `cam1` (MediaMTX takes
-its settings from `MTX_` environment variables too), and a Gateway with a TCP listener on port 554
-with a TCPRoute to the RTSP port of MediaMTX. Replace the camera URL with your own.
+The below manifests deploy MediaMTX pulling one camera over TCP into the path `cam1` (MediaMTX
+takes its settings from `MTX_` environment variables), and a Gateway with a TCP listener on port
+554 with a TCPRoute to the RTSP port of MediaMTX. Replace the camera URL with your own.
 
 ```yaml
 apiVersion: apps/v1
@@ -119,10 +111,13 @@ spec:
           port: 8554
 ```
 
-Each pull is one session on the camera, so every camera is pulled by one MediaMTX pod: run one
-replica, or split the cameras among several MediaMTX Deployments, each behind a Gateway of its own.
-A plain listener authenticates nobody (see [plain listeners](SECURITY.md#plain-listeners)): turn on
-the authentication of MediaMTX before exposing it, STUNner relays the RTSP requests unchanged.
+IP cameras are pulled by one MediaMTX pod and served to clients over TCP. The STUNner data plane
+can be scaled to any number of pods. To scale MediaMTX deployment behind STUNner, all media servers
+have to pull every camera so that viewers can reach every stream over every backend. This is
+because the backends of the TCP listener are picked per connection in round robin.  Also note that
+a plain listener does not perform authentication (see the [authentication
+guide](SECURITY.md#authentication)), so turn on the authentication of MediaMTX before exposing
+it. STUNner relays the RTSP requests unchanged.
 
 ## Testing
 
@@ -132,11 +127,3 @@ Watch the camera through the Gateway with FFmpeg or VLC, forcing RTSP over TCP:
 export RTSP_IP=$(kubectl -n cameras get gateway rtsp-gateway -o jsonpath='{.status.addresses[0].value}')
 ffplay -rtsp_transport tcp rtsp://${RTSP_IP}:554/cam1
 ```
-
-## Limitations
-
-- RTSP interleaved over TCP only: a viewer asking for UDP media gets it from the media server's pod
-  address, which it cannot reach.
-- STUNner does not pull cameras: the pull leg is the media server's outgoing traffic.
-- The backends of a TCP listener are picked per connection, round robin: a viewer reaches every
-  stream only if every backend serves every stream.

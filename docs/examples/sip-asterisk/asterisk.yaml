@@ -1,0 +1,76 @@
+# Asterisk answering every call STUNner forwards with an echo: the SIP transport on UDP port 5060,
+# an anonymous endpoint for the calls (the SIPTrunk of the Gateway admits the carriers), an echo
+# dialplan, and RTP on UDP ports 10000-10099 of the pod.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asterisk
+  namespace: default
+data:
+  pjsip.conf: |
+    [transport-udp]
+    type=transport
+    protocol=udp
+    bind=0.0.0.0:5060
+
+    ; the calls STUNner forwards: no authentication, the SIPTrunk admits the carriers
+    [anonymous]
+    type=endpoint
+    transport=transport-udp
+    context=echo
+    disallow=all
+    allow=alaw,ulaw
+  extensions.conf: |
+    [echo]
+    exten => echo,1,Answer()
+     same => n,Echo()
+     same => n,Hangup()
+  rtp.conf: |
+    [general]
+    rtpstart=10000
+    rtpend=10099
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asterisk
+  namespace: default
+  labels:
+    app: asterisk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asterisk
+  template:
+    metadata:
+      labels:
+        app: asterisk
+    spec:
+      containers:
+        - name: asterisk
+          image: andrius/asterisk:latest
+          ports:
+            - containerPort: 5060
+              protocol: UDP
+          volumeMounts:
+            - {name: config, mountPath: /etc/asterisk/pjsip.conf, subPath: pjsip.conf}
+            - {name: config, mountPath: /etc/asterisk/extensions.conf, subPath: extensions.conf}
+            - {name: config, mountPath: /etc/asterisk/rtp.conf, subPath: rtp.conf}
+      volumes:
+        - name: config
+          configMap:
+            name: asterisk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asterisk
+  namespace: default
+spec:
+  selector:
+    app: asterisk
+  ports:
+    - name: sip
+      port: 5060
+      protocol: UDP

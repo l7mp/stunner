@@ -1,0 +1,72 @@
+# A STUNner SIP Gateway in front of Asterisk: the carrier (SIPp here, at MY_IP) calls the SIP
+# listener, the media of the calls arrives at the media listener, and one UDPRoute with no
+# sectionName sends both to Asterisk, which terminates the SIP and the RTP alike.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: stunner-gatewayclass
+spec:
+  controllerName: "stunner.l7mp.io/gateway-operator"
+  parametersRef:
+    group: "stunner.l7mp.io"
+    kind: GatewayConfig
+    name: stunner-gatewayconfig
+    namespace: stunner
+  description: "STUNner is the Kubernetes real-time media gateway"
+---
+apiVersion: stunner.l7mp.io/v1
+kind: GatewayConfig
+metadata:
+  name: stunner-gatewayconfig
+  namespace: stunner
+spec:
+  realm: stunner.l7mp.io
+  authType: static
+  userName: "user-1"
+  password: "pass-1"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sip-gateway
+  namespace: stunner
+  annotations:
+    stunner.l7mp.io/external-traffic-policy: local
+spec:
+  gatewayClassName: stunner-gatewayclass
+  infrastructure:
+    parametersRef:
+      group: stunner.l7mp.io
+      kind: SIPTrunk
+      name: carrier
+  listeners:
+    - name: sip
+      protocol: UDP
+      port: 5060
+    - name: media
+      protocol: UDP
+      port: 30000
+---
+apiVersion: stunner.l7mp.io/v1alpha1
+kind: SIPTrunk
+metadata:
+  name: carrier
+  namespace: stunner
+spec:
+  mediaListener: media
+  allowedSources:
+    - MY_IP
+---
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: asterisk
+  namespace: stunner
+spec:
+  parentRefs:
+    - name: sip-gateway
+  rules:
+    - backendRefs:
+        - name: asterisk
+          namespace: default
+          port: 5060

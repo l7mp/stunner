@@ -22,13 +22,13 @@ helm repo update
 
 ### Stable version
 
-The below will install the stable version of STUNner: the chart deploys the STUNner control plane and the authentication service. We recommend to use the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
+The below will install the stable version of STUNner: the chart deploys the STUNner control plane and the authentication service. We recommend using the `stunner-system` namespace to keep the full STUNner control plane in a single scope.
 
 ```console
 helm install stunner stunner/stunner --create-namespace --namespace=stunner-system
 ```
 
-And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The `stunnerd` pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1#DataplaneSpec).
+And that's all: you don't need to install the dataplane separately, this is handled automatically by the operator.  The [`stunnerd`](cmd/stunnerd.md) pods created by the operator can be customized using the Dataplane custom resource: you can specify the `stunnerd` container image version, provision resources per each `stunnerd` pod, deploy into the host network namespace, etc.; see the documentation [here](https://pkg.go.dev/github.com/l7mp/stunner-gateway-operator/api/v1#DataplaneSpec).
 
 ### Development version
 
@@ -56,17 +56,17 @@ helm install stunner stunner/stunner --create-namespace --namespace=stunner-syst
 To manually install the CRDs:
 
 ```console
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/experimental-install.yaml
 kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner-helm/main/helm/stunner/crds/stunner-crds.yaml
 ```
 
 ## Customization
 
-The Helm charts let you fine-tune STUNner features, including [compute resources](#resources) provisioned for `stunnerd` pods and [graceful shutdown](#graceful-shutdown).
+The Helm charts let you fine-tune STUNner features, including [compute resources](#resources-requestslimits) provisioned for `stunnerd` pods and [graceful shutdown](#graceful-shutdown).
 
 ### Resources requests/limits
 
-it is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner/values.yaml) resource request and limit is set as follows:
+It is important to manage the [amount of CPU and memory resources](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers) available for each `stunnerd` pod.  The [default](https://github.com/l7mp/stunner-helm/blob/main/helm/stunner/values.yaml) resource request and limit is set as follows:
 
 ```yaml
 resources:
@@ -82,6 +82,6 @@ This means that every `stunnerd` pod will request 0.5 CPU cores and 128 mebibyte
 
 ### Graceful shutdown
 
-STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunner` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile.
+STUNner has full support for [graceful shutdown](SCALING.md). This means that `stunnerd` pods will remain alive as long as there are active allocations in the embedded TURN server, and a pod will automatically remove itself once all allocations are deleted or time out. This enables the full support for graceful scale-down: the user can scale the number of `stunner` instances up and down and no harm should be made to active client connections meanwhile.
 
-The default termination period is set to 3600 seconds (1 hour). To modify, use the `--set stunner.deployment.container.terminationGracePeriodSeconds=<NEW_PERIOD_IN_SECONDS>` flag.
+The default termination period is set to 3600 seconds (1 hour). To modify, use the `--set stunnerGatewayOperator.dataplane.spec.terminationGracePeriodSeconds=<NEW_PERIOD_IN_SECONDS>` flag.

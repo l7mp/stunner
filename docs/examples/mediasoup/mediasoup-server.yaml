@@ -78,7 +78,7 @@ metadata:
   namespace: mediasoup
 spec:
   rules:
-  - host: mediasoup-ingressserviceip.nip.io
+  - host: mediasoup-${INGRESS_IP}.nip.io
     http:
       paths:
       - backend:
@@ -90,7 +90,7 @@ spec:
         pathType: Prefix
   tls:
   - hosts:
-    - mediasoup-ingressserviceip.nip.io
+    - mediasoup-${INGRESS_IP}.nip.io
     secretName: mediasoup-demo-tls
 ---
 apiVersion: cert-manager.io/v1

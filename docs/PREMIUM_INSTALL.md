@@ -1,6 +1,6 @@
 # Getting started with STUNner premium tiers
 
-Congratulations for subscribing to STUNner premium. You should have received a customer key during the subscription procedure; [contact us](mailto:info@l7mp.io) if not. Make sure to save the customer key to a safe place, you will need it every time you (re)deploy STUNner.
+Congratulations on subscribing to STUNner premium. You should have received a customer key during the subscription procedure; [contact us](mailto:info@l7mp.io) if not. Make sure to save the customer key to a safe place, you will need it every time you (re)deploy STUNner.
 
 The below guide will walk you through unlocking STUNner's premium features. See the [premium feature reference](PREMIUM_REFERENCE.md) for the features of each tier, and [here](https://l7mp.io/pricing) for the tiers and their pricing.
 
@@ -114,7 +114,7 @@ License status:
 
 This command will connect to the STUNner gateway operator and report the license status. It will also report any errors encountered while validating your license. The limits of your subscription are in the dataplane status of [`stunnerctl status`](cmd/stunnerctl.md#status) (`limits={...}`).
 
-It is also possible to check the license status of STUNners's dataplane pods. The below [`stunnerctl`](/docs/cmd/stunnerctl.md) command will connect to each dataplane pod of the `stunner/udp-gateway` gateway and report the running licensing status.
+It is also possible to check the license status of STUNner's dataplane pods. The below [`stunnerctl`](/docs/cmd/stunnerctl.md) command will connect to each dataplane pod in all namespaces and report the running licensing status.
 
 ```console
 stunnerctl -a status -o jsonpath='License status for dataplane node {.admin.name}: {.admin.licensing_info}'

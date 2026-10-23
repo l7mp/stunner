@@ -1,6 +1,6 @@
 # Security
 
-Like any conventional gateway service, an improperly configured STUNner service may easily end up exposing sensitive services to the Internet. The below security guidelines will allow to minimize the risks associated with a misconfigured STUNner gateway service.
+Like any conventional gateway service, an improperly configured STUNner service may easily end up exposing sensitive services to the Internet. The below security guidelines will help minimize the risks associated with a misconfigured STUNner gateway service. 
 
 ## Table of Contents
 
@@ -8,13 +8,12 @@ Like any conventional gateway service, an improperly configured STUNner service 
 1. [Locking down STUNner](#locking-down-stunner)
 1. [Authentication](#authentication)
 1. [Access control](#access-control)
-1. [Exposing internal IP addresses](#exposing-internal-ip-addresses)
-1. [User quota](#user-quota-only-available-in-the-premium-version)
-1. [SIP gateway](#sip-gateway)
+<!-- 1. [Exposing internal IP addresses](#exposing-internal-ip-addresses) -->
+1. [User quotas](#user-quotas)
 
 ## Threat
 
-Before deploying STUNner, it is worth evaluating the potential [security risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly configured public STUN/TURN server poses.  To demonstrate the risks, below we shall use the [tunnel mode of `stunnerd`](cmd/stunnerd.md#tunnel-mode) and `dig` to query the Kubernetes DNS service through a misconfigured STUNner gateway.
+Before deploying STUNner, it is worth evaluating the potential [security risks](https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty) a poorly configured public WebRTC gateway server poses.  To demonstrate the risks, below we shall use the [tunnel mode of `stunnerd`](cmd/stunnerd.md#tunnel-mode) over UDP/TURN and `dig` to query the Kubernetes DNS service through a misconfigured STUNner gateway. The example considers WebRTC, but the risks are similar for the rest of the media protocols supported by STUNner.
 
 Start with a [fresh STUNner installation](INSTALL.md) into an empty namespace called `stunner` and apply the below configuration.
 
@@ -54,7 +53,7 @@ dig +short @127.0.0.1 -p 5000 kubernetes.default.svc.cluster.local
 
 You should see the internal Cluster IP address for the Kubernetes API server. 
 
-This little experiment should demonstrate the threats associated with a poorly configured STUNner gateway: it may allow external access to *any* UDP service running inside your cluster. The prerequisites for this:
+This little experiment should demonstrate the threats associated with a poorly configured STUNner gateway: it may allow external access to *any* UDP or TCP service running inside your cluster. The prerequisites for this:
 
 1. the target service *must* be wrapped with a UDPRoute or a TCPRoute;
 2. the attacker *must* know at least one pod address or the ClusterIP for the targeted service.
@@ -77,7 +76,7 @@ spec:
         - name: dummy
 ```
 
-Repeat the above `dig` command to query the Kubernetes DNS service again and observe how the query times out. This demonstrates that a properly locked down STUNner installation blocks all access outside of the backend services explicitly opened up via a UDPRoute.
+Repeat the above `dig` command to query the Kubernetes DNS service again and observe how the query times out. This demonstrates that a properly locked down STUNner installation blocks all access outside of the backend services explicitly opened up. 
 
 ## Locking down STUNner
 
@@ -85,21 +84,19 @@ Unless properly locked down, STUNner may be used maliciously to open a tunnel to
 
 STUNner's basic security model is as follows:
 
-> In a properly configured deployment, STUNner provides the same level of security as a media server pool exposed to the Internet over a public IP address. A malicious attacker, even possessing a valid TURN credential, can reach only the media servers deployed behind STUNner, but no other services.
+> In a properly configured deployment, STUNner provides the same level of security as a media server pool exposed to the Internet over a public IP address. A malicious attacker, even possessing a valid STUNner credential, can reach only the media servers deployed behind STUNner, and only on a specific set of ports, but no other services.
 
-The below security considerations will greatly reduce this attack surface even further. In any case, use STUNner at your own risk.
+The below security considerations will reduce this attack surface even further. In any case, use STUNner at your own risk.
 
 ## Authentication
 
-By default, STUNner uses a single static username/password pair for all WebRTC clients and the password is available in plain text at the clients (`static` authentication mode). Anyone with access to the static STUNner credentials can open a UDP tunnel via STUNner, provided that they know the private IP address of the target service or pod and provided that a UDPRoute exists that specifies the target service as a backend. This means that a service is exposed only if STUNner is explicitly configured so.
+STUNner provides extensive support for authenticating clients before granting access to the media services of the cluster. See the details in the [authentication guide](AUTH.md).
 
-For production WebRTC deployments we recommend the `ephemeral` authentication mode, which uses per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for configuring STUNner with `ephemeral` authentication.
+In order to authenticate WebRTC clients, STUNner uses a single static username/password pair shared by all clients by default (`static` authentication mode). Worse yet, the password is available in plain text at the clients. Anyone with access to the static credentials can open a UDP or TCP tunnel into the cluster. For production WebRTC deployments we recommend the `ephemeral` authentication mode, which uses per-client fixed lifetime username/password pairs. This makes it more difficult for attackers to steal and reuse STUNner's TURN credentials. See the [authentication guide](AUTH.md) for configuring STUNner with `ephemeral` authentication.
 
-Note that STUNner can also be deployed as a STUN server without enabling the TURN protocol (only available in the premium tiers), in which case it needs no authentication. Refer to the [user guide](PREMIUM_REFERENCE.md) for the details.
+For VoIP gateways, STUNner provides the usual SIP authentication options. [Inbound SIP trunks](SIP.md#ip-authenticated-trunks) typically use IP authentication: list the carrier's signaling address ranges in the `allowedSources` field of the SIPTrunk, and the SIP listeners refuse calls from any other source (an empty list admits no calls at all). Digest challenges pass through STUNner unchanged, so if the SIP backend challenges inbound calls, the carrier answers the backend directly, on top of the address filter.  For [registration-based SIP trunks](SIP.md#registration-based-trunks), set the carrier account's digest credentials in a Kubernetes Secret and refer the SIPTrunk to the Secret via the `authRef` of the registration. STUNner registers with the carrier and answers the registrar's digest challenge on behalf of the cluster, so the carrier credentials never reach the SIP backend or the clients. Prefer TLS listeners for SIP whenever the carrier supports it, and `sips:` registrars for registrations, so neither the signaling nor the credentials cross the Internet in the clear. SRTP media is relayed untouched: STUNner never holds the media keys.
 
-### Plain listeners
-
-A plain UDP or TCP listener relays raw client flows to its preconfigured peer with *no authentication whatsoever*: raw flows carry no credentials, so anyone who can reach the listener socket can relay traffic to the peer. An open plain listener is therefore unauthenticated open ingress to the pinned peer, limited only to the endpoints of the server's clusters, with no per-user quota and no rate limiting. A Gateway listener is plain when its protocol is `UDP`, `TCP`, `TLS` or `DTLS` instead of `TURN-UDP`, `TURN-TCP`, `TURN-TLS` or `TURN-DTLS` or with a SIPTrunk in the parameters reference. Keep plain listeners on internal or otherwise firewalled addresses unless the peer service is meant to be publicly reachable.
+Plain UDP/TCP transport gateways (ones with `UDP`, `TCP`, `TLS` or `DTLS` listeners) run with *no authentication whatsoever* so that anyone who can reach the listener socket can relay traffic to the peer. This is systematic, since raw UDP/TCP flows carry no credentials.  An open plain listener is therefore unauthenticated open ingress limited only to the endpoints of the cluster endpoints, with no per-user quota and no rate limiting. Keep plain listeners on firewalled addresses, unless the peer service is meant to be publicly reachable or uses end-to-end authentication.
 
 A typical use is exposing a pure TCP workload that runs only inside the cluster, such as the RTMP ingest of a media server. This lets drones, IP cameras and encoders push streams to the media server over TCP port 1935. The below Gateway exposes a [MediaMTX](https://github.com/bluenviron/mediamtx) server in the `media-plane` namespace on a plain TCP listener, next to the TURN listeners of the same STUNner installation.
 
@@ -161,6 +158,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: stunner-network-policy
+  namespace: stunner
 spec:
 # Choose the STUNner pods as source
   podSelector:
@@ -183,43 +181,15 @@ spec:
       endPort: 20000
 ```
 
-Kubernetes network policies can be easily [tested](https://banzaicloud.com/blog/network-policy) before exposing STUNner publicly; e.g., the [tunnel mode of `stunnerd`](cmd/stunnerd.md#tunnel-mode) can be used conveniently for this [purpose](examples/simple-tunnel/README.md).
+<!-- ## Exposing internal IP addresses -->
 
-## Exposing internal IP addresses
+<!-- The trick in STUNner is that both the internal proxy address (e.g., the TURN relay transport address) and the media server address are internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model) without the involvement of a NAT. This makes it possible to host the entire media server infrastructure over the private internal pod network and still allow external clients to make connections to the media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP addresses may now exposed to the Internet: e.g., WebRTC clients may read servers' pod addresses from the ICE candidates. -->
 
-The trick in STUNner is that both the internal proxy address (e.g., the TURN relay transport address) and the media server address are internal pod IP addresses, and pods in Kubernetes are guaranteed to be able to connect [directly](https://sookocheff.com/post/kubernetes/understanding-kubernetes-networking-model/#kubernetes-networking-model) without the involvement of a NAT. This makes it possible to host the entire media server infrastructure over the private internal pod network and still allow external clients to make connections to the media servers via STUNner.  At the same time, this also has the bitter consequence that internal IP addresses may now exposed to the Internet: e.g., WebRTC clients may read servers' pod addresses from the ICE candidates.
+<!-- The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP address of all STUNner pods and all media server pods. This should pose no major security risk though: remember, none of these private IP addresses can be reached externally. The attack surface can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE mode](DEPLOYMENT.md#symmetric-ice-mode). -->
 
-The threat model is that, possessing the correct credentials, an attacker can scan the *private* IP address of all STUNner pods and all media server pods. This should pose no major security risk though: remember, none of these private IP addresses can be reached externally. The attack surface can be further reduced to the STUNner pods' private IP addresses by using the [symmetric ICE mode](DEPLOYMENT.md#symmetric-ice-mode).
+<!-- Nevertheless, if worried about information exposure then STUNner may not be the best option at the moment. In later releases, we plan to implement a feature to obscure the relay transport addresses returned by STUNner. Please file an issue if you think this limitation is a blocker for your use case. -->
 
-Nevertheless, if worried about information exposure then STUNner may not be the best option at the moment. In later releases, we plan to implement a feature to obscure the relay transport addresses returned by STUNner. Please file an issue if you think this limitation is a blocker for your use case.
+## User quotas
 
-## User quota (only available in the premium version)
-
-In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM_REFERENCE.md) for the details.
-
-## SIP gateway
-
-> [!WARNING]
-> The SIP gateway is in beta: the API may change in any release and there is no support on any tier.
-> Please test and report issues, but in any way, use it at your own risk.
-
-A public SIP port is found and probed by scanners within minutes. STUNner proxies only inbound
-calls, so a SIP gateway cannot be abused to place calls, but every call that reaches your SIP
-server may still start a session unless properly locked down. Below are a set of best-practices to
-make sure only SIP trunks can place calls in the cluster:
-
-- **Admit only the SIP carriers.** List the carriers' signaling address ranges in the SIPTrunk's
-  `allowedSources`; an empty list admits no inbound call at all, which is right for
-  registration-only trunks. The filter needs the carriers' real source addresses, so set
-  `stunner.l7mp.io/external-traffic-policy: local` on the Gateway. Note that register-only SIP
-  trunks require no `allowedSources` setting.
-- **Prefer TLS.** Use `TLS` listeners for SIP over TLS from carriers when available, and `sips:`
-  registrars for registrations, so neither the signaling nor the credentials cross the Internet in
-  the clear. SRTP media is relayed untouched: STUNner never holds the media keys.
-- **Keep the media port tight.** STUNner relays media only for the calls it set up, and only from
-  the source addresses in their SDP; anything else arriving at the media port is dropped.
-- **Keep the credentials in Secrets.** Registration credentials live in the Secret the
-  registration's `authRef` names, in the namespace of the SIPTrunk.
-- **Cap the sessions.** The free and member tiers cap the parallel sessions per SIP Gateway (see the
-  [pricing](https://l7mp.io/pricing)).
+In order to prevent potential Denial-of-Service (DoS) attacks that may be launched by an attacker creating a huge number of parallel TURN allocations to overwhelm STUNner, it is possible to impose a user quota on the number of simultaneous allocations that can be made with the same TURN credential. Refer to the `UserQuota` feature description in the [premium user guide](PREMIUM_REFERENCE.md) for the details and see the [pricing](https://l7mp.io/pricing) for the premium tiers and prices.
 

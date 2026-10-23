@@ -6,6 +6,9 @@
 
 *Note: This page documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
 
+> [!WARNING]
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> pricing.
 
 ## Overview
 
@@ -24,8 +27,8 @@
 * [Monitoring](MONITORING.md)
 * [Scaling](SCALING.md)
 * [Security](SECURITY.md)
-* [TURN gateway](TURN.md)
-* [SIP gateway (beta)](SIP.md)
+* [WebRTC gateway](WebRTC.md)
+* [SIP/RTP gateway (beta)](SIP.md)
 * [SRT gateway (beta)](SRT.md)
 * [RTSP streaming (beta)](RTSP.md)
 
@@ -38,30 +41,24 @@
 
 ## Tutorials
 
-### Basics
+### WebRTC gateways
 
+* [Direct one to one video call with headless STUNner](examples/direct-one2one-call)
 * [Deploying a UDP echo service behind STUNner](examples/udp-echo)
 * [Opening a UDP tunnel via STUNner](examples/simple-tunnel)
-
-### Headless deployment model
-
-* [Direct one to one video call via STUNner](examples/direct-one2one-call)
-
-### Media-plane deployment model
-
 * [Video-conferencing with LiveKit](examples/livekit/README.md)
 * [Video-conferencing with mediasoup](examples/mediasoup/README.md)
 * [Video-conferencing with Janus](examples/janus/README.md)
-* [Video-conferencing with Elixir WebRTC](examples/elixir-webrtc/README.md)
-* [Video-conferencing with Jitsi](examples/jitsi/README.md)
-* [Cloud-gaming with CloudRetro](examples/cloudretro/README.md)
-* [Remote desktop access with Neko](examples/neko/README.md)
-* [One to one video call with Kurento](examples/kurento-one2one-call)
-* [Magic mirror with Kurento](examples/kurento-magic-mirror/README.md)
 
-### SIP deployment models (beta)
+### SIP/RTP gateways (beta)
 
 * [Calling a SIP echo service in Kubernetes](examples/sip-echo/README.md)
+* [Asterisk behind a STUNner SIP Gateway](examples/sip-asterisk/README.md)
+
+### SRT gateways (beta)
+
+* [Streaming SRT through STUNner with mediactl](examples/srt-echo/README.md)
+* [Streaming SRT video into MediaMTX](examples/srt-mediamtx/README.md)
 
 ## Manuals
 

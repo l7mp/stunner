@@ -1,8 +1,8 @@
-# STUNner demo: Video-conferencing with mediasoup
+# STUNner Tutorial: Video-conferencing with mediasoup
 
 This document guides you through the installation of [mediasoup](https://mediasoup.org/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
 
-In this demo you will learn to:
+In this tutorial you will learn how to:
 
 - integrate a typical WebRTC application with STUNner,
 - obtain a valid TLS certificate to secure the signaling plane,
@@ -20,14 +20,19 @@ To run this example, you need:
 
 > [!NOTE]
 >
-> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `default` namespace under the `mediasoup-demo-tls` name.
+> If you have your own TLS certificate, put it in a `Secret` [resource](https://kubernetes.io/docs/concepts/configuration/secret/) and deploy it into the `mediasoup` namespace under the `mediasoup-demo-tls` name.
 
+The [TLS guide](../TLS.md) installs the Ingress controller and cert-manager, and exports the
+address of the Ingress in the `INGRESS_IP` variable the commands below use.
+
+The commands fill the addresses into the manifests with `envsubst` from GNU gettext, installed on
+most Linux systems (`gettext-base` on Debian and Ubuntu, `gettext` on macOS with Homebrew).
 
 ## Description
 
-The recommended way to install mediasoup ([link](https://mediasoup.discourse.group/t/server-in-kubernetes-with-turn/3434),[link](https://www.reddit.com/r/kubernetes/comments/sdkhwn/deploying_mediasoup_webrtc_sfu_in_kubernetes/)) into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, however, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
+The recommended way to install mediasoup ([link](https://mediasoup.discourse.group/t/server-in-kubernetes-with-turn/3434),[link](https://www.reddit.com/r/kubernetes/comments/sdkhwn/deploying_mediasoup_webrtc_sfu_in_kubernetes/)) into Kubernetes is deploying the media servers into the host-network namespace of the Kubernetes nodes (`hostNetwork: true`). This deployment model, however, comes with a set of uncanny [operational limitations and security concerns](../../WHY.md). Using STUNner, media servers can be deployed into ordinary Kubernetes pods and run over a private IP network, like any "normal" Kubernetes workload.
 
-The figure below shows mediasoup deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, mediasoup is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for mediasoup, saving the overhead of using public a 3rd party STUN/TURN server for NAT traversal.
+The figure below shows mediasoup deployed into regular Kubernetes pods behind STUNner without the host-networking hack. Here, mediasoup is deployed behind STUNner in the [*media-plane deployment model*](../../DEPLOYMENT.md), so that STUNner acts as a "local" STUN/TURN server for mediasoup, saving the overhead of using a public 3rd party STUN/TURN server for NAT traversal.
 
 ![STUNner mediasoup integration deployment architecture](../../img/stunner_mediasoup.svg)
 
@@ -35,11 +40,11 @@ In this tutorial we deploy a video room example using [mediasoup's demo applicat
 
 ### Modifications on the mediasoup demo
 
-Below are the modification that has been done starting from [mediasoup-demo](https://github.com/versatica/mediasoup-demo/):
+Below are the modifications made starting from [mediasoup-demo](https://github.com/versatica/mediasoup-demo/):
 
 - Added a multistage Dockerfile
 
-  - stage 0: run gulp dist to create the frontend app file (they will be served by nodejs from the backend)
+  - stage 0: run gulp dist to create the frontend app files (they will be served by nodejs from the backend)
   - stage 1: build the image for the mediasoup-server and copy the mediasoup-client file
 
 - Added a simple script that gathers the internal/private IP of the running pod, this is not foolproof, however,
@@ -55,7 +60,7 @@ with an additional environment variable we can load the pod's private IP into th
 
 ### STUNner
 
-Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy (after some minor modifications) the [manifest](mediasoup-server.yaml) packaged with STUNner.
+Now comes the fun part. The simplest way to run this demo is to clone the [STUNner git repository](https://github.com/l7mp/stunner) and deploy the manifests packaged with STUNner.
 
 To install the stable version of STUNner, please follow the instructions in [this section](../../INSTALL.md#installation-1).
 
@@ -64,6 +69,7 @@ Configure STUNner to act as a STUN/TURN server to clients, and route all receive
 ```console
 git clone https://github.com/l7mp/stunner
 cd stunner
+kubectl create namespace stunner
 kubectl apply -f docs/examples/mediasoup/mediasoup-call-stunner.yaml
 ```
 
@@ -104,27 +110,24 @@ Wait until Kubernetes assigns an external IP and store the external IP assigned 
 STUNner in an environment variable for later use.
 
 ```console
-until [ -n "$(kubectl get svc udp-gateway -n stunner-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
-export STUNNERIP=$(kubectl get service udp-gateway -n stunner-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+until [ -n "$(kubectl get svc udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')" ]; do sleep 1; done
+export STUNNER_IP=$(kubectl get service udp-gateway -n stunner -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ```
 
 ### mediasoup
 
-The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. However, there is a slight issue. In this deployment it's not the server that instructs the clients to use STUNner but the user itself. Obviously, it is not the optimal way but for the sake of the demo purpose we keep it that way. In case anyone would want to create a production ready deployment, they would need to add extra capabilities to the mediasoup server:
+The crucial step of integrating *any* WebRTC media server with STUNner is to ensure that the server instructs the clients to use STUNner as the STUN/TURN server. However, there is a slight issue. In this deployment it's not the server that instructs the clients to use STUNner but the user. Obviously, it is not the optimal way but for the sake of the demo we keep it that way. In case anyone would want to create a production ready deployment, they would need to add extra capabilities to the mediasoup server:
 - first to make sure turn servers can be configured in the server's config.js file
 - second to make sure that clients can fetch (or get automatically) the configured turn servers from the mediasoup server
 
-We need the Ingress external IP address we have stored previously: this will make sure that the TLS certificate created by cert-manager will be bound to the proper `nip.io` domain and IP address.
-
-```console
-sed -i "s/ingressserviceip/$INGRESSIP/g" docs/examples/mediasoup/mediasoup-server.yaml
-```
+The manifest names the address of the Ingress with the placeholder `${INGRESS_IP}`, so that cert-manager issues the TLS certificate for the right `nip.io` domain.
 
 Finally, fire up mediasoup.
 
 ```console
 kubectl create ns mediasoup
-kubectl apply -f docs/examples/mediasoup/mediasoup-server.yaml
+envsubst '$INGRESS_IP' < docs/examples/mediasoup/mediasoup-server.yaml > mediasoup-server.yaml
+kubectl apply -f mediasoup-server.yaml
 ```
 
 The demo installation bundle includes a lot of resources to deploy mediasoup:
@@ -141,10 +144,10 @@ Wait until all pods become operational and jump right into testing!
 After installing everything, execute the following command to retrieve the URL of your fresh mediasoup demo app:
 
 ```console
-echo "https://mediasoup-$INGRESSIP.nip.io:443?enableIceServer=yes&iceServerHost=$STUNNERIP&iceServerPort=3478&iceServerProto=udp&iceServerUser=user-1&iceServerPass=pass-1"
+echo "https://mediasoup-$INGRESS_IP.nip.io:443?enableIceServer=yes&iceServerHost=$STUNNER_IP&iceServerPort=3478&iceServerProto=udp&iceServerUser=user-1&iceServerPass=pass-1"
 ```
 
-Opening the output in a browser should get the mediasoup client demo app
+Opening the output in a browser should bring up the mediasoup client demo app.
 
 In case you changed something additionally in the STUNner configuration during deployment watch out for the URL parameters:
   - `enableIceServer` must be `yes` in order to use STUNner as a TURN server
@@ -154,11 +157,39 @@ In case you changed something additionally in the STUNner configuration during d
   - `iceServerUser` is the username used for authentication in STUNner
   - `iceServerPass` is the credential used for authentication in STUNner
 
-
-## Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
-
 ## Acknowledgments
 
 This demo is adopted from [damhau/mediasoup-demo-docker](https://github.com/damhau/mediasoup-demo-docker). Huge thanks to @damhau for the great demo!
+
+## Going further: DaemonSet dataplane
+
+A large conference draws clients to every node of the cluster, while a Deployment places the
+STUNner pods wherever the scheduler likes: the load balancer takes an extra hop to reach them, and
+a busy node may carry several. With a STUNner license, the [DaemonSet
+dataplane](../../PREMIUM_REFERENCE.md#deploying-into-a-daemonset) runs one STUNner pod on every
+node, which grows with the cluster and, with the `stunner.l7mp.io/external-traffic-policy: local`
+Gateway annotation, serves every client from the node the load balancer sends it to:
+
+```console
+kubectl patch dataplane default --type merge -p '{"spec":{"dataplaneResource":"DaemonSet"}}'
+kubectl -n stunner get daemonsets
+```
+
+See the [pricing](https://l7mp.io/pricing) for the license tiers and the [premium installation
+guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
+
+## Next steps
+
+The [other media-plane tutorials](../../README.md) put further WebRTC media servers behind STUNner.
+
+## Clean up
+
+Remove everything the tutorial created:
+
+```console
+kubectl delete -f mediasoup-server.yaml
+kubectl delete -f docs/examples/mediasoup/mediasoup-call-stunner.yaml
+kubectl patch dataplane default --type merge -p '{"spec":{"dataplaneResource":"Deployment"}}'
+kubectl delete namespace mediasoup stunner
+rm mediasoup-server.yaml
+```

@@ -1,230 +1,213 @@
-# STUNner Tutorial: Opening a UDP tunnel via STUNner
+# STUNner Tutorial: Open a UDP tunnel via STUNner
 
-This tutorial shows how to tunnel a local UDP client through STUNner to a UDP service in the cluster, and how to measure the loss and the round trip of the path to evaluate your cloud provider's UDP and TCP stack.
+This tutorial tunnels a local UDP client through STUNner to a UDP echo service in the cluster, and
+measures the loss and the round trip of the path, over TURN on UDP and on TCP and under load: a
+quick way to evaluate the UDP and TCP stack of your cloud provider. A similar setup makes a
+makeshift VPN into your cluster.
+
+![STUNner UDP tunnel tutorial](../../img/stunner_benchmark.svg)
 
 In this tutorial you will learn how to:
-* configure a UDP service in Kubernetes,
-* configure STUNner to expose the service to clients,
-* use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to connect to the UDP service via STUNner,
-* measure the path with [`mediactl`](../../cmd/mediactl.md).
+* expose a UDP service to clients over TURN on UDP and on TCP,
+* open a local UDP tunnel into the cluster with the [tunnel mode of
+  `stunnerd`](../../cmd/stunnerd.md#tunnel-mode),
+* measure the path, also under load, with [`mediactl`](../../cmd/mediactl.md).
 
-## Installation
+## Prerequisites
 
-### Prerequisites
+* A STUNner installation, see the [installation guide](../../INSTALL.md).
+* The `stunnerd`, `stunnerctl` and `mediactl` tools: download them from the [STUNner
+  releases](https://github.com/l7mp/stunner/releases) or install them with `go install
+  github.com/l7mp/stunner/v2/cmd/<tool>@latest`.
 
-The tutorial assumes a fresh STUNner installation; see the [STUNner installation and configuration guide](../../INSTALL.md). Create a namespace called `stunner` if there is none. Issue `make build` to build `stunnerd`, `stunnerctl` and `mediactl` in the `bin/` directory.
+## Configuration
 
-### Setup
+1. Deploy the echo server: a Deployment running `mediactl udp echo` on UDP port 9001, behind the
+   `echo-server` Service of type `ClusterIP` in the `default` namespace. The Service has no external
+   address, so the only way in is through STUNner.
 
-In this tutorial we perform a quick Kubernetes/STUNner test: we fire up a `mediactl` UDP echo server inside the cluster and measure the path to it from the local console. We will use the [tunnel mode of `stunnerd`](../../cmd/stunnerd.md#tunnel-mode) to tunnel test traffic to the echo server via STUNner acting as a STUN/TURN gateway.
+   ```console
+   cd stunner
+   kubectl apply -f docs/examples/simple-tunnel/echo-server.yaml
+   ```
 
-![STUNner benchmarks setup](../../img/stunner_benchmark.svg)
+1. Expose the echo server through STUNner. The manifest creates the GatewayClass and the
+   GatewayConfig of the other tutorials, a TURN Gateway on UDP port 3478 and another one on TCP port
+   3478, and a UDPRoute that attaches to both and names the `echo-server` Service as its backend:
 
-You can easily implement a makeshift VPN with STUNner using a similar setup.
+   ```console
+   kubectl create namespace stunner
+   kubectl apply -f docs/examples/simple-tunnel/tunnel-stunner.yaml
+   ```
 
-### Server configuration
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: Gateway
+   metadata:
+     name: udp-gateway
+     namespace: stunner
+   spec:
+     gatewayClassName: stunner-gatewayclass
+     listeners:
+       - name: udp-listener
+         port: 3478
+         protocol: TURN-UDP
+   ---
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: Gateway
+   metadata:
+     name: tcp-gateway
+     namespace: stunner
+   spec:
+     gatewayClassName: stunner-gatewayclass
+     listeners:
+       - name: tcp-listener
+         port: 3478
+         protocol: TURN-TCP
+   ---
+   apiVersion: stunner.l7mp.io/v1
+   kind: UDPRoute
+   metadata:
+     name: echo-server
+     namespace: stunner
+   spec:
+     parentRefs:
+       - name: udp-gateway
+       - name: tcp-gateway
+     rules:
+       - backendRefs:
+           - name: echo-server
+             namespace: default
+   ```
 
-Set up a UDP echo server in the `default` Kubernetes namespace and wrap it in a Kubernetes
-service called `echo-server`.
-```console
-cd stunner
-kubectl apply -f docs/examples/simple-tunnel/echo-server.yaml
-```
+1. Check that both Gateways are programmed and have a public address (a cloud load balancer may
+   take up to a minute to assign one):
 
-This will start a Deployment that runs `mediactl udp echo` on UDP port 9001 and wraps it in a Kubernetes service called `echo-server` of type ClusterIP. Check this service and make sure that it is not exposed to the outside world (i.e., `EXTERNAL-IP` is set to `<none>` by Kubernetes); this makes sure that the only way to reach this service from the local test client is through STUNner.
+   ```console
+   kubectl -n stunner get gateways
+   NAME          CLASS                  ADDRESS         PROGRAMMED   AGE
+   tcp-gateway   stunner-gatewayclass   35.187.97.94    True         40s
+   udp-gateway   stunner-gatewayclass   35.205.10.190   True         40s
+   ```
 
-```console
-kubectl get service echo-server -o wide
-NAME          TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE   SELECTOR
-echo-server   ClusterIP   10.120.5.36   <none>        9001/UDP   19s   app=echo-server
-```
+   [`stunnerctl`](../../cmd/stunnerctl.md) shows the configuration STUNner runs for a Gateway:
+   `stunnerctl -n stunner config udp-gateway`.
 
-### STUNner configuration
+## Test
 
-Expose the service via the STUNner. The pre-compiled manifest below will create the required GatewayClass and GateayConfig resources, fire up a Gateway listener at UDP:3478 and another one on TCP:3478, and route client connections received on the gateways to the `echo-server` service.
-
-```console
-kubectl apply -f docs/examples/simple-tunnel/tunnel-stunner.yaml
-```
-
-For convenience, below is a dump of the Gateway and UDPRoute resources the manifests create. Note that the UDPRoute specifies the `echo-server` service as the `backendRef`, which makes sure that STUNner will forward the client connections received in any of the Gateways to the echo server.
-
-```yaml
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: udp-gateway
-  namespace: stunner
-spec:
-  gatewayClassName: stunner-gatewayclass
-  listeners:
-    - name: udp-listener
-      port: 3478
-      protocol: TURN-UDP
-
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: tcp-gateway
-  namespace: stunner
-spec:
-  gatewayClassName: stunner-gatewayclass
-  listeners:
-    - name: tcp-listener
-      port: 3478
-      protocol: TURN-TCP
-
----
-apiVersion: stunner.l7mp.io/v1
-kind: UDPRoute
-metadata:
-  name: echo-server
-  namespace: stunner
-spec:
-  parentRefs:
-    - name: udp-gateway
-    - name: tcp-gateway
-  rules:
-    - backendRefs:
-        - name: echo-server
-          namespace: default
-```
-
-### Check your configuration
-
-Check whether you have all the necessary STUNner resources installed namespace.
-
-```console 
-kubectl get gatewayconfigs,gateways,udproutes.stunner.l7mp.io -n stunner 
-NAME                                                  REALM             DATAPLANE   AGE
-gatewayconfig.stunner.l7mp.io/stunner-gatewayconfig   stunner.l7mp.io   default     139m
-
-NAME                                            CLASS                  ADDRESS         PROGRAMMED   AGE
-gateway.gateway.networking.k8s.io/tcp-gateway   stunner-gatewayclass   35.187.97.94    True         139m
-gateway.gateway.networking.k8s.io/udp-gateway   stunner-gatewayclass   35.205.10.190   True         139m
-
-NAME                                    AGE
-udproute.stunner.l7mp.io/echo-server    139m
-```
-
-You can also use the handy [`stunnerctl` CLI tool](/docs/cmd/stunnerctl.md) to dump the running STUNner configuration for the UDP gateway.
-
-``` console
-bin/stunnerctl -n stunner config udp-gateway
-Gateway: stunner/udp-gateway (loglevel: "all:INFO")
-Authentication default: static, username/password: user-1/pass-1
-Listeners:
-  - Name: stunner/udp-gateway/udp-listener
-    Protocol: UDP
-    Server: stunner/udp-gateway/udp-listener (TURN)
-    Address:port: <none>:3478
-    Public address:port: 34.118.88.91:3478
-    Clusters: [stunner/echo-server/udp]
-    Endpoints: [10.76.1.4, 10.80.4.47]
-```
-
-Likewise, the below will dump the config for the TCP gateway.
-
-``` console
-bin/stunnerctl -n stunner config tcp-gateway
-Gateway: stunner/tcp-gateway (loglevel: "all:INFO")
-Authentication default: static, username/password: user-1/pass-1
-Listeners:
-  - Name: stunner/tcp-gateway/tcp-listener
-    Protocol: TCP
-    Server: stunner/tcp-gateway/tcp-listener (TURN)
-    Address:port: <none>:3478
-    Public address:port: 34.116.180.89:3478
-    Clusters: [stunner/echo-server/udp]
-    Endpoints: [10.76.1.4, 10.80.4.47]
-```
-
-NOTE: It usually takes 30-60 seconds for Kubernetes to assign an external IP address to STUNner gateways. As long as the external address is in `<PENDING>` status, STUNner exposes the Gateway on a NodePort.  Once Kubernetes finishes the exposition of the Gateway service, STUNner will pick up the new address/port and update the config accordingly.
-
-If in doubt, you can always query Kubernetes for the service statuses.
-
-``` console
-kubectl get -n stunner services
-NAME          TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)          AGE
-stunner       ClusterIP      10.0.9.70     <none>          3478/UDP         15m
-tcp-gateway   LoadBalancer   10.0.3.91     35.187.97.94    3478:31781/TCP   143m
-udp-gateway   LoadBalancer   10.0.14.218   35.205.10.190   3478:31048/UDP   143m
-```
-
-### Run the test
-
-Set up a tunnel to listen on `UDP:127.0.0.1:5000` and relay the packets from this listener via the STUNner STUN/TURN listener `udp-listener` to the echo server. Luckily, `stunnerd` is clever enough to [parse the running STUNner configuration](../../cmd/stunnerd.md#tunnel-mode) from Kubernetes and set the STUN/TURN server public address/port and the authentication credentials accordingly, and to find the echo server from its Service.
-
-``` console
-bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/udp-gateway/udp-listener \
-     k8s://default/echo-server:udp
-```
-
-The two meta-URIs do the heavy lifting: `k8s://stunner/udp-gateway/udp-listener` instructs the tunnel to look for the Gateway called `udp-gateway` in the `stunner` namespace and create a connection to the TURN listener called `udp-listener` of the Gateway, and `k8s://default/echo-server:udp` is the first ready pod of the `echo-server` Service in the `default` namespace, at the port of the Service port called `udp`.
-
-From another terminal, send packets through the tunnel for 10 seconds and measure the echo. By default `mediactl` sends 50 packets of 160 bytes a second, the 20 ms frames of a G.711 call.
+Open a tunnel that listens on the local UDP port 5000 and relays what it receives through the TURN
+listener `udp-listener` to the echo server. `stunnerd` reads the address of the TURN server and the
+credentials from the Gateway, and the address of the echo server from the Service, through your
+kubeconfig: `k8s://default/echo-server:udp` is the first ready pod of the `echo-server` Service, at
+the port of its Service port `udp`.
 
 ```console
-bin/mediactl udp send -t 10s 127.0.0.1:5000
-14:31:02.897379 mediactl.go:298: mediactl INFO: interval  0.0- 1.0s: sent 50 pkts 63.99 kbit/s, received 49 pkts 62.71 kbit/s
-14:31:03.897349 mediactl.go:298: mediactl INFO: interval  1.0- 2.0s: sent 50 pkts 64 kbit/s, received 50 pkts 64 kbit/s
-...
-14:31:12.398291 mediactl.go:344: mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 63.99 kbit/s, received 500 pkts 80 kB 63.99 kbit/s, lost 0/500 (0.00%), rtt min/avg/max 215µs/460µs/2.367ms
+stunnerd udp://127.0.0.1:5000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
 ```
 
-Every packet carries a sequence number and a timestamp, so `mediactl` reports the loss and the round trip of the whole path: the tunnel, STUNner and the echo server. Add `--max-loss` or `--max-rtt` to make `mediactl` fail above a threshold, or `-o json` for a machine-readable report. The echo server logs every flow it echoed:
+From another terminal, send packets through the tunnel for ten seconds and measure the echo. By
+default `mediactl` sends 50 packets of 160 bytes a second, the 20 ms frames of a G.711 call:
 
 ```console
-kubectl logs deploy/echo-server
-14:31:01.876212 net.go:52: mediactl INFO: echoing UDP at [::]:9001
-14:31:01.896914 echo.go:51: mediactl INFO: echoing 10.116.1.21:34475
-14:31:14.898450 echo.go:56: mediactl INFO: flow 10.116.1.21:34475: 10.0s, received 500 pkts 80 kB 64.13 kbit/s
+mediactl udp send -t 10s 127.0.0.1:5000
+mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 63.99 kbit/s, received 500 pkts 80 kB 63.99 kbit/s, lost 0/500 (0.00%), rtt min/avg/max 215µs/460µs/2.367ms, jitter 31µs
 ```
 
-Repeat the test, this time with STUN/TURN over TCP. Notice the new meta-URI: `k8s://stunner/tcp-gateway/tcp-listener` to select the TURN server exposed on TCP for the tunnel.
-
-``` console
-bin/stunnerd --log=all:INFO udp://127.0.0.1:5000 k8s://stunner/tcp-gateway/tcp-listener \
-     k8s://default/echo-server:udp
-```
-
-Run the same test and compare the round trip of the two transports: TURN over TCP retransmits lost packets and holds back everything behind them, which shows up as a growing round trip on a lossy path. That's why you should [avoid TCP at all cost](https://bloggeek.me/why-you-should-prefer-udp-over-tcp-for-your-webrtc-sessions) in real-time communications.
-
-`mediactl` can also relay through STUNner by itself, with no tunnel: it reads the TURN server and the credentials from the Gateway and the peer from the Service the same way.
+Every packet carries a sequence number and a timestamp, so `mediactl` reports the loss, the round
+trip and the jitter of the whole path: the tunnel, STUNner and the echo server. Add `--max-loss` or
+`--max-rtt` to fail above a threshold, or `-o json` for a machine-readable report. Stop the tunnel
+and repeat the test over TURN on TCP:
 
 ```console
-bin/mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+stunnerd udp://127.0.0.1:5000 k8s://stunner/tcp-gateway/tcp-listener k8s://default/echo-server:udp
+```
+
+TURN over TCP retransmits the lost packets and holds back everything behind them, which shows as a
+growing round trip on a lossy path: that is why real-time media should [avoid
+TCP](https://bloggeek.me/why-you-should-prefer-udp-over-tcp-for-your-webrtc-sessions) whenever it
+can.
+
+`mediactl` can also relay through STUNner by itself, with no tunnel:
+
+```console
+mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
 ```
 
 ### Measuring under load
 
-For more load, run several streams in parallel with `-P` and set the packet rate per stream with `-k` and the packet size with `--length`; `mediactl` reports every stream and their total. A stream paces its packets in user space and falls short of high rates, so keep `-k` moderate and add streams instead. Five streams of 250 packets of 1000 bytes a second, 10 Mbit/s in total:
+Run several streams at once with `-P`, and set the packet rate per stream with `-k` and the packet
+size with `--length`; `mediactl` reports every stream and their total. Five streams of 250 packets
+of 1000 bytes a second, 10 Mbit/s in total:
 
 ```console
-bin/mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
 ```
 
-To learn how much of the round trip the cluster adds, take a local baseline: the same streams through a [standalone TURN server](../../cmd/stunnerd.md#usage) on the loopback to a local echo server.
+A stream paces its packets in user space and falls short of high rates, so keep `-k` moderate and
+add streams instead. To learn how much the cluster adds, take a local baseline: the same streams
+through a [standalone TURN server](../../cmd/stunnerd.md#usage) on the loopback to a local echo
+server.
 
 ```console
-bin/mediactl udp echo 127.0.0.1:9001 &
-bin/stunnerd "turn://user-1:pass-1@127.0.0.1:3478?transport=udp" &
-bin/mediactl turn send -P 5 -t 10s -k 250 --length 1000 --username user-1 --password pass-1 \
+mediactl udp echo 127.0.0.1:9001 &
+stunnerd "turn://user-1:pass-1@127.0.0.1:3478?transport=udp" &
+mediactl turn send -P 5 -t 10s -k 250 --length 1000 --username user-1 --password pass-1 \
     "turn:127.0.0.1:3478?transport=udp" 127.0.0.1:9001
+kill %1 %2
 ```
 
-Repeat the measurements with a few packet sizes, say 64, 256, 512 and 1200 bytes: small packets yield a lower throughput at the same packet rate.
+## Troubleshooting
 
-### Cleaning up
+* **The Gateways have no public address.** It takes up to a minute for a cloud load balancer to
+  assign one. Check the Services of the Gateways: `kubectl -n stunner get services`.
+* **The tunnel gets no echo.** Check the credentials and the endpoints in `stunnerctl -n stunner
+  config udp-gateway`, and the `stunnerd` logs: `kubectl -n stunner logs deploy/udp-gateway`.
 
-Stop the tunnel and wipe all Kubernetes configuration.
+## Going further: kernel offload
+
+The 10 Mbit/s above is easy for a dataplane with CPU to spare, but in production the dataplane
+shares its node with busy neighbors. Model a dataplane short of CPU: give the Gateways a Dataplane
+of their own, squeezed to 20m CPU, and repeat the load.
+
+```console
+kubectl apply -f docs/examples/simple-tunnel/simple-tunnel-dataplane.yaml
+kubectl -n stunner patch gatewayconfig stunner-gatewayconfig --type merge -p '{"spec":{"dataplane":"simple-tunnel"}}'
+mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+mediactl INFO: total of 5 streams: 9.9s, sent 12.3k pkts 12 MB 9.99 Mbit/s, received 968 pkts 968 kB 784.35 kbit/s, lost 11.3k/12.3k (92.16%), ...
+```
+
+(The new Dataplane replaces the pods of the Gateways: wait until `kubectl -n stunner get pods`
+shows one pod per Gateway before sending.) The packets wait in user space for the CPU and get lost.
+The [kernel offload](../../PREMIUM_REFERENCE.md#kernel-offload) of STUNner relays the TURN channels
+in the Linux kernel instead, and the free tier includes it, no license needed. Switch it on, the same
+pods with the same 20m CPU, no restart, and repeat:
+
+```console
+kubectl patch dataplane simple-tunnel --type merge -p '{"spec":{"offloadEngine":"TC"}}'
+mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+mediactl INFO: total of 5 streams: 9.9s, sent 12.2k pkts 12 MB 9.9 Mbit/s, received 12.2k pkts 12 MB 9.9 Mbit/s, lost 0/12.2k (0.00%), ...
+```
+
+The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
+many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see the
+[pricing](https://l7mp.io/pricing) and the [premium installation guide](../../PREMIUM_INSTALL.md).
+
+## Next steps
+
+The [UDP echo tutorial](../udp-echo/README.md) walks through the STUNner configuration step by step,
+and the [media-plane tutorials](../../README.md) put real WebRTC media servers behind STUNner.
+
+## Clean up
+
+Stop the tunnel and remove everything the tutorial created:
 
 ```console
 kubectl delete -f docs/examples/simple-tunnel/echo-server.yaml
 kubectl delete -f docs/examples/simple-tunnel/tunnel-stunner.yaml
+kubectl delete -f docs/examples/simple-tunnel/simple-tunnel-dataplane.yaml --ignore-not-found
+kubectl delete namespace stunner
 ```
 
-# Help
-
-STUNner development is coordinated in Discord, feel free to [join](https://discord.gg/DyPgEsbwzc).
+The dataplane shuts down gracefully, serving its live TURN sessions to the end, so deleting the
+namespace may take a while: a session whose client went away without releasing it ends when it
+times out, within ten minutes.
