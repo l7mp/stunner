@@ -6,11 +6,12 @@
 > limits and pricing.
 
 This tutorial streams [SRT](https://github.com/Haivision/srt) through a STUNner SRT Gateway to an
-SRT test service running in Kubernetes, two replicas of the STUNner [`mediactl`](../../cmd/mediactl.md) tool, and measures
-the path with `mediactl`. It shows the job of the gateway in its simplest form: an SRT publisher and
-its readers connect to one public UDP port, and STUNner sends every connection of a stream to the
-pod that holds the stream, whichever pod the load balancer would have picked. It is the smallest
-end-to-end test of the beta [SRT gateway](../../SRT.md).
+SRT test service running in Kubernetes, two replicas of the STUNner
+[`mediactl`](../../cmd/mediactl.md) tool, and measures the path with `mediactl`. It shows the job
+of the gateway in its simplest form: an SRT publisher and SRT readers connect to one public UDP
+port, and STUNner sends every connection of a stream to the pod that holds the stream, whichever
+pod the load balancer would have picked. Again, a single public IP and a single port is exposed via
+STUNner.
 
 ![STUNner SRT echo tutorial](../../img/stunner_srt_echo.svg)
 
@@ -100,7 +101,8 @@ mediactl srt send -t 10s k8s://stunner/srt-gateway live/echo --passphrase my-srt
 `mediactl` logs every second and a summary at the end:
 
 ```console
-mediactl INFO: summary 10.0s, sent 497 pkts 80 kB 63.9 kbit/s, received 497 pkts 80 kB 63.9 kbit/s, lost 0/497 (0.00%), rtt min/avg/max 246.106ms/250.163ms/251.063ms, jitter 532µs
+...
+mediactl INFO: summary ..., lost 0/497 (0.00%), rtt min/avg/max 246.106ms/250.163ms/251.063ms, ...
 ```
 
 No loss means the stream made the round trip through STUNner. The round trip includes the latency
@@ -135,7 +137,7 @@ You can watch the connections in the STUNner dataplane while they run:
 stunnerctl -n stunner status srt-gateway
 ```
 
-## Troubleshooting
+If in trouble, try the below:
 
 * **The connection is rejected.** STUNner rejects a stream ID that names no stream, a stream with
   no backend, and a stream over the parallel sessions of your tier, in the handshake (see the [pricing](https://l7mp.io/pricing)).
@@ -147,8 +149,8 @@ stunnerctl -n stunner status srt-gateway
 ## User quota (premium tiers)
 
 A misconfigured encoder fleet, or a single encoder reconnecting under ever new stream names, can
-open more streams than the media servers can take. Model four encoders, each publishing a stream of
-its own: all four get in.
+open more streams than the media servers can take. Model four encoders, each one publishing a
+stream.
 
 ```console
 for s in a b c d; do (mediactl srt send -t 5s -l all:WARN k8s://stunner/srt-gateway live/$s \
@@ -159,12 +161,11 @@ live/c admitted
 live/d admitted
 ```
 
-With a STUNner license, the [user quota](../../PREMIUM_REFERENCE.md#user-quota) caps the streams an
-SRT Gateway admits at once: the streams beyond the quota are refused in the SRT handshake, a clean
-rejection the encoder reports, before they reach the media servers. Every connection of an admitted
+STUNner implements a [user quota](../../PREMIUM_REFERENCE.md#user-quota) feature to cap the streams
+an SRT Gateway admits at once. Streams beyond the quota are refused in the SRT handshake with a
+clean rejection message before they reach the media servers. Every connection of an admitted
 stream, its publisher and all its readers, counts as the one stream. Cap the streams at two and
-repeat (a stream stays placed for 30 seconds after its last connection, so wait half a minute after
-the previous run):
+repeat:
 
 ```console
 kubectl -n stunner patch gatewayconfig stunner-gatewayconfig --type merge -p '{"spec":{"userQuota":2}}'

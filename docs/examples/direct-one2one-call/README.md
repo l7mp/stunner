@@ -1,7 +1,7 @@
-# Direct one to one video call via STUNner
+# Direct one to one video call with headless STUNner
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 This tutorial shows the *headless deployment model* of STUNner: two WebRTC clients call each other
@@ -44,19 +44,13 @@ env:
     value: "8088"
 ```
 
-and asks for an ICE configuration whenever a client registers, which it then returns to the client
-in the `registerResponse` message:
+With this configuration, the application server can ask for an ICE configuration whenever a client
+registers, which it then returns to the client in the `registerResponse` message:
 
 ```js
-let options = {
-  host: process.env.STUNNER_AUTH_ADDR,
-  port: process.env.STUNNER_AUTH_PORT,
-  method: 'GET',
-  path: url.format({
-    pathname: '/ice',
-    query: { service: "turn", username: name, iceTransportPolicy: "relay" },
-  }),
-};
+const query = new URLSearchParams({ service: 'turn', username: name, iceTransportPolicy: 'relay' });
+const res = await fetch(`http://${authAddr}:${authPort}/ice?${query}`);
+const iceConfiguration = await res.json();
 ```
 
 The client passes the ICE configuration to every PeerConnection it creates. The full code is in the
@@ -132,16 +126,16 @@ The console of the page shows the call setup:
 * The other browser does the same, and the media flows between the two relays inside STUNner. The
   browsers can sit behind any NAT: they only ever talk to STUNner.
 
-## Troubleshooting
+<!-- ## Troubleshooting -->
 
-* **The page does not load.** Check that the `webrtc-server` Service has an external address and
-  that TCP port 8443 is reachable from your browser.
-* **No ICE candidate appears.** Compare the ICE configuration in the `registerResponse` with
-  `stunnerctl -n stunner config udp-gateway`, and look for permission errors in the STUNner logs:
-  `kubectl -n stunner logs deploy/udp-gateway`.
-* **No audio or video.** UDP may be blocked on the way: the TCP Gateway offers the browsers TURN over
-  TCP as well. The [TURN troubleshooting guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html)
-  helps to track down the rest.
+<!-- * **The page does not load.** Check that the `webrtc-server` Service has an external address and -->
+<!--   that TCP port 8443 is reachable from your browser. -->
+<!-- * **No ICE candidate appears.** Compare the ICE configuration in the `registerResponse` with -->
+<!--   `stunnerctl -n stunner config udp-gateway`, and look for permission errors in the STUNner logs: -->
+<!--   `kubectl -n stunner logs deploy/udp-gateway`. -->
+<!-- * **No audio or video.** UDP may be blocked on the way: the TCP Gateway offers the browsers TURN over -->
+<!--   TCP as well. The [TURN troubleshooting guide](https://www.giacomovacca.com/2022/05/troubleshooting-turn.html) -->
+<!--   helps to track down the rest. -->
 
 ## Relay address discovery (premium tiers)
 

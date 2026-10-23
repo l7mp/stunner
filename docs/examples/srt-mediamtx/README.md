@@ -6,11 +6,11 @@
 > limits and pricing.
 
 This tutorial streams [SRT](https://github.com/Haivision/srt) video through a STUNner SRT Gateway
-into [MediaMTX](https://github.com/bluenviron/mediamtx), a popular open-source media server, running
-in two replicas in Kubernetes. An [FFmpeg](https://ffmpeg.org) publisher sends a test video and
-FFmpeg readers watch it, all through a single public UDP port: STUNner sends the publisher and the
-readers of a stream to the same MediaMTX pod, so the replicas scale out without host networking or
-a Service per pod.
+into [MediaMTX](https://github.com/bluenviron/mediamtx), a popular open-source media server,
+running in two replicas in Kubernetes. An [FFmpeg](https://ffmpeg.org) publisher sends a test video
+and FFmpeg readers watch it. STUNner accepts connections on a single public IP address and port and
+sends the publisher and the readers of a stream to the same MediaMTX pod. This allows to scale out
+the media server replicas without host networking or a Service per pod.
 
 ![STUNner MediaMTX tutorial](../../img/stunner_srt_mediamtx.svg)
 
@@ -135,7 +135,7 @@ kubectl logs -l app=mediamtx --prefix | grep "is publishing"
 [pod/mediamtx-69dddf99bc-xwsmb/mediamtx] ... [SRT] [conn 10.244.0.17:42951] is publishing to path 'live/test2'
 ```
 
-## Troubleshooting
+If in trouble, try the below:
 
 * **The connection is rejected.** STUNner rejects a stream ID that names no stream, a stream with
   no backend, and a stream over the parallel sessions of your tier, in the handshake (see the [pricing](https://l7mp.io/pricing)). Check that the stream ID uses the `#!::r=<stream>`

@@ -7,7 +7,7 @@
 *Note: This page documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 ## Overview
@@ -43,8 +43,8 @@
 
 ### WebRTC gateways
 
-* [Opening a UDP tunnel via STUNner](examples/simple-tunnel)
 * [Deploying a UDP echo service behind STUNner](examples/udp-echo)
+* [Opening a UDP tunnel via STUNner](examples/simple-tunnel)
 * [Direct one to one video call with headless STUNner](examples/direct-one2one-call)
 * [Video-conferencing with LiveKit](examples/livekit/README.md)
 * [Video-conferencing with mediasoup](examples/mediasoup/README.md)

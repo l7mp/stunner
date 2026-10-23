@@ -1,12 +1,12 @@
 # Open a UDP tunnel via STUNner
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 This tutorial tunnels a local UDP client through STUNner to a UDP echo service in the cluster, and
 measures the loss and the round trip of the path, over TURN on UDP and on TCP and under load: a
-quick way to evaluate the UDP and TCP stack of your cloud provider. A similar setup makes a
+quick way to evaluate the UDP and TCP stack of your cloud provider. A similar setup creates a
 makeshift VPN into your cluster.
 
 ![STUNner UDP tunnel tutorial](../../img/stunner_benchmark.svg)
@@ -97,6 +97,10 @@ In this tutorial you will learn how to:
    [`stunnerctl`](../../cmd/stunnerctl.md) shows the configuration STUNner runs for a Gateway:
    `stunnerctl -n stunner config udp-gateway`.
 
+1. Check that the Gateways got a public address. It takes up to a minute for a cloud load balancer
+   to assign one. Check the Services of the Gateways: `kubectl -n stunner get services`.
+
+
 ## Test
 
 Open a tunnel that listens on the local UDP port 5000 and relays what it receives through the TURN
@@ -114,7 +118,8 @@ default `mediactl` sends 50 packets of 160 bytes a second, the 20 ms frames of a
 
 ```console
 mediactl udp send -t 10s 127.0.0.1:5000
-mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 63.99 kbit/s, received 500 pkts 80 kB 63.99 kbit/s, lost 0/500 (0.00%), rtt min/avg/max 215µs/460µs/2.367ms, jitter 31µs
+...
+mediactl INFO: summary ..., lost 0/500 (0.00%), rtt min/avg/max 215µs/460µs/2.367ms, jitter 31µs
 ```
 
 Every packet carries a sequence number and a timestamp, so `mediactl` reports the loss, the round
@@ -148,53 +153,47 @@ mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/ud
 ```
 
 A stream paces its packets in user space and falls short of high rates, so keep `-k` moderate and
-add streams instead. To learn how much the cluster adds, take a local baseline: the same streams
-through a [standalone TURN server](../../cmd/stunnerd.md#usage) on the loopback to a local echo
-server.
+add streams instead. 
 
-```console
-mediactl udp echo 127.0.0.1:9001 &
-stunnerd "turn://user-1:pass-1@127.0.0.1:3478?transport=udp" &
-mediactl turn send -P 5 -t 10s -k 250 --length 1000 --username user-1 --password pass-1 \
-    "turn:127.0.0.1:3478?transport=udp" 127.0.0.1:9001
-kill %1 %2
-```
-
-## Troubleshooting
-
-* **The Gateways have no public address.** It takes up to a minute for a cloud load balancer to
-  assign one. Check the Services of the Gateways: `kubectl -n stunner get services`.
-* **The tunnel gets no echo.** Check the credentials and the endpoints in `stunnerctl -n stunner
-  config udp-gateway`, and the `stunnerd` logs: `kubectl -n stunner logs deploy/udp-gateway`.
-
-## Going further: kernel offload
+## Kernel offload (premium tiers)
 
 The 10 Mbit/s above is easy for a dataplane with CPU to spare, but in production the dataplane
-shares its node with busy neighbors. Model a dataplane short of CPU: give the Gateways a Dataplane
-of their own, squeezed to 20m CPU, and repeat the load.
+shares its node with busy neighbors. Below we restrict the dataplane to 20m CPU to model a data
+plane under very high load and significant CPU stress, and we repeat the load.
+
+Load a custom Dataplane that restricts the STUNner data plane pods to 20 mcore and patch the
+GatewayConfig to re-deploy STUNner over the restricted pods. Wait until `kubectl -n stunner get
+pods` shows one ready pod per Gateway.
 
 ```console
 kubectl apply -f docs/examples/simple-tunnel/simple-tunnel-dataplane.yaml
 kubectl -n stunner patch gatewayconfig stunner-gatewayconfig --type merge -p '{"spec":{"dataplane":"simple-tunnel"}}'
-mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
-mediactl INFO: total of 5 streams: 9.9s, sent 12.3k pkts 12 MB 9.99 Mbit/s, received 968 pkts 968 kB 784.35 kbit/s, lost 11.3k/12.3k (92.16%), ...
 ```
 
-(The new Dataplane replaces the pods of the Gateways: wait until `kubectl -n stunner get pods`
-shows one pod per Gateway before sending.) The packets wait in user space for the CPU and get lost.
-The [kernel offload](../../PREMIUM_REFERENCE.md#kernel-offload) of STUNner relays the TURN channels
-in the Linux kernel instead, and the free tier includes it, no license needed. Switch it on, the same
-pods with the same 20m CPU, no restart, and repeat:
+Next, repeat the experiment: the measurement script shows 92.16% packet loss under load:
+
+```console
+mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
+...
+mediactl INFO: total of 5 streams: ..., lost 11.3k/12.3k (92.16%), ...
+```
+
+Easily, the CPU stress causes TURN packets to pile up in user space, waiting for CPU, and get
+lost. The [kernel offload](../../PREMIUM_REFERENCE.md#kernel-offload) feature of STUNner relays the
+TURN channels in the Linux kernel instead of the user space TURN daemon, which is much faster and
+requires way less CPU. Switch offload on but otherwise use the same pods with the same 20m CPU, and
+repeat:
 
 ```console
 kubectl patch dataplane simple-tunnel --type merge -p '{"spec":{"offloadEngine":"TC"}}'
 mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/udp-listener k8s://default/echo-server:udp
-mediactl INFO: total of 5 streams: 9.9s, sent 12.2k pkts 12 MB 9.9 Mbit/s, received 12.2k pkts 12 MB 9.9 Mbit/s, lost 0/12.2k (0.00%), ...
+...
+mediactl INFO: total of 5 streams: ..., lost 0/12.2k (0.00%), ...
 ```
 
-The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
-many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see the
-[pricing](https://l7mp.io/pricing) and the [premium installation guide](../../PREMIUM_INSTALL.md).
+Zero loss and much smaller latency (not shown here). Note that the free tier offloads only a
+limited number of flows: see the [pricing](https://l7mp.io/pricing) for the [premium
+tiers](../../PREMIUM_INSTALL.md) to unlock unlimited offloads.
 
 ## Clean up
 

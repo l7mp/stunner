@@ -55,7 +55,7 @@ metadata:
 spec:
   mediaListener: media
   allowedSources:
-    - MY_IP
+    - ${MY_IP}
 ---
 apiVersion: stunner.l7mp.io/v1
 kind: UDPRoute

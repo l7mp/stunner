@@ -1,7 +1,7 @@
 # WebRTC gateway
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 The TURN gateway is the WebRTC face of STUNner: browsers and WebRTC clients open a TURN allocation

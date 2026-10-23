@@ -1,7 +1,7 @@
 # Deploy a UDP echo service behind STUNner
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 This tutorial exposes a UDP service running in Kubernetes to clients outside the cluster through a
@@ -148,6 +148,9 @@ kubectl create namespace stunner
    kubectl apply -f https://raw.githubusercontent.com/l7mp/stunner/refs/heads/main/docs/examples/udp-echo/udp-echo.yaml
    ```
 
+1. Check that the Gateway got a public address. It takes up to a minute for a cloud load balancer
+   to assign one. Check the Services of the Gateways: `kubectl -n stunner get services`.
+
 ## Check your config
 
 [`stunnerctl`](../../cmd/stunnerctl.md) shows the configuration STUNner runs for a Gateway:
@@ -193,7 +196,8 @@ report the loss and the round trip of the echo:
 
 ```console
 mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://default/media-plane:media-plane-port
-mediactl INFO: summary 10.0s, sent 500 pkts 80 kB 64 kbit/s, received 500 pkts 80 kB 64 kbit/s, lost 0/500 (0.00%), rtt min/avg/max ...
+...
+mediactl INFO: summary ..., lost 0/500 (0.00%), rtt min/avg/max ...
 ```
 
 Your WebRTC clients need no tunnel: every browser and WebRTC client has a TURN client built in. The
@@ -270,20 +274,12 @@ service whichever transport they use.
    STUNner takes the TURN connection over TLS and relays it to the UDP echo service: the conversion
    between TLS and UDP happens in STUNner.
 
-## Troubleshooting
-
-* **The Gateway has no public address.** It takes up to a minute for a cloud load balancer to assign
-  one; until then `stunnerctl config` shows no public address. Check the Service of the Gateway:
-  `kubectl -n stunner get service udp-gateway`.
-* **The tunnel gets no echo.** Check the credentials and the endpoints in `stunnerctl config`, and
-  the `stunnerd` pod logs: `kubectl -n stunner logs deploy/udp-gateway`.
-
 ## Post-quantum TLS (premium tiers)
 
 Data recorded today may be decrypted tomorrow: a large enough quantum computer would break the key
-exchange of today's TLS, which is why regulators start to require post-quantum encryption for
-sensitive traffic. Out of the box, the TLS listener admits any client, classical key exchange
-included:
+exchange of today's TLS. Regulators have start to require post-quantum encryption for sensitive
+traffic. Out of the box, a STUNner TLS listener admits any client, even ones using insecure
+classical key exchange protocols.
 
 ```console
 export TLS_IP=$(kubectl -n stunner get gateway tls-gateway -o jsonpath='{.status.addresses[0].value}')
@@ -291,10 +287,11 @@ openssl s_client -connect ${TLS_IP}:443 -groups X25519 < /dev/null 2>&1 | grep -
 Server Temp Key: X25519, 253 bits
 ```
 
-With a STUNner license, the [post-quantum TLS](../../PREMIUM_REFERENCE.md#post-quantum-tls) of
-STUNner enforces a key exchange quantum computers cannot break, per Gateway. Enforce it, and the
-classical client is refused, while the tunnel, which offers the post-quantum key exchange, still
-gets through:
+STUNner offers [post-quantum TLS](../../PREMIUM_REFERENCE.md#post-quantum-tls) to enforce a key
+exchange quantum computers cannot break. There are two settings:
+`stunner.l7mp.io/pqc-mode=preferred` will prefer a quantum-safe key exchange protocol during TLS
+handshake but otherwise admits clients using a classical TLS client, while
+`stunner.l7mp.io/pqc-mode=enforced` refuses classical TLS clients all together.
 
 ```console
 kubectl -n stunner annotate --overwrite gateway tls-gateway stunner.l7mp.io/pqc-mode=enforced

@@ -3,7 +3,7 @@
 > [!WARNING]
 > The SIP gateway is in beta: the API may change in any release and there is no support on any
 > tier.  Please test and report issues, but in any way, use it at your own risk. Certain features
-> require premium support: see [here](https://l7mp.io/pricing) for the limits and pricing.
+> require premium support: see [here](https://l7mp.io/pricing) for limits and pricing.
 
 The SIP/RTP gateway is the VoIP leg of STUNner: it lets you ingest SIP/RTP traffic from a SIP trunk
 into Kubernetes.  Carriers send SIP signaling and RTP media to STUNner's public address and it

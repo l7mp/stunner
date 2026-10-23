@@ -3,8 +3,8 @@
 > [!WARNING]
 > RTSP streaming through STUNner is in beta: the deployment model may change in any release, there
 > is no support on any tier, and only RTSP interleaved over TCP is supported. Certain features
-> require premium support: see [here](https://l7mp.io/pricing) for the limits and pricing. Please
-> test and report issues, but in any way, use it at your own risk.
+> require premium support: see [here](https://l7mp.io/pricing) for limits and pricing. Please test
+> and report issues, but in any way, use it at your own risk.
 
 STUNner lets the viewers outside the cluster watch IP cameras through a media server running in
 ordinary Kubernetes pods (e.g., [MediaMTX](https://github.com/bluenviron/mediamtx)). This allows

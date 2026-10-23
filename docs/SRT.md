@@ -51,7 +51,7 @@ the stream ID in the handshake and sends every connection naming the same stream
 An SRT gateway is a Gateway with a listener of protocol `SRT`, a UDP port taking SRT callers. The
 UDPRoutes attached to the listener name the media servers, STUNner connects to them at the `port` of
 the backend reference. Every listener of an SRT Gateway must be `SRT`, see the [Gateway
-reference](GATEWAY.md#srt-gateways).
+reference](GATEWAY.md#listener-configuration).
 
 The encryption is end to end: STUNner never sees the passphrase, the media server checks it. A
 stream ID that names no stream (`#!::m=publish`), a reader with no backend, and a stream over the

@@ -1,7 +1,7 @@
 # Video-conferencing with LiveKit
 
 > [!WARNING]
-> Certain features require premium support: see [here](https://l7mp.io/pricing) for the limits and
+> Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
 
 This document guides you through the installation of [LiveKit](https://livekit.io/) into Kubernetes, when it is used together with the STUNner WebRTC media gateway.
@@ -28,6 +28,10 @@ To run this example, you need:
 
 The [TLS guide](../TLS.md) installs the Ingress controller and cert-manager, and exports the
 address of the Ingress in the `INGRESS_IP` variable the commands below use.
+The demo gets its TLS certificate from [Let's Encrypt](https://letsencrypt.org) for a
+[nip.io](https://nip.io) domain that resolves to the address of the Ingress, so that it works
+without a domain of your own; for anything beyond a demo, acquire a TLS certificate for your own
+domain.
 
 The commands fill the addresses into the manifests with `envsubst` from GNU gettext, installed on
 most Linux systems (`gettext-base` on Debian and Ubuntu, `gettext` on macOS with Homebrew).

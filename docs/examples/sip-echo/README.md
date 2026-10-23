@@ -25,7 +25,7 @@ In this tutorial you will learn how to:
 * A load balancer that preserves the source address of the traffic it forwards
   (`externalTrafficPolicy: Local`): the managed load balancers of the large cloud providers do, and
   so does [MetalLB](https://metallb.io) on a local [kind](https://kind.sigs.k8s.io) cluster.
-* A machine to run `mediactl` on whose address the cluster sees unchanged: a machine with a
+* A host to run `mediactl` on whose address the cluster sees unchanged: a machine with a
   public IP address, or your own machine calling a local kind cluster. STUNner matches the media
   of a call to the address in its SDP, so a phone behind a NAT that rewrites its source
   address gets no media back (carriers do not sit behind such NATs, which is why STUNner can rely
@@ -33,6 +33,8 @@ In this tutorial you will learn how to:
 * The `mediactl` tool, a media source and sink that also makes SIP calls: download it from the
   [STUNner releases](https://github.com/l7mp/stunner/releases) or install it with `go install
   github.com/l7mp/stunner/v2/cmd/mediactl@latest`.
+* `envsubst` from GNU gettext, which fills your address into the manifests: installed on most
+  Linux systems (`gettext-base` on Debian and Ubuntu, `gettext` on macOS with Homebrew).
 
 ## Configuration
 
@@ -61,7 +63,7 @@ In this tutorial you will learn how to:
 
    ```console
    kubectl create namespace stunner
-   sed "s/MY_IP/${MY_IP}/" docs/examples/sip-echo/sip-echo-stunner.yaml | kubectl apply -f -
+   envsubst '$MY_IP' < docs/examples/sip-echo/sip-echo-stunner.yaml | kubectl apply -f -
    ```
 
 1. Check that the Gateway is programmed and has a public address.
@@ -84,13 +86,12 @@ mediactl sip call -t 10s --voip k8s://stunner/sip-gateway/sip
 ```
 
 Without a kubeconfig, call the address of the Gateway: `mediactl sip call -t 10s
-sip:echo@<address>:5060`.
-
-`mediactl` sends G.711-sized audio packets for ten seconds, logs every second, and hangs up with a
-summary:
+sip:echo@<address>:5060`. Start `mediactl`: it sends G.711-sized audio packets for ten seconds,
+logs every second, and terminates with a summary:
 
 ```console
-mediactl INFO: summary 9.9s, sent 496 pkts 79 kB 63.94 kbit/s, received 496 pkts 79 kB 63.94 kbit/s, lost 0/496 (0.00%), rtt min/avg/max 280µs/466µs/907µs, jitter 29µs, R-factor 93.0, MOS 4.40
+...
+mediactl INFO: summary ..., lost 0/496 (0.00%), rtt min/avg/max 280µs/466µs/907µs, jitter 29µs, R-factor 93.0, MOS 4.40
 ```
 
 No loss means the media made the round trip through STUNner. The loss, the round trip and the
@@ -102,7 +103,7 @@ gets. You can watch the call in the STUNner dataplane, while it runs:
 stunnerctl -n stunner status sip-gateway
 ```
 
-## Troubleshooting
+If in trouble, try the below:
 
 * **The call gets no answer.** The SIP listener admits only the addresses of `allowedSources`.
   Check that `MY_IP` is the address the cluster sees, and that the load balancer preserves it (the
@@ -117,25 +118,27 @@ stunnerctl -n stunner status sip-gateway
 
 In production the dataplane shares its node with busy neighbors, and a traffic spike can leave it
 short of CPU. Model this: give the Gateway a Dataplane of its own, squeezed to 20m CPU, and place
-ten calls at once.
+ten calls at once. Note that the new Dataplane replaces the Gateway's pod: wait until `kubectl -n
+stunner get pods` shows a single pod before calling.
 
 ```console
 kubectl apply -f docs/examples/sip-echo/sip-echo-dataplane.yaml
 kubectl -n stunner patch gatewayconfig stunner-gatewayconfig --type merge -p '{"spec":{"dataplane":"sip-echo"}}'
 mediactl sip call -P 10 -t 15s --voip k8s://stunner/sip-gateway/sip
-mediactl INFO: total of 10 streams: 14.6s, ..., lost 5.9k/7.2k (82.16%), ..., jitter 230.953ms, R-factor -454.7, MOS 1.00
+...
+mediactl INFO: total of 10 streams: ..., lost 5.9k/7.2k (82.16%), ..., MOS 1.00
 ```
 
-(The new Dataplane replaces the Gateway's pod: wait until `kubectl -n stunner get pods` shows a
-single pod before calling.) The calls are unusable: the media waits in user space for the CPU. The
-[kernel offload](../../PREMIUM_REFERENCE.md#kernel-offload) of STUNner relays the media in the Linux
-kernel instead, and the free tier includes it, no license needed. Switch it on: the same pod with
-the same 20m CPU, no restart, and the calls are as good as G.711 gets.
+The calls are unusable: the media waits in user space for the CPU. The [kernel
+offload](../../PREMIUM_REFERENCE.md#kernel-offload) of STUNner relays the media in the Linux kernel
+instead, which required much less CPU. Switch it on: the same pod with the same 20m CPU, no
+restart, and the calls are as again at the maximum quality G.711 can provide.
 
 ```console
 kubectl patch dataplane sip-echo --type merge -p '{"spec":{"offloadEngine":"TC"}}'
 mediactl sip call -P 10 -t 15s --voip k8s://stunner/sip-gateway/sip
-mediactl INFO: total of 10 streams: 14.9s, ..., lost 0/7k (0.00%), ..., jitter 56µs, R-factor 92.8, MOS 4.40
+...
+mediactl INFO: total of 10 streams: ..., lost 0/7k (0.00%), ..., MOS 4.40
 ```
 
 The free tier offloads a limited number of flows per dataplane pod. A STUNner license offloads
@@ -146,7 +149,7 @@ many more and unlocks the [premium features](../../PREMIUM_REFERENCE.md): see th
 
 ```console
 kubectl delete -f docs/examples/sip-echo/sip-echo-server.yaml
-sed "s/MY_IP/${MY_IP}/" docs/examples/sip-echo/sip-echo-stunner.yaml | kubectl delete -f -
+envsubst '$MY_IP' < docs/examples/sip-echo/sip-echo-stunner.yaml | kubectl delete -f -
 kubectl delete -f docs/examples/sip-echo/sip-echo-dataplane.yaml --ignore-not-found
 kubectl delete namespace stunner
 ```

@@ -3,7 +3,7 @@
 > [!WARNING]
 > SIP/RTP and SRT gateways cannot be scaled beyond a single dataplane pod at the moment. Please
 > file a wishlist issue if you critically depend on SIP/RTP and SRT server scaling. Certain
-> features require premium support: see [here](https://l7mp.io/pricing) for the limits and pricing.
+> features require premium support: see [here](https://l7mp.io/pricing) for limits and pricing.
 
 [Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale) is one of the key features in Kubernetes and STUNner supports it for WebRTC workloads. This means that Kubernetes will automatically increase the number of pods that run a service as the demand for the service increases, and reduce the number of pods when the demand drops. This improves service quality, simplifies management, and reduces operational costs by avoiding the need to over-provision services to the peak load. Most importantly, autoscaling saves you from having to guess the number of nodes or pods needed to run your workload: Kubernetes will automatically and dynamically resize your workload based on demand. On top of that, autoscaling ensures load is smaller on each STUNner dataplane instance, which may result in better and more stable performance, and reduces the blast radius, in that, when scaled to multiple replicas, fewer calls will be affected if a pod fails for some reason.
 

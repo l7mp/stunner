@@ -5,13 +5,13 @@
 > tier. Certain features require premium support: see [here](https://l7mp.io/pricing) for the
 > limits and pricing.
 
-This tutorial puts [Asterisk](https://www.asterisk.org), the most popular open-source PBX, behind a
-STUNner SIP Gateway, the way a SIP trunk from a carrier reaches a PBX running in Kubernetes. The
-carrier is played by [SIPp](https://sipp.sourceforge.net), the SIP traffic generator carriers and
-SIP vendors test with: it calls Asterisk through STUNner and streams audio, and Asterisk answers
-every call with an echo. Asterisk needs no host networking, no public address and no open RTP port
-range: STUNner proxies the SIP and relays the RTP from a single public media port to the Asterisk
-pod.
+This tutorial deploys [Asterisk](https://www.asterisk.org), the most popular open-source PBX,
+behind a STUNner SIP Gateway. This allows calls from a SIP trunk reach a PBX running inside
+Kubernetes over a single UDP port. The carrier is played by [SIPp](https://sipp.sourceforge.net), a
+popular SIP traffic generator: it calls Asterisk through STUNner and streams audio, Asterisk
+answers every call with an echo, and SIPp displays statistics. Asterisk needs no host networking in
+this setup, no public address and no open RTP port range: STUNner proxies the SIP and relays the
+RTP from a single public media port to the Asterisk pod.
 
 ![STUNner Asterisk tutorial](../../img/stunner_sip_asterisk.svg)
 
@@ -30,7 +30,7 @@ tutorial](../sip-echo/README.md).
 * A load balancer that preserves the source address of the traffic it forwards
   (`externalTrafficPolicy: Local`): the managed load balancers of the large cloud providers do, and
   so does [MetalLB](https://metallb.io) on a local [kind](https://kind.sigs.k8s.io) cluster.
-* A machine to run SIPp on whose address the cluster sees unchanged: a machine with a public IP
+* A host to run SIPp on whose address the cluster sees unchanged: a machine with a public IP
   address, or your own machine calling a local kind cluster. STUNner sends the media of a call to
   the address in the SDP of the caller, as carriers expect.
 * [SIPp](https://sipp.sourceforge.net) 3.8 or newer (`sipp -v`; older versions end the call
@@ -42,6 +42,8 @@ tutorial](../sip-echo/README.md).
   ```
 
   or, where your distribution's package is 3.8 or newer, `sudo apt-get install sip-tester`.
+* `envsubst` from GNU gettext, which fills your address into the manifests: installed on most
+  Linux systems (`gettext-base` on Debian and Ubuntu, `gettext` on macOS with Homebrew).
 
 ## Configuration
 
@@ -83,9 +85,7 @@ tutorial](../sip-echo/README.md).
     same => n,Hangup()
    ```
 
-1. Find the address your calls come from, as the cluster sees it: on a local kind cluster this
-   is the address of your machine on the kind network (`docker network inspect kind`), otherwise
-   your public address.
+1. Find the address your calls come from, as the cluster sees it: 
 
    ```console
    export MY_IP=$(curl -s -4 ifconfig.me)
@@ -95,7 +95,7 @@ tutorial](../sip-echo/README.md).
 
    ```console
    kubectl create namespace stunner
-   sed "s/MY_IP/${MY_IP}/" docs/examples/sip-asterisk/sip-gateway.yaml | kubectl apply -f -
+   envsubst '$MY_IP' < docs/examples/sip-asterisk/sip-gateway.yaml | kubectl apply -f -
    ```
 
    The manifest holds the GatewayClass and the GatewayConfig of the other tutorials and the three
@@ -139,7 +139,7 @@ tutorial](../sip-echo/README.md).
    spec:
      mediaListener: media
      allowedSources:
-       - MY_IP
+       - ${MY_IP}
    ```
 
    Asterisk terminates both the SIP and the RTP, so a single UDPRoute with no `sectionName`
@@ -214,7 +214,7 @@ And STUNner counts the media it relayed on the media listener and to the Asteris
 stunnerctl -n stunner status sip-gateway
 ```
 
-## Troubleshooting
+If in trouble, try the below:
 
 * **The calls get no answer.** The SIP listener admits only the addresses of `allowedSources`.
   Check that `MY_IP` is the address the cluster sees, and that the load balancer preserves it.
@@ -258,6 +258,6 @@ guide](../../PREMIUM_INSTALL.md) for setting up STUNner with a license.
 ```console
 cd ../../..
 kubectl delete -f docs/examples/sip-asterisk/asterisk.yaml
-sed "s/MY_IP/${MY_IP}/" docs/examples/sip-asterisk/sip-gateway.yaml | kubectl delete -f -
+envsubst '$MY_IP' < docs/examples/sip-asterisk/sip-gateway.yaml | kubectl delete -f -
 kubectl delete namespace stunner
 ```
