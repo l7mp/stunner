@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +61,10 @@ type Config struct {
 	// ByteStream tells that the conn is a byte stream (TCP): a packet is a read or a write, no
 	// header is read and nothing is lost.
 	ByteStream bool
+	// VoIP estimates the call quality of an echoing stream as the ITU-T G.107 E-model does for a
+	// G.711 voice call: the R-factor and the MOS, from the loss, the round trip and the jitter.
+	// They mean nothing for other media, such as video.
+	VoIP bool
 	// Source, if set, fills every packet sent instead of the header and the padding: real media,
 	// such as an MPEG-TS file. The receiver measures no loss and no round trip then; a short read
 	// sends a short packet, an error ends the stream.
@@ -69,15 +74,17 @@ type Config struct {
 }
 
 // Stats count a stream: the packets and bytes sent and received, and over the received packets
-// that carry a header, the highest sequence number and the round trip.
+// that carry a header, the highest sequence number, the round trip and the jitter.
 type Stats struct {
 	mu                               sync.Mutex
-	sending, echo, byteStream        bool
+	sending, echo, byteStream, voip  bool
 	start, end, last                 time.Time // the start, the end of sending, the last packet received
 	sent, sentBytes, recv, recvBytes int64
 	maxSeq                           int64 // -1 before the first header
 	rttN                             int64
 	rttSum, rttMin, rttMax           time.Duration
+	transit                          time.Duration // of the last packet, for the jitter
+	jitter                           float64       // nanoseconds
 }
 
 // NewStats returns the stats of a receiver alone, such as an echo server, starting now.
@@ -100,11 +107,19 @@ func (s *Stats) Received(p []byte, parse bool) {
 	}
 	s.rttMax = max(s.rttMax, rtt)
 	s.rttSum += rtt
+	// RFC 3550 interarrival jitter over the transit times; a constant clock offset between a
+	// publisher and its reader cancels out of the differences
+	if s.rttN > 0 {
+		d := rtt - s.transit
+		s.jitter += (math.Abs(float64(d)) - s.jitter) / 16
+	}
+	s.transit = rtt
 	s.rttN++
 }
 
 // Result is what a stream measured. Lost and Expected are zero when the stream cannot tell
-// (nothing to compare against, or a byte stream), the round trip when nothing echoed came back.
+// (nothing to compare against, or a byte stream), the round trip when nothing echoed came back,
+// the jitter when fewer than two packets with a header arrived.
 // It marshals to JSON with the durations as strings.
 type Result struct {
 	// Duration is up to the last packet sent, for a receiver alone up to the last received.
@@ -112,23 +127,30 @@ type Result struct {
 	Sent, SentBytes, Received, ReceivedBytes int64
 	Lost, Expected                           int64
 	RTTMin, RTTAvg, RTTMax                   time.Duration
+	Jitter                                   time.Duration
+	// RFactor and MOS estimate the call quality of a VoIP stream, zero for other streams.
+	RFactor, MOS float64
 }
 
 // MarshalJSON renders the result with snake case names and the durations as strings.
 func (r Result) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Duration      string `json:"duration"`
-		Sent          int64  `json:"sent"`
-		SentBytes     int64  `json:"sent_bytes"`
-		Received      int64  `json:"received"`
-		ReceivedBytes int64  `json:"received_bytes"`
-		Lost          int64  `json:"lost"`
-		Expected      int64  `json:"expected"`
-		RTTMin        string `json:"rtt_min,omitempty"`
-		RTTAvg        string `json:"rtt_avg,omitempty"`
-		RTTMax        string `json:"rtt_max,omitempty"`
+		Duration      string  `json:"duration"`
+		Sent          int64   `json:"sent"`
+		SentBytes     int64   `json:"sent_bytes"`
+		Received      int64   `json:"received"`
+		ReceivedBytes int64   `json:"received_bytes"`
+		Lost          int64   `json:"lost"`
+		Expected      int64   `json:"expected"`
+		RTTMin        string  `json:"rtt_min,omitempty"`
+		RTTAvg        string  `json:"rtt_avg,omitempty"`
+		RTTMax        string  `json:"rtt_max,omitempty"`
+		Jitter        string  `json:"jitter,omitempty"`
+		RFactor       float64 `json:"r_factor,omitempty"`
+		MOS           float64 `json:"mos,omitempty"`
 	}{r.Duration.String(), r.Sent, r.SentBytes, r.Received, r.ReceivedBytes, r.Lost, r.Expected,
-		durationOrEmpty(r.RTTMin), durationOrEmpty(r.RTTAvg), durationOrEmpty(r.RTTMax)})
+		durationOrEmpty(r.RTTMin), durationOrEmpty(r.RTTAvg), durationOrEmpty(r.RTTMax),
+		durationOrEmpty(r.Jitter), r.RFactor, r.MOS})
 }
 
 func durationOrEmpty(d time.Duration) string {
@@ -139,11 +161,14 @@ func durationOrEmpty(d time.Duration) string {
 }
 
 // Total adds up the results of parallel streams: the counters summed, the longest duration, the
-// round trip over all of them, its average weighted by the packets received.
+// round trip over all of them, its average and the jitter weighted by the packets received, and
+// the call quality of VoIP streams from these.
 func Total(rs []Result) Result {
 	var t Result
-	var weighted, weight int64
+	var weighted, weight, jitter int64
+	voip := false
 	for _, r := range rs {
+		voip = voip || r.MOS > 0
 		t.Duration = max(t.Duration, r.Duration)
 		t.Sent += r.Sent
 		t.SentBytes += r.SentBytes
@@ -151,6 +176,7 @@ func Total(rs []Result) Result {
 		t.ReceivedBytes += r.ReceivedBytes
 		t.Lost += r.Lost
 		t.Expected += r.Expected
+		jitter += int64(r.Jitter) * r.Received
 		if r.RTTMax == 0 {
 			continue
 		}
@@ -164,7 +190,40 @@ func Total(rs []Result) Result {
 	if weight > 0 {
 		t.RTTAvg = time.Duration(weighted / weight)
 	}
+	if t.Received > 0 {
+		t.Jitter = time.Duration(jitter / t.Received)
+	}
+	if voip {
+		t.RFactor, t.MOS = quality(t)
+	}
 	return t
+}
+
+// quality estimates the R-factor and the MOS of a G.711 voice stream with packet loss concealment
+// with the ITU-T G.107 E-model, simplified as by Cole and Rosenbluth: the one-way delay is half
+// the round trip, plus a jitter buffer of twice the jitter and 10 ms of codec delay; the loss is
+// taken as random (Ie = 0, Bpl = 25.1).
+func quality(r Result) (rFactor, mos float64) {
+	d := float64(r.RTTAvg/2+2*r.Jitter)/float64(time.Millisecond) + 10
+	id := 0.024 * d
+	if d > 177.3 {
+		id += 0.11 * (d - 177.3)
+	}
+	loss := 0.0
+	if r.Expected > 0 {
+		loss = 100 * float64(r.Lost) / float64(r.Expected)
+	}
+	ie := 95 * loss / (loss + 25.1)
+	rFactor = 93.2 - id - ie
+	switch {
+	case rFactor <= 0:
+		mos = 1
+	case rFactor >= 100:
+		mos = 4.5
+	default:
+		mos = 1 + 0.035*rFactor + 7e-6*rFactor*(rFactor-60)*(100-rFactor)
+	}
+	return rFactor, mos
 }
 
 // String reports a result: what was sent, what was received, the loss and the round trip, each
@@ -187,6 +246,12 @@ func (r Result) String() string {
 	if r.RTTMax > 0 {
 		parts = append(parts, fmt.Sprintf("rtt min/avg/max %s/%s/%s", r.RTTMin.Round(time.Microsecond),
 			r.RTTAvg.Round(time.Microsecond), r.RTTMax.Round(time.Microsecond)))
+	}
+	if r.Jitter > 0 {
+		parts = append(parts, fmt.Sprintf("jitter %s", r.Jitter.Round(time.Microsecond)))
+	}
+	if r.MOS > 0 {
+		parts = append(parts, fmt.Sprintf("R-factor %.1f, MOS %.2f", r.RFactor, r.MOS))
 	}
 	return strings.Join(parts, ", ")
 }
@@ -212,6 +277,12 @@ func (s *Stats) Result() Result {
 	}
 	if s.rttN > 0 && s.echo {
 		r.RTTMin, r.RTTAvg, r.RTTMax = s.rttMin, s.rttSum/time.Duration(s.rttN), s.rttMax
+	}
+	if s.rttN > 1 {
+		r.Jitter = time.Duration(s.jitter)
+	}
+	if s.voip && s.echo && r.RTTMax > 0 {
+		r.RFactor, r.MOS = quality(r)
 	}
 	return r
 }
@@ -257,7 +328,7 @@ func Check(r Result, c Config, maxLoss float64, maxRTT time.Duration) error {
 // on the way back before it closes.
 func Stream(ctx context.Context, conn io.ReadWriteCloser, c Config) *Stats {
 	s := NewStats()
-	s.sending, s.echo, s.byteStream = c.Rate > 0, c.Echo, c.ByteStream
+	s.sending, s.echo, s.byteStream, s.voip = c.Rate > 0, c.Echo, c.ByteStream, c.VoIP
 	done := make(chan struct{})
 	go func() {
 		defer close(done)

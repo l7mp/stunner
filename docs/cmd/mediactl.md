@@ -39,7 +39,8 @@ The SRT commands take `--passphrase` for the stream encryption.
 A sender sends `--length` (160) bytes `-k/--send-rate` (50) times a second until `-t/--timeout`
 (default: until Ctrl-C); the defaults are the 20 ms frames of a G.711 call. Over UDP, TURN, SRT
 and the RTP of a SIP call every packet starts with a sequence number and a timestamp, so the
-receiving side measures the loss and an echoing sender the round trip; over TCP the send rate is
+receiving side measures the loss and the jitter (as RTP does, RFC 3550) and an echoing sender the
+round trip; over TCP the send rate is
 the rate of the writes and only the bytes count. A sender logs the rates of every second and a
 summary, but every side reports only what it measures itself: an echoing sender what
 it sent, what came back, the loss and the round trip, a publisher what it sent, a reader what it
@@ -51,6 +52,7 @@ received, and the echo servers every flow, once it ends.
 | `-o/--output json` | Print the results of every stream and the total on the standard output as JSON. |
 | `--max-loss <percent>` | Fail when more than this percent of the packets is lost. |
 | `--max-rtt <duration>` | Fail when the average round trip is longer. |
+| `--voip` | Rate an echoing sender as a voice call: the R-factor and the MOS of the ITU-T G.107 E-model for G.711, from the loss, the round trip and the jitter. Meaningless for other media, such as video. |
 | `--ts <file>` | Send the bytes of a file, an MPEG-TS file say, instead of measured packets, from the start again at its end; only the bitrate is measured. |
 
 A sender fails (exits non-zero) when nothing came back that should have, or a threshold is

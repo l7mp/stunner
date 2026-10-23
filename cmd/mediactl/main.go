@@ -97,6 +97,7 @@ func newRootCmd() *cobra.Command {
 	f.StringP("output", "o", "text", `the results of a sender: "text" (logged) or "json" (on stdout)`)
 	f.Float64("max-loss", -1, "fail a sender losing more than this percent of its packets; negative: never")
 	f.Duration("max-rtt", 0, "fail an echoing sender whose average round trip is longer; 0: never")
+	f.Bool("voip", false, "report the call quality of an echoing sender as the E-model rates a G.711 voice call: R-factor and MOS")
 	f.String("ts", "", "stream the packets of this file (an MPEG-TS file, say) instead of measured "+
 		"packets, from the start again at its end; nothing is measured but the bitrate")
 	a.k8s.K8s.AddFlags(f)
@@ -116,7 +117,8 @@ func (a *app) context(cmd *cobra.Command) (context.Context, context.CancelFunc) 
 
 // config returns the stream config of the flags, logging to the run's logger.
 func (a *app) config() mediactl.Config {
-	return mediactl.Config{Length: a.v.GetInt("length"), Rate: a.v.GetFloat64("send-rate"), Logger: a.log}
+	return mediactl.Config{Length: a.v.GetInt("length"), Rate: a.v.GetFloat64("send-rate"),
+		VoIP: a.v.GetBool("voip"), Logger: a.log}
 }
 
 // address resolves a k8s:// Gateway address to the listener's public host:port; any other

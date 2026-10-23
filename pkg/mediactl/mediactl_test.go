@@ -73,16 +73,42 @@ func TestStreamEcho(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 			defer cancel()
-			r := Stream(ctx, conn, Config{Length: 100, Rate: 200, Echo: true}).Result()
+			r := Stream(ctx, conn, Config{Length: 100, Rate: 200, Echo: true, VoIP: true}).Result()
 			require.NotZero(t, r.Sent)
 			assert.Equal(t, r.Sent, r.Expected, "an echoing stream expects what it sent")
 			if c.lose {
 				assert.InDelta(t, r.Sent/2, r.Lost, 1, "half of it lost")
+				assert.Less(t, r.MOS, 2.0, "a call losing half its packets is unusable")
 			} else {
 				assert.Zero(t, r.Lost)
+				assert.Greater(t, r.MOS, 4.3, "a clean call on the loopback is as good as G.711 gets")
 			}
+			assert.NotZero(t, r.Jitter, "the jitter of the echo")
 			assert.NotZero(t, r.RTTMax, "the round trip of the echo")
 			assert.LessOrEqual(t, r.RTTMin, r.RTTAvg)
+		})
+	}
+}
+
+// TestQuality pins the E-model: G.711 tops out at R 93.2 less the delay impairment, the loss
+// impairs the call fast and the delay beyond 177.3 ms one way faster.
+func TestQuality(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		rtt    time.Duration
+		jitter time.Duration
+		lost   int64
+		r, mos float64
+	}{
+		{"clean", 20 * time.Millisecond, 0, 0, 92.72, 4.40},
+		{"5% loss", 20 * time.Millisecond, 0, 50, 76.94, 3.91},
+		{"400 ms round trip", 400 * time.Millisecond, 5 * time.Millisecond, 0, 83.22, 4.14},
+		{"satellite", 600 * time.Millisecond, 0, 0, 71.16, 3.65},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			r, mos := quality(Result{RTTAvg: c.rtt, Jitter: c.jitter, Lost: c.lost, Expected: 1000})
+			assert.InDelta(t, c.r, r, 0.01, "R-factor")
+			assert.InDelta(t, c.mos, mos, 0.01, "MOS")
 		})
 	}
 }
