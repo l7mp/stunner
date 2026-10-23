@@ -31,13 +31,13 @@
 * [SIP/RTP gateway (beta)](SIP.md)
 * [SRT gateway (beta)](SRT.md)
 * [RTSP streaming (beta)](RTSP.md)
+* [Premium features](PREMIUM_REFERENCE.md)
 
 ## Reference
 
 * [GatewayClass](GATEWAYCLASS.md)
 * [Gateway](GATEWAY.md)
 * [Routes](ROUTE.md)
-* [Premium tiers](PREMIUM_REFERENCE.md)
 
 ## Tutorials
 
