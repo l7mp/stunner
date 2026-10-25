@@ -31,11 +31,12 @@ import (
 const env = "MEDIACTL"
 
 // app is one run of mediactl: its settings, from the flags, the environment and the config file in
-// this order, its logger, and the resolver of its k8s:// addresses.
+// this order, its logger, its output, and the resolver of its k8s:// addresses.
 type app struct {
 	v   *viper.Viper
 	lf  logger.LoggerFactory
 	log logging.LeveledLogger
+	out io.Writer
 	k8s k8s.Resolver
 }
 
@@ -82,6 +83,7 @@ func newRootCmd() *cobra.Command {
 			}
 			a.log = a.lf.NewLogger("mediactl")
 			a.k8s.Log = a.lf.NewLogger("k8s")
+			a.out = cmd.OutOrStdout()
 			return nil
 		},
 	}
@@ -186,7 +188,9 @@ func (a *app) send(ctx context.Context, d mediactl.Dialer, network, address stri
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(b))
+		if _, err := fmt.Fprintln(a.out, string(b)); err != nil {
+			return err
+		}
 	}
 
 	if err := errors.Join(errs...); err != nil {

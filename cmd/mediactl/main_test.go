@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -104,15 +104,16 @@ func TestParallelJSON(t *testing.T) {
 	// the echo may not be up yet: wait for one stream through it first
 	eventually(t, "udp", "send", "127.0.0.1:27011")
 
-	out := captureStdout(t, func() {
-		require.NoError(t, run(context.Background(), "udp", "send", "127.0.0.1:27011", "-P", "3", "-o", "json",
-			"-k", "100", "-t", "300ms"))
-	})
+	cmd, out := newRootCmd(), &bytes.Buffer{}
+	cmd.SetOut(out)
+	cmd.SetArgs([]string{"udp", "send", "127.0.0.1:27011", "-P", "3", "-o", "json", "-k", "100", "-t",
+		"300ms", "--log", "all:WARN"})
+	require.NoError(t, cmd.ExecuteContext(context.Background()))
 	var res struct {
 		Streams []map[string]any `json:"streams"`
 		Total   map[string]any   `json:"total"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(out), &res), out)
+	require.NoError(t, json.Unmarshal(out.Bytes(), &res), out.String())
 	assert.Len(t, res.Streams, 3)
 	assert.Positive(t, res.Total["received"])
 	assert.NotEmpty(t, res.Total["rtt_avg"])
@@ -140,19 +141,4 @@ func TestK8sAddress(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid Gateway address")
 	err = run(context.Background(), "turn", "send", "turn:127.0.0.1:3478", "k8s://ns/svc", "-t", "100ms")
 	assert.ErrorContains(t, err, "invalid Service address")
-}
-
-// captureStdout returns what f prints on the standard output.
-func captureStdout(t *testing.T, f func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	stdout := os.Stdout
-	os.Stdout = w
-	f()
-	os.Stdout = stdout
-	require.NoError(t, w.Close())
-	b, err := io.ReadAll(r)
-	require.NoError(t, err)
-	return string(b)
 }
