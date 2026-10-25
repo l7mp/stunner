@@ -96,8 +96,8 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			ServerSpec: stnrv2.ServerSpec{
 				Name:     "default-server",
 				Type:     stnrv2.ServerTypeTURN.String(),
-				Clusters: []string{"allow-any"}},
-			TURN: &stnrv2.TURNServerConfig{PermissionFilters: []string{"allow-any"}},
+				Clusters: []string{"default-cluster"},
+				Filters:  []string{"allow-any"}},
 		}},
 		// a rule with no address block matches every peer
 		Filters: []stnrv2.FilterConfig{{
@@ -105,7 +105,7 @@ func NewDefaultConfig(uri string) (*stnrv2.StunnerConfig, error) {
 			Rules: []stnrv2.FilterRule{{Action: stnrv2.FilterActionAllow.String()}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:     "allow-any",
+			Name:     "default-cluster",
 			Protocol: "UDP",
 			Addrs:    []string{u.Host},
 		}},

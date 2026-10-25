@@ -93,10 +93,10 @@ func setupTURNRelayChain(t *testing.T, tn testNet, upstreamProto string) (*Stunn
 			Port:     23479,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{"allow-any"}},
+			ServerSpec: stnrv2.ServerSpec{Name: "upstream", Type: "turn", Clusters: []string{"default-cluster"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:     "allow-any",
+			Name:     "default-cluster",
 			Protocol: "UDP",
 			Addrs:    []string{tn.host},
 		}},

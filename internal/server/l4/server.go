@@ -12,6 +12,7 @@ import (
 
 	"github.com/pion/logging"
 	"github.com/pion/turn/v5"
+	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/v2/internal/api"
 	"github.com/l7mp/stunner/v2/internal/flow"
@@ -39,6 +40,9 @@ type Server struct {
 	quota  *turnsrv.Quota
 	gate   turn.QuotaHandler
 	events EventHandler
+	// rejected logs a refused flow at most once a second: a refused client is refused again on
+	// every packet it sends
+	rejected rate.Sometimes
 
 	mu          sync.RWMutex
 	auth        string              // the policy whose realm scopes the quota of the flows
@@ -59,14 +63,15 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	// the quota machinery is shared with the TURN server
 	q := turnsrv.NewQuotaHandler(rt)
 	s := &Server{
-		rt:     rt,
-		log:    log,
-		idle:   FlowTimeout,
-		quota:  q,
-		gate:   q.QuotaHandler(),
-		events: NewEventHandler(rt, log, q),
+		rt:       rt,
+		log:      log,
+		idle:     FlowTimeout,
+		quota:    q,
+		gate:     q.QuotaHandler(),
+		events:   NewEventHandler(rt, log, q),
+		rejected: rate.Sometimes{Interval: time.Second},
 	}
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}
@@ -129,7 +134,9 @@ func (s *Server) accept(q *server.AcceptQueue) {
 		go func(c api.Conn) {
 			f, err := s.newFlow(c)
 			if err != nil {
-				s.log.Infof("rejecting flow from client %s: %s", c.RemoteAddr().String(), err.Error())
+				s.rejected.Do(func() {
+					s.log.Debugf("rejecting flow from client %s: %s", c.RemoteAddr().String(), err.Error())
+				})
 				_ = c.Close()
 				return
 			}

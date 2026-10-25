@@ -205,15 +205,15 @@ func (cl *udpDialer) ListenPacket(network string, port int) (net.PacketConn, net
 		if err != nil {
 			return nil, nil, err
 		}
-		return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, session, cl.name,
-			cl.kind), admit: cl.admit}, session.LocalAddr(), nil
+		return netconn.FilterPacketConn(account.PacketConn(cl.rt.Telemetry, session, cl.name,
+			cl.kind), cl.admit), session.LocalAddr(), nil
 	}
 	sock, err := cl.rt.Net.ListenPacket(network, net.JoinHostPort("", strconv.Itoa(sanitizePort(port))))
 	if err != nil {
 		return nil, nil, err
 	}
-	return &filteredPacketConn{PacketConn: account.PacketConn(cl.rt.Telemetry, sock, cl.name,
-		cl.kind), admit: cl.admit}, cl.advertise(network, sock.LocalAddr()), nil
+	return netconn.FilterPacketConn(account.PacketConn(cl.rt.Telemetry, sock, cl.name,
+		cl.kind), cl.admit), cl.advertise(network, sock.LocalAddr()), nil
 }
 
 func (cl *udpDialer) Listen(string, int) (net.Listener, net.Addr, error) {
@@ -286,8 +286,8 @@ func (cl *tcpDialer) Listen(network string, port int) (net.Listener, net.Addr, e
 	if cl.tunnel != nil {
 		l = rejectListener{l}
 	}
-	return &filteredListener{Listener: account.Listener(cl.rt.Telemetry, l, cl.name,
-		cl.kind), admit: cl.admit}, cl.advertise(network, l.Addr()), nil
+	return netconn.FilterListener(account.Listener(cl.rt.Telemetry, l, cl.name,
+		cl.kind), cl.admit), cl.advertise(network, l.Addr()), nil
 }
 
 // fifoDialer opens the fifo the first address of its cluster names, whatever it is asked to dial.
@@ -322,45 +322,6 @@ func (b *base) checkPeer(peer net.Addr) error {
 }
 
 var errRefused = errors.New("peer refused by the filters")
-
-// filteredPacketConn drops the datagrams to and from the peers the cluster's filters refuse.
-type filteredPacketConn struct {
-	net.PacketConn
-	admit func(net.Addr) bool
-}
-
-// WriteTo drops a datagram to a refused peer silently, as the network would.
-func (c *filteredPacketConn) WriteTo(p []byte, addr net.Addr) (int, error) {
-	if !c.admit(addr) {
-		return len(p), nil
-	}
-	return c.PacketConn.WriteTo(p, addr)
-}
-
-func (c *filteredPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	for {
-		n, from, err := c.PacketConn.ReadFrom(p)
-		if err != nil || c.admit(from) {
-			return n, from, err
-		}
-	}
-}
-
-// filteredListener closes the conns of the peers the cluster's filters refuse.
-type filteredListener struct {
-	net.Listener
-	admit func(net.Addr) bool
-}
-
-func (l *filteredListener) Accept() (net.Conn, error) {
-	for {
-		c, err := l.Listener.Accept()
-		if err != nil || l.admit(c.RemoteAddr()) {
-			return c, err
-		}
-		_ = c.Close()
-	}
-}
 
 func sanitizePort(p int) int {
 	if p <= 1 || p > 65535 {

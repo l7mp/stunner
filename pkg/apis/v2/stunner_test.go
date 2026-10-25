@@ -206,7 +206,7 @@ func TestDeepCopyIsExact(t *testing.T) {
 	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
-	full.Servers[0].TURN = &TURNServerConfig{PermissionFilters: []string{"peers"}}
+	full.Servers[0].Filters = []string{"peers"}
 	full.Listeners[0].Labels = map[string]string{"role": "control"}
 	full.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061",
 		TLS: &TLSConfig{SNI: "sip.example.com"}}
@@ -247,10 +247,8 @@ func TestDeepCopyIsExact(t *testing.T) {
 			}
 		}
 		for i := range cp.Servers {
-			if turn := cp.Servers[i].TURN; turn != nil {
-				for j := range turn.PermissionFilters {
-					turn.PermissionFilters[j] = "changed"
-				}
+			for j := range cp.Servers[i].Filters {
+				cp.Servers[i].Filters[j] = "changed"
 			}
 			if sip := cp.Servers[i].SIP; sip != nil {
 				for j := range sip.Registrations {

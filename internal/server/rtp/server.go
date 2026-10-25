@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	// MediaTimeout is how long a call lives without media in either direction.
+	// MediaTimeout is how long a call lives with no media from either party.
 	MediaTimeout = 5 * time.Minute
 	// EarlyMediaHold is how long media from an unknown source waits for the answer that names it.
 	EarlyMediaHold = 2 * time.Second
@@ -39,6 +39,7 @@ const bufferSize = 65535
 var (
 	errNoSocket = errors.New("no cluster makes a media socket")
 	errNoCall   = errors.New("unknown call")
+	errRefused  = errors.New("media peer refused by the filters")
 )
 
 // Server is an rtp server.
@@ -159,7 +160,7 @@ func hold(q [][]byte, p []byte) [][]byte {
 // newServer creates the RTP server of a validated config.
 func newServer(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	s := &Server{rt: rt, log: rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name))}
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}
@@ -375,6 +376,13 @@ func (s *Server) negotiate(req *ng.Request) (string, error) {
 				rtcp[i] = st.sockAddr
 			}
 		} else {
+			// the filters of the server decide which internal parties it relays to
+			for _, a := range []netip.AddrPort{e.rtp, e.rtcp} {
+				if a.IsValid() && !s.Admits(net.UDPAddrFromAddrPort(a)) {
+					s.deleteLocked(c.id)
+					return "", fmt.Errorf("%w: %s", errRefused, a)
+				}
+			}
 			st.in = e
 			st.flushIn()
 			s.offloadLocked(st)

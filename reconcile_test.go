@@ -62,10 +62,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -104,11 +104,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -135,10 +135,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -166,10 +166,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -195,10 +195,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -226,7 +226,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -255,10 +255,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{""},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -287,7 +287,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -316,7 +316,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "",
@@ -351,10 +351,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -395,11 +395,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -427,10 +427,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -470,11 +470,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -503,10 +503,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -553,11 +553,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -586,10 +586,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -628,11 +628,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -660,10 +660,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -702,11 +702,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -734,10 +734,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -782,11 +782,11 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -818,7 +818,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -850,7 +850,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -878,10 +878,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"renamed-listener"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "renamed-listener", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "renamed-listener", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -897,7 +897,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, "allow-any", serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "server cluster name ok")
+			assert.Equal(t, "default-cluster", serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "server cluster name ok")
 		},
 	},
 	{
@@ -924,7 +924,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -949,7 +949,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "none", "server cluster name ok")
 			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[1], "dummy", "server cluster name ok")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -980,7 +980,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1017,12 +1017,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}, {
 				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1039,9 +1039,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).Addr, "127.0.0.1", "listener address ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1090,12 +1090,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}, {
 				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1118,9 +1118,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).TLS.Key, dummyKey64, "listener key ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1169,12 +1169,12 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Port:     1,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}, {
 				ServerSpec: stnrv2.ServerSpec{Name: "newlistener", Type: "turn", Clusters: []string{"none", "dummy"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1197,9 +1197,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).TLS.Key, dummyKey64, "listener key ok")
 			assert.Equal(t, listenerConf(t, l).Port, stnrv2.DefaultPort, "listener port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1243,10 +1243,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1265,9 +1265,9 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			assert.Equal(t, listenerConf(t, l).PublicAddr, "127.0.0.2", "listener public address ok")
 			assert.Equal(t, listenerConf(t, l).PublicPort, 33478, "listener public port ok")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 1, "server cluster count ok")
-			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "allow-any", "server cluster name ok")
+			assert.Equal(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters[0], "default-cluster", "server cluster name ok")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1290,7 +1290,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 			Listeners: []stnrv2.ListenerConfig{},
 			Servers:   []stnrv2.ServerConfig{},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1330,10 +1330,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:      "allow-any",
+				Name:      "default-cluster",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}},
@@ -1343,7 +1343,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1383,7 +1383,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 		tester: func(t *testing.T, s *Stunner, err error) {
 			assert.NoError(t, err, err)
 
-			assert.Nil(t, s.GetCluster("allow-any"), "old cluster deleted")
+			assert.Nil(t, s.GetCluster("default-cluster"), "old cluster deleted")
 
 			c := s.GetCluster("renamed-cluster")
 			assert.NotNil(t, c, "renamed cluster found")
@@ -1418,7 +1418,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1431,7 +1431,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.Nil(t, c, "cluster found")
 
 			c = s.GetCluster("newcluster")
@@ -1464,7 +1464,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
@@ -1477,7 +1477,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 1, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.Nil(t, c, "cluster found")
 
 			c = s.GetCluster("newcluster")
@@ -1510,14 +1510,14 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "newcluster",
 				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}, {
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1526,7 +1526,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1569,7 +1569,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Endpoints: []string{"1.1.1.1", "2.2.2.2"},
 				Protocol:  "UDP",
 			}, {
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1579,7 +1579,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1622,7 +1622,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Endpoints: []string{"1.1.1.1:2", "2.2.2.2:4"},
 				Protocol:  "UDP",
 			}, {
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1632,7 +1632,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 
 			assert.Len(t, s.rt.Registry.List(runtime.TypeCluster), 2, "cluster keys")
 
-			c := s.GetCluster("allow-any")
+			c := s.GetCluster("default-cluster")
 			assert.NotNil(t, c, "cluster found")
 			assert.IsType(t, c, &object.Cluster{}, "cluster type ok")
 			assert.Equal(t, stnrv2.ClusterTypeStatic, mustClusterType(t, c), "cluster type ok")
@@ -1668,7 +1668,7 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{},
 		},
@@ -1837,10 +1837,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				Servers:  []string{"default-server"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1874,10 +1874,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -1909,10 +1909,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				PublicPort: 33478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -2049,10 +2049,10 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 				TLS:      &stnrv2.TLSConfig{Cert: "ZHVtbXkK", Key: "ZHVtbXkK", PQCMode: "Preferred"},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 			}},
 		},
@@ -2086,36 +2086,36 @@ var testReconcileDefault = []StunnerReconcileTestConfig{
 						ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: clusters},
 					}},
 					Clusters: []stnrv2.ClusterConfig{{
-						Name:     "allow-any",
+						Name:     "default-cluster",
 						Protocol: "UDP",
 					}},
 				}
 			}
 
 			// a mode change reconciles in place: the next handshake uses it
-			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any")), "mode change: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("enforced", "default-cluster")), "mode change: no restart")
 			assert.Equal(t, "enforced", listenerConf(t, l).TLS.PQCMode, "mode change applied")
 
 			// the same mode with a cluster change reconciles in place
-			assert.NoError(t, s.Reconcile(tlsConf("enforced", "allow-any", "dummy")), "cluster change: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("enforced", "default-cluster", "dummy")), "cluster change: no restart")
 			assert.Equal(t, "enforced", listenerConf(t, l).TLS.PQCMode, "cluster change: mode kept")
 			assert.Len(t, serverConf(t, s.GetServer(listenerConf(t, l).FirstServer())).Clusters, 2, "cluster change applied")
 
 			// back to the default mode, in place: the default is the empty string
-			assert.NoError(t, s.Reconcile(tlsConf("Default", "allow-any", "dummy")), "default mode: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("Default", "default-cluster", "dummy")), "default mode: no restart")
 			assert.Empty(t, listenerConf(t, l).TLS.PQCMode, "default mode normalized to empty")
 			assert.NotContains(t, l.Status().String(), "pqc=", "default mode absent from status")
 
 			// an omitted mode and a spelled-out default are the running mode: no restart
-			assert.NoError(t, s.Reconcile(tlsConf("", "allow-any", "dummy")), "omitted mode: no restart")
-			assert.NoError(t, s.Reconcile(tlsConf("default", "allow-any", "dummy")), "spelled-out default: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("", "default-cluster", "dummy")), "omitted mode: no restart")
+			assert.NoError(t, s.Reconcile(tlsConf("default", "default-cluster", "dummy")), "spelled-out default: no restart")
 
 			// the mode must parse
-			assert.ErrorContains(t, s.Reconcile(tlsConf("quantum", "allow-any", "dummy")), "unknown PQC mode", "unknown mode")
+			assert.ErrorContains(t, s.Reconcile(tlsConf("quantum", "default-cluster", "dummy")), "unknown PQC mode", "unknown mode")
 			assert.Empty(t, listenerConf(t, l).TLS.PQCMode, "a rejected config leaves the listener alone")
 
 			// a listener of another protocol takes a mode and ignores it
-			udp := tlsConf("preferred", "allow-any", "dummy")
+			udp := tlsConf("preferred", "default-cluster", "dummy")
 			udp.Listeners[0].Protocol, udp.Listeners[0].TLS = "UDP", &stnrv2.TLSConfig{PQCMode: "preferred"}
 			_, ok = s.Reconcile(udp).(stnrv2.ErrRestarted)
 			assert.True(t, ok, "a mode on a UDP listener: restarted for the protocol change")
@@ -2233,7 +2233,7 @@ func TestConcurrentReadsDuringReconcile(t *testing.T) {
 
 				// the cluster endpoints the L4 servers read, while reconciliation swaps
 				// them
-				if r := s.GetCluster("allow-any"); r != nil {
+				if r := s.GetCluster("default-cluster"); r != nil {
 					_ = r.Targets()
 				}
 			}
@@ -3246,8 +3246,7 @@ var testReconcileE2E = []StunnerTestReconcileE2EConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"open-cluster"}},
-				TURN:       &stnrv2.TURNServerConfig{PermissionFilters: []string{"deny-all"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp-ok", Type: "turn", Clusters: []string{"open-cluster"}, Filters: []string{"deny-all"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:     "open-cluster",
@@ -3568,10 +3567,10 @@ func makeRaceConfig(realm string) stnrv2.StunnerConfig {
 			Port:     3478,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+			ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 		}},
 		Clusters: []stnrv2.ClusterConfig{{
-			Name:     "allow-any",
+			Name:     "default-cluster",
 			Type:     stnrv2.ClusterTypeStatic.String(),
 			Protocol: stnrv2.ProtocolUDP.String(),
 			Addrs:    []string{"127.0.0.1"},

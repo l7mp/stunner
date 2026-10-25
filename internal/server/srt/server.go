@@ -99,7 +99,7 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 		gate:   q.QuotaHandler(),
 		secret: secret,
 	}
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}

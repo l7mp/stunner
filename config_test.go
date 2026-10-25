@@ -545,10 +545,10 @@ func TestStunnerConfigPatcher(t *testing.T) {
 					Servers:  []string{"default-server"},
 				}},
 				Servers: []stnrv2.ServerConfig{{
-					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"allow-any"}},
+					ServerSpec: stnrv2.ServerSpec{Name: "default-server", Type: "turn", Clusters: []string{"default-cluster"}},
 				}},
 				Clusters: []stnrv2.ClusterConfig{{
-					Name:     "allow-any",
+					Name:     "default-cluster",
 					Protocol: "UDP",
 				}},
 			}
@@ -625,8 +625,8 @@ func checkDefaultConfig(t *testing.T, c *stnrv2.StunnerConfig, proto string) {
 	assert.Equal(t, []string{"default-server"}, c.Listeners[0].Servers, "listener server")
 	assert.Len(t, c.Servers, 1, "servers len")
 	assert.Equal(t, "TURN", c.Servers[0].Type, "server type")
-	assert.Equal(t, []string{"allow-any"}, c.Servers[0].Clusters, "server clusters")
-	assert.Equal(t, []string{"allow-any"}, c.Servers[0].TURN.PermissionFilters, "permission filters")
+	assert.Equal(t, []string{"default-cluster"}, c.Servers[0].Clusters, "server clusters")
+	assert.Equal(t, []string{"allow-any"}, c.Servers[0].Filters, "server filters")
 	require.Len(t, c.Filters, 1, "filters len")
 	require.Len(t, c.Filters[0].Rules, 1, "filter rules len")
 	r := c.Filters[0].Rules[0]

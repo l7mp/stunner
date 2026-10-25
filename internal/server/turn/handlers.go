@@ -136,18 +136,14 @@ func (q *Quota) AllocationHandler(_ net.Addr, _ net.Addr, _ string, username, re
 	}
 }
 
-// permissionHandler grants a permission when a rule of the permission filters allows the peer IP;
-// a peer no rule matches is denied.
+// permissionHandler grants a permission when the filters of the server admit the peer IP on some
+// port: the ports are checked on the traffic.
 func (s *Server) permissionHandler(src net.Addr, peer net.IP) bool {
 	ip, ok := netip.AddrFromSlice(peer)
 	if !ok {
 		return false
 	}
-	s.mu.RLock()
-	filters := s.permissionFilters
-	s.mu.RUnlock()
-	allow, matched := s.rt.Match(filters, net.UDPAddrFromAddrPort(netip.AddrPortFrom(ip.Unmap(), 0)))
-	if matched && allow {
+	if s.Admits(net.UDPAddrFromAddrPort(netip.AddrPortFrom(ip.Unmap(), 0))) {
 		s.log.Debugf("permission granted on server %q for client %q to peer %s", s.Name(),
 			src.String(), peer.String())
 		return true
@@ -215,15 +211,11 @@ func (s *Server) eventHandler(ct *flow.Conntrack) turn.EventHandler {
 			if !found || rc.Tag().Proto != stnrv2.ProtocolUDP {
 				return
 			}
-			conf := s.rt.ClusterConfig(rc.Name())
-			if conf == nil {
-				return
-			}
 			if _, isUDP := peer.(*net.UDPAddr); !isUDP {
 				return
 			}
-			// the kernel path skips the cluster's filters: offload only a peer they admit
-			if allow, matched := s.rt.Match(conf.Filters, peer); matched && !allow {
+			// the kernel path skips the filters: offload only a peer they admit
+			if !s.Admits(peer) {
 				return
 			}
 			pair := offloadPair{

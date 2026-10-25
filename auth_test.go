@@ -68,10 +68,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
@@ -100,10 +100,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
@@ -131,10 +131,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
@@ -165,10 +165,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
@@ -201,10 +201,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},
@@ -237,10 +237,10 @@ var testStunnerAuthWithVnet = []StunnerTestAuthWithVnet{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"1.2.3.4"},
 			}},

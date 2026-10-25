@@ -31,6 +31,10 @@ func (r *rule) matches(a netip.AddrPort) bool {
 	if len(r.ports) == 0 {
 		return true
 	}
+	if a.Port() == 0 {
+		// the address on any port: allowed on some ports is allowed, denied on some is not denied
+		return r.allow
+	}
 	for _, p := range r.ports {
 		if a.Port() >= p[0] && a.Port() <= p[1] {
 			return true
@@ -72,7 +76,8 @@ func New(conf *stnrv2.FilterConfig) *Filter {
 func (f *Filter) Name() string { return f.name }
 
 // Match returns the verdict of the first rule matching the traffic of an address; matched is false
-// when no rule matches.
+// when no rule matches. Port 0 asks for the address on any port: it matches an ALLOW on some of
+// its ports, and a DENY only on all of them.
 func (f *Filter) Match(a netip.AddrPort) (allow, matched bool) {
 	for i := range f.rules {
 		if f.rules[i].matches(a) {

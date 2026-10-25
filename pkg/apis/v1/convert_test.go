@@ -95,42 +95,9 @@ func TestConvertToV2(t *testing.T) {
 	r, err := v2.GetClusterConfig("media")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.2.3.4", "10.2.3.5", "10.2.3.6"}, r.Endpoints)
+	// the endpoints of a cluster behind a TURN listener, on their ports, go to the filter of the
+	// server: the cluster has none
 	permissions := []stnrv2.FilterRule{
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.1.0.0/16", Except: []string{}},
-			Ports: []stnrv2.FilterPort{}},
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.2.3.4/32", Except: []string{}},
-			Ports: []stnrv2.FilterPort{}},
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.2.3.5/32", Except: []string{}},
-			Ports: []stnrv2.FilterPort{}},
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.2.3.6/32", Except: []string{}},
-			Ports: []stnrv2.FilterPort{}},
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "2001:db8::/32", Except: []string{}},
-			Ports: []stnrv2.FilterPort{}},
-	}
-	for _, name := range []string{"ns/gw/udp", "ns/gw/tls"} {
-		s, err := v2.GetServerConfig(name)
-		require.NoError(t, err)
-		assert.Equal(t, []string{name}, s.TURN.PermissionFilters, name)
-		f, err := v2.GetFilterConfig(name)
-		require.NoError(t, err)
-		assert.Equal(t, permissions, f.Rules, name)
-	}
-	// the same filter for a TURN-* cluster: it admits every peer
-	s, err = v2.GetServerConfig("ns/gw/proxy")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"ns/gw/proxy"}, s.TURN.PermissionFilters)
-	f, err := v2.GetFilterConfig("ns/gw/proxy")
-	require.NoError(t, err)
-	assert.Equal(t, []stnrv2.FilterRule{
-		{Action: "ALLOW", Ports: []stnrv2.FilterPort{}},
-	}, f.Rules)
-
-	// the ports of the v1 endpoints of a cluster behind a TURN listener convert to a filter of
-	// the cluster's name, allowing each endpoint on its ports and denying the rest
-	assert.Equal(t, []string{"media"}, r.Filters)
-	f, err = v2.GetFilterConfig("media")
-	require.NoError(t, err)
-	assert.Equal(t, []stnrv2.FilterRule{
 		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.1.0.0/16", Except: []string{}},
 			Ports: []stnrv2.FilterPort{}},
 		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.2.3.4/32", Except: []string{}},
@@ -141,8 +108,28 @@ func TestConvertToV2(t *testing.T) {
 			Ports: []stnrv2.FilterPort{}},
 		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "2001:db8::/32", Except: []string{}},
 			Ports: []stnrv2.FilterPort{{Port: 7000, EndPort: 7100}}},
-		{Action: "DENY", Ports: []stnrv2.FilterPort{}},
+	}
+	for _, name := range []string{"ns/gw/udp", "ns/gw/tls"} {
+		s, err := v2.GetServerConfig(name)
+		require.NoError(t, err)
+		assert.Equal(t, []string{name}, s.Filters, name)
+		f, err := v2.GetFilterConfig(name)
+		require.NoError(t, err)
+		assert.Equal(t, permissions, f.Rules, name)
+	}
+	// the same filter for a TURN-* cluster: it admits every peer
+	s, err = v2.GetServerConfig("ns/gw/proxy")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ns/gw/proxy"}, s.Filters)
+	f, err := v2.GetFilterConfig("ns/gw/proxy")
+	require.NoError(t, err)
+	assert.Equal(t, []stnrv2.FilterRule{
+		{Action: "ALLOW", Ports: []stnrv2.FilterPort{}},
 	}, f.Rules)
+
+	assert.Empty(t, r.Filters)
+	_, err = v2.GetFilterConfig("media")
+	assert.Error(t, err, "a cluster has no filter")
 	_, err = v2.GetFilterConfig("rtp")
 	assert.Error(t, err, "a cluster behind an L4 listener dials its single port: no filter")
 	r, err = v2.GetClusterConfig("rtp")
@@ -206,13 +193,12 @@ func TestConvertCluster(t *testing.T) {
 		{Name: "turn", Protocol: "TURN-UDP", Addrs: []string{"10.0.0.1", "fd00::1"},
 			Routes: []string{"media", "shared"}},
 	}
-	c, f, err := ConvertCluster(ClusterConfig{Name: "media", Endpoints: []string{"10.1.0.0/16",
+	c, err := ConvertCluster(ClusterConfig{Name: "media", Endpoints: []string{"10.1.0.0/16",
 		"10.9.0.1", "fd00::7"}}, listeners)
-	assert.Nil(t, f, "no ports, no filter")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.9.0.1", "fd00::7"}, c.Endpoints, "the addresses, not the prefix")
 
-	_, _, err = ConvertCluster(ClusterConfig{Name: "mixed", Endpoints: []string{"10.1.0.0/16",
+	_, err = ConvertCluster(ClusterConfig{Name: "mixed", Endpoints: []string{"10.1.0.0/16",
 		"media.svc"}}, listeners)
 	assert.Error(t, err, "a filter cannot name a domain")
 
@@ -231,15 +217,14 @@ func TestConvertCluster(t *testing.T) {
 	assert.Equal(t, "10.0.0.1/32", permissions.Rules[0].IPBlock.CIDR)
 	assert.Equal(t, []string{"10.0.0.1", "fd00::1"}, c.Addrs)
 
-	c, f, err = ConvertCluster(ClusterConfig{Name: "shared", Endpoints: []string{"10.2.0.1:<5000-5000>"}},
+	c, err = ConvertCluster(ClusterConfig{Name: "shared", Endpoints: []string{"10.2.0.1:<5000-5000>"}},
 		listeners)
-	assert.Nil(t, f, "an L4 listener routes to it first: it dials its port")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"10.2.0.1:5000"}, c.Endpoints, "the first listener routing to it wins")
 	assert.Equal(t, []string{"10.0.0.9", "fd00::1"}, c.Addrs, "the first address per family")
 
 	// an address that is no IP is kept as it is, once: it is resolved where the config is loaded
-	c, _, err = ConvertCluster(ClusterConfig{Name: "env"}, []ListenerConfig{
+	c, err = ConvertCluster(ClusterConfig{Name: "env"}, []ListenerConfig{
 		{Name: "a", Protocol: "TURN-UDP", Addr: "$STUNNER_ADDR", Routes: []string{"env"}},
 		{Name: "b", Protocol: "TURN-TCP", Addr: "$STUNNER_ADDR", Addrs: []string{"$STUNNER_ADDRS"},
 			Routes: []string{"env"}},
@@ -247,11 +232,11 @@ func TestConvertCluster(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"$STUNNER_ADDR", "$STUNNER_ADDRS"}, c.Addrs)
 
-	c, _, err = ConvertCluster(ClusterConfig{Name: "orphan"}, listeners)
+	c, err = ConvertCluster(ClusterConfig{Name: "orphan"}, listeners)
 	require.NoError(t, err)
 	assert.Empty(t, c.Addrs)
 
-	_, _, err = ConvertCluster(ClusterConfig{Name: "bad", Endpoints: []string{"10.0.0.1:<70000-70000>"}}, nil)
+	_, err = ConvertCluster(ClusterConfig{Name: "bad", Endpoints: []string{"10.0.0.1:<70000-70000>"}}, nil)
 	assert.Error(t, err)
 }
 

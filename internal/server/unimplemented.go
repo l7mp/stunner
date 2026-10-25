@@ -23,7 +23,7 @@ type Unimplemented struct {
 // implement.
 func NewUnimplemented(conf *stnrv2.ServerConfig, rt *runtime.Runtime) (*Unimplemented, error) {
 	s := &Unimplemented{log: rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name))}
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}

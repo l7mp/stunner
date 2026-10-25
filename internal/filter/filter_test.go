@@ -37,6 +37,9 @@ func TestFilter(t *testing.T) {
 		"198.51.100.7:5061":          false, // not a port of the rule
 		"198.51.100.7:15000":         true,  // within the range
 		"198.51.100.7:20001":         false,
+		"198.51.100.7:0":             true, // port 0: the address on any port of the rule
+		"[2001:db8::1]:0":            true,
+		"192.0.2.1:0":                false,
 		"[2001:db8::1]:5060":         true,
 		"[::ffff:203.0.113.10]:5060": true,  // a v4-mapped address matches its v4 block
 		"192.0.2.1:5060":             false, // the final DENY
@@ -47,11 +50,39 @@ func TestFilter(t *testing.T) {
 	_, matched := f.Match(netip.MustParseAddrPort("[2001:db8::1]:5070"))
 	assert.False(t, matched, "no rule matches: the decision is left to the next filter")
 
+	// a port range belongs to its address: the range of one backend never opens another
+	f = compile(t,
+		stnrv2.FilterRule{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.1"},
+			Ports: []stnrv2.FilterPort{{Port: 100, EndPort: 200}}},
+		stnrv2.FilterRule{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.2"},
+			Ports: []stnrv2.FilterPort{{Port: 300, EndPort: 400}}})
+	for addr, want := range map[string]bool{
+		"10.0.0.1:150": true,
+		"10.0.0.2:350": true,
+		"10.0.0.1:350": false, // the range of 10.0.0.2
+		"10.0.0.2:150": false, // the range of 10.0.0.1
+		"10.0.0.3:150": false,
+		"10.0.0.1:0":   true, // a TURN permission: the address, on its own range
+	} {
+		allow, matched := f.Match(netip.MustParseAddrPort(addr))
+		assert.Equal(t, want, allow && matched, addr)
+	}
+
+	// port 0: a DENY on some ports leaves the address to the next rule
+	f = compile(t,
+		stnrv2.FilterRule{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.0/8"},
+			Ports: []stnrv2.FilterPort{{Port: 6678}}},
+		stnrv2.FilterRule{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.0/8"}})
+	allow, _ := f.Match(netip.MustParseAddrPort("10.1.2.3:0"))
+	assert.True(t, allow, "allowed on the other ports")
+	allow, _ = f.Match(netip.MustParseAddrPort("10.1.2.3:6678"))
+	assert.False(t, allow, "denied on the port of the DENY")
+
 	// the order decides: an ALLOW before a DENY of the same block wins
 	f = compile(t,
 		stnrv2.FilterRule{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.0/8"}},
 		stnrv2.FilterRule{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "10.1.0.0/16"}})
-	allow, _ := f.Match(netip.MustParseAddrPort("10.1.2.3:80"))
+	allow, _ = f.Match(netip.MustParseAddrPort("10.1.2.3:80"))
 	assert.True(t, allow)
 	_, matched = compile(t).Match(netip.MustParseAddrPort("10.0.0.1:80"))
 	assert.False(t, matched, "no rules match nothing")

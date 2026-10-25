@@ -36,6 +36,7 @@ servers:
   - name: rtp
     type: RTP
     clusters: [media-peers]
+    filters: [media]
     rtp:
       public_address: "$STUNNER_ADDR"
       public_port: 30000
@@ -46,7 +47,6 @@ clusters:
   - name: media-peers
     protocol: UDP
     addresses: ["$STUNNER_ADDR"]
-    filters: [media]
   - name: rtp-ng
     protocol: FIFO
     addresses: [rtp-ng]

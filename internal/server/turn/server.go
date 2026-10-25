@@ -5,7 +5,6 @@ package turn
 import (
 	"fmt"
 	"net"
-	"slices"
 	"sync"
 	"time"
 
@@ -30,9 +29,8 @@ type Server struct {
 	log   logging.LeveledLogger
 	quota *Quota
 
-	mu                sync.RWMutex
-	auth              string
-	permissionFilters []string
+	mu   sync.RWMutex
+	auth string
 	// realm is the realm the running pion instance was built with, and stun whether its policy
 	// was of type none, which makes a pure STUN server
 	realm string
@@ -57,7 +55,7 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 		log:   rt.Logger.NewLogger(fmt.Sprintf("server-%s", conf.Name)),
 		quota: NewQuotaHandler(rt),
 	}
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}
@@ -89,7 +87,7 @@ func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (ob
 	return action, nil
 }
 
-// Reconcile applies the spec, the policy and the permission filters to the next requests.
+// Reconcile applies the spec, the filters and the policy to the next requests.
 func (s *Server) Reconcile(conf stnrv2.Config) error {
 	if err := s.Base.Reconcile(conf); err != nil {
 		return err
@@ -97,7 +95,7 @@ func (s *Server) Reconcile(conf stnrv2.Config) error {
 	req, _ := s.Desired(conf)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.auth, s.permissionFilters = req.TURN.Auth, slices.Clone(req.TURN.PermissionFilters)
+	s.auth = req.TURN.Auth
 	return nil
 }
 
@@ -105,7 +103,7 @@ func (s *Server) GetConfig() stnrv2.Config {
 	c := s.Base.GetConfig().(*stnrv2.ServerConfig)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	c.TURN = &stnrv2.TURNServerConfig{Auth: s.auth, PermissionFilters: slices.Clone(s.permissionFilters)}
+	c.TURN = &stnrv2.TURNServerConfig{Auth: s.auth}
 	return c
 }
 

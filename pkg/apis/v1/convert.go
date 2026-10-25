@@ -14,9 +14,8 @@ import (
 // portRangeMatcher matches a v1 endpoint with a port range: "<IP>[/<prefix>]:<min-max>".
 var portRangeMatcher = regexp.MustCompile("^(.*):<([0-9]+)-([0-9]+)>$")
 
-// ConvertToV2 converts a v1 config into a v2 config. Every TURN server gets a permission filter
-// allowing its clusters' endpoints (every address for TURN-*); a permission no rule allows is
-// denied.
+// ConvertToV2 converts a v1 config into a v2 config. Every TURN server gets a filter allowing its
+// clusters' endpoints on their ports (every address for TURN-*); a peer no rule allows is refused.
 func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 	c := req.DeepCopy()
 	if err := c.Validate(); err != nil {
@@ -48,14 +47,11 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 		ret.Servers = append(ret.Servers, server)
 	}
 	for _, cl := range c.Clusters {
-		cluster, filter, err := ConvertCluster(cl, c.Listeners)
+		cluster, err := ConvertCluster(cl, c.Listeners)
 		if err != nil {
 			return nil, err
 		}
 		ret.Clusters = append(ret.Clusters, cluster)
-		if filter != nil {
-			ret.Filters = append(ret.Filters, *filter)
-		}
 		// the credentials of a TURN-* cluster's tunnel become a policy the tunnel names
 		if cl.TURNServer != nil && cl.TURNServer.Auth != nil && cluster.Tunnel != nil {
 			ret.Auths = append(ret.Auths, convertAuth(*cl.TURNServer.Auth, cluster.Tunnel.Auth))
@@ -68,26 +64,32 @@ func ConvertToV2(req *StunnerConfig) (*stnrv2.StunnerConfig, error) {
 			continue
 		}
 		filter := stnrv2.FilterConfig{Name: server.Name}
-		allow := func(block *stnrv2.IPBlock) {
+		allow := func(block *stnrv2.IPBlock, ports []stnrv2.FilterPort) {
 			filter.Rules = append(filter.Rules, stnrv2.FilterRule{
-				Action: stnrv2.FilterActionAllow.String(), IPBlock: block})
+				Action: stnrv2.FilterActionAllow.String(), IPBlock: block, Ports: ports})
 		}
 		for _, cl := range c.Clusters {
 			if !slices.Contains(l.Routes, cl.Name) {
 				continue
 			}
 			if p, _ := NewClusterProtocol(cl.Protocol); p.IsTURN() {
-				allow(nil)
+				allow(nil, nil)
 				continue
 			}
 			// a domain endpoint of a cluster an L4 listener routes to first is no address block
 			for _, ep := range cl.Endpoints {
-				if e, _ := convertEndpoint(ep); e.block.IsValid() {
-					allow(&stnrv2.IPBlock{CIDR: e.block.String()})
+				e, _ := convertEndpoint(ep)
+				if !e.block.IsValid() {
+					continue
 				}
+				var ports []stnrv2.FilterPort
+				if e.port != 0 {
+					ports = []stnrv2.FilterPort{{Port: e.port, EndPort: e.endPort}}
+				}
+				allow(&stnrv2.IPBlock{CIDR: e.block.String()}, ports)
 			}
 		}
-		server.TURN = &stnrv2.TURNServerConfig{PermissionFilters: []string{filter.Name}}
+		server.Filters = []string{filter.Name}
 		ret.Filters = append(ret.Filters, filter)
 	}
 
@@ -134,10 +136,10 @@ func ConvertListener(l ListenerConfig) (stnrv2.ListenerConfig, stnrv2.ServerConf
 	}
 }
 
-// ConvertCluster converts a v1 cluster, given the v1 listeners of its config, and returns the
-// filter of its endpoint ports, nil for none. The listeners routing to it give its relay addresses,
-// and the first of them whether its endpoints are dial targets or TURN peers.
-func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.ClusterConfig, *stnrv2.FilterConfig, error) {
+// ConvertCluster converts a v1 cluster, given the v1 listeners of its config. The listeners routing
+// to it give its relay addresses, and the first of them whether its endpoints are dial targets or
+// TURN peers.
+func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.ClusterConfig, error) {
 	proto, _ := NewClusterProtocol(cl.Protocol)
 
 	cluster := stnrv2.ClusterConfig{
@@ -181,13 +183,11 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 		}
 	}
 
-	// prefixes live in the permission filter only; endpoint ports become a cluster filter
-	filter := &stnrv2.FilterConfig{Name: cl.Name}
-	restricted := false
+	// prefixes and endpoint ports live in the filter of the TURN server only
 	for _, ep := range cl.Endpoints {
 		e, err := convertEndpoint(ep)
 		if err != nil {
-			return stnrv2.ClusterConfig{}, nil, fmt.Errorf("cluster %q: %w", cl.Name, err)
+			return stnrv2.ClusterConfig{}, fmt.Errorf("cluster %q: %w", cl.Name, err)
 		}
 		if l4 {
 			// an L4 server dials an address or domain at a single port
@@ -201,28 +201,13 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 			continue
 		}
 		if !e.block.IsValid() {
-			return stnrv2.ClusterConfig{}, nil, fmt.Errorf("cluster %q: cannot convert domain "+
+			return stnrv2.ClusterConfig{}, fmt.Errorf("cluster %q: cannot convert domain "+
 				"endpoint %q behind a TURN listener: TURN permissions are filters, and a filter "+
 				"cannot name a domain", cl.Name, ep)
 		}
 		if !e.prefix {
 			cluster.Endpoints = append(cluster.Endpoints, e.host)
 		}
-		rule := stnrv2.FilterRule{Action: stnrv2.FilterActionAllow.String(),
-			IPBlock: &stnrv2.IPBlock{CIDR: e.block.String()}}
-		if e.port != 0 {
-			restricted = true
-			rule.Ports = []stnrv2.FilterPort{{Port: e.port, EndPort: e.endPort}}
-		}
-		filter.Rules = append(filter.Rules, rule)
-	}
-	if !restricted {
-		filter = nil
-	} else {
-		filter.Rules = append(filter.Rules, stnrv2.FilterRule{Action: stnrv2.FilterActionDeny.String()})
-	}
-	if filter != nil {
-		cluster.Filters = []string{filter.Name}
 	}
 
 	if proto.IsTURN() {
@@ -241,7 +226,7 @@ func ConvertCluster(cl ClusterConfig, listeners []ListenerConfig) (stnrv2.Cluste
 			}
 		}
 	}
-	return cluster, filter, nil
+	return cluster, nil
 }
 
 // convertAuth converts a v1 auth config into a v2 authentication policy of a name.

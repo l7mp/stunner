@@ -91,13 +91,13 @@ func sipGatewayConfig() *stnrv2.StunnerConfig {
 			{ServerSpec: stnrv2.ServerSpec{Name: "sip", Type: "SIP", Clusters: []string{"livekit-sip"}},
 				SIP: &stnrv2.SIPServerConfig{PublicAddr: sipStunnerIP, PublicPort: 5060, MediaProxy: "rtp-ng",
 					LBPolicy: "ROUND_ROBIN"}},
-			{ServerSpec: stnrv2.ServerSpec{Name: "rtp", Type: "RTP", Clusters: []string{"livekit-media"}},
+			{ServerSpec: stnrv2.ServerSpec{Name: "rtp", Type: "RTP", Clusters: []string{"livekit-media"},
+				Filters: []string{"pods"}},
 				RTP: &stnrv2.RTPServerConfig{PublicAddr: sipStunnerIP, PublicPort: 30000}},
 		},
 		Clusters: []stnrv2.ClusterConfig{
 			{Name: "livekit-sip", Protocol: "UDP", Endpoints: []string{sipPeerIP + ":5060"}},
-			{Name: "livekit-media", Protocol: "UDP", Addrs: []string{sipStunnerIP},
-				Filters: []string{"pods"}},
+			{Name: "livekit-media", Protocol: "UDP", Addrs: []string{sipStunnerIP}},
 			{Name: "rtp-ng", Protocol: "FIFO", Addrs: []string{"rtp-ng"}},
 		},
 		Filters: []stnrv2.FilterConfig{
@@ -307,11 +307,35 @@ func TestSIPGateway(t *testing.T) {
 		dcancel()
 		assert.ErrorIs(t, err, context.DeadlineExceeded, "the exception drops the trunk")
 
-		// a missing filter has no rules: the stranger gets through
-		conf.Filters = nil
+		// a missing listener filter has no rules: the stranger gets through
+		conf.Filters = conf.Filters[1:]
 		require.NoError(t, f.stunner.Reconcile(conf))
 		call, err = stranger.Dial(ctx, uri)
 		require.NoError(t, err, "a missing filter admits")
+		require.NoError(t, call.Hangup(ctx))
+	})
+
+	t.Run("media-filter", func(t *testing.T) {
+		f := newSIPFixture(t, sip.Config{})
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// the filters of the rtp server decide which internal parties it relays to: the media of
+		// a party they refuse is not relayed
+		conf := sipGatewayConfig()
+		conf.Filters[1].Rules[0].IPBlock.CIDR = "10.0.0.0/8"
+		require.NoError(t, f.stunner.Reconcile(conf))
+		go func() {
+			select {
+			case c := <-f.peer.Incoming():
+				go mediactl.Echo(c, true)
+			case <-ctx.Done():
+			}
+		}()
+		call, err := f.trunk.Dial(ctx, uri)
+		require.NoError(t, err, "the proxy forwards the answer the media proxy refused")
+		assert.NotEqual(t, sipStunnerIP+":30000", call.RemoteMedia().String(),
+			"the trunk is not given the public media address")
+		mediaDeleted(t, f.stunner)
 		require.NoError(t, call.Hangup(ctx))
 	})
 

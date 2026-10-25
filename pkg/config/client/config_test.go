@@ -67,7 +67,7 @@ func TestParseConfig(t *testing.T) {
 		r, err := c.GetClusterConfig("ns/media")
 		require.NoError(t, err)
 		assert.Empty(t, r.Endpoints, "the prefix leaves the cluster with no endpoints")
-		assert.Equal(t, []string{"ns/gw1/udp"}, s.TURN.PermissionFilters, "the prefix is the server's filter")
+		assert.Equal(t, []string{"ns/gw1/udp"}, s.Filters, "the prefix is the server's filter")
 	})
 
 	t.Run("v2 parses", func(t *testing.T) {

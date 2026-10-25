@@ -16,6 +16,9 @@ type ServerSpec struct {
 	Type string `json:"type,omitempty"`
 	// Clusters lists the names of the clusters the server uses, in order.
 	Clusters []string `json:"clusters,omitempty"`
+	// Filters name the filters a server relaying to the peers others choose (TURN, RTP) checks
+	// those peers against, in order: a peer no rule allows is refused. Other servers ignore them.
+	Filters []string `json:"filters,omitempty"`
 }
 
 // ServerConfig is a server: its spec and the options of its type. Listeners attach to a server by
@@ -39,8 +42,6 @@ type TURNServerConfig struct {
 	// Auth names the authentication policy the server authenticates its clients by. Default is
 	// "default".
 	Auth string `json:"auth,omitempty"`
-	// PermissionFilters name the filters checking the peer IP of a permission.
-	PermissionFilters []string `json:"permission_filters,omitempty"`
 }
 
 // L4ServerConfig holds the options of an L4 server.
@@ -137,6 +138,9 @@ func (req *ServerConfig) Validate() error {
 	if req.Clusters == nil {
 		req.Clusters = []string{}
 	}
+	if req.Filters == nil {
+		req.Filters = []string{}
+	}
 	// the block of the server's own type is always there; the blocks of other types are ignored
 	switch t {
 	case ServerTypeTURN:
@@ -145,9 +149,6 @@ func (req *ServerConfig) Validate() error {
 		}
 		if req.TURN.Auth == "" {
 			req.TURN.Auth = DefaultAuthName
-		}
-		if req.TURN.PermissionFilters == nil {
-			req.TURN.PermissionFilters = []string{}
 		}
 	case ServerTypeL4:
 		if req.L4 == nil {
@@ -231,9 +232,9 @@ func (req *ServerConfig) DeepCopyInto(dst Config) {
 	ret := dst.(*ServerConfig)
 	*ret = *req
 	ret.Clusters = slices.Clone(req.Clusters)
+	ret.Filters = slices.Clone(req.Filters)
 	if req.TURN != nil {
 		t := *req.TURN
-		t.PermissionFilters = slices.Clone(req.TURN.PermissionFilters)
 		ret.TURN = &t
 	}
 	if req.L4 != nil {
@@ -262,10 +263,10 @@ func (req *ServerConfig) String() string {
 		n = req.Name
 	}
 	opts := ""
+	if len(req.Filters) > 0 {
+		opts += ",filters=[" + strings.Join(req.Filters, ",") + "]"
+	}
 	if t := req.TURN; t != nil {
-		if len(t.PermissionFilters) > 0 {
-			opts += ",permission_filters=[" + strings.Join(t.PermissionFilters, ",") + "]"
-		}
 		if t.Auth != "" {
 			opts += ",auth=" + t.Auth
 		}

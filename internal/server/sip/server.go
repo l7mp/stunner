@@ -187,7 +187,7 @@ func newServer(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, erro
 		s.proxy(req, tx, c.(*peer))
 	})
 	s.txl.OnResponse(func(res *sipmsg.Response, _ net.Conn) { s.forwardResponse(res) })
-	s.Init(conf)
+	s.Init(conf, rt)
 	if err := s.Reconcile(conf); err != nil {
 		return nil, err
 	}

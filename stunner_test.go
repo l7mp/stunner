@@ -105,25 +105,22 @@ func addrFamilySuffix(hostport string) string {
 	return "4"
 }
 
-// allowPeers gives every TURN server of a config that names no permission filter one admitting
+// allowPeers gives every TURN server of a config that names no server filter one admitting
 // every peer, since a permission no rule allows is denied, and returns the config.
 func allowPeers(c *stnrv2.StunnerConfig) *stnrv2.StunnerConfig {
 	const name = "allow-peers"
-	added := false
+	used := false
 	for i := range c.Servers {
 		s := &c.Servers[i]
 		if t, err := stnrv2.NewServerType(s.Type); s.Type != "" && (err != nil || t != stnrv2.ServerTypeTURN) {
 			continue
 		}
-		if s.TURN == nil {
-			s.TURN = &stnrv2.TURNServerConfig{}
+		if len(s.Filters) == 0 {
+			s.Filters = []string{name}
 		}
-		if len(s.TURN.PermissionFilters) == 0 {
-			s.TURN.PermissionFilters = []string{name}
-			added = true
-		}
+		used = used || slices.Contains(s.Filters, name)
 	}
-	if added && !slices.ContainsFunc(c.Filters, func(f stnrv2.FilterConfig) bool { return f.Name == name }) {
+	if used && !slices.ContainsFunc(c.Filters, func(f stnrv2.FilterConfig) bool { return f.Name == name }) {
 		c.Filters = append(c.Filters, stnrv2.FilterConfig{Name: name,
 			Rules: []stnrv2.FilterRule{{Action: stnrv2.FilterActionAllow.String()}}})
 	}
@@ -510,10 +507,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -543,10 +540,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -577,10 +574,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -610,10 +607,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -644,10 +641,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "TCP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -677,10 +674,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				PublicPort: 3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "TCP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -713,10 +710,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "TCP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -748,10 +745,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -782,10 +779,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -817,10 +814,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"127.0.0.1"},
 			}},
@@ -845,10 +842,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"::1"},
 			}},
@@ -873,10 +870,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"::1"},
 			}},
@@ -901,10 +898,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tcp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "TCP",
 				Addrs:    []string{"::1"},
 			}},
@@ -930,10 +927,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "tls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"::1"},
 			}},
@@ -959,10 +956,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				TLS:        &stnrv2.TLSConfig{Cert: certPem64, Key: keyPem64},
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "dtls", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"::1"},
 			}},
@@ -989,10 +986,10 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 				Port:       23478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
-				Name:     "allow-any",
+				Name:     "default-cluster",
 				Protocol: "UDP",
 				Addrs:    []string{"::1"},
 			}},
@@ -1358,8 +1355,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
-				TURN:       &stnrv2.TURNServerConfig{PermissionFilters: []string{"peers"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}, Filters: []string{"peers"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -1439,8 +1435,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"dummy_cluster", "echo-server-cluster"}},
-				TURN:       &stnrv2.TURNServerConfig{PermissionFilters: []string{"peers"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"dummy_cluster", "echo-server-cluster"}, Filters: []string{"peers"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",
@@ -1521,8 +1516,7 @@ var testClusterConfigsWithVNet = []StunnerTestClusterConfig{
 				Port:     3478,
 			}},
 			Servers: []stnrv2.ServerConfig{{
-				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}},
-				TURN:       &stnrv2.TURNServerConfig{PermissionFilters: []string{"peers"}},
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"echo-server-cluster"}, Filters: []string{"peers"}},
 			}},
 			Clusters: []stnrv2.ClusterConfig{{
 				Name:      "echo-server-cluster",

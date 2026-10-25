@@ -333,7 +333,7 @@ type ServerType int
 const (
 	// ServerTypeUnknown is an invalid server type.
 	ServerTypeUnknown ServerType = iota
-	// ServerTypeTURN serves TURN: permission filters grant the peers a client may reach.
+	// ServerTypeTURN serves TURN: its filters admit the peers a client may reach.
 	ServerTypeTURN
 	// ServerTypeL4 forwards every client flow to an endpoint load-balanced over its clusters.
 	ServerTypeL4

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"slices"
 	"sync"
 
@@ -10,15 +11,18 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// Base is the server object of the fields every server has, its spec: the name, the type and the
-// clusters. A server of a type embeds it, calls into it for the spec and adds the options of its
-// type. Reconcile writes the clusters, the data path reads them, under mu.
+// Base is the server object of the fields every server has, its spec: the name, the type, the
+// clusters and the filters. A server of a type embeds it, calls into it for the spec and adds the
+// options of its type. Reconcile writes the clusters and the filters, the data path reads them,
+// under mu.
 type Base struct {
 	name string
 	typ  stnrv2.ServerType
+	rt   *runtime.Runtime
 
 	mu       sync.RWMutex
 	clusters []string
+	filters  []string
 }
 
 var (
@@ -26,10 +30,12 @@ var (
 	_ runtime.Object = &Base{}
 )
 
-// Init sets the name and the type of the server of a validated config.
-func (b *Base) Init(conf *stnrv2.ServerConfig) {
+// Init sets the name and the type of the server of a validated config, and the runtime its filters
+// are looked up in.
+func (b *Base) Init(conf *stnrv2.ServerConfig, rt *runtime.Runtime) {
 	b.name = conf.Name
 	b.typ, _ = stnrv2.NewServerType(conf.Type)
+	b.rt = rt
 }
 
 func (b *Base) Name() string             { return b.name }
@@ -78,7 +84,7 @@ func (b *Base) Reconcile(conf stnrv2.Config) error {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.clusters = slices.Clone(req.Clusters)
+	b.clusters, b.filters = slices.Clone(req.Clusters), slices.Clone(req.Filters)
 	return nil
 }
 
@@ -87,7 +93,7 @@ func (b *Base) Reconcile(conf stnrv2.Config) error {
 func (b *Base) GetConfig() stnrv2.Config {
 	b.mu.RLock()
 	c := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: b.name, Type: b.typ.String(),
-		Clusters: slices.Clone(b.clusters)}}
+		Clusters: slices.Clone(b.clusters), Filters: slices.Clone(b.filters)}}
 	b.mu.RUnlock()
 	_ = c.Validate()
 	return c
@@ -102,6 +108,16 @@ func (b *Base) Clusters() []string {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.clusters
+}
+
+// Admits tells whether the filters of the server admit a peer: a peer no rule matches is refused.
+// Port 0 asks for the address of the peer on any port.
+func (b *Base) Admits(peer net.Addr) bool {
+	b.mu.RLock()
+	filters := b.filters
+	b.mu.RUnlock()
+	allow, matched := b.rt.Match(filters, peer)
+	return matched && allow
 }
 
 func (b *Base) Start() error     { return nil }

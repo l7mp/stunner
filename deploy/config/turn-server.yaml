@@ -36,8 +36,7 @@ servers:
   - name: turn
     type: TURN
     clusters: [relay-udp, relay-tcp]
-    turn:
-      permission_filters: [peers]
+    filters: [peers]
 clusters:
   - name: relay-udp
     protocol: UDP

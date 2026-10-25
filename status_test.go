@@ -36,9 +36,9 @@ func TestStunnerStatus(t *testing.T) {
 			Name: "udp", Protocol: "UDP", Servers: []string{"udp"}, Addr: "127.0.0.1", Port: 23478,
 		}},
 		Servers: []stnrv2.ServerConfig{{
-			ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"allow-any"}},
+			ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
 		}},
-		Clusters: []stnrv2.ClusterConfig{{Name: "allow-any", Protocol: "UDP", Addrs: []string{"127.0.0.1"}}},
+		Clusters: []stnrv2.ClusterConfig{{Name: "default-cluster", Protocol: "UDP", Addrs: []string{"127.0.0.1"}}},
 	}
 	require.NoError(t, s.Reconcile(allowPeers(&conf)), "reconcile")
 

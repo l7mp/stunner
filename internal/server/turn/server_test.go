@@ -116,8 +116,8 @@ func newTestServer(t *testing.T) *testServer {
 		{Action: "ALLOW"}}})
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(all, nil))
-	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"loopback"}},
-		TURN: &stnrv2.TURNServerConfig{PermissionFilters: []string{"all"}}}
+	conf := &stnrv2.ServerConfig{ServerSpec: stnrv2.ServerSpec{Name: "turn", Type: "turn", Clusters: []string{"loopback"},
+		Filters: []string{"all"}}}
 	require.NoError(t, conf.Validate())
 	s, err := turn.New(conf, rt)
 	require.NoError(t, err)
@@ -247,7 +247,7 @@ func TestTURNServerPermissions(t *testing.T) {
 	filter, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: rules("10.0.0.1/32")})
 	require.NoError(t, err)
 	require.NoError(t, ts.rt.Registry.Add(filter, nil))
-	ts.conf.TURN.PermissionFilters = []string{"peers"}
+	ts.conf.Filters = []string{"peers"}
 	require.NoError(t, ts.Reconcile(ts.conf))
 	peer := udpEcho(t)
 
@@ -256,12 +256,52 @@ func TestTURNServerPermissions(t *testing.T) {
 	require.NoError(t, c.SetReadDeadline(time.Now().Add(500*time.Millisecond)))
 	buf := make([]byte, 16)
 	_, _, err = c.ReadFrom(buf)
-	assert.Error(t, err, "a peer the server's permission filters deny is not reachable")
+	assert.Error(t, err, "a peer the server's filters refuse is not reachable")
 
 	// a filter change applies to the new permissions of running allocations
 	require.NoError(t, filter.Reconcile(&stnrv2.FilterConfig{Name: "peers", Rules: rules("127.0.0.1/32")}))
 	c2 := ts.allocate(t, stnrv2.ProtocolTURNUDP, ts.ports["UDP"])
 	relay(t, c2, peer.LocalAddr(), "admitted")
+}
+
+// TestTURNServerFilterPorts pins that the server's filters check the ports of the peers on the
+// traffic, whatever cluster made the relay socket: the permission is granted by IP, the datagrams of
+// a port the filters refuse are dropped, and only an admitted peer is offloaded.
+func TestTURNServerFilterPorts(t *testing.T) {
+	ts := newTestServer(t)
+	in, out := udpEcho(t), udpEcho(t)
+	port := uint16(in.LocalAddr().(*net.UDPAddr).Port)
+	filter, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: []stnrv2.FilterRule{
+		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "127.0.0.1/32"},
+			Ports: []stnrv2.FilterPort{{Port: int(port), EndPort: int(port)}}},
+		{Action: "DENY"}}})
+	require.NoError(t, err)
+	require.NoError(t, ts.rt.Registry.Add(filter, nil))
+	ts.conf.Filters = []string{"peers"}
+	require.NoError(t, ts.Reconcile(ts.conf))
+
+	c := ts.allocate(t, stnrv2.ProtocolTURNUDP, ts.ports["UDP"])
+	relay(t, c, in.LocalAddr(), "admitted port")
+	require.Eventually(t, func() bool {
+		up, _ := ts.offload.counts()
+		return up == 1
+	}, 5*time.Second, 20*time.Millisecond, "the admitted peer is offloaded")
+
+	for range 3 {
+		_, _ = c.WriteTo([]byte("x"), out.LocalAddr())
+	}
+	require.NoError(t, c.SetReadDeadline(time.Now().Add(500*time.Millisecond)))
+	buf := make([]byte, 16)
+	for {
+		n, from, err := c.ReadFrom(buf)
+		if err != nil {
+			break
+		}
+		assert.NotEqual(t, out.LocalAddr().String(), from.String(), "a refused port is unreachable: %q", buf[:n])
+	}
+	time.Sleep(200 * time.Millisecond)
+	up, _ := ts.offload.counts()
+	assert.Equal(t, 1, up, "a refused peer is not offloaded")
 }
 
 func TestTURNServerPreAllocationTimeout(t *testing.T) {

@@ -223,7 +223,6 @@ func TestOffloadMatrix(t *testing.T) {
 					Rules: []stnrv2.FilterRule{{Action: "ALLOW"}}})
 				require.NoError(t, err)
 				env.start(t, peers, nil)
-				permissions := &stnrv2.TURNServerConfig{PermissionFilters: []string{"peers"}}
 				eps := []string{"127.0.0.1"}
 				if row.server == stnrv2.ServerTypeL4 {
 					eps = []string{udpPeer.LocalAddr().String()}
@@ -243,8 +242,8 @@ func TestOffloadMatrix(t *testing.T) {
 					require.NoError(t, err)
 					env.start(t, upCluster, nil)
 					upServer, err := object.NewServer(&stnrv2.ServerConfig{
-						ServerSpec: stnrv2.ServerSpec{Name: "upstream", Clusters: []string{"upstream-peer"}},
-						TURN:       permissions,
+						ServerSpec: stnrv2.ServerSpec{Name: "upstream", Clusters: []string{"upstream-peer"},
+							Filters: []string{"peers"}},
 					}, env.rt)
 					require.NoError(t, err)
 					env.start(t, upServer, nil)
@@ -261,8 +260,8 @@ func TestOffloadMatrix(t *testing.T) {
 				env.start(t, cl, nil)
 
 				srv, err := object.NewServer(&stnrv2.ServerConfig{
-					ServerSpec: stnrv2.ServerSpec{Name: "server", Type: row.server.String(), Clusters: []string{"peer"}},
-					TURN:       permissions,
+					ServerSpec: stnrv2.ServerSpec{Name: "server", Type: row.server.String(), Clusters: []string{"peer"},
+						Filters: []string{"peers"}},
 				}, env.rt)
 				require.NoError(t, err)
 				env.start(t, srv, nil)

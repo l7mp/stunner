@@ -39,25 +39,26 @@ func TestPermissionHandler(t *testing.T) {
 	assert.False(t, permits("10.1.2.3"), "no filters deny every peer")
 
 	// the filters decide alone: the endpoints of the clusters are no filter
-	conf.TURN.PermissionFilters = []string{"all"}
+	conf.Filters = []string{"all"}
 	require.NoError(t, s.Reconcile(conf))
 	assert.True(t, permits("10.1.2.3"), "an endpoint")
 	assert.True(t, permits("192.168.0.1"), "not an endpoint: endpoints do not filter")
 
-	// the server's permission filters decide, by IP: a rule with ports never matches a permission
+	// the server's filters decide by IP: a rule with ports matches a permission on any of its
+	// ports, the ports are checked on the traffic
 	filter, err := object.NewFilter(&stnrv2.FilterConfig{Name: "peers", Rules: []stnrv2.FilterRule{
 		{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "10.1.2.0/24", Except: []string{"10.1.2.3/32"}}},
-		{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}, Ports: []stnrv2.FilterPort{{Port: 1, EndPort: 65535}}},
-		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.0.0.0/8"}},
+		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.9.0.0/16"}, Ports: []stnrv2.FilterPort{{Port: 5000, EndPort: 5100}}},
+		{Action: "ALLOW", IPBlock: &stnrv2.IPBlock{CIDR: "10.1.0.0/16"}},
 		{Action: "DENY", IPBlock: &stnrv2.IPBlock{CIDR: "0.0.0.0/0"}},
 	}})
 	require.NoError(t, err)
 	require.NoError(t, rt.Registry.Add(filter, nil))
-	conf.TURN.PermissionFilters = []string{"peers"}
+	conf.Filters = []string{"peers"}
 	require.NoError(t, s.Reconcile(conf))
 	assert.True(t, permits("10.1.2.3"), "the exception of the first DENY")
 	assert.False(t, permits("10.1.2.4"), "the first DENY")
-	assert.True(t, permits("10.9.0.1"), "a rule with ports never matches: the ALLOW decides")
+	assert.True(t, permits("10.9.0.1"), "an ALLOW with ports")
 	assert.False(t, permits("192.168.0.1"), "the last DENY")
 
 	// a peer no rule matches is denied, and a config change applies to the next permission
@@ -67,7 +68,7 @@ func TestPermissionHandler(t *testing.T) {
 	require.NoError(t, rt.Registry.Replace(filter, peers))
 	assert.True(t, permits("10.1.2.4"), "a matching ALLOW")
 	assert.False(t, permits("192.168.0.1"), "no rule matches")
-	conf.TURN.PermissionFilters = nil
+	conf.Filters = nil
 	require.NoError(t, s.Reconcile(conf))
 	assert.False(t, permits("10.1.2.4"), "no filters deny every peer")
 }

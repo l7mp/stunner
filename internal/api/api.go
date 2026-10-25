@@ -89,7 +89,8 @@ type Router interface {
 }
 
 // Filter admits or drops traffic by the address and port of its client or peer: Match returns the
-// verdict of its first rule matching the address, matched is false when none does.
+// verdict of its first rule matching the address. Set Port to zero to ignore the port rules during
+// Match.
 type Filter interface {
 	Named
 	Match(a netip.AddrPort) (allow, matched bool)
