@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	stnrv1 "github.com/l7mp/stunner/v2/pkg/apis/v1" //nolint:staticcheck // warns of deprecated v1 configs
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/pion/logging"
 )
@@ -55,6 +56,12 @@ func (w *ConfigFileClient) Load() (*stnrv2.StunnerConfig, error) {
 	c, err := ParseConfig(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	k := ConfigSkeleton{}
+	if err := unmarshal(b, &k); err == nil && k.ApiVersion == stnrv1.ApiVersion {
+		w.log.Warnf("config file %q uses the deprecated %s config API, converted to %s",
+			w.configFile, stnrv1.ApiVersion, stnrv2.ApiVersion)
 	}
 
 	return c, nil
