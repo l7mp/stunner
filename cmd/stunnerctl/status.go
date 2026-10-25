@@ -50,6 +50,9 @@ func runStatus(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error searching for stunnerd pods: %w", err)
 	}
+	if gw != "" && len(pods) == 0 {
+		return fmt.Errorf("no stunnerd pods found %s", extraLog)
+	}
 
 	for _, pod := range pods {
 		status, err := discovery.GetStunnerdStatus(ctx, pod.Addr)
