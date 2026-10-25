@@ -47,9 +47,8 @@ type Runtime struct {
 	// Registry stores every live node in the dataplane.
 	Registry *Registry
 
-	ready      atomic.Bool
-	shutdown   atomic.Bool
-	forceReady atomic.Bool
+	ready    atomic.Bool
+	shutdown atomic.Bool
 }
 
 // New creates a Runtime with an empty Registry.
@@ -70,14 +69,10 @@ func New(deps Config) *Runtime {
 	return &Runtime{Config: deps, Registry: NewRegistry()}
 }
 
-// IsReady returns true if STUNner is ready to serve requests.
+// IsReady returns true from the first config until the daemon closes, through the graceful
+// shutdown; it backs the readiness probe.
 func (rt *Runtime) IsReady() bool {
 	return rt.ready.Load()
-}
-
-// ReadyForProbes returns true if readiness probes should report ready.
-func (rt *Runtime) ReadyForProbes() bool {
-	return rt.forceReady.Load() || rt.ready.Load()
 }
 
 // IsShutdown returns true if STUNner is in shutdown mode.
@@ -90,15 +85,10 @@ func (rt *Runtime) SetReady(v bool) {
 	rt.ready.Store(v)
 }
 
-// SetShutdown updates shutdown mode and clears readiness on shutdown.
+// SetShutdown updates shutdown mode. The graceful shutdown keeps the readiness on purpose: kube-proxy
+// deletes the UDP conntrack entries of an endpoint that stops serving, which would cut the live UDP
+// sessions, while a terminating pod gets no new traffic anyway. See the readiness probe in
+// internal/object/health.go for the full story before changing this.
 func (rt *Runtime) SetShutdown(v bool) {
 	rt.shutdown.Store(v)
-	if v {
-		rt.ready.Store(false)
-	}
-}
-
-// SetForceReady configures force-ready readiness probe behavior.
-func (rt *Runtime) SetForceReady(v bool) {
-	rt.forceReady.Store(v)
 }

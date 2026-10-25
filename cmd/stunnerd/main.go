@@ -69,7 +69,6 @@ func main() {
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
 	var noGracefulShutdown = flag.Bool("no-graceful-shutdown", false, "Exit at once on SIGTERM or SIGINT, closing the live sessions, instead of waiting for them to end (default: false)")
-	var forceReadyDuringTermination = flag.Bool("force-ready-status", false, "Prevent the server from failing the readiness probe during graceful shutdown as a workaround for buggy kube-proxy implementations (default: false)")
 	var verbose = flag.BoolP("verbose", "v", false, "Verbose logging, identical to <-l all:DEBUG>")
 	var sni = flag.String("sni", "", "Server name (SNI) for the TURN/TLS and TURN/DTLS transports (tunnel mode)")
 	var insecure = flag.Bool("insecure", false, "Accept self-signed TURN server TLS certificates (tunnel mode, default: false)")
@@ -168,10 +167,9 @@ func main() {
 		Name: *id,
 		LogOptions: stunner.LogOptions{Level: logLevel, Format: *logFormat,
 			RateLimit: rate.Limit(*logRate), Burst: *logBurst},
-		DryRun:                      *dryRun,
-		NodeName:                    nodeName,
-		ForceReadyDuringTermination: *forceReadyDuringTermination,
-		BuildInfo:                   buildInfo,
+		DryRun:    *dryRun,
+		NodeName:  nodeName,
+		BuildInfo: buildInfo,
 	})
 	defer st.Close()
 

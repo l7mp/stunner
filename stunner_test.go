@@ -1205,8 +1205,8 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 			stunner.Shutdown()
 
 			assert.True(t, stunner.rt.IsShutdown(), "lifecycle 4: shutting down")
-			assert.False(t, stunner.rt.IsReady(), "lifecycle 4: not-ready")
-			assert.False(t, stunner.IsReady(), "lifecycle 4: not-ready")
+			assert.True(t, stunner.rt.IsReady(), "lifecycle 4: ready while draining")
+			assert.True(t, stunner.IsReady(), "lifecycle 4: ready while draining")
 
 			stunner.Close()
 
@@ -2419,7 +2419,7 @@ func TestStunnerLifecycle(t *testing.T) {
 
 	status, err = doReadinessCheck("http://127.0.0.1:8086")
 	assert.NoError(t, err, "readiness test after graceful-shutdown: running")
-	assert.False(t, status, "readiness test after graceful-shutdown: ready")
+	assert.True(t, status, "readiness test after graceful-shutdown: ready while draining")
 
 	s.Close()
 
@@ -2569,9 +2569,11 @@ func TestStunnerMetrics(t *testing.T) {
 
 	s.Shutdown()
 
-	assert.False(t, s.IsReady(), "server ready")
+	assert.True(t, s.IsReady(), "server ready while draining")
 
 	s.Close()
+
+	assert.False(t, s.IsReady(), "closed server not ready")
 }
 
 func doHttp(uri string) (bool, error) {

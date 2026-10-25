@@ -52,7 +52,7 @@ type Stunner struct {
 	cdsLabels     map[string]string
 
 	// Flags.
-	forceReady, suppressRollback, dryRun bool
+	suppressRollback, dryRun bool
 
 	// Subsystems shared across object factories.
 	reconciler      *reconciler.Reconciler
@@ -129,7 +129,6 @@ func NewStunner(options Options) *Stunner {
 		dryRun:           options.DryRun,
 		resolver:         r,
 		cdsLabels:        cdsLabels(options.NodeName),
-		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
 	}
 
@@ -171,7 +170,6 @@ func NewStunner(options Options) *Stunner {
 		BuildInfo:     options.BuildInfo,
 	})
 	rt.QuotaHandler = quota.New()
-	rt.SetForceReady(s.forceReady)
 	s.rt = rt
 
 	// Catalog describes the object hierarchy.
@@ -261,6 +259,9 @@ func (s *Stunner) GetStatus() stnrv2.Status {
 // Close stops the STUNner daemon, cleans up any internal state, and closes all connections.
 func (s *Stunner) Close() {
 	s.log.Info("closing STUNner")
+	if s.rt != nil {
+		s.rt.SetReady(false)
+	}
 	if s.reconciler != nil {
 		_ = s.reconciler.Shutdown()
 	}

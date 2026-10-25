@@ -178,6 +178,42 @@ func (h *Health) buildMux() *http.ServeMux {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("{}\n")) //nolint:errcheck
 	})
+	// Readiness probe: OK from the first config until the daemon closes, INCLUDING the
+	// graceful shutdown. Do not "fix" this by failing the probe on SIGTERM: that kills every
+	// live UDP session about 30-45 s into each rollout or scale-down (3 failed probes of 15
+	// s).
+	//
+	// A passing probe does not bring new connections to a terminating pod. The probe only sets
+	// the serving condition of the endpoint-slice; Kubernetes sets its ready condition to
+	// false on termination whatever the probe says, and kube-proxy sends new connections to
+	// ready endpoints only (with the one exception at the end). So the draining pod keeps its
+	// live sessions and gets no new ones, which is exactly the graceful shutdown we want.
+	//
+	// What happens on SIGTERM, with the EndpointSlice conditions:
+	//   - Kubernetes marks the endpoint terminating=true and ready=false (always, for a
+	//     terminating pod), while serving mirrors the readiness probe. kube-proxy sends new
+	//     connections to the ready pods only, so the draining pod gets no new traffic either way.
+	//   - kube-proxy deletes every UDP conntrack entry towards a Service, LoadBalancer or
+	//     NodePort frontend that is not DNATed to a SERVING endpoint (CleanStaleEntries in
+	//     kubernetes/pkg/proxy/conntrack/cleanup.go: the serving-based check is PR #119394,
+	//     Kubernetes 1.29; the reconciler doing it on every sync is PR #127318, 1.32). TCP
+	//     entries are never deleted, so TCP drains whatever the probe says.
+	//   - Fail the probe and serving flips to false, kube-proxy deletes the UDP flows, and the
+	//     next packet of each session is load-balanced afresh to another pod that knows nothing
+	//     about it: the session dies. Keep the probe passing and serving stays true, the flows
+	//     stick to the draining pod until the sessions end.
+	//
+	// Upstream considers this the intended behavior, not a bug: KEP-1669 (proxy terminating
+	// endpoints) defines serving as readiness regardless of termination and tells workloads to
+	// fail readiness on SIGTERM only to have ALL their traffic taken away, live flows included,
+	// and in kubernetes/kubernetes#132635 (2025) sig-network argued that UDP flows should stick
+	// to an endpoint for as long as it serves. Failing readiness on SIGTERM is a habit from the
+	// time a terminating pod left the endpoints at once.
+	//
+	// The one side effect: when every stunnerd pod is terminating, kube-proxy sends new
+	// connections to the serving terminating ones so a draining stunnerd still serves them;
+	// kube-proxy's node health check fails then, so a Local load balancer steers new clients
+	// to other nodes.
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		if h.rt == nil {
@@ -186,7 +222,7 @@ func (h *Health) buildMux() *http.ServeMux {
 				http.StatusOK, "READY")
 			return
 		}
-		if !h.rt.ReadyForProbes() {
+		if !h.rt.IsReady() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, "{\"status\":%d,\"message\":\"%s\"}\n", //nolint:errcheck
 				http.StatusServiceUnavailable, "stunnerd not ready")
