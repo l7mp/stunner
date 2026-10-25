@@ -58,20 +58,24 @@ func TestClusterFilter(t *testing.T) {
 		conf := filterTURNConfig(only6678, rest)
 		require.NoError(t, s.Reconcile(allowPeers(conf)))
 
-		lconn, err := tn.client.ListenPacket("udp4", "0.0.0.0:0")
-		require.NoError(t, err)
-		defer lconn.Close() //nolint:errcheck // the TURN client does not close the conn it is given
-		client, err := turn.NewClient(&turn.ClientConfig{STUNServerAddr: "1.2.3.4:3478",
-			TURNServerAddr: "1.2.3.4:3478", Username: "user1", Password: "passwd1", Conn: lconn,
-			Net: tn.client, LoggerFactory: lf})
-		require.NoError(t, err)
-		defer client.Close()
-		require.NoError(t, client.Listen())
-		relay, err := client.Allocate()
-		require.NoError(t, err)
-		defer relay.Close()
+		allocate := func() net.PacketConn {
+			lconn, err := tn.client.ListenPacket("udp4", "0.0.0.0:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = lconn.Close() }) // the TURN client does not close the conn it is given
+			client, err := turn.NewClient(&turn.ClientConfig{STUNServerAddr: "1.2.3.4:3478",
+				TURNServerAddr: "1.2.3.4:3478", Username: "user1", Password: "passwd1", Conn: lconn,
+				Net: tn.client, LoggerFactory: lf})
+			require.NoError(t, err)
+			t.Cleanup(client.Close)
+			require.NoError(t, client.Listen())
+			relay, err := client.Allocate()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = relay.Close() })
+			return relay
+		}
+		relay := allocate()
 
-		echo := func(peer net.PacketConn) bool {
+		echo := func(relay, peer net.PacketConn) bool {
 			_, err := relay.WriteTo([]byte("hello"), peer.LocalAddr())
 			require.NoError(t, err, "the permission is the address's: the write succeeds")
 			buf := make([]byte, 100)
@@ -79,12 +83,12 @@ func TestClusterFilter(t *testing.T) {
 			n, from, err := relay.ReadFrom(buf)
 			return err == nil && string(buf[:n]) == "hello" && from.String() == peer.LocalAddr().String()
 		}
-		assert.True(t, echo(allowed), "the admitted port relays")
-		assert.False(t, echo(refused), "the refused port is dropped")
+		assert.True(t, echo(relay, allowed), "the admitted port relays")
+		assert.False(t, echo(relay, refused), "the refused port is dropped")
 
 		// the return direction too: the refused port reaches the client through a permitted
 		// address, and is dropped
-		_, err = refused.WriteTo([]byte("hello"), relay.LocalAddr())
+		_, err := refused.WriteTo([]byte("hello"), relay.LocalAddr())
 		require.NoError(t, err)
 		buf := make([]byte, 100)
 		require.NoError(t, relay.SetReadDeadline(time.Now().Add(300*time.Millisecond)))
@@ -95,20 +99,23 @@ func TestClusterFilter(t *testing.T) {
 		conf.Filters[0].Rules = []stnrv2.FilterRule{only6678, {Action: "ALLOW",
 			IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.5"}, Ports: []stnrv2.FilterPort{{Port: 6679}}}, rest}
 		require.NoError(t, s.Reconcile(allowPeers(conf)))
-		assert.True(t, echo(refused), "a new rule admits the port")
+		assert.True(t, echo(relay, refused), "a new rule admits the port")
 
-		// the first matching rule decides: an exception before the ALLOW
+		// the first matching rule decides: an exception before the ALLOW; an admitted peer stays
+		// admitted on its relay, a new relay refuses it
 		conf.Filters[0].Rules = append([]stnrv2.FilterRule{{Action: "DENY",
 			IPBlock: &stnrv2.IPBlock{CIDR: "1.2.3.0/24"}, Ports: []stnrv2.FilterPort{{Port: 6678}}}},
 			conf.Filters[0].Rules...)
 		require.NoError(t, s.Reconcile(allowPeers(conf)))
-		assert.False(t, echo(allowed), "the earlier DENY decides")
-		assert.True(t, echo(refused))
+		assert.True(t, echo(relay, allowed), "an admitted peer stays admitted")
+		fresh := allocate()
+		assert.False(t, echo(fresh, allowed), "the earlier DENY decides")
+		assert.True(t, echo(fresh, refused))
 
 		// a missing filter has no rules: everything passes
 		conf.Filters = nil
 		require.NoError(t, s.Reconcile(allowPeers(conf)))
-		assert.True(t, echo(allowed), "a missing filter admits")
+		assert.True(t, echo(fresh, allowed), "a missing filter admits")
 	})
 
 	t.Run("l4-dial", func(t *testing.T) {
