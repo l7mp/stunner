@@ -157,31 +157,36 @@ func (c *Call) String() string {
 // sdp makes the phone's SDP for the call.
 func (c *Call) sdp(payloads []uint8, mux bool) []byte {
 	local := addrPortOf(c.conn.LocalAddr())
-	addr, port := local.Addr(), local.Port()
-	family := "IP4"
-	if addr.Is6() {
+	addr, family := local.Addr().String(), "IP4"
+	if local.Addr().Is6() {
 		family = "IP6"
 	}
-	b := &strings.Builder{}
-	fmt.Fprintf(b, "v=0\r\no=- %d 1 IN %s %s\r\ns=phone\r\nc=IN %s %s\r\nt=0 0\r\nm=audio %d RTP/AVP",
-		time.Now().UnixNano()>>1, family, addr, family, addr, port)
-	for _, pt := range payloads {
-		fmt.Fprintf(b, " %d", pt)
-	}
-	b.WriteString("\r\n")
+	m := &sdp.MediaDescription{MediaName: sdp.MediaName{Media: "audio",
+		Port: sdp.RangedPort{Value: int(local.Port())}, Protos: []string{"RTP", "AVP"}}}
 	for _, pt := range payloads {
 		name := "PCMU"
 		if pt == payloadPCMA {
 			name = "PCMA"
 		}
-		fmt.Fprintf(b, "a=rtpmap:%d %s/8000\r\n", pt, name)
+		m.WithCodec(pt, name, 8000, 0, "")
 	}
-	b.WriteString("a=ptime:20\r\n")
+	m.WithValueAttribute("ptime", "20")
 	if mux {
-		b.WriteString("a=rtcp-mux\r\n")
+		m.WithPropertyAttribute("rtcp-mux")
 	}
-	b.WriteString("a=sendrecv\r\n")
-	return []byte(b.String())
+	m.WithPropertyAttribute("sendrecv")
+	d := &sdp.SessionDescription{
+		Origin: sdp.Origin{Username: "-", SessionID: uint64(time.Now().UnixNano() >> 1), SessionVersion: 1,
+			NetworkType: "IN", AddressType: family, UnicastAddress: addr},
+		SessionName: "phone",
+		ConnectionInformation: &sdp.ConnectionInformation{NetworkType: "IN", AddressType: family,
+			Address: &sdp.Address{Address: addr}},
+		TimeDescriptions:  []sdp.TimeDescription{{}},
+		MediaDescriptions: []*sdp.MediaDescription{m},
+	}
+	// a description built here always marshals
+	b, _ := d.Marshal()
+	return b
 }
 
 // parseSDP reads the first audio stream of an SDP.

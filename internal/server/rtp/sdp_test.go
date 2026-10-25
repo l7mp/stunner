@@ -58,41 +58,81 @@ func TestRewrite(t *testing.T) {
 	ap := netip.MustParseAddrPort
 	pub := ap("1.2.3.4:30000")
 	for _, tc := range []struct {
-		name      string
-		sdp       string
-		addrs     []netip.AddrPort
-		rtcp      []netip.AddrPort
-		mux       []bool
-		contains  []string
-		forbidden []string
+		name  string
+		sdp   string
+		addrs []netip.AddrPort
+		rtcp  []netip.AddrPort
+		mux   []bool
+		check func(t *testing.T, d *sdp.SessionDescription)
 	}{
 		{
 			name: "towards the cluster, mux offered with an RTCP fallback socket", sdp: trunkPlain,
 			addrs: []netip.AddrPort{ap("10.0.0.4:5100")}, rtcp: []netip.AddrPort{ap("10.0.0.4:5102")},
 			mux: []bool{true},
-			contains: []string{"c=IN IP4 10.0.0.4", "m=audio 5100 RTP/AVP 0 8 101", "a=rtcp-mux", "a=rtcp:5102",
-				"o=root 1406452391 1406452391 IN IP4 10.0.0.4", "a=rtpmap:101 telephone-event/8000",
-				"a=maxptime:150", "a=sendrecv"},
-			forbidden: []string{"54.172.60.1"},
+			check: func(t *testing.T, d *sdp.SessionDescription) {
+				assert.Equal(t, "10.0.0.4", d.ConnectionInformation.Address.Address, "session address")
+				assert.Equal(t, uint64(1406452391), d.Origin.SessionID, "origin kept")
+				assert.Equal(t, "10.0.0.4", d.Origin.UnicastAddress, "origin address")
+				m := d.MediaDescriptions[0]
+				assert.Equal(t, 5100, m.MediaName.Port.Value)
+				assert.Equal(t, []string{"0", "8", "101"}, m.MediaName.Formats)
+				_, ok := m.Attribute("rtcp-mux")
+				assert.True(t, ok, "rtcp-mux offered")
+				v, _ := m.Attribute("rtcp")
+				assert.Equal(t, "5102", v, "the RTCP fallback socket")
+				v, _ = m.Attribute("maxptime")
+				assert.Equal(t, "150", v, "other attributes kept")
+				_, ok = m.Attribute("sendrecv")
+				assert.True(t, ok, "direction kept")
+				assert.Contains(t, m.Attributes, sdp.Attribute{Key: "rtpmap", Value: "101 telephone-event/8000"})
+			},
 		},
 		{
 			name: "towards a trunk, RTCP on the public port", sdp: trunkRTCPAddr,
 			addrs: []netip.AddrPort{pub}, rtcp: []netip.AddrPort{pub}, mux: []bool{false},
-			contains:  []string{"m=audio 30000 RTP/AVP 0", "c=IN IP4 1.2.3.4", "a=rtcp:30000"},
-			forbidden: []string{"192.0.2.1", "a=rtcp-mux", "a=rtcp:20011"},
+			check: func(t *testing.T, d *sdp.SessionDescription) {
+				m := d.MediaDescriptions[0]
+				assert.Equal(t, 30000, m.MediaName.Port.Value)
+				assert.Equal(t, "1.2.3.4", m.ConnectionInformation.Address.Address, "media address")
+				v, _ := m.Attribute("rtcp")
+				assert.Equal(t, "30000", v, "RTCP on the public port, not on the trunk's address")
+				_, ok := m.Attribute("rtcp-mux")
+				assert.False(t, ok, "no rtcp-mux")
+			},
 		},
 		{
 			name: "ICE stripped, crypto and direction kept", sdp: trunkMuxSRTPICE,
 			addrs: []netip.AddrPort{pub}, rtcp: []netip.AddrPort{pub}, mux: []bool{true},
-			contains: []string{"m=audio 30000 RTP/SAVP 8", "a=crypto:1 AES_CM_128_HMAC_SHA1_80",
-				"a=rtcp-mux", "a=sendonly"},
-			forbidden: []string{"ice-", "candidate", "198.51.100.7"},
+			check: func(t *testing.T, d *sdp.SessionDescription) {
+				assert.Equal(t, "1.2.3.4", d.ConnectionInformation.Address.Address, "session address")
+				_, ok := d.Attribute("ice-lite")
+				assert.False(t, ok, "no session ICE")
+				m := d.MediaDescriptions[0]
+				assert.Equal(t, []string{"RTP", "SAVP"}, m.MediaName.Protos)
+				assert.Equal(t, []string{"8"}, m.MediaName.Formats)
+				for _, key := range []string{"ice-ufrag", "ice-pwd", "candidate"} {
+					_, ok := m.Attribute(key)
+					assert.False(t, ok, "no %s", key)
+				}
+				v, _ := m.Attribute("crypto")
+				assert.Equal(t, "1 AES_CM_128_HMAC_SHA1_80 inline:WVNfX19zZW1jdGwgKCkgewkyMjA7fQp9CnVubGVz", v)
+				_, ok = m.Attribute("rtcp-mux")
+				assert.True(t, ok)
+				_, ok = m.Attribute("sendonly")
+				assert.True(t, ok)
+			},
 		},
 		{
 			name: "a rejected section stays rejected", sdp: trunkRejected,
 			addrs: []netip.AddrPort{pub, {}}, rtcp: []netip.AddrPort{pub, {}}, mux: []bool{false, false},
-			contains:  []string{"m=audio 30000 RTP/AVP 0", "m=video 0 RTP/AVP 96"},
-			forbidden: []string{"203.0.113.9"},
+			check: func(t *testing.T, d *sdp.SessionDescription) {
+				assert.Equal(t, "1.2.3.4", d.ConnectionInformation.Address.Address, "session address")
+				assert.Equal(t, "1.2.3.4", d.Origin.UnicastAddress, "origin address")
+				require.Len(t, d.MediaDescriptions, 2)
+				assert.Equal(t, 30000, d.MediaDescriptions[0].MediaName.Port.Value)
+				assert.Equal(t, 0, d.MediaDescriptions[1].MediaName.Port.Value, "video rejected")
+				assert.Equal(t, []string{"96"}, d.MediaDescriptions[1].MediaName.Formats)
+			},
 		},
 	} {
 		d := &sdp.SessionDescription{}
@@ -100,16 +140,10 @@ func TestRewrite(t *testing.T) {
 		rewrite(d, tc.addrs, tc.rtcp, tc.mux)
 		b, err := d.Marshal()
 		require.NoError(t, err, tc.name)
-		out := string(b)
-		for _, s := range tc.contains {
-			assert.Contains(t, out, s, tc.name)
-		}
-		for _, s := range tc.forbidden {
-			assert.NotContains(t, out, s, tc.name)
-		}
-		// the rewritten SDP parses back to the proxy's endpoints
+		// the rewritten SDP parses back, to the proxy's endpoints
 		d2 := &sdp.SessionDescription{}
 		require.NoError(t, d2.Unmarshal(b), tc.name)
+		t.Run(tc.name, func(t *testing.T) { tc.check(t, d2) })
 		eps, err := endpoints(d2)
 		require.NoError(t, err, tc.name)
 		assert.Equal(t, tc.addrs[0], eps[0].rtp, tc.name)
