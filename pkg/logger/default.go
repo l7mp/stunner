@@ -21,9 +21,8 @@ var (
 const defaultFlags = log.Lmicroseconds | log.Lshortfile | log.Lmsgprefix
 
 // LeveledLoggerFactory defines levels by scopes and creates new LeveledLoggers that can
-// dynamically change their own loglevels. All loggers share the single Writer, so wrapping
-// Writer with a RateLimitedWriter (via NewRateLimitedLoggerFactory) applies a single shared
-// token bucket across all scopes.
+// dynamically change their own loglevels. All loggers write to the single Writer, the loggers of
+// the rate-limited scopes through a token bucket of their own.
 type LeveledLoggerFactory struct {
 	Writer io.Writer
 	scopedLevels
@@ -48,13 +47,14 @@ func (f *LeveledLoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 		return l
 	}
 
-	dl := logging.NewDefaultLeveledLoggerForScope(scope, f.levelFor(scope), f.Writer)
+	w := f.writerFor(scope, f.Writer)
+	dl := logging.NewDefaultLeveledLoggerForScope(scope, f.levelFor(scope), w)
 	dl.
-		WithTraceLogger(log.New(f.Writer, fmt.Sprintf("%s TRACE: ", scope), defaultFlags)).
-		WithDebugLogger(log.New(f.Writer, fmt.Sprintf("%s DEBUG: ", scope), defaultFlags)).
-		WithInfoLogger(log.New(f.Writer, fmt.Sprintf("%s INFO: ", scope), defaultFlags)).
-		WithWarnLogger(log.New(f.Writer, fmt.Sprintf("%s WARNING: ", scope), defaultFlags)).
-		WithErrorLogger(log.New(f.Writer, fmt.Sprintf("%s ERROR: ", scope), defaultFlags))
+		WithTraceLogger(log.New(w, fmt.Sprintf("%s TRACE: ", scope), defaultFlags)).
+		WithDebugLogger(log.New(w, fmt.Sprintf("%s DEBUG: ", scope), defaultFlags)).
+		WithInfoLogger(log.New(w, fmt.Sprintf("%s INFO: ", scope), defaultFlags)).
+		WithWarnLogger(log.New(w, fmt.Sprintf("%s WARNING: ", scope), defaultFlags)).
+		WithErrorLogger(log.New(w, fmt.Sprintf("%s ERROR: ", scope), defaultFlags))
 
 	f.loggers[scope] = dl
 	return dl

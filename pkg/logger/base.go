@@ -1,10 +1,12 @@
 package logger
 
 import (
+	"io"
 	"strings"
 	"sync"
 
 	"github.com/pion/logging"
+	"golang.org/x/time/rate"
 )
 
 // logLevels maps the string representation of a log level to the pion LogLevel constant.
@@ -33,6 +35,10 @@ type scopedLevels struct {
 	ScopeLevels     map[string]logging.LogLevel
 	loggers         map[string]levelSetter
 	lock            sync.RWMutex
+	// the rate limit of the loggers of the scopes starting with one of the limited prefixes
+	limit   rate.Limit
+	burst   int
+	limited []string
 }
 
 func newScopedLevels() scopedLevels {
@@ -82,6 +88,25 @@ func (s *scopedLevels) SetLevel(levelSpec string) {
 	for scope, l := range s.loggers {
 		l.SetLevel(s.levelFor(scope))
 	}
+}
+
+// SetRateLimit sets the rate limit of the loggers of the scopes starting with one of the prefixes,
+// created after this call.
+func (s *scopedLevels) SetRateLimit(limit rate.Limit, burst int, prefixes ...string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.limit, s.burst, s.limited = limit, burst, prefixes
+}
+
+// writerFor returns the writer of the logger of a scope: w itself, or w behind a token bucket of
+// the logger's own when the scope is rate-limited. Caller must hold the lock.
+func (s *scopedLevels) writerFor(scope string, w io.Writer) io.Writer {
+	for _, p := range s.limited {
+		if strings.HasPrefix(scope, p) {
+			return NewRateLimitedWriter(w, s.limit, s.burst, true)
+		}
+	}
+	return w
 }
 
 // GetLevel returns the log level string for the given scope.

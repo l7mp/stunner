@@ -22,6 +22,7 @@ import (
 	// servers and wss:// config origins must still verify. A system bundle, when present,
 	// takes precedence.
 	_ "golang.org/x/crypto/x509roots/fallback"
+	"golang.org/x/time/rate"
 
 	"github.com/l7mp/stunner/v2"
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
@@ -62,6 +63,8 @@ func main() {
 	var config = flag.StringP("config", "c", "", "Config origin, either a valid address in the format IP:port, or HTTP URL to the CDS server, or literal \"k8s\" to discover the CDS server from Kubernetes, or a proper file name URI in the format file://<path-to-config-file> (overrides: STUNNER_CONFIG_ORIGIN)")
 	var level = flag.StringP("log", "l", "", "Log level (format: <scope>:<level>, overrides: PION_LOG_*, default: all:INFO)")
 	var logFormat = flag.String("log-format", "text", `Log output format: "text" (default) or "json"`)
+	var logRate = flag.Float64("log-rate", float64(stunner.LogRateLimit), "Log events per second of each listener, cluster and server logger, at every level: raise it for troubleshooting")
+	var logBurst = flag.Int("log-burst", stunner.LogBurst, "Burst size of the log rate limit of each listener, cluster and server logger")
 	var id = flag.StringP("id", "i", "", "Id for identifying with the CDS server (format: <namespace>/<name>, overrides: STUNNER_NAMESPACE/STUNNER_NAME, default: <default/stunnerd-hostname>)")
 	var watch = flag.BoolP("watch", "w", false, "Watch config file for updates (default: false)")
 	var dryRun = flag.BoolP("dry-run", "d", false, "Suppress side-effects, intended for testing (default: false)")
@@ -162,8 +165,9 @@ func main() {
 
 	buildInfo := buildinfo.BuildInfo{Version: version, CommitHash: commitHash, BuildDate: buildDate}
 	st := stunner.NewStunner(stunner.Options{
-		Name:                        *id,
-		LogOptions:                  stunner.LogOptions{Level: logLevel, Format: *logFormat},
+		Name: *id,
+		LogOptions: stunner.LogOptions{Level: logLevel, Format: *logFormat,
+			RateLimit: rate.Limit(*logRate), Burst: *logBurst},
 		DryRun:                      *dryRun,
 		NodeName:                    nodeName,
 		ForceReadyDuringTermination: *forceReadyDuringTermination,

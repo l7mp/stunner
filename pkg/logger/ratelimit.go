@@ -10,32 +10,10 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const (
-	DefaultRateLimit = rate.Limit(.25)
-	DefaultBurstSize = 1
-)
-
-// NewRateLimitedLoggerFactory wraps the factory's current writer with a single shared
-// rate-limiting token bucket. All log scopes and both backends share this bucket.
-// Must be called before any loggers are created via NewLogger.
-func NewRateLimitedLoggerFactory(logger LoggerFactory, limit rate.Limit, burst int) LoggerFactory {
-	var w io.Writer
-	switch f := logger.(type) {
-	case *LeveledLoggerFactory:
-		w = f.Writer
-	case *JSONLoggerFactory:
-		w = f.Writer
-	default:
-		panic(fmt.Sprintf("logger: NewRateLimitedLoggerFactory: unsupported factory type %T", logger))
-	}
-	logger.SetWriter(NewRateLimitedWriter(w, limit, burst, true))
-	return logger
-}
-
 // RateLimitedWriter is a writer limited by a token bucket.
 type RateLimitedWriter struct {
 	io.Writer
-	*RateLimiter
+	*rate.Limiter
 	// Counter counts the events suppressed since the last logged one.
 	Counter       atomic.Int64
 	AddSuppressed bool
@@ -47,7 +25,7 @@ type RateLimitedWriter struct {
 func NewRateLimitedWriter(writer io.Writer, limit rate.Limit, burst int, addSuppressed bool) *RateLimitedWriter {
 	return &RateLimitedWriter{
 		Writer:        writer,
-		RateLimiter:   NewRateLimiter(limit, burst),
+		Limiter:       rate.NewLimiter(limit, burst),
 		AddSuppressed: addSuppressed,
 	}
 }
@@ -69,35 +47,6 @@ func (w *RateLimitedWriter) Write(p []byte) (int, error) {
 	}
 
 	return n, nil
-}
-
-// RateLimiter is a token bucket that can be disabled.
-type RateLimiter struct {
-	*rate.Limiter
-	Enabled bool
-}
-
-// NewRateLimiter creates a new enabled rate limiter.
-func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
-	return &RateLimiter{
-		Limiter: rate.NewLimiter(r, b),
-		Enabled: true,
-	}
-}
-
-func (l *RateLimiter) EnableRateLimiter() {
-	l.Enabled = true
-}
-
-func (l *RateLimiter) DisableRateLimiter() {
-	l.Enabled = false
-}
-
-func (l *RateLimiter) Allow() bool {
-	if !l.Enabled {
-		return true
-	}
-	return l.Limiter.Allow()
 }
 
 // AutoFlushWriter wraps a bufio.Writer and ensures that Flush is called after every Write

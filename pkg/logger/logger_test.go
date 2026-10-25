@@ -402,6 +402,29 @@ type rateLimiterLoggerTestCase struct {
 
 var rateLimitedLoggerTests = []rateLimiterLoggerTestCase{
 	{
+		name:  "rate-limited-logger-per-scope",
+		level: "all:INFO",
+		limit: 100.0,
+		burst: 1,
+		tester: func(t *testing.T, lf LoggerFactory) {
+			// every rate-limited scope has a bucket of its own
+			log, other := lf.NewLogger(testScope), lf.NewLogger("dummy-other")
+			log.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy")
+			log.Info("dummy")
+			assert.Zerof(t, loglenr(), "suppressed")
+			other.Info("dummy")
+			assert.Contains(t, logreadr(), "dummy", "a bucket of its own")
+
+			// a scope with no limited prefix is not limited
+			free := lf.NewLogger("control")
+			for range 10 {
+				free.Info("dummy")
+				assert.Contains(t, logreadr(), "dummy", "not limited")
+			}
+		},
+	},
+	{
 		name:  "rate-limited-logger-default",
 		limit: 1.0,
 		burst: 1,
@@ -549,10 +572,10 @@ func TestRateLimitedLogger(t *testing.T) {
 
 	for _, c := range rateLimitedLoggerTests {
 		t.Run(c.name, func(t *testing.T) {
-			// create: set the target writer before wrapping it with the rate limiter
+			// create: the writer and the rate limit apply to the loggers created afterwards
 			loggerFactory := NewLoggerFactory(c.level)
 			loggerFactory.SetWriter(logBuffer)
-			loggerFactory = NewRateLimitedLoggerFactory(loggerFactory, c.limit, c.burst)
+			loggerFactory.SetRateLimit(c.limit, c.burst, "dummy-")
 			logreset()
 
 			// prepare

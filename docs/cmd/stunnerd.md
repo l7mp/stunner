@@ -43,9 +43,6 @@ The below command will open a TURN server listener at `127.0.0.1:5000` over UDP,
 ./stunnerd --log=all:TRACE --log-format=json turn://user1:passwd1@127.0.0.1:5000
 ```
 
-> [!WARNING]
-> The standalone TURN server is not secure at all. Apart from the username and the password, nothing restricts clients from relaying to any peer the server can reach, including the services and the loopback of the host it runs on. Use the standalone TURN server for quick tests only.
-
 ### Tunnel mode
 
 The tunnel mode tunnels a local client socket through a TURN server to a remote peer. The general CLI shape for the tunnel mode invocation is as below:
@@ -93,7 +90,7 @@ Configuration files for `stunnerd`, now at API version `v2`, are built from five
 - Filters are ordered lists of allow/deny rules on addresses and ports. Filters can be invoked at various points in the processing pipeline: listener filters are applied at the ingress, cluster filters at the egress, etc. The first matching rule decides, and each caller decides what no match means: listener and cluster filters pass unmatched traffic, TURN permission filters deny it; a rule without an `ip_block` matches every address, so end an allow-list with a bare `- action: DENY`.
 - Auth configs are named authentication policies (`static`, `ephemeral` or `none`).
 
-A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON (e.g., `{"key":"...","hmac":"..."}`); `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`), on every interface or, after a colon, on the listed ones (e.g., `--offload tc:eth1,eth2`); and `--no-graceful-shutdown` disables graceful shutdowns: normally on being closed `stunnerd` waits for live sessions to end, which minimizes disruptions to clients but may take minutes or hours; the flag lets `stunnerd` close immediately. Started with URIs only (a standalone TURN server or a tunnel), `stunnerd` exits at once as with `--no-graceful-shutdown`, and logs only warnings and errors unless `-l` or `-v` says otherwise.
+A few flags override the config, whatever its origin: `--license` takes the license config as the single-line JSON (e.g., `{"key":"...","hmac":"..."}`); `--offload` sets the offload engine (`none`, `xdp`, `tc` or `auto`), on every interface or, after a colon, on the listed ones (e.g., `--offload tc:eth1,eth2`); and `--no-graceful-shutdown` disables graceful shutdowns: normally on being closed `stunnerd` waits for live sessions to end, which minimizes disruptions to clients but may take minutes or hours; the flag lets `stunnerd` close immediately. Started with URIs only (a standalone TURN server or a tunnel), `stunnerd` exits at once as with `--no-graceful-shutdown`. Logs are emitted only for warnings and errors in plain text unless `-l` or `-v` says otherwise; JSON log format can be set with `--log-format=json`, the logger's rate limiter can be configured with `--log-rate` (events per second) and `--log-burst`.
 
 The `--enable-udp-listener-connect` flag enables an optimized UDP listeners codepath. By default every UDP packet involves a goroutine context switch. This is fast but it still adds overhead. With the flag turned on the extra goroutine is eliminated, resulting a much faster UDP listener, at the cost of a minimal chance of losing 1-2 packets at the connection initialization phase under extremely high load.
 

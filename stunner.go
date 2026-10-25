@@ -28,13 +28,16 @@ import (
 // DefaultLogLevel indicates the default log level.
 const DefaultLogLevel = "all:WARN"
 
-// LogRateLimit is the default number of log events per second reported at ERROR, WARN and INFO
-// loglevel (logging at DEBUG and TRACE levels is not rate-limited).
-var LogRateLimit rate.Limit = 50.0
+// LogRateLimit is the default number of log events per second of a rate-limited logger, at every
+// level: the loggers a client can make log per packet, see LogRateLimitedScopes.
+var LogRateLimit rate.Limit = 5.0
 
-// LogBurst is the default burst size for rate-limited logging at ERROR, WARN and INFO loglevel
-// (logging at DEBUG and TRACE levels is not rate-limited).
-var LogBurst = 3
+// LogBurst is the default burst size of a rate-limited logger.
+var LogBurst = 50
+
+// LogRateLimitedScopes are the prefixes of the rate-limited logger scopes: the listeners, the
+// clusters, the servers and the TURN machinery, each scope with a token bucket of its own.
+var LogRateLimitedScopes = []string{"listener-", "cluster-", "server-", "turn"}
 
 // DefaultInstanceId is the default instance id for stunnerd processes.
 var DefaultInstanceId = fmt.Sprintf("default/stunnerd-%s", uuid.New().String())
@@ -60,10 +63,8 @@ type Stunner struct {
 	net             transport.Net
 
 	// Logging.
-	logRateLimit rate.Limit
-	logBurst     int
-	log          logging.LeveledLogger
-	logger       logger.LoggerFactory
+	log    logging.LeveledLogger
+	logger logger.LoggerFactory
 }
 
 // NewStunner creates a new STUNner daemon for the specified Options. Call Reconcile to reconcile
@@ -82,6 +83,14 @@ func NewStunner(options Options) *Stunner {
 	if options.LogOptions.Writer != nil {
 		logFactory.SetWriter(options.LogOptions.Writer)
 	}
+	logRateLimit, logBurst := LogRateLimit, LogBurst
+	if options.LogOptions.RateLimit > 0 {
+		logRateLimit = options.LogOptions.RateLimit
+	}
+	if options.LogOptions.Burst > 0 {
+		logBurst = options.LogOptions.Burst
+	}
+	logFactory.SetRateLimit(logRateLimit, logBurst, LogRateLimitedScopes...)
 	log := logFactory.NewLogger("stunner")
 
 	r := options.Resolver
@@ -100,16 +109,6 @@ func NewStunner(options Options) *Stunner {
 	} else {
 		vnet = options.Net
 		log.Warn("virtual net (vnet) is enabled")
-	}
-
-	logRateLimit := LogRateLimit
-	if options.LogOptions.RateLimit > 0 {
-		logRateLimit = options.LogOptions.RateLimit
-	}
-
-	logBurst := LogBurst
-	if options.LogOptions.Burst > 0 {
-		logBurst = options.LogOptions.Burst
 	}
 
 	id := options.Name
@@ -132,8 +131,6 @@ func NewStunner(options Options) *Stunner {
 		cdsLabels:        cdsLabels(options.NodeName),
 		forceReady:       options.ForceReadyDuringTermination,
 		net:              vnet,
-		logRateLimit:     logRateLimit,
-		logBurst:         logBurst,
 	}
 
 	// The license manager is a process-wide service: created once here, reconciled in place by

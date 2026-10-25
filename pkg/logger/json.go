@@ -12,7 +12,8 @@ var _ LoggerFactory = (*JSONLoggerFactory)(nil)
 
 // JSONLoggerFactory wraps pion's JSON logger factory and satisfies STUNner's LoggerFactory
 // interface (which adds SetLevel, GetLevel, and SetWriter on top of pion's NewLogger).
-// Like LeveledLoggerFactory, all scopes share the single Writer.
+// Like LeveledLoggerFactory, all scopes write to the single Writer, the rate-limited ones through
+// a token bucket of their own.
 type JSONLoggerFactory struct {
 	Writer io.Writer
 	scopedLevels
@@ -41,7 +42,7 @@ func (f *JSONLoggerFactory) NewLogger(scope string) logging.LeveledLogger {
 	}
 
 	l := logging.NewJSONLoggerFactory(
-		logging.WithJSONWriter(f.Writer),
+		logging.WithJSONWriter(f.writerFor(scope, f.Writer)),
 		logging.WithJSONDefaultLevel(f.levelFor(scope)),
 	).NewLogger(scope)
 
