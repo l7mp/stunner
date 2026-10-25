@@ -99,10 +99,10 @@ spec:
   image: l7mp/stunnerd:latest
   resources:
     limits:
-      cpu: 2
+      cpu: 1000m
       memory: 512Mi
     requests:
-      cpu: 500m
+      cpu: 250m
       memory: 128Mi
   terminationGracePeriodSeconds: 3600
 ```

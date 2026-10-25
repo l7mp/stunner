@@ -71,10 +71,10 @@ It is important to manage the [amount of CPU and memory resources](https://kuber
 ```yaml
 resources:
   limits:
-    cpu: 2
+    cpu: 1000m
     memory: 512Mi
   requests:
-    cpu: 500m
+    cpu: 250m
     memory: 128Mi
 ```
 
