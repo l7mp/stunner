@@ -387,14 +387,15 @@ func (p *Phone) answer(req *sip.Request, tx *siptx.ServerTx, conn net.Conn) {
 		return
 	}
 
+	// the media starts before the 2xx goes out: its ACK hands the call to Incoming, whose reader
+	// must find the RTP session
+	c.startMedia()
 	res := sip.NewSDPResponseFromRequest(req, c.sdp(remote.payloads[:1], remote.mux))
 	res.To().Params.Add("tag", c.localTag)
 	res.AppendHeader(contact(conn))
 	if err := tx.Respond(res); err != nil {
 		c.end(err.Error())
-		return
 	}
-	c.startMedia()
 }
 
 // register takes a REGISTER: it binds the AOR to the flow and the Contact the request came with,
