@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pion/sdp/v3"
 	"github.com/pion/stun/v4"
 	pionturn "github.com/pion/turn/v5"
 
@@ -600,9 +601,9 @@ func (s *Server) proxy(req *sipmsg.Request, tx *siptx.ServerTx, in *peer) {
 				if err != nil {
 					s.log.Infof("media proxy refused the answer of call %s: %s",
 						req.CallID().Value(), err)
-				} else {
-					res.SetBody(body)
+					body = declined(res.Body())
 				}
+				res.SetBody(body)
 			}
 			final := !res.IsProvisional()
 			if final && res.IsSuccess() && req.IsInvite() {
@@ -655,9 +656,11 @@ func (s *Server) forwardAck(req *sipmsg.Request, in *peer) {
 		body, err := s.mediaRequest(&ng.Request{Command: ng.CommandAnswer,
 			CallID: req.CallID().Value(), FromTag: fromTag(req), ToTag: toTag, SDP: string(req.Body()),
 			ICE: "remove", Replace: []string{"origin"}})
-		if err == nil {
-			req.SetBody(body)
+		if err != nil {
+			s.log.Infof("media proxy refused the answer of call %s: %s", req.CallID().Value(), err)
+			body = declined(req.Body())
 		}
+		req.SetBody(body)
 	}
 	req.PrependHeader(s.via(out, in, false))
 	_, _ = out.Write([]byte(req.String()))
@@ -776,6 +779,34 @@ func fromTag(req *sipmsg.Request) string {
 func isSDP(msg sipmsg.Message) bool {
 	ct := msg.GetHeaders("Content-Type")
 	return len(ct) > 0 && strings.EqualFold(ct[0].Value(), "application/sdp")
+}
+
+// declined returns an SDP with its media declined (RFC 3264 section 6): every stream at port 0
+// without attributes, every address unspecified, or nil for an SDP it cannot parse. The endpoints
+// learn the media failed and end the call themselves, and the other party never sees the refused
+// addresses.
+func declined(b []byte) []byte {
+	d := &sdp.SessionDescription{}
+	if err := d.Unmarshal(b); err != nil {
+		return nil
+	}
+	unspecified := map[string]string{"IP4": "0.0.0.0", "IP6": "::"}
+	d.Origin.UnicastAddress = unspecified[d.Origin.AddressType]
+	if c := d.ConnectionInformation; c != nil && c.Address != nil {
+		c.Address = &sdp.Address{Address: unspecified[c.AddressType]}
+	}
+	for _, m := range d.MediaDescriptions {
+		m.MediaName.Port = sdp.RangedPort{Value: 0}
+		m.Attributes = nil
+		if c := m.ConnectionInformation; c != nil && c.Address != nil {
+			c.Address = &sdp.Address{Address: unspecified[c.AddressType]}
+		}
+	}
+	out, err := d.Marshal()
+	if err != nil {
+		return nil
+	}
+	return out
 }
 
 func randomHex(n int) string {

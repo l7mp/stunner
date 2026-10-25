@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pion/sdp/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,4 +64,24 @@ func TestStreamFraming(t *testing.T) {
 			assert.Equal(t, "TLS", transport(netconn.NewConn(server, api.Tag{Proto: stnrv2.ProtocolTLS}, nil)))
 		})
 	}
+}
+
+func TestDeclined(t *testing.T) {
+	offer := "v=0\r\no=- 1 1 IN IP4 10.0.0.5\r\ns=-\r\nc=IN IP4 10.0.0.5\r\nt=0 0\r\na=sendrecv\r\n" +
+		"m=audio 4000 RTP/AVP 0 8\r\nc=IN IP6 fd00::5\r\na=rtcp:4001\r\na=candidate:1 1 UDP 1 10.0.0.5 4000 typ host\r\n" +
+		"m=video 5000 RTP/AVP 96\r\na=rtpmap:96 VP8/90000\r\n"
+	d := &sdp.SessionDescription{}
+	require.NoError(t, d.Unmarshal(declined([]byte(offer))), "a valid SDP")
+	assert.Equal(t, "0.0.0.0", d.Origin.UnicastAddress, "no origin address")
+	assert.Equal(t, "0.0.0.0", d.ConnectionInformation.Address.Address, "no session address")
+	assert.Len(t, d.Attributes, 1, "the session attributes are kept")
+	require.Len(t, d.MediaDescriptions, 2)
+	for _, m := range d.MediaDescriptions {
+		assert.Equal(t, 0, m.MediaName.Port.Value, "%s declined", m.MediaName.Media)
+		assert.Empty(t, m.Attributes, "%s: no media attributes, no candidates", m.MediaName.Media)
+	}
+	assert.Equal(t, "::", d.MediaDescriptions[0].ConnectionInformation.Address.Address, "no media address")
+	assert.Equal(t, []string{"0", "8"}, d.MediaDescriptions[0].MediaName.Formats, "the formats are kept")
+
+	assert.Nil(t, declined([]byte("not an SDP")), "nothing of an SDP that cannot be parsed")
 }

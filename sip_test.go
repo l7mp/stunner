@@ -319,8 +319,8 @@ func TestSIPGateway(t *testing.T) {
 		f := newSIPFixture(t, sip.Config{})
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		// the filters of the rtp server decide which internal parties it relays to: the media of
-		// a party they refuse is not relayed
+		// the filters of the rtp server decide which internal parties it relays to: the answer of
+		// a party they refuse reaches the trunk with its media declined
 		conf := sipGatewayConfig()
 		conf.Filters[1].Rules[0].IPBlock.CIDR = "10.0.0.0/8"
 		require.NoError(t, f.stunner.Reconcile(conf))
@@ -333,8 +333,7 @@ func TestSIPGateway(t *testing.T) {
 		}()
 		call, err := f.trunk.Dial(ctx, uri)
 		require.NoError(t, err, "the proxy forwards the answer the media proxy refused")
-		assert.NotEqual(t, sipStunnerIP+":30000", call.RemoteMedia().String(),
-			"the trunk is not given the public media address")
+		assert.Equal(t, "0.0.0.0:0", call.RemoteMedia().String(), "the media is declined")
 		mediaDeleted(t, f.stunner)
 		require.NoError(t, call.Hangup(ctx))
 	})
