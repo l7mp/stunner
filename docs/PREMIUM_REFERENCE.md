@@ -53,7 +53,7 @@ stunnerctl -n stunner config udp-gateway -o jsonpath='{.admin.user_quota}'
 
 Once the number of allocations created for a user-id reach the configured quota, new allocations will be rejected with the TURN error 486 (Allocation Quota Reached).
 
-Note that a plain (L4) listener counts flows against the quota of the client's source address. Behind a load balancer that rewrites the source addresses (the default `externalTrafficPolicy: Cluster`), every client of a node appears from the same address and shares one quota; set the `stunner.l7mp.io/external-traffic-policy: local` annotation on the Gateway to keep the client addresses. A UDP flow holds its quota until it has been idle for 10 minutes.
+Note that a plain (L4) listener counts flows against the quota of the client's source address. Behind a load balancer that rewrites the source addresses (the default `externalTrafficPolicy: Cluster`), every client of a node appears from the same address and shares one quota; set the `stunner.l7mp.io/external-traffic-policy: local` annotation on the Gateway to keep the client addresses. A UDP flow holds its quota until it has been idle for 5 minutes.
 
 ## Deploying into a DaemonSet
 

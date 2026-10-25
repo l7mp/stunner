@@ -22,8 +22,8 @@ import (
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 )
 
-// FlowTimeout is the idle timeout of a flow, the default TURN allocation lifetime.
-var FlowTimeout = 10 * time.Minute
+// FlowTimeout is the idle timeout of a flow.
+var FlowTimeout = 5 * time.Minute
 
 var (
 	errQuotaExceeded = errors.New("flow quota exceeded")
