@@ -114,7 +114,7 @@ If in trouble, try the below:
 * **The Gateway is not accepted.** The open-source operator supports no SIPTrunk: install the
   official STUNner chart. Each tier serves a limited number of SIP Gateways (see the [pricing](https://l7mp.io/pricing)); the oldest ones by creation time win.
 
-## Kernel offload (premium tiers)
+## Kernel offload
 
 In production the dataplane shares its node with busy neighbors, and a traffic spike can leave it
 short of CPU. Model this: give the Gateway a Dataplane of its own, squeezed to 20m CPU, and place

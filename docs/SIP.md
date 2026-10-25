@@ -51,14 +51,18 @@ the RTP and RTCP of every call, and any number of additional *SIP listeners* (ty
 UDPRoutes attach to the listeners of a SIP Gateway as to any Gateway. A UDPRoute that attaches to a
 SIP listener (by using the `sectionName` of the SIP listener) is considered as a SIP next hop:
 STUNner will proxy the calls to the backend pods at the backend port with round robin). Likewise, a
-UDPRoute attaching to the media listener (again, by using the `sectionName` of the SIP listener)
+UDPRoute attaching to the media listener (again, by using the `sectionName` of the media listener)
 lists the media peers (the pods STUNner relays the media to). This is the useful model when you
 have a separate SIP server pool and media server pool (e.g., Kamailio with rtpengine). In this
 case, the SIP servers and the media servers need 2 UDPRoutes, both with specific `sectionNames`
-(see [Separate SIP and media servers](#separate-sip-and-media-servers)). In contrast, a
-UDPRoute with no `sectionName` attaches to *every* listener, so a single route can serve both
-roles. This is useful when the SIP backend also terminates media (e.g., LiveKit SIP). Note also
-that a backend with a `port` and an `endPort` restricts the media peers to that port range.
+(see [Separate SIP and media servers](#separate-sip-and-media-servers)). In contrast, a UDPRoute
+with no `sectionName` attaches to *every* listener, so a single route can serve both roles. This is
+useful when the SIP backend also terminates media (e.g., LiveKit SIP).  For
+[registration](#registration-based-trunks), attach SIP routes the registration by setting the
+`sectionName` to the `name` of the registration. This sets the route's backends as the SIP next
+hops for the calls received by the gateway. A UDPRoute with no `sectionName` attaches to the
+registrations too. Note also that a backend with a `port` and an `endPort` restricts the media
+peers to that port range.
 
 Carriers match the media of a call by the exact source address of the media they receive, so the
 Gateway's load balancer must preserve the client source address: the
@@ -134,6 +138,11 @@ the registered connection, so the carrier needs no route to the Gateway's SIP li
 egress address of the cluster does not matter for signaling. The media still arrives at the
 Gateway's media listener.
 
+STUNner keeps the registration up: it refreshes it at half of the granted expiry and, over UDP,
+sends STUN keepalives on the registered connection. A registrar that answers the keepalives lets
+STUNner notice a lost connection within about a minute and register again; with a registrar that
+does not, STUNner notices it at the next refresh.
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -159,10 +168,59 @@ spec:
         name: carrier-digest
 ```
 
-The Gateway and the UDPRoute are those of the inbound case; the Gateway needs no SIP listener of
-its own, only the media listener. The calls of a registration go to the next hops of the routes of
-the SIP listeners. A TLS registration verifies the registrar's certificate against the system roots
-and the host of `registrar`. An inbound trunk and registrations may share a SIPTrunk.
+A registration is a listener of its own: STUNner dials out from it to the registrar instead of
+listening on a port, so it has no entry in the Gateway's `listeners`. Routes can still attach to it
+by setting the `name` of the registration as the `sectionName`: backends of these routes then take
+the calls of the registration. A route attached only to the media listener makes its backends media
+peers but sends them no calls: STUNner rejects every call of the registration.
+
+The Gateway needs no SIP listener, only the media listener. The UDPRoute attaches to the
+registration `carrier` for the calls and to the media listener for the media, here of a SIP
+backend that terminates the media itself:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: sip-gateway
+  namespace: voice
+  annotations:
+    stunner.l7mp.io/external-traffic-policy: local
+spec:
+  gatewayClassName: stunner-gatewayclass
+  infrastructure:
+    parametersRef:
+      group: stunner.l7mp.io
+      kind: SIPTrunk
+      name: carriers
+  listeners:
+    - name: media
+      protocol: UDP
+      port: 30000
+---
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: livekit-sip
+  namespace: voice
+spec:
+  parentRefs:
+    - name: sip-gateway
+      sectionName: carrier  # the registration: the calls
+    - name: sip-gateway
+      sectionName: media    # the media listener: the media peers
+  rules:
+    - backendRefs:
+        - name: livekit-sip
+          port: 5060
+```
+
+A UDPRoute with no `sectionName` attaches to the registrations too, so the single route of the
+inbound case serves as is. With separate SIP and media servers, the route of the SIP servers
+attaches to the registration and the route of the media servers to the media listener. A
+registration may not share the name of a listener of the Gateway. A TLS registration verifies the
+registrar's certificate against the system roots and the host of `registrar`. An inbound trunk and
+registrations may share a SIPTrunk.
 
 ## Separate SIP and media servers
 
@@ -173,7 +231,8 @@ another one for the media server backends: the UDPRoute pointing to the SIP serv
 SIP listeners by the `sectionName`, while the UDPRoute for media attaches to the media listener,
 again by `sectionName`. Other SIP servers terminate the media themselves (LiveKit SIP): a single
 UDPRoute with no `sectionName` serves both roles. In any case, STUNner relays the media to the
-address in the SDP the SIP server returns, which must be an address of the media server's pods.
+address in the SDP the SIP server returns, and only if it is an address of the backends of the
+routes of the media listener: the media of any other address is not relayed.
 
 LiveKit SIP runs with a single shared UDPRoute for both SIP signaling and media. Configure the
 STUNner UDPRoute with no `sectionName`, and LiveKit SIP with its pod address in the SDP it sends:

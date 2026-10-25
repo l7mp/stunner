@@ -39,8 +39,8 @@ behind one address: STUNner spreads the connections over the pods but it makes s
 encoder publishing `live/van7` and the decoder reading `live/van7` land on one pod. STUNner reads
 the stream ID in the handshake and sends every connection naming the same stream to the same pod:
 
-- the first connection of a stream places it on the backend with the fewest streams, whatever its
-  mode, publisher or reader;
+- the first connection of a stream places it on the next backend in round robin order, whatever
+  its mode, publisher or reader;
 - every later connection naming the stream goes to the same backend;
 - a stream stays placed for 30 seconds after its last connection closes, so a publisher that
   reconnects after a network outage returns to its readers;

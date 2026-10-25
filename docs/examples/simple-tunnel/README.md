@@ -155,7 +155,7 @@ mediactl turn send -P 5 -t 10s -k 250 --length 1000 k8s://stunner/udp-gateway/ud
 A stream paces its packets in user space and falls short of high rates, so keep `-k` moderate and
 add streams instead. 
 
-## Kernel offload (premium tiers)
+## Kernel offload
 
 The 10 Mbit/s above is easy for a dataplane with CPU to spare, but in production the dataplane
 shares its node with busy neighbors. Below we restrict the dataplane to 20m CPU to model a data

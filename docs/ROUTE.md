@@ -30,10 +30,10 @@ spec:
           namespace: media-plane
 ```
 
-Note that STUNner provides its own UDPRoute resource instead of the official UDPRoute resource available in the Gateway API. In contrast to the official version, still at version v1alpha2, STUNner's UDPRoutes can be considered stable and expected to be supported throughout the entire lifetime of STUNner v1. You can still use the official UDPRoute resource as well, by changing the API version and adding an arbitrary port to the backend references (this is required by the official API). Note that the port will be omitted.
+Note that STUNner provides its own UDPRoute resource next to the official UDPRoute of the Gateway API, which STUNner supports at v1 as well. The official UDPRoute requires a `port` in every backend reference: a TURN listener ignores it, other listeners dial the backend at it (see below). The official route has no `endPort`, and its backend weights are ignored.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: UDPRoute
 metadata:
   name: media-plane-route
@@ -63,13 +63,17 @@ Backend reference configuration is as follows:
 | `kind` | `string` | The kind of the backend resource, either `Service` or `StaticService`. Default: `Service`. | No |
 | `name` | `string` | Name of the backend Service or StaticService. | Yes |
 | `namespace` | `string` | Namespace of the backend Service or StaticService. | No |
-| `port` | `int` | The port an L4 listener dials the backend at: without it an L4 listener has nothing to dial. Also the start of the port range of the backend, effective only with `endPort`: a `port` alone restricts nothing. Default: empty (every port).| No (Yes for L4 listeners) |
-| `endPort` | `int` | End of the port range of the backend, if `port` is also specified: the dataplane drops traffic to the ports of the backend outside the range. Default: empty.| No |
+| `port` | `int` | The port a listener other than TURN dials the backend at: a port of the Service, dialed at its target port on the pods (a port the Service does not have is dialed as is); the port itself for a StaticService. Without it such a listener has nothing to dial. Also the start of the port range of the backend, effective only with `endPort`: a `port` alone restricts nothing. Default: empty (every port).| No (Yes for listeners other than TURN) |
+| `endPort` | `int` | End of the port range of the backend, if `port` is also specified: a TURN listener, and the media listener of a SIP Gateway, reach the peers of the backend only on the ports of the range. Default: empty.| No |
+
+The pods of a Service backend play two roles. A listener that dials its backends (every listener
+but TURN, and the SIP signaling of a SIP Gateway) opens new connections only to the ready pods, or,
+while every pod is terminating, to the terminating pods that still pass their readiness probe, as
+Kubernetes does; the live connections of a pod that turns unready keep going. A TURN listener and
+the media listener of a SIP Gateway admit every pod of the Service as a peer, ready or not, because
+which pod a client talks to is the application's choice.
 
 UDPRoute resources are safe for modification: [`stunnerd`](cmd/stunnerd.md) knows how to reconcile modified routes without restarting any listeners/TURN servers.
-
-> [!NOTE]
-> Port ranges are ambiguous on a Gateway listener with several routes attached: the port range of the first route applies to every peer of the listener, so the peers of the other routes are reachable only on the ports the first route admits. 
 
 ## TCPRoute
 

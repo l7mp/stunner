@@ -102,10 +102,10 @@ Each `listener` is defined by a unique name, a protocol and a port. The protocol
 | `name` | `string` | Name of the listener. Must be unique per Gateway. | Yes |
 | `port` | `int` | Network port for the listener. | Yes |
 | `protocol` | `string` | Protocol of the listener: TURN-UDP, TURN-TCP, TURN-TLS or TURN-DTLS for a TURN listener, UDP, TCP, TLS or DTLS for an L4 listener, SRT for an SRT listener. | Yes |
-| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig).| Yes (for TLS/DTLS listeners) |
-| `allowedRoutes.namespaces.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1beta1.AllowedRoutes), either `All`, `Selector`, or `Same`. Default: `Same`. | No |
+| `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#gatewaytlsconfig).| Yes (for TLS/DTLS listeners) |
+| `allowedRoutes.namespaces.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#allowedroutes), either `All`, `Selector`, or `Same`. Default: `Same`. | No |
 
-For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io%2fv1beta1.GatewayTLSConfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key. The certificate may come from anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with `--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`. A DNS-01 certificate names a hostname, not the load balancer IP: set `spec.addresses: [{type: Hostname, value: <hostname>}]` on the Gateway so that its listeners advertise the hostname (e.g., `turns:<hostname>:<port>` in the ICE server list) and clients verify the certificate against it, and point a DNS record of the hostname at the load balancer.
+For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#gatewaytlsconfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key. The certificate may come from anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with `--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`. A DNS-01 certificate names a hostname, not the load balancer IP: set `spec.addresses: [{type: Hostname, value: <hostname>}]` on the Gateway so that its listeners advertise the hostname (e.g., `turns:<hostname>:<port>` in the ICE server list) and clients verify the certificate against it, and point a DNS record of the hostname at the load balancer.
 
 A Gateway whose `spec.infrastructure.parametersRef` names a [SIPTrunk](#siptrunk) is a SIP gateway:
 its media listener carries the RTP of every call and each other listener, `UDP`, `TCP` or `TLS`,
@@ -236,13 +236,46 @@ spec:
 | `mediaListener` | `string` | The name of the Gateway listener carrying the media, a `UDP` listener. Every other listener of the Gateway carries SIP. | Yes |
 | `allowedSources` | `[]string` | The address prefixes (or addresses) the SIP listeners admit calls from. Empty admits no inbound calls, which suits registration-only trunks. | No |
 | `registrations` | `[]object` | The registrations kept up with registration-based trunks. | No |
-| `registrations[].name` | `string` | The name of the registration, unique in the SIPTrunk. | Yes |
+| `registrations[].name` | `string` | The name of the registration, unique in the SIPTrunk and distinct from the listener names of the Gateway, a lowercase DNS name like a listener name. Routes attach to the registration by this name as the `sectionName`. | Yes |
 | `registrations[].registrar` | `string` | The SIP URI of the carrier's registrar, as in Kamailio or Asterisk: `sip:host[:port][;transport=udp\|tcp\|tls]`, or `sips:host[:port]` for TLS; a bare `host[:port]` is a `sip:` URI. The transport defaults to UDP (TLS for `sips:`), the port to 5060 (5061 over TLS). | Yes |
 | `registrations[].aor` | `string` | The address of record to register, a `sip:` or `sips:` URI. | Yes |
 | `registrations[].authRef` | `object` | A Secret in the namespace of the SIPTrunk with the `username` and `password` keys, answering the registrar's digest challenge. | No |
 | `registrations[].expires` | `string` | The registration lifetime STUNner asks for. Default is `600s`. | No |
 
-The SIP listeners of the Gateway admit calls only from `allowedSources`, and the calls go to the
-backends of the UDPRoutes attached to the SIP listeners; the UDPRoutes attached to the media
-listener list the media peers. A TLS registration verifies the registrar's certificate against the
-system roots and the host of `registrar`.
+A SIPTrunk can be set into one of two modes (see [here](DEPLOYMENT.md#sip-deployment-models) for
+the SIP deployment models). For *IP-authenticated inbound SIP trunks*, the SIP listeners of the
+Gateway admit calls from the `allowedSources` of the SIPTrunk. SIP signaling go to the backends of
+the UDPRoutes attached to the SIP listeners, while the UDPRoutes attached to the media listener
+list the media peers. A TLS registration verifies the registrar's certificate against the system
+roots and the host of `registrar`.
+
+For *registration-based SIP trunks*, set the details of the SIP registration, including the AOR and
+the authentication credentials in the `registrations` object. Note that registration-based
+SIPTrunks have no SIP listeners, so there is no listener to which SIP routes can be
+attached. Therefore, a SIPTrunk registration is a listener of its own identified by a name. If you
+want to attach a SIP route for forwarding SIP messages upstream, set the corresponding
+`sectionName` in the `parentRef` of the route to the name of the registration (or set no
+`sectionName` at all, in which case the route attaches to all the listeners of the gateway, SIP and
+media included). SIP servers must have a SIP route, otherwise STUNner rejects every call of the
+registration. 
+
+For the above sample Gateway with only a media listener and the registration `carrier`, attach a
+SIP route as follows.
+
+```yaml
+apiVersion: stunner.l7mp.io/v1
+kind: UDPRoute
+metadata:
+  name: livekit-sip
+  namespace: voice
+spec:
+  parentRefs:
+    - name: sip-gateway
+      sectionName: carrier  # the registration: the SIP calls
+    - name: sip-gateway
+      sectionName: media    # the media listener: the media peers
+  rules:
+    - backendRefs:
+        - name: livekit-sip
+          port: 5060
+```

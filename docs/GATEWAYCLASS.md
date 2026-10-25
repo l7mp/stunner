@@ -134,6 +134,8 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                                                            | No       |
 | `dataplaneResource`             | `string`   | Kubernetes resource type to be used for deploying the dataplane, either a Deployment (default) or DaemonSet (**not supported in the free tier**).                                                                      | No       |
 
+A change to a Dataplane (a new image, resources, arguments) takes effect through a rolling update of the `stunnerd` pods of every Gateway that uses it: Kubernetes starts a new pod and retires the old one only once the new one is ready. If the new pod never gets ready (it cannot be scheduled, its image cannot be pulled, it crashes), the old pod keeps serving with the previous settings and the change never takes effect. A Deployment gives up on such a rollout at a point; the Gateway then turns `Programmed` to `False` with reason `Pending`. An in-progress rollout sets `Programmed=true`. Note that a DaemonSet dataplane does not report a stuck rollout.
+
 There can be multiple Dataplane resources defined in a cluster, say, one for the production workload and one for development. Use the `spec.dataplane` field in the GatewayConfig to choose the Dataplane per each STUNner install.
 
 > [!WARNING]

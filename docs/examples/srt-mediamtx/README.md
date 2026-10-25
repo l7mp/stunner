@@ -125,8 +125,8 @@ ffplay "srt://${SRT_IP}:9000?streamid=#!::r=live/test,m=request&passphrase=my-sr
 ```
 
 The publisher and the reader reach the same MediaMTX pod. Publish a second stream with the same
-FFmpeg command under another name, `live/test2`, and it lands on the other pod, the one with fewer
-streams. The MediaMTX logs show
+FFmpeg command under another name, `live/test2`, and it lands on the other pod: new streams take the
+pods in turn. The MediaMTX logs show
 where each stream went:
 
 ```console
@@ -151,7 +151,7 @@ If in trouble, try the below:
 * **The Gateway is not accepted.** The open-source operator renders no SRT server: install the
   official STUNner chart. Each tier serves a limited number of SRT Gateways.
 
-## Kernel offload (premium tiers)
+## Kernel offload
 
 A live full HD feed at 10 Mbit/s is heavy work for a dataplane that shares its node with busy
 neighbors. Model a dataplane short of CPU: give the Gateway a Dataplane of its own, squeezed to 20m
