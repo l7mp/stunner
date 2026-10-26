@@ -25,7 +25,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/sdp/v3 v3.0.20
 	github.com/pion/stun/v4 v4.0.1
-	github.com/pion/transport/v5 v5.1.1
+	github.com/pion/transport/v5 v5.1.2
 	github.com/pion/turn/v5 v5.1.3-0.20260917120801-d17ad27a4f3c
 	github.com/pion/webrtc/v4 v4.2.23
 	github.com/prometheus/client_golang v1.25.0
@@ -146,4 +146,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
 
-replace github.com/pion/turn/v5 => github.com/l7mp/turn/v5 v5.0.0-20261001150446-f39c25679b40
+replace github.com/pion/turn/v5 => github.com/l7mp/turn/v5 v5.0.0-20261026113225-13cc48a811cc
