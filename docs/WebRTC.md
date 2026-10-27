@@ -105,6 +105,12 @@ mediactl turn send -t 10s k8s://stunner/udp-gateway/udp-listener k8s://stunner/u
 Service through your kubeconfig; see the [mediactl manual](cmd/mediactl.md) for plain addresses and
 more.
 
+`icetest` and `mediactl` measure the gateway. To see a real call from the browser's side (which
+ICE candidate pair was selected, whether media actually went through the TURN relay, and loss and
+jitter as the client saw them), open `chrome://webrtc-internals` during the call, or record every
+call in production with [rtcstats-js](https://rtcstats.com/open-source), an open-source client
+library.
+
 ## Kernel offload
 
 STUNner can relay the UDP channels of a TURN/UDP listener in the Linux kernel instead of in user
