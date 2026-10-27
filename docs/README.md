@@ -4,8 +4,6 @@
   <img alt="STUNner", src="img/stunner.svg" width="50%" height="50%"></br>
 </p>
 
-*Note: This page documents the latest development version of STUNner. See the documentation for the stable version [here](https://docs.l7mp.io/en/stable).*
-
 > [!WARNING]
 > Certain features require premium support: see [here](https://l7mp.io/pricing) for limits and
 > pricing.
