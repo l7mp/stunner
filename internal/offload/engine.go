@@ -1,6 +1,5 @@
 // Package offload implements the kernel offload of relayed UDP flows. The open-source build ships
-// only the null engine; New dispatches through the engineConstructor seam and wraps the engine in
-// the admission of the offload limit of the license.
+// only the null engine; New dispatches through the engineConstructor seam.
 //
 // An offloaded flow is a pair of sides, each a 4-tuple and a channel: a packet arriving on one side
 // leaves on the other, its addresses and ports rewritten and the ChannelData framing changed from
@@ -18,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/pion/logging"
 
@@ -37,76 +35,12 @@ var engineConstructor = func(Deps) Engine { return NewNullEngine() }
 
 // New builds the offload engine. The engine is a process-wide singleton with the lifetime of the
 // server: it is created once at startup, Start pins the eBPF maps, and Close unpins them on
-// shutdown. It admits at most the offload limit of the license of flows at a time.
-func New(deps Deps) Engine {
-	return &limited{Engine: engineConstructor(deps), lic: deps.License, live: map[string]struct{}{}}
-}
+// shutdown.
+func New(deps Deps) Engine { return engineConstructor(deps) }
 
 // ErrOffloadLimit is the error of an Upsert beyond the offload limit of the license: the flow
 // stays in user space.
 var ErrOffloadLimit = errors.New("offload limit reached")
-
-// offloadLimit returns how many flows the engine may hold at a time under a license: 0 is
-// unlimited, a negative value unknown, which enforces nothing.
-var offloadLimit = func(lic licensecfg.ConfigManager) int {
-	if lic == nil {
-		return -1
-	}
-	return licensecfg.GetLimits(lic.SubscriptionType()).Offloads
-}
-
-// limited admits the flows of an engine up to the offload limit of the license, counting the live
-// ones: an Upsert of a flow already held refreshes it, a Remove frees its place, and Start and
-// Close start over, since the engine loses its flows.
-type limited struct {
-	Engine
-	lic  licensecfg.ConfigManager
-	mu   sync.Mutex
-	live map[string]struct{}
-}
-
-func (l *limited) Start(mode string, interfaces []string) error {
-	l.mu.Lock()
-	clear(l.live)
-	l.mu.Unlock()
-	return l.Engine.Start(mode, interfaces)
-}
-
-func (l *limited) Close() error {
-	l.mu.Lock()
-	clear(l.live)
-	l.mu.Unlock()
-	return l.Engine.Close()
-}
-
-func (l *limited) Upsert(a, b Connection, listenerName, clusterName string) error {
-	key := a.String() + "/" + b.String()
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if _, held := l.live[key]; !held {
-		if n := offloadLimit(l.lic); n > 0 && len(l.live) >= n {
-			return ErrOffloadLimit
-		}
-	}
-	if err := l.Engine.Upsert(a, b, listenerName, clusterName); err != nil {
-		return err
-	}
-	l.live[key] = struct{}{}
-	return nil
-}
-
-func (l *limited) Flows() (live, limit int) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.live), offloadLimit(l.lic)
-}
-
-func (l *limited) Remove(a, b Connection) error {
-	l.mu.Lock()
-	delete(l.live, a.String()+"/"+b.String())
-	l.mu.Unlock()
-	return l.Engine.Remove(a, b)
-}
 
 // Engine provides a general interface for offloading techniques (e.g., XDP). The engine instance
 // is a process-wide singleton (rt.OffloadEngine) with the server's lifetime; Start pins the eBPF
@@ -134,8 +68,7 @@ type Engine interface {
 	// offloaded. The counter is monotone between upserts; Upsert resets it.
 	Packets(a, b Connection) (uint64, bool)
 	// Flows returns how many flows the engine holds and the offload limit it admits them up to:
-	// 0 is unlimited, a negative value unknown. Only the admission of New counts: a bare engine
-	// reports none.
+	// 0 is unlimited, a negative value unknown.
 	Flows() (live, limit int)
 }
 

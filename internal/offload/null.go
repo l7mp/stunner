@@ -28,7 +28,7 @@ func (o *NullEngine) Remove(_, _ Connection) error { return nil }
 // stays visible to its own pumps and needs no kernel-side liveness signal.
 func (o *NullEngine) Packets(_, _ Connection) (uint64, bool) { return 0, false }
 
-// Flows reports no flows: the admission of New counts them.
+// Flows reports no flows and no known limit: the null engine offloads nothing.
 func (o *NullEngine) Flows() (live, limit int) { return 0, -1 }
 
 // Stats returns the last cached offload statistics.
