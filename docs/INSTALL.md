@@ -47,7 +47,7 @@ kubectl -n <gateway-namespace> rollout restart deployment <gateway-name>
 
 ### Skip install CRDs
 
-You can install the STUNner chart without the Gateway API CRDs and STUNner CRDs with the `--skip-crds` flag. However, ensure that the CRDs are already present in the cluster, as the STUNner Gateway Operator will fail to start without them.
+You can install the STUNner chart without the Gateway API CRDs and STUNner CRDs with the `--skip-crds` flag. However, ensure that the CRDs are already present in the cluster, as the STUNner Gateway Operator will fail to start without them. The TCPRoute and TURNRoute CRDs are optional: the operator ignores the route kinds the cluster does not serve.
 
 ```console
 helm install stunner stunner/stunner --create-namespace --namespace=stunner-system --skip-crds

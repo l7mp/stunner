@@ -31,7 +31,7 @@ Each STUNner gateway instance exports a number of standard metrics that describe
 
 ### Connection statistics
 
-STUNner provides deep visibility into the amount of traffic sent and received on each listener (downstream connections) and cluster (upstream connections). The gateway operator names a listener `<gateway-namespace>/<gateway-name>/<listener-name>` and the cluster of a route `<route-namespace>/<route-name>/udp` (`tcp` for a TCPRoute). The particular metrics are as follows.
+STUNner provides deep visibility into the amount of traffic sent and received on each listener (downstream connections) and cluster (upstream connections). The gateway operator names a listener `<gateway-namespace>/<gateway-name>/<listener-name>` and the cluster of a route `<route-namespace>/<route-name>/udp` (`tcp` for a TCPRoute, `turn` for a TURNRoute). The particular metrics are as follows.
 
 | Metric | Description | Type | Labels |
 | :--- | :--- | :--- | :--- |

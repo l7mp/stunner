@@ -35,7 +35,7 @@ Below is a quick reference of the most important fields of the GatewayClass [`sp
 | Field | Type | Description | Required |
 | :--- | :---: | :--- | :---: |
 | `controllerName` | `string` | Reference to the controller that is managing the Gateways of this class. The value of this field MUST be specified as `stunner.l7mp.io/gateway-operator`. | Yes |
-| `parametersRef` | `object` | Reference to a GatewayConfig resource, identified by the `name` and `namespace`, for general STUNner configuration. The settings `group: "stunner.l7mp.io"` and `kind: GatewayConfig` are default and can be omitted, any other group or kind is an error. | Yes |
+| `parametersRef` | `object` | Reference to a GatewayConfig resource, identified by the `name` and `namespace`, for general STUNner configuration. The `group` must be `stunner.l7mp.io` and the `kind` must be `GatewayConfig`, any other group or kind is an error. | Yes |
 | `description` | `string` | Description helps describe a GatewayClass with more details. | No |
 
 ## GatewayConfig
@@ -133,6 +133,8 @@ The following fields can be set in the Dataplane `spec` to customize the provisi
 | `disableHealthCheck`            | `bool`     | Disable health-checking. If false, HTTP health-checks are enabled on port 8086: liveness probe responder will be exposed on path `/live` and readiness probe on path `/ready`. Default: false.                                | No       |
 | `enableMetricsEndpoint`         | `bool`     | Enable Prometheus metrics scraping. If true, a metrics endpoint will be available at `http://0.0.0.0:8080`. Default: false.                                                                                            | No       |
 | `dataplaneResource`             | `string`   | Kubernetes resource type to be used for deploying the dataplane, either a Deployment (default) or DaemonSet (**not supported in the free tier**).                                                                      | No       |
+| `offloadEngine`                 | `string`   | The [kernel offload](/docs/PREMIUM_REFERENCE.md#kernel-offload) mode of the dataplane, either `None`, `XDP`, `TC` or `Auto`, within the limits of the tier. Default: `None`. | No       |
+| `offloadInterfaces`             | `list`     | The interfaces the kernel offload runs on. Default: every interface. | No       |
 
 A change to a Dataplane (a new image, resources, arguments) takes effect through a rolling update of the `stunnerd` pods of every Gateway that uses it: Kubernetes starts a new pod and retires the old one only once the new one is ready. If the new pod never gets ready (it cannot be scheduled, its image cannot be pulled, it crashes), the old pod keeps serving with the previous settings and the change never takes effect. A Deployment gives up on such a rollout at a point; the Gateway then turns `Programmed` to `False` with reason `Pending`. An in-progress rollout sets `Programmed=true`. Note that a DaemonSet dataplane does not report a stuck rollout.
 

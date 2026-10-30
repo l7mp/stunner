@@ -82,7 +82,7 @@ Below is a reference of the most important fields of the Gateway [`spec`](https:
 > - changing the transport protocol or port of an *existing* listener will restart the listener but leave the rest of the listeners intact; TLS keys and certificates apply to future connections without a restart;
 > - changing the TURN authentication realm will restart *all* TURN servers.
 
-Manually hinted public address describes an address that can be bound to a Gateway. It is defined by an address type, which can be either `IPAddress` (default) or `Hostname`, and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will enforce the use of that address all over STUNner as a public address for the gateway. If the address type specifies an IP address then that address will also be used in the Service created by STUNner to expose the Gateway as a [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) and [externalIPs](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=and%2Dservice%2Dproxies-,externalIPs,-string%20array).
+Manually hinted public address describes an address that can be bound to a Gateway. It is defined by an address type, which can be either `IPAddress` (default) or `Hostname`, and an address value. Note that only the first address is used. Setting the `spec.addresses` field in the Gateway will enforce the use of that address all over STUNner as a public address for the gateway. If the address type specifies an IP address and the Gateway is exposed by a LoadBalancer Service (the default), then that address is also requested as the [loadBalancerIP](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#service-v1-core:~:text=non%20%27LoadBalancer%27%20type.-,loadBalancerIP,-string) of the Service created by STUNner.
 
 | Field   | Type     | Description                                                   | Required |
 |:--------|:--------:|:--------------------------------------------------------------|:--------:|
@@ -91,7 +91,7 @@ Manually hinted public address describes an address that can be bound to a Gatew
 
 > [!WARNING]
 >
-> Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if your Kubernetes install does not support the feature. In addition, the `externalIPs` field is denied by some cloud-providers.
+> Be careful when using this feature. Since Kubernetes v1.24 the `loadBalancerIP` field is deprecated and it will be ignored if your Kubernetes install does not support the feature.
 
 ### Listener configuration
 
@@ -105,7 +105,19 @@ Each `listener` is defined by a unique name, a protocol and a port. The protocol
 | `tls` | `object` | [TLS configuration](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#gatewaytlsconfig).| Yes (for TLS/DTLS listeners) |
 | `allowedRoutes.namespaces.from` | `object` | [Route attachment policy](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#allowedroutes), either `All`, `Selector`, or `Same`. Default: `Same`. | No |
 
-For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes Secret](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#gatewaytlsconfig) of type `tls` or `opaque` with exactly two keys: `tls.crt` must hold the TLS PEM certificate and `tls.key` must hold the TLS PEM key. The certificate may come from anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with `--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`. A DNS-01 certificate names a hostname, not the load balancer IP: set `spec.addresses: [{type: Hostname, value: <hostname>}]` on the Gateway so that its listeners advertise the hostname (e.g., `turns:<hostname>:<port>` in the ICE server list) and clients verify the certificate against it, and point a DNS record of the hostname at the load balancer.
+For TLS and DTLS listeners, `tls.mode` must be set to `Terminate` or omitted (STUNner terminates
+TLS, there is no `Passthrough`), and `tls.certificateRefs` must be a [reference to a Kubernetes
+Secret](https://gateway-api.sigs.k8s.io/reference/api-spec/1.6/spec/#gatewaytlsconfig) of type
+`tls` or `opaque` with exactly two keys: `tls.crt` (or `crt`, `cert`) must hold the TLS PEM
+certificate and `tls.key` (or `key`) must hold the TLS PEM key. The certificate may come from
+anywhere. If you use cert-manager's Gateway API support (cert-manager v1.21 or later with
+`--enable-gateway-api`, DNS-01 challenges only), a TLS listener gets its certificate without
+further setup, while TURN-TLS and TURN-DTLS listeners need cert-manager to accept these protocols
+with `--gateway-api-extra-protocols=TURN-TLS,TURN-DTLS`. A DNS-01 certificate names a hostname, not
+the load balancer IP: set `spec.addresses: [{type: Hostname, value: <hostname>}]` on the Gateway so
+that its listeners advertise the hostname (e.g., `turns:<hostname>:<port>` in the ICE server list)
+and clients verify the certificate against it, and point a DNS record of the hostname at the load
+balancer.
 
 A Gateway whose `spec.infrastructure.parametersRef` names a [SIPTrunk](#siptrunk) is a SIP gateway:
 its media listener carries the RTP of every call and each other listener, `UDP`, `TCP` or `TLS`,

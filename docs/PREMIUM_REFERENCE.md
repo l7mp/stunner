@@ -115,6 +115,8 @@ Below is the set of steps to enable relay address discovery:
    kubectl annotate --overwrite gateway <your-stunner-gateway> stunner.l7mp.io/enable-relay-address-discovery="true"
    ```
 
+   The same annotation in the `loadBalancerServiceAnnotations` of the GatewayConfig enables relay address discovery for every Gateway of the class.
+
 3. Check whether STUNner has successfully discovered the node's public IP.
 
    As usual, the [`stunnerctl`](/docs/cmd/stunnerctl.md) tool comes in handy. The below will load the dataplane configuration for the gateway `<gateway-namespace>/<gateway-name>` with respect to the node `<node-name>` and print the relay address of each cluster:

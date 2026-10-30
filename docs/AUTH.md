@@ -132,6 +132,8 @@ stringData:
 EOF
 ```
 
+The key `sharedSecret` is accepted in place of `secret`.
+
 Obtaining an ICE config from the STUNner authentication service will now return an ephemeral TURN
 credential that is valid only for a single day. 
 
