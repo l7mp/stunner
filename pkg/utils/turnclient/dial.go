@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/stdnet"
@@ -302,7 +302,7 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 			// pion refuses an empty certificate option
 			opts = append(opts, dtls.WithCertificates(c.Certificates...))
 		}
-		conn, err := dtls.ClientWithOptions(sock, udpAddr, opts...)
+		conn, err := dtls.Client(sock, udpAddr, opts...)
 		if err != nil {
 			_ = sock.Close()
 			return nil, nil, fmt.Errorf("failed to allocate TURN/DTLS socket: %w", err)

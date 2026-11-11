@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -321,7 +321,7 @@ func TestOffloadMatrix(t *testing.T) {
 						sock, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 						require.NoError(t, err)
 						raddr, _ := net.ResolveUDPAddr("udp", addr)
-						c, err = dtls.ClientWithOptions(sock, raddr, dtls.WithInsecureSkipVerify(true))
+						c, err = dtls.Client(sock, raddr, dtls.WithInsecureSkipVerify(true))
 					}
 					require.NoError(t, err)
 					t.Cleanup(func() { _ = c.Close() })

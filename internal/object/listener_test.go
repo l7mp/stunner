@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/stdnet"
@@ -399,7 +399,7 @@ func TestListeners(t *testing.T) {
 			Port: port, Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: cert, Key: key}})
 		sock, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 		require.NoError(t, err)
-		c, err := dtls.ClientWithOptions(sock, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+		c, err := dtls.Client(sock, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 			dtls.WithInsecureSkipVerify(true))
 		require.NoError(t, err)
 		defer c.Close() //nolint:errcheck
@@ -695,8 +695,8 @@ func TestDialingListener(t *testing.T) {
 	})
 
 	t.Run("DTLS", func(t *testing.T) {
-		ln, err := dtls.Listen("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")},
-			&dtls.Config{Certificates: []tls.Certificate{serverCert}})
+		ln, err := dtls.ListenAddr("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")},
+			dtls.WithCertificates(serverCert))
 		require.NoError(t, err)
 		echoStream(t, ln)
 		_, emitted := startDialer(t, rt, &stnrv2.ListenerConfig{Name: "dtls", Protocol: "DTLS",

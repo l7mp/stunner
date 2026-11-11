@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/stdnet"
@@ -1168,7 +1168,7 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 				sock, err := tn.client.ListenPacket("udp"+fam, wildcard)
 				assert.NoError(t, err, "cannot create DTLS client socket")
 				udpAddr := &net.UDPAddr{IP: net.ParseIP(host), Port: port}
-				conn, err := dtls.ClientWithOptions(sock, udpAddr, dtls.WithCertificates(cer),
+				conn, err := dtls.Client(sock, udpAddr, dtls.WithCertificates(cer),
 					dtls.WithInsecureSkipVerify(true))
 				assert.NoError(t, err, "cannot create DTLS client socket")
 				lconn = turn.NewSTUNConn(conn)

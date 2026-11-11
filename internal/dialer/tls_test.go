@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -132,8 +132,8 @@ func TestTLSDialer(t *testing.T) {
 func TestDTLSDialer(t *testing.T) {
 	rt := newTestRuntime(t)
 	serverCert, ca, _ := selfSigned(t)
-	ln, err := dtls.Listen("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")},
-		&dtls.Config{Certificates: []tls.Certificate{serverCert}})
+	ln, err := dtls.ListenAddr("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")},
+		dtls.WithCertificates(serverCert))
 	require.NoError(t, err)
 	streamEcho(t, ln)
 

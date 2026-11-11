@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/api"
@@ -143,7 +143,7 @@ func (l *Listener) secure(c net.Conn) (net.Conn, func(context.Context) error, er
 		tc := tls.Server(c, newTLSConfig(mode, kp, l.log))
 		return tc, tc.HandshakeContext, nil
 	}
-	dc, err := dtls.ServerWithOptions(netconn.PacketConn{Conn: c}, c.RemoteAddr(),
+	dc, err := dtls.Server(netconn.PacketConn{Conn: c}, c.RemoteAddr(),
 		dtls.WithCertificates(kp))
 	if err != nil {
 		return nil, nil, err

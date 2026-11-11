@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pion/dtls/v3"
+	"github.com/pion/dtls/v4"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5/reuseport"
 
@@ -131,7 +131,7 @@ func (b *base) establish(ctx context.Context, c net.Conn, w netconn.Wire, addr s
 				// pion refuses an empty certificate option
 				opts = append(opts, dtls.WithCertificates(conf.Certificates...))
 			}
-			dc, err := dtls.ClientWithOptions(netconn.PacketConn{Conn: c}, c.RemoteAddr(), opts...)
+			dc, err := dtls.Client(netconn.PacketConn{Conn: c}, c.RemoteAddr(), opts...)
 			if err != nil {
 				_ = c.Close()
 				return nil, err
