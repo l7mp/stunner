@@ -287,7 +287,7 @@ openssl s_client -connect ${TLS_IP}:443 -groups X25519 < /dev/null 2>&1 | grep -
 Server Temp Key: X25519, 253 bits
 ```
 
-STUNner offers [post-quantum TLS](../../PREMIUM_REFERENCE.md#post-quantum-tls) to enforce a key
+STUNner offers [post-quantum TLS](../../PREMIUM_REFERENCE.md#post-quantum-tls-and-dtls) to enforce a key
 exchange quantum computers cannot break. There are two settings:
 `stunner.l7mp.io/pqc-mode=preferred` will prefer a quantum-safe key exchange protocol during TLS
 handshake but otherwise admits clients using a classical TLS client, while

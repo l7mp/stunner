@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v4"
+	"github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol"
 	"github.com/pion/logging"
 
 	"github.com/l7mp/stunner/v2/internal/api"
@@ -134,7 +136,9 @@ func (l *Listener) socket() (net.Listener, error) {
 }
 
 // secure starts the server side of TLS or DTLS on an accepted conn, with the certificate and the
-// PQC mode of the moment, and returns the handshake to complete.
+// PQC mode of the moment, and returns the handshake to complete. The DTLS PQC modes mirror the TLS
+// ones: enforced accepts only DTLS 1.3 with the X25519MLKEM768 hybrid key exchange, preferred
+// offers it first, default leaves the key exchange to pion/dtls.
 func (l *Listener) secure(c net.Conn) (net.Conn, func(context.Context) error, error) {
 	l.mu.RLock()
 	mode, kp := l.pqcMode, l.keyPair
@@ -143,8 +147,16 @@ func (l *Listener) secure(c net.Conn) (net.Conn, func(context.Context) error, er
 		tc := tls.Server(c, newTLSConfig(mode, kp, l.log))
 		return tc, tc.HandshakeContext, nil
 	}
-	dc, err := dtls.Server(netconn.PacketConn{Conn: c}, c.RemoteAddr(),
-		dtls.WithCertificates(kp))
+	opts := []dtls.ServerOption{dtls.WithCertificates(kp)}
+	switch mode {
+	case stnrv2.PQCModeEnforced:
+		opts = append(opts, dtls.WithMinVersion(protocol.Version1_3),
+			dtls.WithEllipticCurves(elliptic.X25519MLKEM768))
+	case stnrv2.PQCModePreferred:
+		opts = append(opts, dtls.WithEllipticCurves(elliptic.X25519MLKEM768, elliptic.X25519,
+			elliptic.P256))
+	}
+	dc, err := dtls.Server(netconn.PacketConn{Conn: c}, c.RemoteAddr(), opts...)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -48,16 +48,16 @@ func (a AuthType) String() string {
 	}
 }
 
-// PQCMode selects the post-quantum key exchange policy of a TLS listener.
+// PQCMode selects the post-quantum key exchange policy of a TLS or DTLS listener.
 type PQCMode int
 
 const (
-	// PQCModeDefault serves Go's default TLS settings.
+	// PQCModeDefault serves the default settings of the TLS and DTLS stacks.
 	PQCModeDefault PQCMode = iota
 	// PQCModePreferred prefers a post-quantum hybrid key exchange, falling back to classical
-	// TLS 1.2 or 1.3 for clients that do not offer one.
+	// (D)TLS 1.2 or 1.3 for clients that do not offer one.
 	PQCModePreferred
-	// PQCModeEnforced serves TLS 1.3 with a post-quantum hybrid key exchange only.
+	// PQCModeEnforced serves (D)TLS 1.3 with a post-quantum hybrid key exchange only.
 	PQCModeEnforced
 )
 

@@ -9,7 +9,7 @@ STUNner's premium features are designed to help medium to large scale enterprise
 1. [Relay address discovery](#relay-address-discovery)
 1. [Dual-stack TURN](#dual-stack-turn)
 1. [High-availability operator](#high-availability-operator)
-1. [Post-quantum TLS](#post-quantum-tls)
+1. [Post-quantum TLS and DTLS](#post-quantum-tls-and-dtls)
 1. [Kernel offload](#kernel-offload)
 
 ## User quota
@@ -167,15 +167,15 @@ When using the high-availability mode, operator failovers become seamless: the n
 
 High-availability operator mode is available in your tier if the `HAOperator` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature the operator falls back to rolling the dataplane as before.
 
-## Post-quantum TLS
+## Post-quantum TLS and DTLS
 
 **Feature:** `PQC`. **Availability:** member and enterprise tiers.
 
-A TURN session over a TLS transport carries everything between the client and the server inside the TLS connection. Standard TLS uses an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
+A TURN session over a TLS or DTLS transport carries everything between the client and the server inside the encrypted connection. Standard TLS and DTLS use an encryption that a large enough quantum computer may break, exposing anything recorded today to be decrypted later. The PQC feature allows STUNner to upgrade to a stronger "post-quantum encryption" scheme, which is protected against quantum computers.
 
-The selected PQC TLS mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode setting applies to all TLS listeners of a Gateway (TURN-TLS and plain TLS). There are three modes: `default` (or a missing annotation) serves the standard TLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption, refusing clients that don't support it. The policy is TLS-only. Post-quantum TLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
+The PQC mode can be chosen by setting the `stunner.l7mp.io/pqc-mode` annotation per Gateway. The selected mode applies to all TLS and DTLS listeners of the Gateway (TURN-TLS, TURN-DTLS, and plain TLS and DTLS). There are three modes: `default` (or a missing annotation) serves the standard TLS and DTLS settings, `preferred` prefers a post-quantum encryption but still admits clients that offer only a classical one, and `enforced` serves *only* a post-quantum safe encryption over TLS 1.3 and DTLS 1.3, refusing clients that don't support it. Post-quantum TLS and DTLS is available in your tier if the `PQC` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). 
 
-Below is the set of steps to enable post-quantum TLS:
+Below is the set of steps to enable post-quantum TLS and DTLS:
 
 1. Select the mode.
 

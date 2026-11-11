@@ -25,8 +25,8 @@ type TLSConfig struct {
 	SNI string `json:"sni,omitempty"`
 	// Insecure skips the verification of the peer when we dial.
 	Insecure bool `json:"insecure,omitempty"`
-	// PQCMode is the post-quantum key exchange policy when we accept over TLS: "default",
-	// "preferred" or "enforced".
+	// PQCMode is the post-quantum key exchange policy when we accept over TLS or DTLS:
+	// "default", "preferred" or "enforced".
 	PQCMode string `json:"pqc_mode,omitempty"`
 }
 

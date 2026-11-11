@@ -1,6 +1,7 @@
 package object_test
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -17,6 +18,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v4"
+	dtlselliptic "github.com/pion/dtls/v4/pkg/crypto/elliptic"
+	"github.com/pion/dtls/v4/pkg/protocol"
 	"github.com/pion/logging"
 	"github.com/pion/transport/v5"
 	"github.com/pion/transport/v5/stdnet"
@@ -546,6 +549,42 @@ func TestTLSListenerPQCEnforced(t *testing.T) {
 	_, err = tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true, //nolint:noctx,gosec
 		CurvePreferences: []tls.CurveID{tls.X25519}})
 	assert.Error(t, err, "a classical client is refused")
+}
+
+// TestDTLSListenerPQCEnforced checks that a DTLS listener enforcing PQC serves a client that can
+// do the hybrid key exchange and refuses a classical one and a DTLS 1.2 one.
+func TestDTLSListenerPQCEnforced(t *testing.T) {
+	certPEM, keyPEM := selfSignedPEM(t)
+	nw, err := stdnet.NewNet()
+	require.NoError(t, err)
+	rt := newTestRuntime(t, nw)
+	port := freePort(t, "udp")
+	startListener(t, rt, &stnrv2.ListenerConfig{Name: "dtls", Protocol: "DTLS", Port: port,
+		Servers: []string{"s"}, TLS: &stnrv2.TLSConfig{Cert: certPEM, Key: keyPEM, PQCMode: "enforced"}})
+	dial := func(opts ...dtls.ClientOption) (*dtls.Conn, error) {
+		sock, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+		require.NoError(t, err)
+		c, err := dtls.Client(sock, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+			append([]dtls.ClientOption{dtls.WithInsecureSkipVerify(true)}, opts...)...)
+		require.NoError(t, err)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := c.HandshakeContext(ctx); err != nil {
+			_ = c.Close()
+			return nil, err
+		}
+		return c, nil
+	}
+
+	c, err := dial()
+	require.NoError(t, err, "a default client offers the hybrid key exchange")
+	defer c.Close() //nolint:errcheck
+	roundTrip(t, c, "hello")
+
+	_, err = dial(dtls.WithEllipticCurves(dtlselliptic.X25519))
+	assert.Error(t, err, "a classical client is refused")
+	_, err = dial(dtls.WithMaxVersion(protocol.Version1_2))
+	assert.Error(t, err, "a DTLS 1.2 client is refused")
 }
 
 // startDialer starts a dialing listener whose emitted conns are handed to the test.
