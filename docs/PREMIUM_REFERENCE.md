@@ -153,7 +153,7 @@ The `DualStack` feature wires this up:
 
 Note that the address family is chosen by the *client's* ICE agent when it picks which of the advertised ICE server URLs to contact, and the family of that connection then selects the family of the relay address.
 
-Dual-stack TURN is available in your tier if the `DualStack` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature STUNner falls back to single-stack mode.
+Dual-stack TURN is available in your tier if the `DualStack` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature STUNner runs single-stack with the cluster's native primary IP family (either IPv4 or IPv6).
 
 ## High-availability operator
 
