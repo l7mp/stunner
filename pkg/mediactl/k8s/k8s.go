@@ -9,13 +9,15 @@
 // The argument an address is given for decides which form it takes. The listener may be left out
 // when the Gateway has a single one, and an empty namespace (k8s:///...) is the namespace of the
 // kubeconfig context. A TURN listener resolves to its TURN URI too, with the credentials of its
-// auth policy.
+// auth policy. A preferred address family picks among the public addresses of a listener and the
+// ready pods of a Service.
 package k8s
 
 import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -50,11 +52,45 @@ type Listener struct {
 	Config stnrv2.ListenerConfig
 }
 
+// Family is the IP address family a Resolver prefers.
+type Family int
+
+const (
+	// AnyFamily takes the first address.
+	AnyFamily Family = iota
+	// IPv4 prefers IPv4 addresses.
+	IPv4
+	// IPv6 prefers IPv6 addresses.
+	IPv6
+)
+
+// NewFamily parses an address family: "ipv4", "ipv6", or empty for any family.
+func NewFamily(s string) (Family, error) {
+	switch strings.ToLower(s) {
+	case "":
+		return AnyFamily, nil
+	case "ipv4":
+		return IPv4, nil
+	case "ipv6":
+		return IPv6, nil
+	}
+	return AnyFamily, fmt.Errorf("invalid address family %q: want ipv4 or ipv6", s)
+}
+
+// matches tells whether host is an IP address of the family; never for AnyFamily.
+func (f Family) matches(host string) bool {
+	ip, err := netip.ParseAddr(host)
+	return f != AnyFamily && err == nil && ip.Unmap().Is4() == (f == IPv4)
+}
+
 // Resolver resolves k8s:// addresses.
 type Resolver struct {
 	K8s *cliopt.ConfigFlags
 	CDS *discovery.CDSConfigFlags
 	Log logging.LeveledLogger
+	// Family is the address family preferred among the public addresses of a listener and the
+	// endpoints of a Service; the first address when none is of the family.
+	Family Family
 }
 
 // split splits a k8s:// address into its namespace, the namespace of the kubeconfig context when
@@ -118,6 +154,9 @@ func (r Resolver) Listener(ctx context.Context, addr string) (Listener, error) {
 	if host == "" && len(l.PublicAddrs) > 0 {
 		host = l.PublicAddrs[0]
 	}
+	if i := slices.IndexFunc(l.PublicAddrs, r.Family.matches); i >= 0 {
+		host = l.PublicAddrs[i]
+	}
 	if host == "" {
 		return Listener{}, fmt.Errorf("listener %s has no public address yet", l.Name)
 	}
@@ -127,7 +166,8 @@ func (r Resolver) Listener(ctx context.Context, addr string) (Listener, error) {
 	}
 	res := Listener{Addr: net.JoinHostPort(host, strconv.Itoa(port)), Config: l}
 	if uris, err := conf.GetTURNURIForListener(l.Name, "", time.Time{}); err == nil {
-		res.TURN = &uris[0]
+		i := max(slices.IndexFunc(uris, func(u stnrv2.URI) bool { return u.Host == host }), 0)
+		res.TURN = &uris[i]
 	}
 	return res, nil
 }
@@ -202,6 +242,7 @@ func (r Resolver) Peer(ctx context.Context, addr string) (stnrv2.Protocol, strin
 	if err != nil {
 		return stnrv2.ProtocolUnknown, "", fmt.Errorf("cannot list the endpoints of Service %s/%s: %w", ns, name, err)
 	}
+	first := ""
 	for _, es := range eps.Items {
 		// the endpoint port carries the name of the Service port and the target port
 		j := slices.IndexFunc(es.Ports, func(p discoveryv1.EndpointPort) bool {
@@ -214,8 +255,17 @@ func (r Resolver) Peer(ctx context.Context, addr string) (stnrv2.Protocol, strin
 			if ep.Conditions.Ready != nil && !*ep.Conditions.Ready || len(ep.Addresses) == 0 {
 				continue
 			}
-			return proto, net.JoinHostPort(ep.Addresses[0], strconv.Itoa(int(*es.Ports[j].Port))), nil
+			addr := net.JoinHostPort(ep.Addresses[0], strconv.Itoa(int(*es.Ports[j].Port)))
+			if r.Family.matches(ep.Addresses[0]) {
+				return proto, addr, nil
+			}
+			if first == "" {
+				first = addr
+			}
 		}
+	}
+	if first != "" {
+		return proto, first, nil
 	}
 	return stnrv2.ProtocolUnknown, "", fmt.Errorf("no ready endpoint in Service %s/%s", ns, name)
 }

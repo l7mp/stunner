@@ -83,6 +83,11 @@ func newRootCmd() *cobra.Command {
 			}
 			a.log = a.lf.NewLogger("mediactl")
 			a.k8s.Log = a.lf.NewLogger("k8s")
+			family, err := k8s.NewFamily(a.v.GetString("prefer-address-family"))
+			if err != nil {
+				return err
+			}
+			a.k8s.Family = family
 			a.out = cmd.OutOrStdout()
 			return nil
 		},
@@ -102,6 +107,7 @@ func newRootCmd() *cobra.Command {
 	f.Bool("voip", false, "report the call quality of an echoing sender as the E-model rates a G.711 voice call: R-factor and MOS")
 	f.String("ts", "", "stream the packets of this file (an MPEG-TS file, say) instead of measured "+
 		"packets, from the start again at its end; nothing is measured but the bitrate")
+	f.String("prefer-address-family", "", `prefer the addresses of this family, "ipv4" or "ipv6", when resolving a k8s:// address`)
 	a.k8s.K8s.AddFlags(f)
 	a.k8s.CDS.AddFlags(f)
 

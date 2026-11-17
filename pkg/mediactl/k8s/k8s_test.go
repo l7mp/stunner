@@ -37,3 +37,22 @@ func TestAddresses(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid Service address", addr)
 	}
 }
+
+// TestFamily pins the family syntax and which hosts a family prefers.
+func TestFamily(t *testing.T) {
+	for s, want := range map[string]Family{"": AnyFamily, "ipv4": IPv4, "IPv6": IPv6} {
+		f, err := NewFamily(s)
+		require.NoError(t, err, s)
+		assert.Equal(t, want, f, s)
+	}
+	_, err := NewFamily("dual")
+	assert.Error(t, err)
+
+	assert.True(t, IPv4.matches("1.2.3.4"))
+	assert.False(t, IPv4.matches("2001:db8::1"))
+	assert.True(t, IPv6.matches("2001:db8::1"))
+	assert.False(t, IPv6.matches("1.2.3.4"))
+	assert.False(t, IPv6.matches("::ffff:1.2.3.4"), "a v4-mapped address is IPv4")
+	assert.False(t, IPv4.matches("stunner.example.com"), "a hostname is of no family")
+	assert.False(t, AnyFamily.matches("1.2.3.4"), "any family takes the first address")
+}
