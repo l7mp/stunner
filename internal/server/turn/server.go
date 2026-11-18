@@ -29,14 +29,13 @@ type Server struct {
 	log   logging.LeveledLogger
 	quota *Quota
 
-	mu   sync.RWMutex
-	auth string
-	// realm is the realm the running pion instance was built with, and stun whether its policy
-	// was of type none, which makes a pure STUN server
-	realm string
-	stun  bool
-	pion  *turn.Server
-	queue *server.AcceptQueue // the listener pion accepts from
+	mu     sync.RWMutex
+	auth   string
+	realm  string
+	stun   bool
+	strict bool
+	pion   *turn.Server
+	queue  *server.AcceptQueue // the listener pion accepts from
 	// conntrack tracks the served conns for the offload bookkeeping, and to close and reap the
 	// ones pion never allocated (pion closes only allocated conns)
 	conntrack *flow.Conntrack
@@ -62,8 +61,8 @@ func New(conf *stnrv2.ServerConfig, rt *objruntime.Runtime) (*Server, error) {
 	return s, nil
 }
 
-// Inspect adds to the base what pion bakes into its instance: a change of the realm of the policy,
-// or of whether the policy is of type none, restarts.
+// Inspect inspects whether to restart the server: a change of the realm of the policy, of whether
+// the policy is of type none, or of the relay address family, restarts.
 func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (objruntime.Action, error) {
 	action, err := s.Base.Inspect(old, new, full)
 	if err != nil || action == objruntime.ActionRestart {
@@ -71,7 +70,7 @@ func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (ob
 	}
 	req, _ := s.Desired(new)
 	s.mu.RLock()
-	realm, stun := s.realm, s.stun
+	realm, stun, strict := s.realm, s.stun, s.strict
 	s.mu.RUnlock()
 	// a missing policy is not none
 	if full != nil && realm != "" {
@@ -81,6 +80,10 @@ func (s *Server) Inspect(old, new stnrv2.Config, full *stnrv2.StunnerConfig) (ob
 		}
 		t, _ := stnrv2.NewAuthType(auth.Type)
 		if (err == nil && t == stnrv2.AuthTypeNone) != stun {
+			return objruntime.ActionRestart, nil
+		}
+		f, _ := stnrv2.NewRelayAddressFamily(full.Admin.RelayAddressFamily)
+		if (f == stnrv2.RelayAddressFamilyIPv4) != strict {
 			return objruntime.ActionRestart, nil
 		}
 	}
@@ -121,12 +124,19 @@ func (s *Server) Start() error {
 		t, _ := stnrv2.NewAuthType(auth.Type)
 		realm, stun = auth.Realm, t == stnrv2.AuthTypeNone
 	}
+	strict := false
+	if admin, ok := s.rt.GetConfig(objruntime.TypeAdmin, "").(*stnrv2.AdminConfig); ok && admin != nil {
+		f, _ := stnrv2.NewRelayAddressFamily(admin.RelayAddressFamily)
+		strict = f == stnrv2.RelayAddressFamilyIPv4
+	}
 	queue, ct := server.NewAcceptQueue(server.Backlog), flow.NewConntrack(PreAllocationTimeout)
 	pion, err := turn.NewServer(turn.ServerConfig{
 		Realm:        realm,
 		AuthHandler:  s.AuthHandler(),
 		EventHandler: s.eventHandler(ct),
 		QuotaHandler: s.quota.QuotaHandler(),
+		// an omitted REQUESTED-ADDRESS-FAMILY gets IPv4, else the family of the listener
+		StrictAddressFamily: strict,
 		ListenerConfigs: []turn.ListenerConfig{{
 			Listener:              queue,
 			RelayAddressGenerator: relayAddressGenerator{s},
@@ -138,7 +148,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("cannot set up TURN server %s: %w", s.Name(), err)
 	}
 	s.mu.Lock()
-	s.pion, s.queue, s.conntrack, s.realm, s.stun = pion, queue, ct, realm, stun
+	s.pion, s.queue, s.conntrack, s.realm, s.stun, s.strict = pion, queue, ct, realm, stun, strict
 	s.mu.Unlock()
 	s.log.Infof("server %s: TURN server running", s.Name())
 	return nil

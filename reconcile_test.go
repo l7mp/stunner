@@ -2338,7 +2338,7 @@ func testStunnerReconcileWithVNet(t *testing.T, testcases []StunnerTestReconcile
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, s, "stunner.l7mp.io:3478",
 				lconn, "user", "pass", net.IPv4(5, 6, 7, 8), c.echoServerAddr,
-				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory, "", nil}
+				c.allocateSuccess, c.bindSuccess, c.echoResult, loggerFactory, "", nil, false}
 			stunnerEchoTest(testConfig)
 
 			time.Sleep(100 * time.Millisecond)

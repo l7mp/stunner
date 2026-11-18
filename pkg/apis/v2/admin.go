@@ -37,6 +37,10 @@ type AdminConfig struct {
 	// OffloadInterfaces explicitly specifies the interfaces on which to enable the offload
 	// engine. Empty list means to enable offload on all interfaces (this is the default).
 	OffloadInterfaces []string `json:"offload_interfaces,omitempty"`
+	// RelayAddressFamily is the address family of the relay the TURN servers allocate for a
+	// client that does not request one, either "auto" or "ipv4". Default is "auto": the family of
+	// the listener the client reached. A change restarts the TURN servers.
+	RelayAddressFamily string `json:"relay_address_family,omitempty"`
 	// LicenseConfig describes the licensing info to be used to check subscription status with
 	// the license server.
 	LicenseConfig *LicenseConfig `json:"license_config,omitempty"`
@@ -100,6 +104,15 @@ func (req *AdminConfig) Validate() error {
 	}
 	sort.Strings(req.OffloadInterfaces)
 
+	family, err := NewRelayAddressFamily(req.RelayAddressFamily)
+	if err != nil {
+		return err
+	}
+	req.RelayAddressFamily = ""
+	if family != RelayAddressFamilyAuto {
+		req.RelayAddressFamily = family.String()
+	}
+
 	return nil
 }
 
@@ -154,6 +167,9 @@ func (req *AdminConfig) String() string {
 		}
 		status = append(status, fmt.Sprintf("offload=%s[%s]", req.OffloadEngine, intfs))
 	}
+	if req.RelayAddressFamily != "" {
+		status = append(status, fmt.Sprintf("relay-address-family=%s", req.RelayAddressFamily))
+	}
 	status = append(status, fmt.Sprintf("license_info=%s", LicensingStatus(req.LicenseConfig)))
 
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))
@@ -178,6 +194,7 @@ type AdminStatus struct {
 	OffloadStatus       string         `json:"offload,omitempty"`
 	OffloadFlows        int            `json:"offload_flows,omitempty"`
 	OffloadLimit        int            `json:"offload_limit,omitempty"`
+	RelayAddressFamily  string         `json:"relay_address_family,omitempty"`
 	LicensingInfo       string         `json:"licensing_info,omitempty"`
 	Limits              *LicenseLimits `json:"limits,omitempty"`
 }
@@ -206,6 +223,9 @@ func (a *AdminStatus) String() string {
 	}
 	if a.OffloadStatus != "" {
 		status = append(status, fmt.Sprintf("offload=%s", a.OffloadStatus))
+	}
+	if a.RelayAddressFamily != "" {
+		status = append(status, fmt.Sprintf("relay-address-family=%s", a.RelayAddressFamily))
 	}
 
 	return fmt.Sprintf("admin:{%s}", strings.Join(status, ","))

@@ -47,6 +47,10 @@ type Config struct {
 	LoggerFactory logging.LoggerFactory
 	// Net is the network to reach the TURN server over, nil for the OS network.
 	Net transport.Net
+	// RequestedFamily is the family of the relay to request: zero requests the family of the
+	// socket to the TURN server, IPv4 sends no REQUESTED-ADDRESS-FAMILY, leaving the family to
+	// the server, IPv6 requests IPv6.
+	RequestedFamily turn.RequestedAddressFamily
 }
 
 // network returns the network of the config, the OS network when unset.
@@ -321,6 +325,8 @@ func dial(c Config) (*turn.Client, net.PacketConn, error) {
 		Password:       c.Password,
 		Realm:          c.Realm,
 		LoggerFactory:  c.LoggerFactory,
+		// zero infers the family from the conn
+		RequestedAddressFamily: c.RequestedFamily,
 	})
 	if err != nil {
 		turnConn.Close() //nolint:errcheck

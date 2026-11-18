@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"github.com/pion/logging"
+	pionturn "github.com/pion/turn/v5"
 
 	stnrv2 "github.com/l7mp/stunner/v2/pkg/apis/v2"
 	"github.com/l7mp/stunner/v2/pkg/utils/turnclient"
@@ -21,6 +22,9 @@ type Dialer struct {
 	Username, Password string
 	// Insecure skips the verification of the TURN server's certificate.
 	Insecure bool
+	// RequestedFamily is the family of the relay to request: zero requests the family of the
+	// client's socket, IPv4 requests none, leaving the family to the server, IPv6 requests IPv6.
+	RequestedFamily pionturn.RequestedAddressFamily
 	// LoggerFactory makes the TURN client's logger; nil logs nothing.
 	LoggerFactory logging.LoggerFactory
 }
@@ -38,13 +42,14 @@ func (d Dialer) DialContext(ctx context.Context, network, address string) (net.C
 		return nil, fmt.Errorf("not a TURN URI: %q", d.URI)
 	}
 	td := turnclient.Dialer{Config: turnclient.Config{
-		Protocol:      u.Protocol,
-		ServerAddr:    u.HostPort(),
-		Username:      d.Username,
-		Password:      d.Password,
-		ServerName:    u.Host,
-		Insecure:      d.Insecure,
-		LoggerFactory: d.LoggerFactory,
+		Protocol:        u.Protocol,
+		ServerAddr:      u.HostPort(),
+		Username:        d.Username,
+		Password:        d.Password,
+		ServerName:      u.Host,
+		Insecure:        d.Insecure,
+		LoggerFactory:   d.LoggerFactory,
+		RequestedFamily: d.RequestedFamily,
 	}}
 	if network == "tcp" {
 		return td.DialContext(ctx, "tcp", address)

@@ -55,6 +55,14 @@ func TestStunnerConfigValidate(t *testing.T) {
 	assert.Equal(t, []string{"10.0.0.1", "fd00::1"}, c.Clusters[0].Addrs)
 	assert.Equal(t, DefaultStunnerName, c.Admin.Name)
 
+	// the relay address family is normalized, auto to empty
+	c.Admin.RelayAddressFamily = "IPv4"
+	require.NoError(t, c.Validate())
+	assert.Equal(t, "ipv4", c.Admin.RelayAddressFamily)
+	c.Admin.RelayAddressFamily = "Auto"
+	require.NoError(t, c.Validate())
+	assert.Equal(t, "", c.Admin.RelayAddressFamily)
+
 	// a copy is equal, and survives a JSON round trip
 	cp := c.DeepCopy()
 	assert.True(t, c.DeepEqual(cp))
@@ -105,6 +113,7 @@ func TestStunnerConfigValidateRejects(t *testing.T) {
 		{"cluster TLS cert not base64", func(c *StunnerConfig) { c.Clusters[0].TLS = &TLSConfig{Cert: "%%"} }},
 		{"tunnel TLS CA not base64", func(c *StunnerConfig) { c.Clusters[1].Tunnel.TLS = &TLSConfig{CA: "%%"} }},
 		{"unknown PQC mode", func(c *StunnerConfig) { c.Listeners[1].TLS.PQCMode = "sometimes" }},
+		{"unknown relay address family", func(c *StunnerConfig) { c.Admin.RelayAddressFamily = "ipv5" }},
 		{"duplicate listener", func(c *StunnerConfig) { c.Listeners[2].Name = "turn-udp" }},
 		{"duplicate cluster", func(c *StunnerConfig) { c.Clusters[1].Name = "media-pods" }},
 		{"unknown server type", func(c *StunnerConfig) { c.Servers[0].Type = "no-such-type" }},
@@ -280,6 +289,7 @@ func TestValidateIsIdempotent(t *testing.T) {
 	hc, lic := "http://:8086", &LicenseConfig{Key: "k", HMAC: "h"}
 	full := validConfig()
 	full.Admin.HealthCheckEndpoint, full.Admin.LicenseConfig = &hc, lic
+	full.Admin.RelayAddressFamily = "IPv4"
 	full.Listeners[1].Connect = &ListenerConnectConfig{Address: "sip.example.com:5061"}
 	full.Servers = append(full.Servers, ServerConfig{ServerSpec: ServerSpec{Name: "sip", Type: "SIP"},
 		SIP: &SIPServerConfig{Registrations: []SIPRegistrationConfig{

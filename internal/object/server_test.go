@@ -29,13 +29,16 @@ func TestServerObjectSemantics(t *testing.T) {
 		// realm into its instance, an L4 server has no realm; noneChange is the action of a
 		// policy turning type none: a TURN server rebuilds as a pure STUN server
 		realmChange, noneChange runtime.Action
-		// otherRealmSwitch is the action of a switch to a policy of another realm
-		otherRealmSwitch runtime.Action
+		// otherRealmSwitch is the action of a switch to a policy of another realm; familyChange
+		// the action of a change of the admin's relay address family, baked into a TURN server
+		otherRealmSwitch, familyChange runtime.Action
 	}{
 		{typ: stnrv2.ServerTypeTURN, otherType: stnrv2.ServerTypeL4, realmChange: runtime.ActionRestart,
-			noneChange: runtime.ActionRestart, otherRealmSwitch: runtime.ActionRestart},
+			noneChange: runtime.ActionRestart, otherRealmSwitch: runtime.ActionRestart,
+			familyChange: runtime.ActionRestart},
 		{typ: stnrv2.ServerTypeL4, otherType: stnrv2.ServerTypeTURN, realmChange: runtime.ActionNone,
-			noneChange: runtime.ActionNone, otherRealmSwitch: runtime.ActionReconcile},
+			noneChange: runtime.ActionNone, otherRealmSwitch: runtime.ActionReconcile,
+			familyChange: runtime.ActionNone},
 	} {
 		// policy is the full config with the default policy of a type, in the realm of the base
 		policy := func(typ string, creds map[string]string) *stnrv2.StunnerConfig {
@@ -88,6 +91,9 @@ func TestServerObjectSemantics(t *testing.T) {
 					full: named("other", stnrv2.DefaultRealm), want: runtime.ActionReconcile},
 				{name: "switch-to-policy-of-other-realm", conf: withAuth(server(tc.typ, "cluster-a"), "other"),
 					full: named("other", "other.example.org"), want: tc.otherRealmSwitch},
+				{name: "relay-address-family-change", conf: server(tc.typ, "cluster-a"),
+					full: &stnrv2.StunnerConfig{Admin: stnrv2.AdminConfig{RelayAddressFamily: "ipv4"},
+						Auths: []stnrv2.AuthConfig{*staticAuthConfig()}}, want: tc.familyChange},
 			},
 		})
 	}

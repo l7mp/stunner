@@ -1,6 +1,7 @@
 package main
 
 import (
+	pionturn "github.com/pion/turn/v5"
 	"github.com/spf13/cobra"
 
 	"github.com/l7mp/stunner/v2/pkg/mediactl/k8s"
@@ -35,9 +36,18 @@ func (a *app) turnCmd() *cobra.Command {
 				d.Username, d.Password = u, a.v.GetString("password")
 			}
 			d.Insecure, d.LoggerFactory = a.v.GetBool("insecure"), a.lf
+			family, err := k8s.NewFamily(a.v.GetString("requested-address-family"))
+			if err != nil {
+				return err
+			}
+			switch family {
+			case k8s.IPv4:
+				d.RequestedFamily = pionturn.RequestedAddressFamilyIPv4
+			case k8s.IPv6:
+				d.RequestedFamily = pionturn.RequestedAddressFamilyIPv6
+			}
 			peer := args[1]
 			if k8s.IsAddress(peer) {
-				var err error
 				if _, peer, err = a.k8s.Peer(ctx, peer); err != nil {
 					return err
 				}
@@ -57,6 +67,8 @@ func (a *app) turnCmd() *cobra.Command {
 	f.String("password", "", "TURN password; a k8s:// listener brings its own")
 	f.Bool("insecure", false, "skip the verification of the TURN server's certificate")
 	f.Bool("tcp", false, "relay over an RFC 6062 TCP connection to the peer")
+	f.String("requested-address-family", "", `the family of the relay to request: "ipv4" requests none `+
+		`and leaves it to the TURN server, "ipv6" requests IPv6; default: the family of the client's socket`)
 
 	cmd.AddCommand(send)
 	return cmd

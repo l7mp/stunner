@@ -74,6 +74,8 @@ type echoTestConfig struct {
 	clusterProtocol string
 	// dialData opens the RFC 6062 data connection to the TURN server; nil opens a plain TCP one.
 	dialData func() (transport.TCPConn, error)
+	// omitFamily sends no REQUESTED-ADDRESS-FAMILY: pion's client omits it for IPv4.
+	omitFamily bool
 }
 
 // tlsTCPConn gives a TLS conn the TCP conn methods pion's TURN client wants of an RFC 6062 data
@@ -134,7 +136,7 @@ func stunnerEchoTest(conf echoTestConfig) {
 	// the client's server-reflexive address, so an IPv6 client (hitting an IPv6 listener) requests
 	// an IPv6 relay. This mirrors pion/turn, which allocates an IPv6 relay only for IPv6 clients.
 	reqFamily := turn.RequestedAddressFamilyIPv4
-	if conf.natAddr != nil && conf.natAddr.To4() == nil {
+	if conf.natAddr != nil && conf.natAddr.To4() == nil && !conf.omitFamily {
 		reqFamily = turn.RequestedAddressFamilyIPv6
 	}
 
@@ -477,6 +479,9 @@ type TestStunnerConfigCase struct {
 	// echoSuccess is the expected echo-roundtrip outcome; nil means success (the default). A
 	// cross-family relay/peer combination is expected to fail per pion/turn's address-family rules.
 	echoSuccess *bool
+	// omitFamily makes the client send no REQUESTED-ADDRESS-FAMILY, as browsers do, leaving the
+	// family of the relay to the server.
+	omitFamily bool
 }
 
 // boolPtr returns a pointer to b, for the optional *bool fields in TestStunnerConfigCase.
@@ -998,6 +1003,69 @@ var TestStunnerConfigsWithLocalhost = []TestStunnerConfigCase{
 		echoServerAddr: "127.0.0.1:25678",
 		echoSuccess:    boolPtr(false),
 	},
+	{
+		config: stnrv2.StunnerConfig{
+			// relay address family ipv4: an IPv6 client requesting no family gets an IPv4 relay
+			// and reaches an IPv4 peer
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel, RelayAddressFamily: "ipv4"},
+			Auths: []stnrv2.AuthConfig{{
+				Type:        "static",
+				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
+			}},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:       "udp",
+				Protocol:   "UDP",
+				Servers:    []string{"udp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
+			}},
+			Servers: []stnrv2.ServerConfig{{
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:     "default-cluster",
+				Protocol: "UDP",
+				Addrs:    []string{"::1", "127.0.0.1"},
+			}},
+		},
+		uri:            "turn:[::1]:23478?transport=udp",
+		echoServerAddr: "127.0.0.1:25678",
+		omitFamily:     true,
+	},
+	{
+		config: stnrv2.StunnerConfig{
+			// relay address family auto: an IPv6 client requesting no family gets an IPv6 relay,
+			// of the family of the listener, which cannot reach an IPv4 peer
+			ApiVersion: stnrv2.ApiVersion,
+			Admin:      stnrv2.AdminConfig{LogLevel: stunnerTestLoglevel},
+			Auths: []stnrv2.AuthConfig{{
+				Type:        "static",
+				Credentials: map[string]string{"username": "user1", "password": "passwd1"},
+			}},
+			Listeners: []stnrv2.ListenerConfig{{
+				Name:       "udp",
+				Protocol:   "UDP",
+				Servers:    []string{"udp"},
+				Addr:       "::1",
+				PublicAddr: "::1",
+				Port:       23478,
+			}},
+			Servers: []stnrv2.ServerConfig{{
+				ServerSpec: stnrv2.ServerSpec{Name: "udp", Type: "turn", Clusters: []string{"default-cluster"}},
+			}},
+			Clusters: []stnrv2.ClusterConfig{{
+				Name:     "default-cluster",
+				Protocol: "UDP",
+				Addrs:    []string{"::1", "127.0.0.1"},
+			}},
+		},
+		uri:            "turn:[::1]:23478?transport=udp",
+		echoServerAddr: "127.0.0.1:25678",
+		omitFamily:     true,
+		echoSuccess:    boolPtr(false),
+	},
 }
 
 func TestStunnerServerLocalhost(t *testing.T) {
@@ -1054,6 +1122,10 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 			netName, family, auth, proto, strings.ToLower(clusterProto))
 		if test.echoServerAddr != "" {
 			testName += "_peer:" + test.echoServerAddr
+		}
+		if test.omitFamily {
+			f, _ := stnrv2.NewRelayAddressFamily(c.Admin.RelayAddressFamily)
+			testName += "_unrequested-family:" + f.String()
 		}
 
 		t.Run(testName, func(t *testing.T) {
@@ -1186,6 +1258,7 @@ func testStunnerLocalhost(t *testing.T, tests []TestStunnerConfigCase, onOS bool
 				user:            u,
 				pass:            p,
 				natAddr:         natAddr,
+				omitFamily:      test.omitFamily,
 				echoServerAddr:  echoServerAddr,
 				allocateSuccess: true,
 				bindSuccess:     true,
@@ -1696,7 +1769,7 @@ func TestStunnerClusterWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, true, true, c.result, loggerFactory, "", nil}
+				c.echoServerAddr, true, true, c.result, loggerFactory, "", nil, false}
 			stunnerEchoTest(testConfig)
 
 			assert.NoError(t, lconn.Close(), "cannot close TURN client connection")
@@ -2083,7 +2156,7 @@ func TestStunnerPortRangeWithVNet(t *testing.T) {
 
 			testConfig := echoTestConfig{t, v.podnet, v.wan, stunner,
 				"stunner.l7mp.io:3478", lconn, u, p, net.IPv4(5, 6, 7, 8),
-				c.echoServerAddr, true, true, c.result, loggerFactory, "", nil}
+				c.echoServerAddr, true, true, c.result, loggerFactory, "", nil, false}
 			stunnerEchoFloodTest(testConfig)
 
 			if c.tester != nil {

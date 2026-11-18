@@ -18,14 +18,14 @@ import (
 )
 
 // Admin holds the bits of STUNner administration that aren't carved out into
-// Health/Metrics/Offload: Name/LogLevel/UserQuota/License.
+// Health/Metrics/Offload: Name/LogLevel/UserQuota/RelayAddressFamily/License.
 type Admin struct {
-	name, logLevel string
-	quota          int
-	licenseConfig  *stnrv2.LicenseConfig
+	name, logLevel, relayFamily string
+	quota                       int
+	licenseConfig               *stnrv2.LicenseConfig
 
 	// conf is the atomic snapshot of the admin's own fields, read by the quota handler on
-	// the allocation path via GetConfig.
+	// the allocation path and by the TURN servers on start via GetConfig.
 	conf atomic.Pointer[stnrv2.AdminConfig]
 
 	rt  *runtime.Runtime
@@ -91,13 +91,12 @@ func (a *Admin) Inspect(old, new stnrv2.Config, _ *stnrv2.StunnerConfig) (runtim
 	}
 	cur := old.(*stnrv2.AdminConfig)
 	// Only compare own-state fields. Sub-fields (Health/Metrics/Offload) are inspected by
-	// their owning Objects.
+	// the owning Objects.
 	changed := req.Name != cur.Name ||
 		req.LogLevel != cur.LogLevel ||
 		req.UserQuota != cur.UserQuota ||
+		req.RelayAddressFamily != cur.RelayAddressFamily ||
 		!reflect.DeepEqual(req.LicenseConfig, cur.LicenseConfig)
-	// Admin owns no restartable resources of its own: name/loglevel/quota/license can be
-	// updated in place.
 	if changed {
 		return runtime.ActionReconcile, nil
 	}
@@ -117,14 +116,16 @@ func (a *Admin) Reconcile(conf stnrv2.Config) error {
 	a.name = req.Name
 	a.logLevel = req.LogLevel
 	a.quota = req.UserQuota
+	a.relayFamily = req.RelayAddressFamily
 	a.rt.License.Reconcile(req.LicenseConfig)
 	a.licenseConfig = req.LicenseConfig
 
 	a.conf.Store(&stnrv2.AdminConfig{
-		Name:          a.name,
-		LogLevel:      a.logLevel,
-		UserQuota:     a.quota,
-		LicenseConfig: a.licenseConfig,
+		Name:               a.name,
+		LogLevel:           a.logLevel,
+		UserQuota:          a.quota,
+		RelayAddressFamily: a.relayFamily,
+		LicenseConfig:      a.licenseConfig,
 	})
 	return nil
 }
@@ -166,6 +167,7 @@ func (a *Admin) Status() stnrv2.Status {
 		OffloadStatus:       engine,
 		OffloadFlows:        flows,
 		OffloadLimit:        limit,
+		RelayAddressFamily:  conf.RelayAddressFamily,
 		LicensingInfo:       a.rt.License.Status(),
 		Limits:              &limits,
 	}

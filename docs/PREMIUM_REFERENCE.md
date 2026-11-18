@@ -144,14 +144,18 @@ Below is the set of steps to enable relay address discovery:
 
 **Feature:** `DualStack`. **Availability:** member and enterprise tiers.
 
-A TURN server that is reachable over both IPv4 and IPv6 must hand each client a relayed transport address in the client's own address family: an IPv6 client that ingresses over the IPv6 VIP needs an IPv6 relay to reach IPv6 peers, and analogously for IPv4. Kubernetes preserves the address family end-to-end (a dual-stack Service gets one VIP and one EndpointSlice per family and Kubernetes never cross-connects families), so the missing piece is STUNner respecting the requested address family.
+A TURN server that is reachable over both IPv4 and IPv6 must allocate to each client a relay transport address in the client's own address family: an IPv6 client that ingresses over the IPv6 address typically needs an IPv6 relay to reach IPv6 peers, and analogously for IPv4. Kubernetes preserves the address family end-to-end, so the missing piece is STUNner respecting the requested address family.
 
-The `DualStack` feature wires this up:
-- the STUNner dataplane pods receive their pod IPs for *both* families and advertise a relay address matching each client's family;
-- the public addresses of a Gateway are advertised per family, so the ICE server list your clients receive contains an entry per family;
-- the LoadBalancer Service is configured with a per-family VIP.
+The `DualStack` feature makes sure clients receive a relay address matching their requested address family. With this feature enabled, STUNner dataplane pods are provisioned with pod IPs for *both* families and allocate a relay address per the client's family. In addition, the LoadBalancer Service created by STUNner for the Gateway is configured with both an IPv4 and an IPv6 address, which makes it possible for clients to connect over any address family. Note that the eventual address family is chosen by the client's ICE agent when it picks which of the advertised ICE server to contact. Theoretically, clients can override this by setting a TURN protocol attribute, but browsers practically never do this.
 
-Note that the address family is chosen by the *client's* ICE agent when it picks which of the advertised ICE server URLs to contact, and the family of that connection then selects the family of the relay address.
+Some media servers are reachable over IPv4 only, even when deployed on a dual-stack host. To override STUNner's default address assignment heuristics ("allocate an IPv6 relay address if client connects to the IPv6 gateway address, otherwise IPv4") and fix every client to an IPv4 relay, set the `stunner.l7mp.io/relay-address-family` annotation on the Gateway to `ipv4` (the default is `auto`):
+
+```console
+kubectl annotate --overwrite gateway <your-stunner-gateway> stunner.l7mp.io/relay-address-family="ipv4"
+```
+
+> [!WARNING]
+> Setting, changing or removing the `stunner.l7mp.io/relay-address-family` annotation restarts the TURN servers of the Gateway, dropping all ongoing TURN sessions. A wrong override can disconnect IPv6 clients all together. Do not touch this annotation unless you know what you are doing.
 
 Dual-stack TURN is available in your tier if the `DualStack` feature is enabled in the license status (recall, the status can be obtained using [`stunnerctl license`](/docs/cmd/stunnerctl.md#license-status)). Without the feature STUNner runs single-stack with the cluster's native primary IP family (either IPv4 or IPv6).
 

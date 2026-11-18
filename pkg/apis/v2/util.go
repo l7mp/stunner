@@ -95,6 +95,46 @@ func (m PQCMode) String() string {
 	}
 }
 
+// RelayAddressFamily is the address family of the relay a TURN server allocates for a client that
+// does not request one with REQUESTED-ADDRESS-FAMILY. A requested family is always honored.
+type RelayAddressFamily int
+
+const (
+	// RelayAddressFamilyAuto allocates a relay of the family of the listener the client reached.
+	RelayAddressFamilyAuto RelayAddressFamily = iota
+	// RelayAddressFamilyIPv4 allocates an IPv4 relay, the RFC 6156 default.
+	RelayAddressFamilyIPv4
+)
+
+const (
+	relayAddressFamilyAutoStr = "auto"
+	relayAddressFamilyIPv4Str = "ipv4"
+)
+
+// NewRelayAddressFamily parses a relay address family; the empty string is auto.
+func NewRelayAddressFamily(raw string) (RelayAddressFamily, error) {
+	switch strings.ToLower(raw) {
+	case "", relayAddressFamilyAutoStr:
+		return RelayAddressFamilyAuto, nil
+	case relayAddressFamilyIPv4Str:
+		return RelayAddressFamilyIPv4, nil
+	default:
+		return RelayAddressFamilyAuto, fmt.Errorf("unknown relay address family: %q", raw)
+	}
+}
+
+// String returns the name of the relay address family.
+func (f RelayAddressFamily) String() string {
+	switch f {
+	case RelayAddressFamilyAuto:
+		return relayAddressFamilyAutoStr
+	case RelayAddressFamilyIPv4:
+		return relayAddressFamilyIPv4Str
+	default:
+		return "<unknown>"
+	}
+}
+
 // Protocol specifies a network protocol. A single enum lists every protocol STUNner understands;
 // which subset is valid in a given context is enforced at the use site: NewListenerProtocol and
 // NewClusterProtocol parse the listener and the cluster subsets.
